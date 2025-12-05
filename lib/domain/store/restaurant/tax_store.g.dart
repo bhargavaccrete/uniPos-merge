@@ -1,0 +1,92 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'tax_store.dart';
+
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$TaxStore on _TaxStore, Store {
+  Computed<int>? _$totalTaxCountComputed;
+
+  @override
+  int get totalTaxCount =>
+      (_$totalTaxCountComputed ??= Computed<int>(() => super.totalTaxCount,
+              name: '_TaxStore.totalTaxCount'))
+          .value;
+
+  late final _$isLoadingAtom =
+      Atom(name: '_TaxStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$errorMessageAtom =
+      Atom(name: '_TaxStore.errorMessage', context: context);
+
+  @override
+  String? get errorMessage {
+    _$errorMessageAtom.reportRead();
+    return super.errorMessage;
+  }
+
+  @override
+  set errorMessage(String? value) {
+    _$errorMessageAtom.reportWrite(value, super.errorMessage, () {
+      super.errorMessage = value;
+    });
+  }
+
+  late final _$loadTaxesAsyncAction =
+      AsyncAction('_TaxStore.loadTaxes', context: context);
+
+  @override
+  Future<void> loadTaxes() {
+    return _$loadTaxesAsyncAction.run(() => super.loadTaxes());
+  }
+
+  late final _$addTaxAsyncAction =
+      AsyncAction('_TaxStore.addTax', context: context);
+
+  @override
+  Future<void> addTax(Tax tax) {
+    return _$addTaxAsyncAction.run(() => super.addTax(tax));
+  }
+
+  late final _$updateTaxAsyncAction =
+      AsyncAction('_TaxStore.updateTax', context: context);
+
+  @override
+  Future<void> updateTax(Tax tax) {
+    return _$updateTaxAsyncAction.run(() => super.updateTax(tax));
+  }
+
+  late final _$deleteTaxAsyncAction =
+      AsyncAction('_TaxStore.deleteTax', context: context);
+
+  @override
+  Future<void> deleteTax(String id) {
+    return _$deleteTaxAsyncAction.run(() => super.deleteTax(id));
+  }
+
+  @override
+  String toString() {
+    return '''
+isLoading: ${isLoading},
+errorMessage: ${errorMessage},
+totalTaxCount: ${totalTaxCount}
+    ''';
+  }
+}

@@ -1,0 +1,424 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:unipos/stores/setup_wizard_store.dart';
+import '../util/color.dart';
+
+/// Tax Setup Step
+/// UI Only - uses Observer to listen to store changes
+/// Calls store methods for actions
+class TaxSetupStep extends StatefulWidget {
+  final SetupWizardStore store;
+  final VoidCallback onNext;
+  final VoidCallback onPrevious;
+
+  const TaxSetupStep({
+    Key? key,
+    required this.store,
+    required this.onNext,
+    required this.onPrevious,
+  }) : super(key: key);
+
+  @override
+  State<TaxSetupStep> createState() => _TaxSetupStepState();
+}
+
+class _TaxSetupStepState extends State<TaxSetupStep> {
+  final _taxNameController = TextEditingController();
+  final _taxRateController = TextEditingController();
+
+  List<TaxItem> _taxes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load existing tax data from store
+    _loadFromStore();
+  }
+
+  void _loadFromStore() {
+    // If store has tax data, populate the list
+    if (widget.store.taxName.isNotEmpty && widget.store.taxRate > 0) {
+      _taxes = [
+        TaxItem(widget.store.taxName, widget.store.taxRate, true),
+      ];
+    }
+  }
+
+  @override
+  void dispose() {
+    _taxNameController.dispose();
+    _taxRateController.dispose();
+    super.dispose();
+  }
+
+  void _addTax() {
+    if (_taxNameController.text.isNotEmpty && _taxRateController.text.isNotEmpty) {
+      setState(() {
+        _taxes.add(TaxItem(
+          _taxNameController.text,
+          double.parse(_taxRateController.text),
+          _taxes.isEmpty,
+        ));
+        _taxNameController.clear();
+        _taxRateController.clear();
+      });
+      _syncToStore();
+    }
+  }
+
+  void _syncToStore() {
+    // Find default tax and save to store
+    final defaultTax = _taxes.firstWhere(
+      (t) => t.isDefault,
+      orElse: () => _taxes.isNotEmpty ? _taxes.first : TaxItem('GST', 0, true),
+    );
+    widget.store.setTaxName(defaultTax.name);
+    widget.store.setTaxRate(defaultTax.rate);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tax Configuration',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.darkNeutral,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Configure tax settings for your business',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 30),
+
+          // Tax Settings Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.settings, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tax Settings',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.darkNeutral,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Include Tax Toggle - uses Observer
+                Observer(
+                  builder: (_) => Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Include Tax in Pricing',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      Switch(
+                        value: widget.store.taxEnabled,
+                        onChanged: (value) => widget.store.setTaxEnabled(value),
+                        activeColor: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Tax Type Selection - uses Observer
+                Text(
+                  'Tax Type',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 8),
+                Observer(
+                  builder: (_) => Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<bool>(
+                          title: const Text('Exclusive'),
+                          value: false,
+                          groupValue: widget.store.taxInclusive,
+                          onChanged: (value) => widget.store.setTaxInclusive(value!),
+                          dense: true,
+                        ),
+                      ),
+                      Expanded(
+                        child: RadioListTile<bool>(
+                          title: const Text('Inclusive'),
+                          value: true,
+                          groupValue: widget.store.taxInclusive,
+                          onChanged: (value) => widget.store.setTaxInclusive(value!),
+                          dense: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Add Tax Rates
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.add_circle, color: AppColors.accent, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tax Rates',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.darkNeutral,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _taxNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Tax Name',
+                          hintText: 'e.g., GST, VAT',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8F9FA),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _taxRateController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Rate %',
+                          hintText: '18',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8F9FA),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      onPressed: _addTax,
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.add, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+
+                if (_taxes.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  ...List.generate(_taxes.length, (index) {
+                    final tax = _taxes[index];
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _taxes = _taxes.asMap().entries.map((entry) {
+                            return TaxItem(
+                              entry.value.name,
+                              entry.value.rate,
+                              entry.key == index,
+                            );
+                          }).toList();
+                        });
+                        _syncToStore();
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F9FA),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: tax.isDefault ? AppColors.primary : Colors.grey[300]!,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 18,
+                              color: tax.isDefault ? AppColors.primary : Colors.grey[400],
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${tax.name} - ${tax.rate}%',
+                                style: TextStyle(
+                                  fontWeight: tax.isDefault ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                            if (tax.isDefault)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Default',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            IconButton(
+                              icon: Icon(Icons.delete, size: 18, color: AppColors.danger),
+                              onPressed: () {
+                                setState(() {
+                                  _taxes.removeAt(index);
+                                  if (_taxes.isNotEmpty && index == 0) {
+                                    _taxes[0] = TaxItem(_taxes[0].name, _taxes[0].rate, true);
+                                  }
+                                });
+                                _syncToStore();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 40),
+
+          // Navigation Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: widget.onPrevious,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    side: BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Back'),
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                flex: 2,
+                child: Observer(
+                  builder: (_) => ElevatedButton(
+                    onPressed: widget.store.isLoading
+                        ? null
+                        : () {
+                            widget.store.saveTaxDetails();
+                            widget.onNext();
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: widget.store.isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Continue',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============== DATA MODELS ==============
+class TaxItem {
+  final String name;
+  final double rate;
+  final bool isDefault;
+
+  TaxItem(this.name, this.rate, this.isDefault);
+}

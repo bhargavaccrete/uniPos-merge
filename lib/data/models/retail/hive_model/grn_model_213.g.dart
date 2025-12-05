@@ -1,0 +1,83 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'grn_model_213.dart';
+
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class GRNModelAdapter extends TypeAdapter<GRNModel> {
+  @override
+  final int typeId = 213;
+
+  @override
+  GRNModel read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return GRNModel(
+      grnId: fields[0] as String,
+      grnNumber: fields[1] as String,
+      poId: fields[2] as String,
+      poNumber: fields[3] as String,
+      supplierId: fields[4] as String,
+      supplierName: fields[5] as String?,
+      receivedDate: fields[6] as String,
+      totalOrderedQty: fields[7] as int,
+      totalReceivedQty: fields[8] as int,
+      totalAmount: fields[9] as double?,
+      status: fields[10] as String,
+      notes: fields[11] as String?,
+      invoiceNumber: fields[12] as String?,
+      createdAt: fields[13] as String,
+      updatedAt: fields[14] as String,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, GRNModel obj) {
+    writer
+      ..writeByte(15)
+      ..writeByte(0)
+      ..write(obj.grnId)
+      ..writeByte(1)
+      ..write(obj.grnNumber)
+      ..writeByte(2)
+      ..write(obj.poId)
+      ..writeByte(3)
+      ..write(obj.poNumber)
+      ..writeByte(4)
+      ..write(obj.supplierId)
+      ..writeByte(5)
+      ..write(obj.supplierName)
+      ..writeByte(6)
+      ..write(obj.receivedDate)
+      ..writeByte(7)
+      ..write(obj.totalOrderedQty)
+      ..writeByte(8)
+      ..write(obj.totalReceivedQty)
+      ..writeByte(9)
+      ..write(obj.totalAmount)
+      ..writeByte(10)
+      ..write(obj.status)
+      ..writeByte(11)
+      ..write(obj.notes)
+      ..writeByte(12)
+      ..write(obj.invoiceNumber)
+      ..writeByte(13)
+      ..write(obj.createdAt)
+      ..writeByte(14)
+      ..write(obj.updatedAt);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GRNModelAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}

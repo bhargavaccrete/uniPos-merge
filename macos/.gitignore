@@ -1,0 +1,20 @@
+# Flutter/Dart/Pub
+.dart_tool/
+.packages
+build/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+.dart_tool/
+build/
+ios/Flutter/
+android/app/build/
+macos/Flutter/ephemeral/
+
+# Windows Reserved Names (to prevent this in future)
+nul
+con
+prn
+aux
+com1

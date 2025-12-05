@@ -1,0 +1,188 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/presentation/screens/restaurant/dashboard.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/restaurant/images.dart';
+import 'package:unipos/util/restaurant/responsive_helper.dart';
+
+import '../welcome_Admin.dart';
+
+class AdminLogin extends StatefulWidget {
+  const AdminLogin({super.key});
+
+  @override
+  State<AdminLogin> createState() => _AdminLoginState();
+}
+
+class _AdminLoginState extends State<AdminLogin> {
+  TextEditingController PasswordController = TextEditingController();
+
+  final _formkey = GlobalKey<FormState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.of(context).size.height * 1;
+    final width = MediaQuery.of(context).size.width * 1;
+    ValueNotifier obsecurepass = ValueNotifier(true);
+    PasswordController.text = '123456';
+    return Scaffold(
+      backgroundColor: screenBGColor,
+      body: SingleChildScrollView(
+        child: Container(
+          width: width,
+          height: height,
+          // color: Colors.red,
+          padding: ResponsiveHelper.responsiveSymmetricPadding(context,
+          horizontalPercent: 0.03,
+            verticalPercent: 0.01
+
+          ),
+          // color: Color(0xff1C3F6FF),
+          child: Form(
+            key: _formkey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Image Logo
+                Container(
+                  // color: Colors.red,
+                  alignment: Alignment.bottomCenter,
+                  width: ResponsiveHelper.responsiveWidth(context, 0.5) ,
+                  height: ResponsiveHelper.responsiveHeight(context, 0.20),
+                  child: Image.asset(logo),
+                ),
+                SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                ),
+                // text Admin
+                Text('Admin Login',
+                    // textScaler: TextScaler.linear(1.2),
+
+                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
+
+                SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.05),),
+
+                // password
+                Container(
+                  // width: width * 0.75,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Password',
+                    style: GoogleFonts.poppins(
+                        fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+
+                SizedBox(
+                  height: ResponsiveHelper.responsiveHeight(context, 0.01),
+                ),
+
+                // Textform
+                SizedBox(
+                  width: width ,
+                  child: ValueListenableBuilder(
+                    valueListenable: obsecurepass,
+                    builder: (context, value, child) {
+                      return CommonTextForm(
+                        obsecureText: value,
+                        controller: PasswordController,
+                        hintText: 'Enter Password',
+                        validator: (value) {
+                          if (value == null || value.isEmpty || value.length < 6) {
+                            return value!.isEmpty ? "Please Enter Password" : 'Please Enter Six Digit';
+                          }
+                        },
+                        gesture: GestureDetector(
+                            onTap: () {
+                              obsecurepass.value = !obsecurepass.value;
+                            },
+                            child: obsecurepass.value == true
+                                ? Icon(
+                                    Icons.visibility_off,
+                                    color: primarycolor,
+                                  )
+                                : Icon(
+                                    Icons.visibility,
+                                    color: primarycolor,
+                                  )),
+                      );
+                    },
+                  ),
+                ),
+
+                SizedBox(
+                  height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                ),
+
+                // Login button
+                CommonButton(
+                  width: width,
+                  onTap: () {
+                    if (_formkey.currentState!.validate()) {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => AdminWelcome()));
+                    }
+                  },
+                  child: Center(
+                      child: Text(
+                    'Login',
+                    style: GoogleFonts.poppins(color: Colors.white,
+                        fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                        fontWeight: FontWeight.w400),
+                  )),
+                  height: ResponsiveHelper.responsiveHeight(context, 0.065),
+                ),
+
+                SizedBox(
+                  height: ResponsiveHelper.responsiveHeight(context, 0.02),
+
+                ),
+                // Text pass
+                RichText(
+                    text: TextSpan(
+                        text: 'Default Password for Admin is ',
+
+                        style: GoogleFonts.poppins(
+                            fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                            color: Colors.grey.shade700),
+                        children: [
+                      TextSpan(
+                        text: '123456',
+                        style: GoogleFonts.poppins(
+                            fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                            color: Primarysecond, fontWeight: FontWeight.bold, letterSpacing: 1),
+                      )
+                    ])),
+
+                SizedBox(
+                  height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                ),
+                // back button
+
+                CommonButton(
+                  onTap: () {
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => Dashboard()));
+                  },
+                  width: width,
+                  height: height * 0.065,
+                  child: Center(
+                      child: Text(
+                    'Back',
+                    style: GoogleFonts.poppins(
+                      fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                      fontWeight: FontWeight.w600,
+                      color: primarycolor,
+                    ),
+                  )),
+                  bgcolor: Colors.white,
+                  bordercolor: primarycolor,
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

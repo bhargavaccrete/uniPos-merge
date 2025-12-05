@@ -1,0 +1,790 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'setup_wizard_store.dart';
+
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$SetupWizardStore on _SetupWizardStore, Store {
+  Computed<bool>? _$hasBusinessTypeComputed;
+
+  @override
+  bool get hasBusinessType =>
+      (_$hasBusinessTypeComputed ??= Computed<bool>(() => super.hasBusinessType,
+              name: '_SetupWizardStore.hasBusinessType'))
+          .value;
+  Computed<bool>? _$hasStoreDetailsComputed;
+
+  @override
+  bool get hasStoreDetails =>
+      (_$hasStoreDetailsComputed ??= Computed<bool>(() => super.hasStoreDetails,
+              name: '_SetupWizardStore.hasStoreDetails'))
+          .value;
+  Computed<bool>? _$canProceedFromBusinessTypeComputed;
+
+  @override
+  bool get canProceedFromBusinessType =>
+      (_$canProceedFromBusinessTypeComputed ??= Computed<bool>(
+              () => super.canProceedFromBusinessType,
+              name: '_SetupWizardStore.canProceedFromBusinessType'))
+          .value;
+  Computed<bool>? _$canProceedFromStoreDetailsComputed;
+
+  @override
+  bool get canProceedFromStoreDetails =>
+      (_$canProceedFromStoreDetailsComputed ??= Computed<bool>(
+              () => super.canProceedFromStoreDetails,
+              name: '_SetupWizardStore.canProceedFromStoreDetails'))
+          .value;
+  Computed<double>? _$progressPercentageComputed;
+
+  @override
+  double get progressPercentage => (_$progressPercentageComputed ??=
+          Computed<double>(() => super.progressPercentage,
+              name: '_SetupWizardStore.progressPercentage'))
+      .value;
+  Computed<bool>? _$isBusinessTypeLockedComputed;
+
+  @override
+  bool get isBusinessTypeLocked => (_$isBusinessTypeLockedComputed ??=
+          Computed<bool>(() => super.isBusinessTypeLocked,
+              name: '_SetupWizardStore.isBusinessTypeLocked'))
+      .value;
+  Computed<List<Map<String, String>>>? _$businessTypesComputed;
+
+  @override
+  List<Map<String, String>> get businessTypes => (_$businessTypesComputed ??=
+          Computed<List<Map<String, String>>>(() => super.businessTypes,
+              name: '_SetupWizardStore.businessTypes'))
+      .value;
+
+  late final _$currentStepAtom =
+      Atom(name: '_SetupWizardStore.currentStep', context: context);
+
+  @override
+  int get currentStep {
+    _$currentStepAtom.reportRead();
+    return super.currentStep;
+  }
+
+  @override
+  set currentStep(int value) {
+    _$currentStepAtom.reportWrite(value, super.currentStep, () {
+      super.currentStep = value;
+    });
+  }
+
+  late final _$isLoadingAtom =
+      Atom(name: '_SetupWizardStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$errorMessageAtom =
+      Atom(name: '_SetupWizardStore.errorMessage', context: context);
+
+  @override
+  String? get errorMessage {
+    _$errorMessageAtom.reportRead();
+    return super.errorMessage;
+  }
+
+  @override
+  set errorMessage(String? value) {
+    _$errorMessageAtom.reportWrite(value, super.errorMessage, () {
+      super.errorMessage = value;
+    });
+  }
+
+  late final _$selectedBusinessTypeIdAtom =
+      Atom(name: '_SetupWizardStore.selectedBusinessTypeId', context: context);
+
+  @override
+  String? get selectedBusinessTypeId {
+    _$selectedBusinessTypeIdAtom.reportRead();
+    return super.selectedBusinessTypeId;
+  }
+
+  @override
+  set selectedBusinessTypeId(String? value) {
+    _$selectedBusinessTypeIdAtom
+        .reportWrite(value, super.selectedBusinessTypeId, () {
+      super.selectedBusinessTypeId = value;
+    });
+  }
+
+  late final _$selectedBusinessTypeNameAtom = Atom(
+      name: '_SetupWizardStore.selectedBusinessTypeName', context: context);
+
+  @override
+  String? get selectedBusinessTypeName {
+    _$selectedBusinessTypeNameAtom.reportRead();
+    return super.selectedBusinessTypeName;
+  }
+
+  @override
+  set selectedBusinessTypeName(String? value) {
+    _$selectedBusinessTypeNameAtom
+        .reportWrite(value, super.selectedBusinessTypeName, () {
+      super.selectedBusinessTypeName = value;
+    });
+  }
+
+  late final _$storeNameAtom =
+      Atom(name: '_SetupWizardStore.storeName', context: context);
+
+  @override
+  String get storeName {
+    _$storeNameAtom.reportRead();
+    return super.storeName;
+  }
+
+  @override
+  set storeName(String value) {
+    _$storeNameAtom.reportWrite(value, super.storeName, () {
+      super.storeName = value;
+    });
+  }
+
+  late final _$ownerNameAtom =
+      Atom(name: '_SetupWizardStore.ownerName', context: context);
+
+  @override
+  String get ownerName {
+    _$ownerNameAtom.reportRead();
+    return super.ownerName;
+  }
+
+  @override
+  set ownerName(String value) {
+    _$ownerNameAtom.reportWrite(value, super.ownerName, () {
+      super.ownerName = value;
+    });
+  }
+
+  late final _$phoneAtom =
+      Atom(name: '_SetupWizardStore.phone', context: context);
+
+  @override
+  String get phone {
+    _$phoneAtom.reportRead();
+    return super.phone;
+  }
+
+  @override
+  set phone(String value) {
+    _$phoneAtom.reportWrite(value, super.phone, () {
+      super.phone = value;
+    });
+  }
+
+  late final _$emailAtom =
+      Atom(name: '_SetupWizardStore.email', context: context);
+
+  @override
+  String get email {
+    _$emailAtom.reportRead();
+    return super.email;
+  }
+
+  @override
+  set email(String value) {
+    _$emailAtom.reportWrite(value, super.email, () {
+      super.email = value;
+    });
+  }
+
+  late final _$addressAtom =
+      Atom(name: '_SetupWizardStore.address', context: context);
+
+  @override
+  String get address {
+    _$addressAtom.reportRead();
+    return super.address;
+  }
+
+  @override
+  set address(String value) {
+    _$addressAtom.reportWrite(value, super.address, () {
+      super.address = value;
+    });
+  }
+
+  late final _$gstinAtom =
+      Atom(name: '_SetupWizardStore.gstin', context: context);
+
+  @override
+  String get gstin {
+    _$gstinAtom.reportRead();
+    return super.gstin;
+  }
+
+  @override
+  set gstin(String value) {
+    _$gstinAtom.reportWrite(value, super.gstin, () {
+      super.gstin = value;
+    });
+  }
+
+  late final _$panAtom = Atom(name: '_SetupWizardStore.pan', context: context);
+
+  @override
+  String get pan {
+    _$panAtom.reportRead();
+    return super.pan;
+  }
+
+  @override
+  set pan(String value) {
+    _$panAtom.reportWrite(value, super.pan, () {
+      super.pan = value;
+    });
+  }
+
+  late final _$cityAtom =
+      Atom(name: '_SetupWizardStore.city', context: context);
+
+  @override
+  String get city {
+    _$cityAtom.reportRead();
+    return super.city;
+  }
+
+  @override
+  set city(String value) {
+    _$cityAtom.reportWrite(value, super.city, () {
+      super.city = value;
+    });
+  }
+
+  late final _$stateAtom =
+      Atom(name: '_SetupWizardStore.state', context: context);
+
+  @override
+  String get state {
+    _$stateAtom.reportRead();
+    return super.state;
+  }
+
+  @override
+  set state(String value) {
+    _$stateAtom.reportWrite(value, super.state, () {
+      super.state = value;
+    });
+  }
+
+  late final _$countryAtom =
+      Atom(name: '_SetupWizardStore.country', context: context);
+
+  @override
+  String get country {
+    _$countryAtom.reportRead();
+    return super.country;
+  }
+
+  @override
+  set country(String value) {
+    _$countryAtom.reportWrite(value, super.country, () {
+      super.country = value;
+    });
+  }
+
+  late final _$pincodeAtom =
+      Atom(name: '_SetupWizardStore.pincode', context: context);
+
+  @override
+  String get pincode {
+    _$pincodeAtom.reportRead();
+    return super.pincode;
+  }
+
+  @override
+  set pincode(String value) {
+    _$pincodeAtom.reportWrite(value, super.pincode, () {
+      super.pincode = value;
+    });
+  }
+
+  late final _$isSetupCompleteAtom =
+      Atom(name: '_SetupWizardStore.isSetupComplete', context: context);
+
+  @override
+  bool get isSetupComplete {
+    _$isSetupCompleteAtom.reportRead();
+    return super.isSetupComplete;
+  }
+
+  @override
+  set isSetupComplete(bool value) {
+    _$isSetupCompleteAtom.reportWrite(value, super.isSetupComplete, () {
+      super.isSetupComplete = value;
+    });
+  }
+
+  late final _$taxEnabledAtom =
+      Atom(name: '_SetupWizardStore.taxEnabled', context: context);
+
+  @override
+  bool get taxEnabled {
+    _$taxEnabledAtom.reportRead();
+    return super.taxEnabled;
+  }
+
+  @override
+  set taxEnabled(bool value) {
+    _$taxEnabledAtom.reportWrite(value, super.taxEnabled, () {
+      super.taxEnabled = value;
+    });
+  }
+
+  late final _$taxInclusiveAtom =
+      Atom(name: '_SetupWizardStore.taxInclusive', context: context);
+
+  @override
+  bool get taxInclusive {
+    _$taxInclusiveAtom.reportRead();
+    return super.taxInclusive;
+  }
+
+  @override
+  set taxInclusive(bool value) {
+    _$taxInclusiveAtom.reportWrite(value, super.taxInclusive, () {
+      super.taxInclusive = value;
+    });
+  }
+
+  late final _$taxRateAtom =
+      Atom(name: '_SetupWizardStore.taxRate', context: context);
+
+  @override
+  double get taxRate {
+    _$taxRateAtom.reportRead();
+    return super.taxRate;
+  }
+
+  @override
+  set taxRate(double value) {
+    _$taxRateAtom.reportWrite(value, super.taxRate, () {
+      super.taxRate = value;
+    });
+  }
+
+  late final _$taxNameAtom =
+      Atom(name: '_SetupWizardStore.taxName', context: context);
+
+  @override
+  String get taxName {
+    _$taxNameAtom.reportRead();
+    return super.taxName;
+  }
+
+  @override
+  set taxName(String value) {
+    _$taxNameAtom.reportWrite(value, super.taxName, () {
+      super.taxName = value;
+    });
+  }
+
+  late final _$taxPlaceOfSupplyAtom =
+      Atom(name: '_SetupWizardStore.taxPlaceOfSupply', context: context);
+
+  @override
+  String? get taxPlaceOfSupply {
+    _$taxPlaceOfSupplyAtom.reportRead();
+    return super.taxPlaceOfSupply;
+  }
+
+  @override
+  set taxPlaceOfSupply(String? value) {
+    _$taxPlaceOfSupplyAtom.reportWrite(value, super.taxPlaceOfSupply, () {
+      super.taxPlaceOfSupply = value;
+    });
+  }
+
+  late final _$taxApplyOnDeliveryAtom =
+      Atom(name: '_SetupWizardStore.taxApplyOnDelivery', context: context);
+
+  @override
+  bool get taxApplyOnDelivery {
+    _$taxApplyOnDeliveryAtom.reportRead();
+    return super.taxApplyOnDelivery;
+  }
+
+  @override
+  set taxApplyOnDelivery(bool value) {
+    _$taxApplyOnDeliveryAtom.reportWrite(value, super.taxApplyOnDelivery, () {
+      super.taxApplyOnDelivery = value;
+    });
+  }
+
+  late final _$taxNotesAtom =
+      Atom(name: '_SetupWizardStore.taxNotes', context: context);
+
+  @override
+  String? get taxNotes {
+    _$taxNotesAtom.reportRead();
+    return super.taxNotes;
+  }
+
+  @override
+  set taxNotes(String? value) {
+    _$taxNotesAtom.reportWrite(value, super.taxNotes, () {
+      super.taxNotes = value;
+    });
+  }
+
+  late final _$loadExistingDataAsyncAction =
+      AsyncAction('_SetupWizardStore.loadExistingData', context: context);
+
+  @override
+  Future<void> loadExistingData() {
+    return _$loadExistingDataAsyncAction.run(() => super.loadExistingData());
+  }
+
+  late final _$saveBusinessTypeAsyncAction =
+      AsyncAction('_SetupWizardStore.saveBusinessType', context: context);
+
+  @override
+  Future<void> saveBusinessType() {
+    return _$saveBusinessTypeAsyncAction.run(() => super.saveBusinessType());
+  }
+
+  late final _$saveBusinessDetailsAsyncAction =
+      AsyncAction('_SetupWizardStore.saveBusinessDetails', context: context);
+
+  @override
+  Future<void> saveBusinessDetails() {
+    return _$saveBusinessDetailsAsyncAction
+        .run(() => super.saveBusinessDetails());
+  }
+
+  late final _$saveTaxDetailsAsyncAction =
+      AsyncAction('_SetupWizardStore.saveTaxDetails', context: context);
+
+  @override
+  Future<void> saveTaxDetails() {
+    return _$saveTaxDetailsAsyncAction.run(() => super.saveTaxDetails());
+  }
+
+  late final _$completeSetupAsyncAction =
+      AsyncAction('_SetupWizardStore.completeSetup', context: context);
+
+  @override
+  Future<void> completeSetup() {
+    return _$completeSetupAsyncAction.run(() => super.completeSetup());
+  }
+
+  late final _$resetSetupAsyncAction =
+      AsyncAction('_SetupWizardStore.resetSetup', context: context);
+
+  @override
+  Future<void> resetSetup() {
+    return _$resetSetupAsyncAction.run(() => super.resetSetup());
+  }
+
+  late final _$_SetupWizardStoreActionController =
+      ActionController(name: '_SetupWizardStore', context: context);
+
+  @override
+  void setCurrentStep(int step) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setCurrentStep');
+    try {
+      return super.setCurrentStep(step);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void nextStep() {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.nextStep');
+    try {
+      return super.nextStep();
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void previousStep() {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.previousStep');
+    try {
+      return super.previousStep();
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void selectBusinessType(String id, String name) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.selectBusinessType');
+    try {
+      return super.selectBusinessType(id, name);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setStoreName(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setStoreName');
+    try {
+      return super.setStoreName(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setOwnerName(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setOwnerName');
+    try {
+      return super.setOwnerName(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setPhone(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setPhone');
+    try {
+      return super.setPhone(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setEmail(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setEmail');
+    try {
+      return super.setEmail(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setAddress(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setAddress');
+    try {
+      return super.setAddress(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setGstin(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setGstin');
+    try {
+      return super.setGstin(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setPan(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setPan');
+    try {
+      return super.setPan(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setCity(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setCity');
+    try {
+      return super.setCity(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setState(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setState');
+    try {
+      return super.setState(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setCountry(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setCountry');
+    try {
+      return super.setCountry(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setPincode(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setPincode');
+    try {
+      return super.setPincode(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void clearError() {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.clearError');
+    try {
+      return super.clearError();
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxEnabled(bool value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxEnabled');
+    try {
+      return super.setTaxEnabled(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxInclusive(bool value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxInclusive');
+    try {
+      return super.setTaxInclusive(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxRate(double value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxRate');
+    try {
+      return super.setTaxRate(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxName(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxName');
+    try {
+      return super.setTaxName(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxPlaceOfSupply(String? value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxPlaceOfSupply');
+    try {
+      return super.setTaxPlaceOfSupply(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxApplyOnDelivery(bool value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxApplyOnDelivery');
+    try {
+      return super.setTaxApplyOnDelivery(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxNotes(String? value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxNotes');
+    try {
+      return super.setTaxNotes(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  String toString() {
+    return '''
+currentStep: ${currentStep},
+isLoading: ${isLoading},
+errorMessage: ${errorMessage},
+selectedBusinessTypeId: ${selectedBusinessTypeId},
+selectedBusinessTypeName: ${selectedBusinessTypeName},
+storeName: ${storeName},
+ownerName: ${ownerName},
+phone: ${phone},
+email: ${email},
+address: ${address},
+gstin: ${gstin},
+pan: ${pan},
+city: ${city},
+state: ${state},
+country: ${country},
+pincode: ${pincode},
+isSetupComplete: ${isSetupComplete},
+taxEnabled: ${taxEnabled},
+taxInclusive: ${taxInclusive},
+taxRate: ${taxRate},
+taxName: ${taxName},
+taxPlaceOfSupply: ${taxPlaceOfSupply},
+taxApplyOnDelivery: ${taxApplyOnDelivery},
+taxNotes: ${taxNotes},
+hasBusinessType: ${hasBusinessType},
+hasStoreDetails: ${hasStoreDetails},
+canProceedFromBusinessType: ${canProceedFromBusinessType},
+canProceedFromStoreDetails: ${canProceedFromStoreDetails},
+progressPercentage: ${progressPercentage},
+isBusinessTypeLocked: ${isBusinessTypeLocked},
+businessTypes: ${businessTypes}
+    ''';
+  }
+}

@@ -1,0 +1,89 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'grn_item_model_214.dart';
+
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class GRNItemModelAdapter extends TypeAdapter<GRNItemModel> {
+  @override
+  final int typeId = 214;
+
+  @override
+  GRNItemModel read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return GRNItemModel(
+      grnItemId: fields[0] as String,
+      grnId: fields[1] as String,
+      poItemId: fields[2] as String,
+      variantId: fields[3] as String,
+      productId: fields[4] as String,
+      productName: fields[5] as String?,
+      variantInfo: fields[6] as String?,
+      orderedQty: fields[7] as int,
+      receivedQty: fields[8] as int,
+      acceptedQty: fields[9] as int,
+      damagedQty: fields[10] as int?,
+      damagedHandling: fields[11] as String?,
+      costPrice: fields[12] as double?,
+      totalAmount: fields[13] as double?,
+      remarks: fields[14] as String?,
+      createdAt: fields[15] as String,
+      damagedAmount: fields[16] as double?,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, GRNItemModel obj) {
+    writer
+      ..writeByte(17)
+      ..writeByte(0)
+      ..write(obj.grnItemId)
+      ..writeByte(1)
+      ..write(obj.grnId)
+      ..writeByte(2)
+      ..write(obj.poItemId)
+      ..writeByte(3)
+      ..write(obj.variantId)
+      ..writeByte(4)
+      ..write(obj.productId)
+      ..writeByte(5)
+      ..write(obj.productName)
+      ..writeByte(6)
+      ..write(obj.variantInfo)
+      ..writeByte(7)
+      ..write(obj.orderedQty)
+      ..writeByte(8)
+      ..write(obj.receivedQty)
+      ..writeByte(9)
+      ..write(obj.acceptedQty)
+      ..writeByte(10)
+      ..write(obj.damagedQty)
+      ..writeByte(11)
+      ..write(obj.damagedHandling)
+      ..writeByte(12)
+      ..write(obj.costPrice)
+      ..writeByte(13)
+      ..write(obj.totalAmount)
+      ..writeByte(14)
+      ..write(obj.remarks)
+      ..writeByte(15)
+      ..write(obj.createdAt)
+      ..writeByte(16)
+      ..write(obj.damagedAmount);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GRNItemModelAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}

@@ -1,0 +1,235 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'item_store.dart';
+
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$ItemStore on _ItemStore, Store {
+  Computed<List<Items>>? _$filteredItemsComputed;
+
+  @override
+  List<Items> get filteredItems => (_$filteredItemsComputed ??=
+          Computed<List<Items>>(() => super.filteredItems,
+              name: '_ItemStore.filteredItems'))
+      .value;
+  Computed<List<Items>>? _$enabledItemsComputed;
+
+  @override
+  List<Items> get enabledItems => (_$enabledItemsComputed ??=
+          Computed<List<Items>>(() => super.enabledItems,
+              name: '_ItemStore.enabledItems'))
+      .value;
+  Computed<List<Items>>? _$lowStockItemsComputed;
+
+  @override
+  List<Items> get lowStockItems => (_$lowStockItemsComputed ??=
+          Computed<List<Items>>(() => super.lowStockItems,
+              name: '_ItemStore.lowStockItems'))
+      .value;
+  Computed<List<Items>>? _$outOfStockItemsComputed;
+
+  @override
+  List<Items> get outOfStockItems => (_$outOfStockItemsComputed ??=
+          Computed<List<Items>>(() => super.outOfStockItems,
+              name: '_ItemStore.outOfStockItems'))
+      .value;
+  Computed<int>? _$totalItemCountComputed;
+
+  @override
+  int get totalItemCount =>
+      (_$totalItemCountComputed ??= Computed<int>(() => super.totalItemCount,
+              name: '_ItemStore.totalItemCount'))
+          .value;
+  Computed<int>? _$enabledItemCountComputed;
+
+  @override
+  int get enabledItemCount => (_$enabledItemCountComputed ??= Computed<int>(
+          () => super.enabledItemCount,
+          name: '_ItemStore.enabledItemCount'))
+      .value;
+
+  late final _$isLoadingAtom =
+      Atom(name: '_ItemStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$errorMessageAtom =
+      Atom(name: '_ItemStore.errorMessage', context: context);
+
+  @override
+  String? get errorMessage {
+    _$errorMessageAtom.reportRead();
+    return super.errorMessage;
+  }
+
+  @override
+  set errorMessage(String? value) {
+    _$errorMessageAtom.reportWrite(value, super.errorMessage, () {
+      super.errorMessage = value;
+    });
+  }
+
+  late final _$searchQueryAtom =
+      Atom(name: '_ItemStore.searchQuery', context: context);
+
+  @override
+  String get searchQuery {
+    _$searchQueryAtom.reportRead();
+    return super.searchQuery;
+  }
+
+  @override
+  set searchQuery(String value) {
+    _$searchQueryAtom.reportWrite(value, super.searchQuery, () {
+      super.searchQuery = value;
+    });
+  }
+
+  late final _$selectedCategoryIdAtom =
+      Atom(name: '_ItemStore.selectedCategoryId', context: context);
+
+  @override
+  String? get selectedCategoryId {
+    _$selectedCategoryIdAtom.reportRead();
+    return super.selectedCategoryId;
+  }
+
+  @override
+  set selectedCategoryId(String? value) {
+    _$selectedCategoryIdAtom.reportWrite(value, super.selectedCategoryId, () {
+      super.selectedCategoryId = value;
+    });
+  }
+
+  late final _$loadItemsAsyncAction =
+      AsyncAction('_ItemStore.loadItems', context: context);
+
+  @override
+  Future<void> loadItems() {
+    return _$loadItemsAsyncAction.run(() => super.loadItems());
+  }
+
+  late final _$addItemAsyncAction =
+      AsyncAction('_ItemStore.addItem', context: context);
+
+  @override
+  Future<void> addItem(Items item) {
+    return _$addItemAsyncAction.run(() => super.addItem(item));
+  }
+
+  late final _$updateItemAsyncAction =
+      AsyncAction('_ItemStore.updateItem', context: context);
+
+  @override
+  Future<void> updateItem(Items item) {
+    return _$updateItemAsyncAction.run(() => super.updateItem(item));
+  }
+
+  late final _$deleteItemAsyncAction =
+      AsyncAction('_ItemStore.deleteItem', context: context);
+
+  @override
+  Future<void> deleteItem(String id) {
+    return _$deleteItemAsyncAction.run(() => super.deleteItem(id));
+  }
+
+  late final _$toggleItemEnabledAsyncAction =
+      AsyncAction('_ItemStore.toggleItemEnabled', context: context);
+
+  @override
+  Future<void> toggleItemEnabled(String id) {
+    return _$toggleItemEnabledAsyncAction
+        .run(() => super.toggleItemEnabled(id));
+  }
+
+  late final _$updateStockAsyncAction =
+      AsyncAction('_ItemStore.updateStock', context: context);
+
+  @override
+  Future<void> updateStock(String id, double quantity) {
+    return _$updateStockAsyncAction.run(() => super.updateStock(id, quantity));
+  }
+
+  late final _$deductStockAsyncAction =
+      AsyncAction('_ItemStore.deductStock', context: context);
+
+  @override
+  Future<void> deductStock(String id, double quantity) {
+    return _$deductStockAsyncAction.run(() => super.deductStock(id, quantity));
+  }
+
+  late final _$addStockAsyncAction =
+      AsyncAction('_ItemStore.addStock', context: context);
+
+  @override
+  Future<void> addStock(String id, double quantity) {
+    return _$addStockAsyncAction.run(() => super.addStock(id, quantity));
+  }
+
+  late final _$_ItemStoreActionController =
+      ActionController(name: '_ItemStore', context: context);
+
+  @override
+  void setSearchQuery(String query) {
+    final _$actionInfo = _$_ItemStoreActionController.startAction(
+        name: '_ItemStore.setSearchQuery');
+    try {
+      return super.setSearchQuery(query);
+    } finally {
+      _$_ItemStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setSelectedCategory(String? categoryId) {
+    final _$actionInfo = _$_ItemStoreActionController.startAction(
+        name: '_ItemStore.setSelectedCategory');
+    try {
+      return super.setSelectedCategory(categoryId);
+    } finally {
+      _$_ItemStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void clearFilters() {
+    final _$actionInfo = _$_ItemStoreActionController.startAction(
+        name: '_ItemStore.clearFilters');
+    try {
+      return super.clearFilters();
+    } finally {
+      _$_ItemStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  String toString() {
+    return '''
+isLoading: ${isLoading},
+errorMessage: ${errorMessage},
+searchQuery: ${searchQuery},
+selectedCategoryId: ${selectedCategoryId},
+filteredItems: ${filteredItems},
+enabledItems: ${enabledItems},
+lowStockItems: ${lowStockItems},
+outOfStockItems: ${outOfStockItems},
+totalItemCount: ${totalItemCount},
+enabledItemCount: ${enabledItemCount}
+    ''';
+  }
+}

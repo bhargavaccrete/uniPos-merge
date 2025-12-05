@@ -1,0 +1,59 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'payment_entry_model_216.dart';
+
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class PaymentEntryModelAdapter extends TypeAdapter<PaymentEntryModel> {
+  @override
+  final int typeId = 216;
+
+  @override
+  PaymentEntryModel read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return PaymentEntryModel(
+      paymentEntryId: fields[0] as String,
+      saleId: fields[1] as String,
+      paymentMethod: fields[2] as String,
+      amount: fields[3] as double,
+      referenceId: fields[4] as String?,
+      timestamp: fields[5] as String,
+      note: fields[6] as String?,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, PaymentEntryModel obj) {
+    writer
+      ..writeByte(7)
+      ..writeByte(0)
+      ..write(obj.paymentEntryId)
+      ..writeByte(1)
+      ..write(obj.saleId)
+      ..writeByte(2)
+      ..write(obj.paymentMethod)
+      ..writeByte(3)
+      ..write(obj.amount)
+      ..writeByte(4)
+      ..write(obj.referenceId)
+      ..writeByte(5)
+      ..write(obj.timestamp)
+      ..writeByte(6)
+      ..write(obj.note);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PaymentEntryModelAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}

@@ -1,0 +1,141 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'cart_store.dart';
+
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$CartStore on _CartStore, Store {
+  Computed<int>? _$itemCountComputed;
+
+  @override
+  int get itemCount => (_$itemCountComputed ??=
+          Computed<int>(() => super.itemCount, name: '_CartStore.itemCount'))
+      .value;
+  Computed<int>? _$totalItemsComputed;
+
+  @override
+  int get totalItems => (_$totalItemsComputed ??=
+          Computed<int>(() => super.totalItems, name: '_CartStore.totalItems'))
+      .value;
+  Computed<double>? _$totalPriceComputed;
+
+  @override
+  double get totalPrice =>
+      (_$totalPriceComputed ??= Computed<double>(() => super.totalPrice,
+              name: '_CartStore.totalPrice'))
+          .value;
+  Computed<double>? _$totalTaxableAmountComputed;
+
+  @override
+  double get totalTaxableAmount => (_$totalTaxableAmountComputed ??=
+          Computed<double>(() => super.totalTaxableAmount,
+              name: '_CartStore.totalTaxableAmount'))
+      .value;
+  Computed<double>? _$totalGstAmountComputed;
+
+  @override
+  double get totalGstAmount =>
+      (_$totalGstAmountComputed ??= Computed<double>(() => super.totalGstAmount,
+              name: '_CartStore.totalGstAmount'))
+          .value;
+  Computed<double>? _$totalCgstAmountComputed;
+
+  @override
+  double get totalCgstAmount => (_$totalCgstAmountComputed ??= Computed<double>(
+          () => super.totalCgstAmount,
+          name: '_CartStore.totalCgstAmount'))
+      .value;
+  Computed<double>? _$totalSgstAmountComputed;
+
+  @override
+  double get totalSgstAmount => (_$totalSgstAmountComputed ??= Computed<double>(
+          () => super.totalSgstAmount,
+          name: '_CartStore.totalSgstAmount'))
+      .value;
+  Computed<double>? _$grandTotalComputed;
+
+  @override
+  double get grandTotal =>
+      (_$grandTotalComputed ??= Computed<double>(() => super.grandTotal,
+              name: '_CartStore.grandTotal'))
+          .value;
+
+  late final _$itemsAtom = Atom(name: '_CartStore.items', context: context);
+
+  @override
+  ObservableList<CartItemModel> get items {
+    _$itemsAtom.reportRead();
+    return super.items;
+  }
+
+  @override
+  set items(ObservableList<CartItemModel> value) {
+    _$itemsAtom.reportWrite(value, super.items, () {
+      super.items = value;
+    });
+  }
+
+  late final _$addItemAsyncAction =
+      AsyncAction('_CartStore.addItem', context: context);
+
+  @override
+  Future<CartOperationResult> addItem(
+      ProductModel product, VarianteModel variant,
+      {CategoryModel? category}) {
+    return _$addItemAsyncAction
+        .run(() => super.addItem(product, variant, category: category));
+  }
+
+  late final _$removeItemAsyncAction =
+      AsyncAction('_CartStore.removeItem', context: context);
+
+  @override
+  Future<void> removeItem(String variantId) {
+    return _$removeItemAsyncAction.run(() => super.removeItem(variantId));
+  }
+
+  late final _$incrementQuantityAsyncAction =
+      AsyncAction('_CartStore.incrementQuantity', context: context);
+
+  @override
+  Future<CartOperationResult> incrementQuantity(String variantId) {
+    return _$incrementQuantityAsyncAction
+        .run(() => super.incrementQuantity(variantId));
+  }
+
+  late final _$decrementQuantityAsyncAction =
+      AsyncAction('_CartStore.decrementQuantity', context: context);
+
+  @override
+  Future<void> decrementQuantity(String variantId) {
+    return _$decrementQuantityAsyncAction
+        .run(() => super.decrementQuantity(variantId));
+  }
+
+  late final _$clearCartAsyncAction =
+      AsyncAction('_CartStore.clearCart', context: context);
+
+  @override
+  Future<void> clearCart() {
+    return _$clearCartAsyncAction.run(() => super.clearCart());
+  }
+
+  @override
+  String toString() {
+    return '''
+items: ${items},
+itemCount: ${itemCount},
+totalItems: ${totalItems},
+totalPrice: ${totalPrice},
+totalTaxableAmount: ${totalTaxableAmount},
+totalGstAmount: ${totalGstAmount},
+totalCgstAmount: ${totalCgstAmount},
+totalSgstAmount: ${totalSgstAmount},
+grandTotal: ${grandTotal}
+    ''';
+  }
+}
