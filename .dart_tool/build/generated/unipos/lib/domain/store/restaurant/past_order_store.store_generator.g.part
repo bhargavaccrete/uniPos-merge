@@ -1,0 +1,179 @@
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$PastOrderStore on _PastOrderStore, Store {
+  Computed<List<pastOrderModel>>? _$filteredOrdersComputed;
+
+  @override
+  List<pastOrderModel> get filteredOrders => (_$filteredOrdersComputed ??=
+          Computed<List<pastOrderModel>>(() => super.filteredOrders,
+              name: '_PastOrderStore.filteredOrders'))
+      .value;
+  Computed<List<pastOrderModel>>? _$todaysOrdersComputed;
+
+  @override
+  List<pastOrderModel> get todaysOrders => (_$todaysOrdersComputed ??=
+          Computed<List<pastOrderModel>>(() => super.todaysOrders,
+              name: '_PastOrderStore.todaysOrders'))
+      .value;
+  Computed<int>? _$totalOrderCountComputed;
+
+  @override
+  int get totalOrderCount =>
+      (_$totalOrderCountComputed ??= Computed<int>(() => super.totalOrderCount,
+              name: '_PastOrderStore.totalOrderCount'))
+          .value;
+  Computed<double>? _$totalSalesComputed;
+
+  @override
+  double get totalSales =>
+      (_$totalSalesComputed ??= Computed<double>(() => super.totalSales,
+              name: '_PastOrderStore.totalSales'))
+          .value;
+  Computed<double>? _$todaysSalesComputed;
+
+  @override
+  double get todaysSales =>
+      (_$todaysSalesComputed ??= Computed<double>(() => super.todaysSales,
+              name: '_PastOrderStore.todaysSales'))
+          .value;
+
+  late final _$isLoadingAtom =
+      Atom(name: '_PastOrderStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$errorMessageAtom =
+      Atom(name: '_PastOrderStore.errorMessage', context: context);
+
+  @override
+  String? get errorMessage {
+    _$errorMessageAtom.reportRead();
+    return super.errorMessage;
+  }
+
+  @override
+  set errorMessage(String? value) {
+    _$errorMessageAtom.reportWrite(value, super.errorMessage, () {
+      super.errorMessage = value;
+    });
+  }
+
+  late final _$filterStartDateAtom =
+      Atom(name: '_PastOrderStore.filterStartDate', context: context);
+
+  @override
+  DateTime? get filterStartDate {
+    _$filterStartDateAtom.reportRead();
+    return super.filterStartDate;
+  }
+
+  @override
+  set filterStartDate(DateTime? value) {
+    _$filterStartDateAtom.reportWrite(value, super.filterStartDate, () {
+      super.filterStartDate = value;
+    });
+  }
+
+  late final _$filterEndDateAtom =
+      Atom(name: '_PastOrderStore.filterEndDate', context: context);
+
+  @override
+  DateTime? get filterEndDate {
+    _$filterEndDateAtom.reportRead();
+    return super.filterEndDate;
+  }
+
+  @override
+  set filterEndDate(DateTime? value) {
+    _$filterEndDateAtom.reportWrite(value, super.filterEndDate, () {
+      super.filterEndDate = value;
+    });
+  }
+
+  late final _$loadPastOrdersAsyncAction =
+      AsyncAction('_PastOrderStore.loadPastOrders', context: context);
+
+  @override
+  Future<void> loadPastOrders() {
+    return _$loadPastOrdersAsyncAction.run(() => super.loadPastOrders());
+  }
+
+  late final _$addOrderAsyncAction =
+      AsyncAction('_PastOrderStore.addOrder', context: context);
+
+  @override
+  Future<void> addOrder(pastOrderModel order) {
+    return _$addOrderAsyncAction.run(() => super.addOrder(order));
+  }
+
+  late final _$updateOrderAsyncAction =
+      AsyncAction('_PastOrderStore.updateOrder', context: context);
+
+  @override
+  Future<void> updateOrder(pastOrderModel order) {
+    return _$updateOrderAsyncAction.run(() => super.updateOrder(order));
+  }
+
+  late final _$deleteOrderAsyncAction =
+      AsyncAction('_PastOrderStore.deleteOrder', context: context);
+
+  @override
+  Future<void> deleteOrder(String id) {
+    return _$deleteOrderAsyncAction.run(() => super.deleteOrder(id));
+  }
+
+  late final _$_PastOrderStoreActionController =
+      ActionController(name: '_PastOrderStore', context: context);
+
+  @override
+  void setDateFilter(DateTime? start, DateTime? end) {
+    final _$actionInfo = _$_PastOrderStoreActionController.startAction(
+        name: '_PastOrderStore.setDateFilter');
+    try {
+      return super.setDateFilter(start, end);
+    } finally {
+      _$_PastOrderStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void clearDateFilter() {
+    final _$actionInfo = _$_PastOrderStoreActionController.startAction(
+        name: '_PastOrderStore.clearDateFilter');
+    try {
+      return super.clearDateFilter();
+    } finally {
+      _$_PastOrderStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  String toString() {
+    return '''
+isLoading: ${isLoading},
+errorMessage: ${errorMessage},
+filterStartDate: ${filterStartDate},
+filterEndDate: ${filterEndDate},
+filteredOrders: ${filteredOrders},
+todaysOrders: ${todaysOrders},
+totalOrderCount: ${totalOrderCount},
+totalSales: ${totalSales},
+todaysSales: ${todaysSales}
+    ''';
+  }
+}

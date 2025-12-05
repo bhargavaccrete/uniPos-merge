@@ -11,7 +11,6 @@ class OrderStore = _OrderStore with _$OrderStore;
 abstract class _OrderStore with Store {
   final OrderRepository _orderRepository = locator<OrderRepository>();
 
-  // Using final to avoid InvalidType code generation issue
   final ObservableList<OrderModel> orders = ObservableList<OrderModel>();
 
   @observable

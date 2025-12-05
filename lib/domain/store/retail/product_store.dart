@@ -13,9 +13,9 @@ class ProductStore = _ProductStore with _$ProductStore;
 
 abstract class _ProductStore with Store {
   // Repositories handle all database operations
-  final ProductRepository _productRepository = ProductRepository();
-  final VariantRepository _variantRepository = VariantRepository();
-  final CategoryRepository _categoryRepository = CategoryRepository();
+  late final ProductRepository _productRepository;
+  late final VariantRepository _variantRepository;
+  late final CategoryRepository _categoryRepository;
 
   @observable
   ObservableList<ProductModel> products = ObservableList<ProductModel>();
@@ -24,6 +24,9 @@ abstract class _ProductStore with Store {
   ObservableList<String> categories = ObservableList<String>();
 
   _ProductStore() {
+    _productRepository = ProductRepository();
+    _variantRepository = VariantRepository();
+    _categoryRepository = CategoryRepository();
     _init();
   }
 
@@ -37,9 +40,12 @@ abstract class _ProductStore with Store {
 
   @action
   Future<void> loadProducts() async {
+    print('ProductStore.loadProducts: Loading products from repository...');
     final loadedProducts = await _productRepository.getAllProducts();
+    print('ProductStore.loadProducts: Repository returned ${loadedProducts.length} products');
     products.clear();
     products.addAll(loadedProducts);
+    print('ProductStore.loadProducts: products list now has ${products.length} items');
   }
 
   @action

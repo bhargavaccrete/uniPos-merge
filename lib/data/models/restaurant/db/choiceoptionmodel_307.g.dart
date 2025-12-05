@@ -8,7 +8,7 @@ part of 'choiceoptionmodel_307.dart';
 
 class ChoiceOptionAdapter extends TypeAdapter<ChoiceOption> {
   @override
-  final int typeId = 307;
+  final int typeId = 107;
 
   @override
   ChoiceOption read(BinaryReader reader) {

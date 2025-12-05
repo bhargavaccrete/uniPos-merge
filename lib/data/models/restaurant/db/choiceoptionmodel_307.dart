@@ -1,9 +1,10 @@
 // choiceoptionmodel_307.dart
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'choiceoptionmodel_307.g.dart';
 
-@HiveType(typeId: 307)
+@HiveType(typeId: HiveTypeIds.restaurantChoiceOption)
 class ChoiceOption extends HiveObject {
   @HiveField(0)
   final String id;

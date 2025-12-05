@@ -4,7 +4,7 @@ import '../../models/restaurant/db/variantmodel_305.dart';
 
 /// Repository layer for Variant data access
 class VariantRepository {
-  static const String _boxName = 'variante';
+  static const String _boxName = 'variants';
   late Box<VariantModel> _variantBox;
 
   VariantRepository() {

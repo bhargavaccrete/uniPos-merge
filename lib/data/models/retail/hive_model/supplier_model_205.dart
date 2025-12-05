@@ -1,11 +1,12 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:uuid/uuid.dart';
 
 part 'supplier_model_205.g.dart';
 
 const _uuid = Uuid();
 
-@HiveType(typeId: 205)
+@HiveType(typeId: HiveTypeIds.retailSupplier)
 class SupplierModel extends HiveObject {
   @HiveField(0)
   final String supplierId;

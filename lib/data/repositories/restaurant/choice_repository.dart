@@ -5,7 +5,7 @@ import '../../models/restaurant/db/choiceoptionmodel_307.dart';
 
 /// Repository layer for Choice data access
 class ChoiceRepository {
-  static const String _boxName = 'choice';
+  static const String _boxName = 'choices';
   late Box<ChoicesModel> _choiceBox;
 
   ChoiceRepository() {

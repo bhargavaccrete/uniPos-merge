@@ -11,7 +11,8 @@ class EodStore = _EodStore with _$EodStore;
 abstract class _EodStore with Store {
   final EodRepository _eodRepository = locator<EodRepository>();
 
-  final ObservableList<EndOfDayReport> reports = ObservableList<EndOfDayReport>();
+  final ObservableList<EndOfDayReport> reports =
+      ObservableList<EndOfDayReport>();
 
   @observable
   bool isLoading = false;

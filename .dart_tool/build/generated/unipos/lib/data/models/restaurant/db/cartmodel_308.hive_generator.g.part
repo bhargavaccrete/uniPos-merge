@@ -1,0 +1,87 @@
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class CartItemAdapter extends TypeAdapter<CartItem> {
+  @override
+  final int typeId = 108;
+
+  @override
+  CartItem read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return CartItem(
+      id: fields[0] as String,
+      title: fields[1] as String,
+      imagePath: fields[2] as String,
+      price: fields[3] as double,
+      productId: fields[15] as String,
+      isStockManaged: fields[16] as bool?,
+      quantity: fields[4] as int,
+      variantName: fields[5] as String?,
+      variantPrice: fields[6] as double?,
+      choiceNames: (fields[7] as List?)?.cast<String>(),
+      instruction: fields[8] as String?,
+      taxRate: fields[9] as double?,
+      discount: fields[10] as double?,
+      extras: (fields[12] as List?)
+          ?.map((dynamic e) => (e as Map).cast<String, dynamic>())
+          ?.toList(),
+      weightDisplay: fields[11] as String?,
+      categoryName: fields[13] as String?,
+      refundedQuantity: fields[14] as int?,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, CartItem obj) {
+    writer
+      ..writeByte(17)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.title)
+      ..writeByte(2)
+      ..write(obj.imagePath)
+      ..writeByte(3)
+      ..write(obj.price)
+      ..writeByte(4)
+      ..write(obj.quantity)
+      ..writeByte(5)
+      ..write(obj.variantName)
+      ..writeByte(6)
+      ..write(obj.variantPrice)
+      ..writeByte(7)
+      ..write(obj.choiceNames)
+      ..writeByte(8)
+      ..write(obj.instruction)
+      ..writeByte(9)
+      ..write(obj.taxRate)
+      ..writeByte(10)
+      ..write(obj.discount)
+      ..writeByte(11)
+      ..write(obj.weightDisplay)
+      ..writeByte(12)
+      ..write(obj.extras)
+      ..writeByte(13)
+      ..write(obj.categoryName)
+      ..writeByte(14)
+      ..write(obj.refundedQuantity)
+      ..writeByte(15)
+      ..write(obj.productId)
+      ..writeByte(16)
+      ..write(obj.isStockManaged);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CartItemAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}

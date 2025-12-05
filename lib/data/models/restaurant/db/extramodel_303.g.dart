@@ -8,7 +8,7 @@ part of 'extramodel_303.dart';
 
 class ExtramodelAdapter extends TypeAdapter<Extramodel> {
   @override
-  final int typeId = 303;
+  final int typeId = 103;
 
   @override
   Extramodel read(BinaryReader reader) {

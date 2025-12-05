@@ -1,0 +1,289 @@
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$PurchaseStore on _PurchaseStore, Store {
+  Computed<int>? _$purchaseCountComputed;
+
+  @override
+  int get purchaseCount =>
+      (_$purchaseCountComputed ??= Computed<int>(() => super.purchaseCount,
+              name: '_PurchaseStore.purchaseCount'))
+          .value;
+  Computed<bool>? _$hasSelectionComputed;
+
+  @override
+  bool get hasSelection =>
+      (_$hasSelectionComputed ??= Computed<bool>(() => super.hasSelection,
+              name: '_PurchaseStore.hasSelection'))
+          .value;
+  Computed<double>? _$totalPurchaseAmountComputed;
+
+  @override
+  double get totalPurchaseAmount => (_$totalPurchaseAmountComputed ??=
+          Computed<double>(() => super.totalPurchaseAmount,
+              name: '_PurchaseStore.totalPurchaseAmount'))
+      .value;
+  Computed<int>? _$totalItemsComputed;
+
+  @override
+  int get totalItems =>
+      (_$totalItemsComputed ??= Computed<int>(() => super.totalItems,
+              name: '_PurchaseStore.totalItems'))
+          .value;
+
+  late final _$purchasesAtom =
+      Atom(name: '_PurchaseStore.purchases', context: context);
+
+  @override
+  ObservableList<PurchaseModel> get purchases {
+    _$purchasesAtom.reportRead();
+    return super.purchases;
+  }
+
+  @override
+  set purchases(ObservableList<PurchaseModel> value) {
+    _$purchasesAtom.reportWrite(value, super.purchases, () {
+      super.purchases = value;
+    });
+  }
+
+  late final _$searchResultsAtom =
+      Atom(name: '_PurchaseStore.searchResults', context: context);
+
+  @override
+  ObservableList<PurchaseModel> get searchResults {
+    _$searchResultsAtom.reportRead();
+    return super.searchResults;
+  }
+
+  @override
+  set searchResults(ObservableList<PurchaseModel> value) {
+    _$searchResultsAtom.reportWrite(value, super.searchResults, () {
+      super.searchResults = value;
+    });
+  }
+
+  late final _$currentPurchaseItemsAtom =
+      Atom(name: '_PurchaseStore.currentPurchaseItems', context: context);
+
+  @override
+  ObservableList<PurchaseItemModel> get currentPurchaseItems {
+    _$currentPurchaseItemsAtom.reportRead();
+    return super.currentPurchaseItems;
+  }
+
+  @override
+  set currentPurchaseItems(ObservableList<PurchaseItemModel> value) {
+    _$currentPurchaseItemsAtom.reportWrite(value, super.currentPurchaseItems,
+        () {
+      super.currentPurchaseItems = value;
+    });
+  }
+
+  late final _$searchQueryAtom =
+      Atom(name: '_PurchaseStore.searchQuery', context: context);
+
+  @override
+  String get searchQuery {
+    _$searchQueryAtom.reportRead();
+    return super.searchQuery;
+  }
+
+  @override
+  set searchQuery(String value) {
+    _$searchQueryAtom.reportWrite(value, super.searchQuery, () {
+      super.searchQuery = value;
+    });
+  }
+
+  late final _$selectedPurchaseAtom =
+      Atom(name: '_PurchaseStore.selectedPurchase', context: context);
+
+  @override
+  PurchaseModel? get selectedPurchase {
+    _$selectedPurchaseAtom.reportRead();
+    return super.selectedPurchase;
+  }
+
+  @override
+  set selectedPurchase(PurchaseModel? value) {
+    _$selectedPurchaseAtom.reportWrite(value, super.selectedPurchase, () {
+      super.selectedPurchase = value;
+    });
+  }
+
+  late final _$selectedSupplierIdAtom =
+      Atom(name: '_PurchaseStore.selectedSupplierId', context: context);
+
+  @override
+  String? get selectedSupplierId {
+    _$selectedSupplierIdAtom.reportRead();
+    return super.selectedSupplierId;
+  }
+
+  @override
+  set selectedSupplierId(String? value) {
+    _$selectedSupplierIdAtom.reportWrite(value, super.selectedSupplierId, () {
+      super.selectedSupplierId = value;
+    });
+  }
+
+  late final _$loadPurchasesAsyncAction =
+      AsyncAction('_PurchaseStore.loadPurchases', context: context);
+
+  @override
+  Future<void> loadPurchases() {
+    return _$loadPurchasesAsyncAction.run(() => super.loadPurchases());
+  }
+
+  late final _$addPurchaseAsyncAction =
+      AsyncAction('_PurchaseStore.addPurchase', context: context);
+
+  @override
+  Future<void> addPurchase(
+      PurchaseModel purchase, List<PurchaseItemModel> items) {
+    return _$addPurchaseAsyncAction
+        .run(() => super.addPurchase(purchase, items));
+  }
+
+  late final _$updatePurchaseAsyncAction =
+      AsyncAction('_PurchaseStore.updatePurchase', context: context);
+
+  @override
+  Future<void> updatePurchase(
+      PurchaseModel purchase, List<PurchaseItemModel> items) {
+    return _$updatePurchaseAsyncAction
+        .run(() => super.updatePurchase(purchase, items));
+  }
+
+  late final _$deletePurchaseAsyncAction =
+      AsyncAction('_PurchaseStore.deletePurchase', context: context);
+
+  @override
+  Future<void> deletePurchase(String purchaseId) {
+    return _$deletePurchaseAsyncAction
+        .run(() => super.deletePurchase(purchaseId));
+  }
+
+  late final _$searchPurchasesAsyncAction =
+      AsyncAction('_PurchaseStore.searchPurchases', context: context);
+
+  @override
+  Future<void> searchPurchases(String query) {
+    return _$searchPurchasesAsyncAction.run(() => super.searchPurchases(query));
+  }
+
+  late final _$loadPurchasesBySupplierAsyncAction =
+      AsyncAction('_PurchaseStore.loadPurchasesBySupplier', context: context);
+
+  @override
+  Future<void> loadPurchasesBySupplier(String supplierId) {
+    return _$loadPurchasesBySupplierAsyncAction
+        .run(() => super.loadPurchasesBySupplier(supplierId));
+  }
+
+  late final _$loadPurchaseItemsAsyncAction =
+      AsyncAction('_PurchaseStore.loadPurchaseItems', context: context);
+
+  @override
+  Future<void> loadPurchaseItems(String purchaseId) {
+    return _$loadPurchaseItemsAsyncAction
+        .run(() => super.loadPurchaseItems(purchaseId));
+  }
+
+  late final _$selectPurchaseAsyncAction =
+      AsyncAction('_PurchaseStore.selectPurchase', context: context);
+
+  @override
+  Future<void> selectPurchase(PurchaseModel? purchase) {
+    return _$selectPurchaseAsyncAction
+        .run(() => super.selectPurchase(purchase));
+  }
+
+  late final _$clearSupplierFilterAsyncAction =
+      AsyncAction('_PurchaseStore.clearSupplierFilter', context: context);
+
+  @override
+  Future<void> clearSupplierFilter() {
+    return _$clearSupplierFilterAsyncAction
+        .run(() => super.clearSupplierFilter());
+  }
+
+  late final _$getItemsByPurchaseIdAsyncAction =
+      AsyncAction('_PurchaseStore.getItemsByPurchaseId', context: context);
+
+  @override
+  Future<List<PurchaseItemModel>> getItemsByPurchaseId(String purchaseId) {
+    return _$getItemsByPurchaseIdAsyncAction
+        .run(() => super.getItemsByPurchaseId(purchaseId));
+  }
+
+  late final _$getVariantPurchaseHistoryAsyncAction =
+      AsyncAction('_PurchaseStore.getVariantPurchaseHistory', context: context);
+
+  @override
+  Future<List<PurchaseItemModel>> getVariantPurchaseHistory(String variantId) {
+    return _$getVariantPurchaseHistoryAsyncAction
+        .run(() => super.getVariantPurchaseHistory(variantId));
+  }
+
+  late final _$getProductPurchaseHistoryAsyncAction =
+      AsyncAction('_PurchaseStore.getProductPurchaseHistory', context: context);
+
+  @override
+  Future<List<PurchaseItemModel>> getProductPurchaseHistory(String productId) {
+    return _$getProductPurchaseHistoryAsyncAction
+        .run(() => super.getProductPurchaseHistory(productId));
+  }
+
+  late final _$getLastPurchasePriceAsyncAction =
+      AsyncAction('_PurchaseStore.getLastPurchasePrice', context: context);
+
+  @override
+  Future<double> getLastPurchasePrice(String variantId) {
+    return _$getLastPurchasePriceAsyncAction
+        .run(() => super.getLastPurchasePrice(variantId));
+  }
+
+  late final _$getAverageCostPriceAsyncAction =
+      AsyncAction('_PurchaseStore.getAverageCostPrice', context: context);
+
+  @override
+  Future<double> getAverageCostPrice(String variantId) {
+    return _$getAverageCostPriceAsyncAction
+        .run(() => super.getAverageCostPrice(variantId));
+  }
+
+  late final _$_PurchaseStoreActionController =
+      ActionController(name: '_PurchaseStore', context: context);
+
+  @override
+  void clearSelection() {
+    final _$actionInfo = _$_PurchaseStoreActionController.startAction(
+        name: '_PurchaseStore.clearSelection');
+    try {
+      return super.clearSelection();
+    } finally {
+      _$_PurchaseStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  String toString() {
+    return '''
+purchases: ${purchases},
+searchResults: ${searchResults},
+currentPurchaseItems: ${currentPurchaseItems},
+searchQuery: ${searchQuery},
+selectedPurchase: ${selectedPurchase},
+selectedSupplierId: ${selectedSupplierId},
+purchaseCount: ${purchaseCount},
+hasSelection: ${hasSelection},
+totalPurchaseAmount: ${totalPurchaseAmount},
+totalItems: ${totalItems}
+    ''';
+  }
+}

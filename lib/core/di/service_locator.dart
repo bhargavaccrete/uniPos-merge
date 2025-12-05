@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/data/repositories/business_type_repository.dart';
 import 'package:unipos/data/repositories/business_details_repository.dart';
 import 'package:unipos/data/repositories/tax_details_repository.dart';
@@ -65,16 +66,14 @@ final locator = GetIt.instance;
 /// Call this in main() AFTER Hive initialization
 /// Hive adapters and boxes are registered in main.dart
 Future<void> setupServiceLocator() async {
-  // ==================== REPOSITORIES ====================
+  // ==================== COMMON REPOSITORIES ====================
 
   // Singleton - one instance throughout app
   locator.registerLazySingleton<BusinessTypeRepository>(() => BusinessTypeRepository());
-
   locator.registerLazySingleton<BusinessDetailsRepository>(() => BusinessDetailsRepository());
-
   locator.registerLazySingleton<TaxDetailsRepository>(() => TaxDetailsRepository());
 
-  // ==================== STORES ====================
+  // ==================== COMMON STORES ====================
   // Factory - new instance each time (for screens that need fresh state)
   locator.registerFactory<SetupWizardStore>(
     () => SetupWizardStore(
@@ -84,9 +83,22 @@ Future<void> setupServiceLocator() async {
     ),
   );
 
+  // Register business-specific dependencies based on mode
+  // If mode is not set yet (during setup), we'll register them later
+  if (AppConfig.isBusinessModeSet) {
+    if (AppConfig.isRetail) {
+      await _registerRetailDependencies();
+    } else if (AppConfig.isRestaurant) {
+      await _registerRestaurantDependencies();
+    }
+  }
+}
 
-  /*--------------------------- RETAIL -----------------*/
-
+/// Register retail-specific dependencies
+/// Called when business mode is set to retail
+Future<void> _registerRetailDependencies() async {
+  // Skip if already registered
+  if (locator.isRegistered<ProductStore>()) return;
 
   // Register Repositories (Singletons - lazy loaded)
   locator.registerLazySingleton<SaleItemRepository>(() => SaleItemRepository());
@@ -110,7 +122,6 @@ Future<void> setupServiceLocator() async {
   );
 
   // Register Stores (Singletons - lazy loaded)
-  // These are lazy so they only initialize when first accessed
   locator.registerLazySingleton<retail.CartStore>(() => retail.CartStore());
   locator.registerLazySingleton<ProductStore>(() => ProductStore());
   locator.registerLazySingleton<SaleStore>(() => SaleStore());
@@ -133,11 +144,23 @@ Future<void> setupServiceLocator() async {
   locator.registerLazySingleton<AttributeRepository>(() => AttributeRepository());
   locator.registerLazySingleton<AttributeStore>(() => AttributeStore());
   locator.registerLazySingleton<VariantGeneratorService>(() => VariantGeneratorService());
+}
 
+/// Register restaurant-specific dependencies
+/// Called when business mode is set to restaurant
+Future<void> _registerRestaurantDependencies() async {
+  // ignore: avoid_print
+  print('_registerRestaurantDependencies: checking if already registered');
+  // Skip if already registered
+  if (locator.isRegistered<ItemStore>()) {
+    // ignore: avoid_print
+    print('_registerRestaurantDependencies: already registered, skipping');
+    return;
+  }
+  // ignore: avoid_print
+  print('_registerRestaurantDependencies: registering dependencies');
 
-
-  /*----------Restaurant----------*/
-// ==================== REPOSITORIES ====================
+  // ==================== REPOSITORIES ====================
   locator.registerLazySingleton<ItemRepository>(() => ItemRepository());
   locator.registerLazySingleton<restaurant.CategoryRepository>(() => restaurant.CategoryRepository());
   locator.registerLazySingleton<CartRepository>(() => CartRepository());
@@ -166,8 +189,26 @@ Future<void> setupServiceLocator() async {
   locator.registerLazySingleton<VariantStore>(() => VariantStore());
   locator.registerLazySingleton<ChoiceStore>(() => ChoiceStore());
   locator.registerLazySingleton<ExtraStore>(() => ExtraStore());
+}
 
-
+/// Register business dependencies dynamically (called during setup wizard)
+/// This is called when user selects a business type
+Future<void> registerBusinessDependencies(BusinessMode mode) async {
+  // ignore: avoid_print
+  print('registerBusinessDependencies: mode=$mode');
+  if (mode == BusinessMode.retail) {
+    // ignore: avoid_print
+    print('registerBusinessDependencies: calling _registerRetailDependencies');
+    await _registerRetailDependencies();
+    // ignore: avoid_print
+    print('registerBusinessDependencies: _registerRetailDependencies completed');
+  } else if (mode == BusinessMode.restaurant) {
+    // ignore: avoid_print
+    print('registerBusinessDependencies: calling _registerRestaurantDependencies');
+    await _registerRestaurantDependencies();
+    // ignore: avoid_print
+    print('registerBusinessDependencies: _registerRestaurantDependencies completed');
+  }
 }
 
 /// Reset all dependencies (useful for testing or logout)

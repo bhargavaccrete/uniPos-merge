@@ -9,7 +9,7 @@ part of 'purchase_order_item_model_212.dart';
 class PurchaseOrderItemModelAdapter
     extends TypeAdapter<PurchaseOrderItemModel> {
   @override
-  final int typeId = 212;
+  final int typeId = 162;
 
   @override
   PurchaseOrderItemModel read(BinaryReader reader) {

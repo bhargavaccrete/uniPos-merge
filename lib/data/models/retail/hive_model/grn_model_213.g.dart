@@ -8,7 +8,7 @@ part of 'grn_model_213.dart';
 
 class GRNModelAdapter extends TypeAdapter<GRNModel> {
   @override
-  final int typeId = 213;
+  final int typeId = 163;
 
   @override
   GRNModel read(BinaryReader reader) {

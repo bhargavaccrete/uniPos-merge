@@ -8,7 +8,7 @@ part of 'admin_model_217.dart';
 
 class AdminModelAdapter extends TypeAdapter<AdminModel> {
   @override
-  final int typeId = 217;
+  final int typeId = 167;
 
   @override
   AdminModel read(BinaryReader reader) {

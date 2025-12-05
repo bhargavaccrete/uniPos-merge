@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 part 'companymodel_301.g.dart';
-@HiveType(typeId: 301)
+@HiveType(typeId: HiveTypeIds.restaurantCompany)
 class Company extends HiveObject{
   @HiveField(0)
   String comapanyName;

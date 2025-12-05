@@ -15,7 +15,7 @@
     },
     {
       "name": "archive",
-      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/archive-4.0.7",
+      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/archive-3.6.1",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -204,6 +204,12 @@
       "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/equatable-2.0.7",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "excel",
+      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/excel-4.0.6",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "fake_async",
@@ -453,9 +459,9 @@
     },
     {
       "name": "image",
-      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/image-4.5.4",
+      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/image-4.3.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "2.15"
     },
     {
       "name": "image_picker",
@@ -561,9 +567,9 @@
     },
     {
       "name": "lottie",
-      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/lottie-3.3.2",
+      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/lottie-3.3.0",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.6"
     },
     {
       "name": "matcher",
@@ -744,12 +750,6 @@
       "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/pool-1.5.1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
-    },
-    {
-      "name": "posix",
-      "rootUri": "file:///D:/flutter/pub_cache/hosted/pub.dev/posix-6.0.3",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
     },
     {
       "name": "printing",

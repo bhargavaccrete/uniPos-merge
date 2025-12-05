@@ -4,7 +4,7 @@ import '../../models/restaurant/db/pastordermodel_313.dart';
 
 /// Repository layer for PastOrder data access
 class PastOrderRepository {
-  static const String _boxName = 'pastorderBox';
+  static const String _boxName = 'pastOrders';
   late Box<pastOrderModel> _pastOrderBox;
 
   PastOrderRepository() {

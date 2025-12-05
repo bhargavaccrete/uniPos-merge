@@ -1,9 +1,10 @@
 
 
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 part 'table_Model_311.g.dart';
 
-@HiveType(typeId:311)
+@HiveType(typeId:HiveTypeIds.restaurantTable)
 class TableModel extends HiveObject{
 
   @HiveField(0)

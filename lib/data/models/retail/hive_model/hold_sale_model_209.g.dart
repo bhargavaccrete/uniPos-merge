@@ -8,7 +8,7 @@ part of 'hold_sale_model_209.dart';
 
 class HoldSaleModelAdapter extends TypeAdapter<HoldSaleModel> {
   @override
-  final int typeId = 209;
+  final int typeId = 159;
 
   @override
   HoldSaleModel read(BinaryReader reader) {

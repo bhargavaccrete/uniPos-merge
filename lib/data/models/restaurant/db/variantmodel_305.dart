@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 part 'variantmodel_305.g.dart';
 
 
 
-@HiveType(typeId: 305)
+@HiveType(typeId: HiveTypeIds.restaurantVariant)
 class VariantModel{
   @HiveField(0)
   final String id;

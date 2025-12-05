@@ -446,6 +446,15 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     });
   }
 
+  late final _$selectBusinessTypeAsyncAction =
+      AsyncAction('_SetupWizardStore.selectBusinessType', context: context);
+
+  @override
+  Future<void> selectBusinessType(String id, String name) {
+    return _$selectBusinessTypeAsyncAction
+        .run(() => super.selectBusinessType(id, name));
+  }
+
   late final _$loadExistingDataAsyncAction =
       AsyncAction('_SetupWizardStore.loadExistingData', context: context);
 
@@ -526,17 +535,6 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
         name: '_SetupWizardStore.previousStep');
     try {
       return super.previousStep();
-    } finally {
-      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
-    }
-  }
-
-  @override
-  void selectBusinessType(String id, String name) {
-    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
-        name: '_SetupWizardStore.selectBusinessType');
-    try {
-      return super.selectBusinessType(id, name);
     } finally {
       _$_SetupWizardStoreActionController.endAction(_$actionInfo);
     }

@@ -1,0 +1,182 @@
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$SupplierStore on _SupplierStore, Store {
+  Computed<int>? _$supplierCountComputed;
+
+  @override
+  int get supplierCount =>
+      (_$supplierCountComputed ??= Computed<int>(() => super.supplierCount,
+              name: '_SupplierStore.supplierCount'))
+          .value;
+  Computed<bool>? _$hasSelectionComputed;
+
+  @override
+  bool get hasSelection =>
+      (_$hasSelectionComputed ??= Computed<bool>(() => super.hasSelection,
+              name: '_SupplierStore.hasSelection'))
+          .value;
+  Computed<double>? _$totalOutstandingComputed;
+
+  @override
+  double get totalOutstanding => (_$totalOutstandingComputed ??=
+          Computed<double>(() => super.totalOutstanding,
+              name: '_SupplierStore.totalOutstanding'))
+      .value;
+
+  late final _$suppliersAtom =
+      Atom(name: '_SupplierStore.suppliers', context: context);
+
+  @override
+  ObservableList<SupplierModel> get suppliers {
+    _$suppliersAtom.reportRead();
+    return super.suppliers;
+  }
+
+  @override
+  set suppliers(ObservableList<SupplierModel> value) {
+    _$suppliersAtom.reportWrite(value, super.suppliers, () {
+      super.suppliers = value;
+    });
+  }
+
+  late final _$searchResultsAtom =
+      Atom(name: '_SupplierStore.searchResults', context: context);
+
+  @override
+  ObservableList<SupplierModel> get searchResults {
+    _$searchResultsAtom.reportRead();
+    return super.searchResults;
+  }
+
+  @override
+  set searchResults(ObservableList<SupplierModel> value) {
+    _$searchResultsAtom.reportWrite(value, super.searchResults, () {
+      super.searchResults = value;
+    });
+  }
+
+  late final _$searchQueryAtom =
+      Atom(name: '_SupplierStore.searchQuery', context: context);
+
+  @override
+  String get searchQuery {
+    _$searchQueryAtom.reportRead();
+    return super.searchQuery;
+  }
+
+  @override
+  set searchQuery(String value) {
+    _$searchQueryAtom.reportWrite(value, super.searchQuery, () {
+      super.searchQuery = value;
+    });
+  }
+
+  late final _$selectedSupplierAtom =
+      Atom(name: '_SupplierStore.selectedSupplier', context: context);
+
+  @override
+  SupplierModel? get selectedSupplier {
+    _$selectedSupplierAtom.reportRead();
+    return super.selectedSupplier;
+  }
+
+  @override
+  set selectedSupplier(SupplierModel? value) {
+    _$selectedSupplierAtom.reportWrite(value, super.selectedSupplier, () {
+      super.selectedSupplier = value;
+    });
+  }
+
+  late final _$loadSuppliersAsyncAction =
+      AsyncAction('_SupplierStore.loadSuppliers', context: context);
+
+  @override
+  Future<void> loadSuppliers() {
+    return _$loadSuppliersAsyncAction.run(() => super.loadSuppliers());
+  }
+
+  late final _$addSupplierAsyncAction =
+      AsyncAction('_SupplierStore.addSupplier', context: context);
+
+  @override
+  Future<void> addSupplier(SupplierModel supplier) {
+    return _$addSupplierAsyncAction.run(() => super.addSupplier(supplier));
+  }
+
+  late final _$updateSupplierAsyncAction =
+      AsyncAction('_SupplierStore.updateSupplier', context: context);
+
+  @override
+  Future<void> updateSupplier(SupplierModel supplier) {
+    return _$updateSupplierAsyncAction
+        .run(() => super.updateSupplier(supplier));
+  }
+
+  late final _$deleteSupplierAsyncAction =
+      AsyncAction('_SupplierStore.deleteSupplier', context: context);
+
+  @override
+  Future<void> deleteSupplier(String supplierId) {
+    return _$deleteSupplierAsyncAction
+        .run(() => super.deleteSupplier(supplierId));
+  }
+
+  late final _$searchSuppliersAsyncAction =
+      AsyncAction('_SupplierStore.searchSuppliers', context: context);
+
+  @override
+  Future<void> searchSuppliers(String query) {
+    return _$searchSuppliersAsyncAction.run(() => super.searchSuppliers(query));
+  }
+
+  late final _$updateSupplierBalanceAsyncAction =
+      AsyncAction('_SupplierStore.updateSupplierBalance', context: context);
+
+  @override
+  Future<void> updateSupplierBalance(String supplierId, double amount) {
+    return _$updateSupplierBalanceAsyncAction
+        .run(() => super.updateSupplierBalance(supplierId, amount));
+  }
+
+  late final _$_SupplierStoreActionController =
+      ActionController(name: '_SupplierStore', context: context);
+
+  @override
+  void selectSupplier(SupplierModel? supplier) {
+    final _$actionInfo = _$_SupplierStoreActionController.startAction(
+        name: '_SupplierStore.selectSupplier');
+    try {
+      return super.selectSupplier(supplier);
+    } finally {
+      _$_SupplierStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void clearSelection() {
+    final _$actionInfo = _$_SupplierStoreActionController.startAction(
+        name: '_SupplierStore.clearSelection');
+    try {
+      return super.clearSelection();
+    } finally {
+      _$_SupplierStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  String toString() {
+    return '''
+suppliers: ${suppliers},
+searchResults: ${searchResults},
+searchQuery: ${searchQuery},
+selectedSupplier: ${selectedSupplier},
+supplierCount: ${supplierCount},
+hasSelection: ${hasSelection},
+totalOutstanding: ${totalOutstanding}
+    ''';
+  }
+}

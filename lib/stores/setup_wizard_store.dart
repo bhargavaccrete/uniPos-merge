@@ -6,6 +6,8 @@ import 'package:unipos/data/repositories/business_type_repository.dart';
 import 'package:unipos/data/repositories/business_details_repository.dart';
 import 'package:unipos/data/repositories/tax_details_repository.dart';
 import 'package:unipos/core/config/app_config.dart';
+import 'package:unipos/core/init/hive_init.dart';
+import 'package:unipos/core/di/service_locator.dart' as sl;
 
 part 'setup_wizard_store.g.dart';
 
@@ -158,9 +160,60 @@ abstract class _SetupWizardStore with Store {
   }
 
   @action
-  void selectBusinessType(String id, String name) {
+  Future<void> selectBusinessType(String id, String name) async {
     selectedBusinessTypeId = id;
     selectedBusinessTypeName = name;
+
+    // Determine the business mode based on selection
+    final mode = id == 'restaurant'
+        ? BusinessMode.restaurant
+        : BusinessMode.retail;
+
+    // ignore: avoid_print
+    print('selectBusinessType: id=$id, mode=$mode, isSetupComplete=${AppConfig.isSetupComplete}');
+
+    // During setup wizard (before setup is complete), use forceSetBusinessMode
+    // to allow user to change their mind. The mode is only permanently locked
+    // when completeSetup() is called.
+    if (!AppConfig.isSetupComplete) {
+      try {
+        // Use forceSetBusinessMode during setup to allow changing selection
+        await AppConfig.forceSetBusinessMode(mode);
+        // ignore: avoid_print
+        print('selectBusinessType: AppConfig.forceSetBusinessMode completed');
+      } catch (e) {
+        // ignore: avoid_print
+        print('selectBusinessType: AppConfig.forceSetBusinessMode failed: $e');
+      }
+    }
+
+    // Always ensure Hive boxes and GetIt dependencies are initialized
+    // This handles both first-time setup and cases where user goes back/forward
+    try {
+      // ignore: avoid_print
+      print('selectBusinessType: initializing Hive boxes for $mode');
+      // Initialize Hive boxes for the selected business mode
+      // This is needed because the Add Product screen will access these boxes
+      await HiveInit.initializeForMode(mode);
+      // ignore: avoid_print
+      print('selectBusinessType: Hive boxes initialized');
+
+      // ignore: avoid_print
+      print('selectBusinessType: registering GetIt dependencies for $mode');
+      // Register GetIt dependencies for the selected business mode
+      // This must be done after Hive boxes are opened
+      await _registerBusinessDependencies(mode);
+      // ignore: avoid_print
+      print('selectBusinessType: GetIt dependencies registered');
+    } catch (e) {
+      // ignore: avoid_print
+      print('selectBusinessType initialization error: $e');
+    }
+  }
+
+  /// Register GetIt dependencies for the selected business mode
+  Future<void> _registerBusinessDependencies(BusinessMode mode) async {
+    await sl.registerBusinessDependencies(mode);
   }
 
   @action
@@ -282,6 +335,15 @@ abstract class _SetupWizardStore with Store {
         if (savedType != null) {
           selectedBusinessTypeId = savedType.id;
           selectedBusinessTypeName = savedType.name;
+
+          // Initialize boxes and dependencies for the saved type
+          // This is crucial when restoring a setup session
+          final mode = savedType.id == 'restaurant' 
+              ? BusinessMode.restaurant 
+              : BusinessMode.retail;
+          
+          await HiveInit.initializeForMode(mode);
+          await _registerBusinessDependencies(mode);
         }
       }
 

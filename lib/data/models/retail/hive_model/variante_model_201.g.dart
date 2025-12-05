@@ -8,7 +8,7 @@ part of 'variante_model_201.dart';
 
 class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
   @override
-  final int typeId = 201;
+  final int typeId = 151;
 
   @override
   VarianteModel read(BinaryReader reader) {

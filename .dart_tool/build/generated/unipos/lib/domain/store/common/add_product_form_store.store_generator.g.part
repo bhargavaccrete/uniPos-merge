@@ -1,0 +1,1086 @@
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$AddProductFormStore on _AddProductFormStore, Store {
+  Computed<bool>? _$isRetailComputed;
+
+  @override
+  bool get isRetail =>
+      (_$isRetailComputed ??= Computed<bool>(() => super.isRetail,
+              name: '_AddProductFormStore.isRetail'))
+          .value;
+  Computed<bool>? _$isRestaurantComputed;
+
+  @override
+  bool get isRestaurant =>
+      (_$isRestaurantComputed ??= Computed<bool>(() => super.isRestaurant,
+              name: '_AddProductFormStore.isRestaurant'))
+          .value;
+  Computed<bool>? _$isVariableProductComputed;
+
+  @override
+  bool get isVariableProduct => (_$isVariableProductComputed ??= Computed<bool>(
+          () => super.isVariableProduct,
+          name: '_AddProductFormStore.isVariableProduct'))
+      .value;
+  Computed<bool>? _$isSimpleProductComputed;
+
+  @override
+  bool get isSimpleProduct =>
+      (_$isSimpleProductComputed ??= Computed<bool>(() => super.isSimpleProduct,
+              name: '_AddProductFormStore.isSimpleProduct'))
+          .value;
+  Computed<bool>? _$hasVariantsComputed;
+
+  @override
+  bool get hasVariants =>
+      (_$hasVariantsComputed ??= Computed<bool>(() => super.hasVariants,
+              name: '_AddProductFormStore.hasVariants'))
+          .value;
+  Computed<bool>? _$isValidComputed;
+
+  @override
+  bool get isValid => (_$isValidComputed ??= Computed<bool>(() => super.isValid,
+          name: '_AddProductFormStore.isValid'))
+      .value;
+  Computed<String>? _$validationMessageComputed;
+
+  @override
+  String get validationMessage => (_$validationMessageComputed ??=
+          Computed<String>(() => super.validationMessage,
+              name: '_AddProductFormStore.validationMessage'))
+      .value;
+  Computed<double>? _$profitMarginComputed;
+
+  @override
+  double get profitMargin =>
+      (_$profitMarginComputed ??= Computed<double>(() => super.profitMargin,
+              name: '_AddProductFormStore.profitMargin'))
+          .value;
+  Computed<double>? _$profitAmountComputed;
+
+  @override
+  double get profitAmount =>
+      (_$profitAmountComputed ??= Computed<double>(() => super.profitAmount,
+              name: '_AddProductFormStore.profitAmount'))
+          .value;
+
+  late final _$nameAtom =
+      Atom(name: '_AddProductFormStore.name', context: context);
+
+  @override
+  String get name {
+    _$nameAtom.reportRead();
+    return super.name;
+  }
+
+  @override
+  set name(String value) {
+    _$nameAtom.reportWrite(value, super.name, () {
+      super.name = value;
+    });
+  }
+
+  late final _$descriptionAtom =
+      Atom(name: '_AddProductFormStore.description', context: context);
+
+  @override
+  String get description {
+    _$descriptionAtom.reportRead();
+    return super.description;
+  }
+
+  @override
+  set description(String value) {
+    _$descriptionAtom.reportWrite(value, super.description, () {
+      super.description = value;
+    });
+  }
+
+  late final _$imagePathAtom =
+      Atom(name: '_AddProductFormStore.imagePath', context: context);
+
+  @override
+  String? get imagePath {
+    _$imagePathAtom.reportRead();
+    return super.imagePath;
+  }
+
+  @override
+  set imagePath(String? value) {
+    _$imagePathAtom.reportWrite(value, super.imagePath, () {
+      super.imagePath = value;
+    });
+  }
+
+  late final _$selectedCategoryIdAtom =
+      Atom(name: '_AddProductFormStore.selectedCategoryId', context: context);
+
+  @override
+  String? get selectedCategoryId {
+    _$selectedCategoryIdAtom.reportRead();
+    return super.selectedCategoryId;
+  }
+
+  @override
+  set selectedCategoryId(String? value) {
+    _$selectedCategoryIdAtom.reportWrite(value, super.selectedCategoryId, () {
+      super.selectedCategoryId = value;
+    });
+  }
+
+  late final _$priceAtom =
+      Atom(name: '_AddProductFormStore.price', context: context);
+
+  @override
+  double get price {
+    _$priceAtom.reportRead();
+    return super.price;
+  }
+
+  @override
+  set price(double value) {
+    _$priceAtom.reportWrite(value, super.price, () {
+      super.price = value;
+    });
+  }
+
+  late final _$taxRateAtom =
+      Atom(name: '_AddProductFormStore.taxRate', context: context);
+
+  @override
+  double get taxRate {
+    _$taxRateAtom.reportRead();
+    return super.taxRate;
+  }
+
+  @override
+  set taxRate(double value) {
+    _$taxRateAtom.reportWrite(value, super.taxRate, () {
+      super.taxRate = value;
+    });
+  }
+
+  late final _$isEnabledAtom =
+      Atom(name: '_AddProductFormStore.isEnabled', context: context);
+
+  @override
+  bool get isEnabled {
+    _$isEnabledAtom.reportRead();
+    return super.isEnabled;
+  }
+
+  @override
+  set isEnabled(bool value) {
+    _$isEnabledAtom.reportWrite(value, super.isEnabled, () {
+      super.isEnabled = value;
+    });
+  }
+
+  late final _$brandNameAtom =
+      Atom(name: '_AddProductFormStore.brandName', context: context);
+
+  @override
+  String? get brandName {
+    _$brandNameAtom.reportRead();
+    return super.brandName;
+  }
+
+  @override
+  set brandName(String? value) {
+    _$brandNameAtom.reportWrite(value, super.brandName, () {
+      super.brandName = value;
+    });
+  }
+
+  late final _$subCategoryAtom =
+      Atom(name: '_AddProductFormStore.subCategory', context: context);
+
+  @override
+  String? get subCategory {
+    _$subCategoryAtom.reportRead();
+    return super.subCategory;
+  }
+
+  @override
+  set subCategory(String? value) {
+    _$subCategoryAtom.reportWrite(value, super.subCategory, () {
+      super.subCategory = value;
+    });
+  }
+
+  late final _$mrpAtom =
+      Atom(name: '_AddProductFormStore.mrp', context: context);
+
+  @override
+  double get mrp {
+    _$mrpAtom.reportRead();
+    return super.mrp;
+  }
+
+  @override
+  set mrp(double value) {
+    _$mrpAtom.reportWrite(value, super.mrp, () {
+      super.mrp = value;
+    });
+  }
+
+  late final _$costPriceAtom =
+      Atom(name: '_AddProductFormStore.costPrice', context: context);
+
+  @override
+  double get costPrice {
+    _$costPriceAtom.reportRead();
+    return super.costPrice;
+  }
+
+  @override
+  set costPrice(double value) {
+    _$costPriceAtom.reportWrite(value, super.costPrice, () {
+      super.costPrice = value;
+    });
+  }
+
+  late final _$hsnCodeAtom =
+      Atom(name: '_AddProductFormStore.hsnCode', context: context);
+
+  @override
+  String? get hsnCode {
+    _$hsnCodeAtom.reportRead();
+    return super.hsnCode;
+  }
+
+  @override
+  set hsnCode(String? value) {
+    _$hsnCodeAtom.reportWrite(value, super.hsnCode, () {
+      super.hsnCode = value;
+    });
+  }
+
+  late final _$skuAtom =
+      Atom(name: '_AddProductFormStore.sku', context: context);
+
+  @override
+  String get sku {
+    _$skuAtom.reportRead();
+    return super.sku;
+  }
+
+  @override
+  set sku(String value) {
+    _$skuAtom.reportWrite(value, super.sku, () {
+      super.sku = value;
+    });
+  }
+
+  late final _$barcodeAtom =
+      Atom(name: '_AddProductFormStore.barcode', context: context);
+
+  @override
+  String get barcode {
+    _$barcodeAtom.reportRead();
+    return super.barcode;
+  }
+
+  @override
+  set barcode(String value) {
+    _$barcodeAtom.reportWrite(value, super.barcode, () {
+      super.barcode = value;
+    });
+  }
+
+  late final _$stockQuantityAtom =
+      Atom(name: '_AddProductFormStore.stockQuantity', context: context);
+
+  @override
+  int get stockQuantity {
+    _$stockQuantityAtom.reportRead();
+    return super.stockQuantity;
+  }
+
+  @override
+  set stockQuantity(int value) {
+    _$stockQuantityAtom.reportWrite(value, super.stockQuantity, () {
+      super.stockQuantity = value;
+    });
+  }
+
+  late final _$minStockAtom =
+      Atom(name: '_AddProductFormStore.minStock', context: context);
+
+  @override
+  int get minStock {
+    _$minStockAtom.reportRead();
+    return super.minStock;
+  }
+
+  @override
+  set minStock(int value) {
+    _$minStockAtom.reportWrite(value, super.minStock, () {
+      super.minStock = value;
+    });
+  }
+
+  late final _$productTypeAtom =
+      Atom(name: '_AddProductFormStore.productType', context: context);
+
+  @override
+  String get productType {
+    _$productTypeAtom.reportRead();
+    return super.productType;
+  }
+
+  @override
+  set productType(String value) {
+    _$productTypeAtom.reportWrite(value, super.productType, () {
+      super.productType = value;
+    });
+  }
+
+  late final _$selectedAttributeIdsAtom =
+      Atom(name: '_AddProductFormStore.selectedAttributeIds', context: context);
+
+  @override
+  ObservableList<String> get selectedAttributeIds {
+    _$selectedAttributeIdsAtom.reportRead();
+    return super.selectedAttributeIds;
+  }
+
+  @override
+  set selectedAttributeIds(ObservableList<String> value) {
+    _$selectedAttributeIdsAtom.reportWrite(value, super.selectedAttributeIds,
+        () {
+      super.selectedAttributeIds = value;
+    });
+  }
+
+  late final _$selectedAttributeValuesAtom = Atom(
+      name: '_AddProductFormStore.selectedAttributeValues', context: context);
+
+  @override
+  ObservableMap<String, List<String>> get selectedAttributeValues {
+    _$selectedAttributeValuesAtom.reportRead();
+    return super.selectedAttributeValues;
+  }
+
+  @override
+  set selectedAttributeValues(ObservableMap<String, List<String>> value) {
+    _$selectedAttributeValuesAtom
+        .reportWrite(value, super.selectedAttributeValues, () {
+      super.selectedAttributeValues = value;
+    });
+  }
+
+  late final _$retailVariantsAtom =
+      Atom(name: '_AddProductFormStore.retailVariants', context: context);
+
+  @override
+  ObservableList<VariantFormData> get retailVariants {
+    _$retailVariantsAtom.reportRead();
+    return super.retailVariants;
+  }
+
+  @override
+  set retailVariants(ObservableList<VariantFormData> value) {
+    _$retailVariantsAtom.reportWrite(value, super.retailVariants, () {
+      super.retailVariants = value;
+    });
+  }
+
+  late final _$isVegAtom =
+      Atom(name: '_AddProductFormStore.isVeg', context: context);
+
+  @override
+  String get isVeg {
+    _$isVegAtom.reportRead();
+    return super.isVeg;
+  }
+
+  @override
+  set isVeg(String value) {
+    _$isVegAtom.reportWrite(value, super.isVeg, () {
+      super.isVeg = value;
+    });
+  }
+
+  late final _$unitAtom =
+      Atom(name: '_AddProductFormStore.unit', context: context);
+
+  @override
+  String? get unit {
+    _$unitAtom.reportRead();
+    return super.unit;
+  }
+
+  @override
+  set unit(String? value) {
+    _$unitAtom.reportWrite(value, super.unit, () {
+      super.unit = value;
+    });
+  }
+
+  late final _$trackInventoryAtom =
+      Atom(name: '_AddProductFormStore.trackInventory', context: context);
+
+  @override
+  bool get trackInventory {
+    _$trackInventoryAtom.reportRead();
+    return super.trackInventory;
+  }
+
+  @override
+  set trackInventory(bool value) {
+    _$trackInventoryAtom.reportWrite(value, super.trackInventory, () {
+      super.trackInventory = value;
+    });
+  }
+
+  late final _$restaurantStockQuantityAtom = Atom(
+      name: '_AddProductFormStore.restaurantStockQuantity', context: context);
+
+  @override
+  double get restaurantStockQuantity {
+    _$restaurantStockQuantityAtom.reportRead();
+    return super.restaurantStockQuantity;
+  }
+
+  @override
+  set restaurantStockQuantity(double value) {
+    _$restaurantStockQuantityAtom
+        .reportWrite(value, super.restaurantStockQuantity, () {
+      super.restaurantStockQuantity = value;
+    });
+  }
+
+  late final _$allowOrderWhenOutOfStockAtom = Atom(
+      name: '_AddProductFormStore.allowOrderWhenOutOfStock', context: context);
+
+  @override
+  bool get allowOrderWhenOutOfStock {
+    _$allowOrderWhenOutOfStockAtom.reportRead();
+    return super.allowOrderWhenOutOfStock;
+  }
+
+  @override
+  set allowOrderWhenOutOfStock(bool value) {
+    _$allowOrderWhenOutOfStockAtom
+        .reportWrite(value, super.allowOrderWhenOutOfStock, () {
+      super.allowOrderWhenOutOfStock = value;
+    });
+  }
+
+  late final _$isSoldByWeightAtom =
+      Atom(name: '_AddProductFormStore.isSoldByWeight', context: context);
+
+  @override
+  bool get isSoldByWeight {
+    _$isSoldByWeightAtom.reportRead();
+    return super.isSoldByWeight;
+  }
+
+  @override
+  set isSoldByWeight(bool value) {
+    _$isSoldByWeightAtom.reportWrite(value, super.isSoldByWeight, () {
+      super.isSoldByWeight = value;
+    });
+  }
+
+  late final _$hasPortionSizesAtom =
+      Atom(name: '_AddProductFormStore.hasPortionSizes', context: context);
+
+  @override
+  bool get hasPortionSizes {
+    _$hasPortionSizesAtom.reportRead();
+    return super.hasPortionSizes;
+  }
+
+  @override
+  set hasPortionSizes(bool value) {
+    _$hasPortionSizesAtom.reportWrite(value, super.hasPortionSizes, () {
+      super.hasPortionSizes = value;
+    });
+  }
+
+  late final _$portionSizesAtom =
+      Atom(name: '_AddProductFormStore.portionSizes', context: context);
+
+  @override
+  ObservableList<PortionSizeFormData> get portionSizes {
+    _$portionSizesAtom.reportRead();
+    return super.portionSizes;
+  }
+
+  @override
+  set portionSizes(ObservableList<PortionSizeFormData> value) {
+    _$portionSizesAtom.reportWrite(value, super.portionSizes, () {
+      super.portionSizes = value;
+    });
+  }
+
+  late final _$selectedChoiceIdsAtom =
+      Atom(name: '_AddProductFormStore.selectedChoiceIds', context: context);
+
+  @override
+  ObservableList<String> get selectedChoiceIds {
+    _$selectedChoiceIdsAtom.reportRead();
+    return super.selectedChoiceIds;
+  }
+
+  @override
+  set selectedChoiceIds(ObservableList<String> value) {
+    _$selectedChoiceIdsAtom.reportWrite(value, super.selectedChoiceIds, () {
+      super.selectedChoiceIds = value;
+    });
+  }
+
+  late final _$selectedExtraIdsAtom =
+      Atom(name: '_AddProductFormStore.selectedExtraIds', context: context);
+
+  @override
+  ObservableList<String> get selectedExtraIds {
+    _$selectedExtraIdsAtom.reportRead();
+    return super.selectedExtraIds;
+  }
+
+  @override
+  set selectedExtraIds(ObservableList<String> value) {
+    _$selectedExtraIdsAtom.reportWrite(value, super.selectedExtraIds, () {
+      super.selectedExtraIds = value;
+    });
+  }
+
+  late final _$extraConstraintsAtom =
+      Atom(name: '_AddProductFormStore.extraConstraints', context: context);
+
+  @override
+  ObservableMap<String, ExtraConstraint> get extraConstraints {
+    _$extraConstraintsAtom.reportRead();
+    return super.extraConstraints;
+  }
+
+  @override
+  set extraConstraints(ObservableMap<String, ExtraConstraint> value) {
+    _$extraConstraintsAtom.reportWrite(value, super.extraConstraints, () {
+      super.extraConstraints = value;
+    });
+  }
+
+  late final _$isLoadingAtom =
+      Atom(name: '_AddProductFormStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$errorMessageAtom =
+      Atom(name: '_AddProductFormStore.errorMessage', context: context);
+
+  @override
+  String? get errorMessage {
+    _$errorMessageAtom.reportRead();
+    return super.errorMessage;
+  }
+
+  @override
+  set errorMessage(String? value) {
+    _$errorMessageAtom.reportWrite(value, super.errorMessage, () {
+      super.errorMessage = value;
+    });
+  }
+
+  late final _$isSubmittedAtom =
+      Atom(name: '_AddProductFormStore.isSubmitted', context: context);
+
+  @override
+  bool get isSubmitted {
+    _$isSubmittedAtom.reportRead();
+    return super.isSubmitted;
+  }
+
+  @override
+  set isSubmitted(bool value) {
+    _$isSubmittedAtom.reportWrite(value, super.isSubmitted, () {
+      super.isSubmitted = value;
+    });
+  }
+
+  late final _$submitAsyncAction =
+      AsyncAction('_AddProductFormStore.submit', context: context);
+
+  @override
+  Future<bool> submit() {
+    return _$submitAsyncAction.run(() => super.submit());
+  }
+
+  late final _$_AddProductFormStoreActionController =
+      ActionController(name: '_AddProductFormStore', context: context);
+
+  @override
+  void setName(String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setName');
+    try {
+      return super.setName(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setDescription(String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setDescription');
+    try {
+      return super.setDescription(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setImagePath(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setImagePath');
+    try {
+      return super.setImagePath(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setSelectedCategoryId(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setSelectedCategoryId');
+    try {
+      return super.setSelectedCategoryId(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setPrice(double value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setPrice');
+    try {
+      return super.setPrice(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxRate(double value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setTaxRate');
+    try {
+      return super.setTaxRate(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setIsEnabled(bool value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setIsEnabled');
+    try {
+      return super.setIsEnabled(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setBrandName(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setBrandName');
+    try {
+      return super.setBrandName(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setSubCategory(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setSubCategory');
+    try {
+      return super.setSubCategory(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setMrp(double value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setMrp');
+    try {
+      return super.setMrp(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setCostPrice(double value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setCostPrice');
+    try {
+      return super.setCostPrice(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setHsnCode(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setHsnCode');
+    try {
+      return super.setHsnCode(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setSku(String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setSku');
+    try {
+      return super.setSku(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setBarcode(String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setBarcode');
+    try {
+      return super.setBarcode(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setStockQuantity(int value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setStockQuantity');
+    try {
+      return super.setStockQuantity(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setMinStock(int value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setMinStock');
+    try {
+      return super.setMinStock(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setProductType(String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setProductType');
+    try {
+      return super.setProductType(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void toggleAttribute(String attributeId) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.toggleAttribute');
+    try {
+      return super.toggleAttribute(attributeId);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void toggleAttributeValue(String attributeId, String valueId) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.toggleAttributeValue');
+    try {
+      return super.toggleAttributeValue(attributeId, valueId);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void generateRetailVariants(
+      List<AttributeModel> attributes, List<AttributeValueModel> allValues) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.generateRetailVariants');
+    try {
+      return super.generateRetailVariants(attributes, allValues);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void addRetailVariant() {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.addRetailVariant');
+    try {
+      return super.addRetailVariant();
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void updateRetailVariant(int index, VariantFormData variant) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.updateRetailVariant');
+    try {
+      return super.updateRetailVariant(index, variant);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void removeRetailVariant(int index) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.removeRetailVariant');
+    try {
+      return super.removeRetailVariant(index);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setIsVeg(String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setIsVeg');
+    try {
+      return super.setIsVeg(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setUnit(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setUnit');
+    try {
+      return super.setUnit(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTrackInventory(bool value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setTrackInventory');
+    try {
+      return super.setTrackInventory(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setRestaurantStockQuantity(double value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setRestaurantStockQuantity');
+    try {
+      return super.setRestaurantStockQuantity(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setAllowOrderWhenOutOfStock(bool value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setAllowOrderWhenOutOfStock');
+    try {
+      return super.setAllowOrderWhenOutOfStock(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setIsSoldByWeight(bool value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setIsSoldByWeight');
+    try {
+      return super.setIsSoldByWeight(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setHasPortionSizes(bool value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setHasPortionSizes');
+    try {
+      return super.setHasPortionSizes(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void addPortionSize() {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.addPortionSize');
+    try {
+      return super.addPortionSize();
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void updatePortionSize(int index, PortionSizeFormData size) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.updatePortionSize');
+    try {
+      return super.updatePortionSize(index, size);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void removePortionSize(int index) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.removePortionSize');
+    try {
+      return super.removePortionSize(index);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void toggleChoiceGroup(String choiceId) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.toggleChoiceGroup');
+    try {
+      return super.toggleChoiceGroup(choiceId);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void toggleExtraGroup(String extraId) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.toggleExtraGroup');
+    try {
+      return super.toggleExtraGroup(extraId);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setExtraConstraint(String extraId, int min, int max) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setExtraConstraint');
+    try {
+      return super.setExtraConstraint(extraId, min, max);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void reset() {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.reset');
+    try {
+      return super.reset();
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  String toString() {
+    return '''
+name: ${name},
+description: ${description},
+imagePath: ${imagePath},
+selectedCategoryId: ${selectedCategoryId},
+price: ${price},
+taxRate: ${taxRate},
+isEnabled: ${isEnabled},
+brandName: ${brandName},
+subCategory: ${subCategory},
+mrp: ${mrp},
+costPrice: ${costPrice},
+hsnCode: ${hsnCode},
+sku: ${sku},
+barcode: ${barcode},
+stockQuantity: ${stockQuantity},
+minStock: ${minStock},
+productType: ${productType},
+selectedAttributeIds: ${selectedAttributeIds},
+selectedAttributeValues: ${selectedAttributeValues},
+retailVariants: ${retailVariants},
+isVeg: ${isVeg},
+unit: ${unit},
+trackInventory: ${trackInventory},
+restaurantStockQuantity: ${restaurantStockQuantity},
+allowOrderWhenOutOfStock: ${allowOrderWhenOutOfStock},
+isSoldByWeight: ${isSoldByWeight},
+hasPortionSizes: ${hasPortionSizes},
+portionSizes: ${portionSizes},
+selectedChoiceIds: ${selectedChoiceIds},
+selectedExtraIds: ${selectedExtraIds},
+extraConstraints: ${extraConstraints},
+isLoading: ${isLoading},
+errorMessage: ${errorMessage},
+isSubmitted: ${isSubmitted},
+isRetail: ${isRetail},
+isRestaurant: ${isRestaurant},
+isVariableProduct: ${isVariableProduct},
+isSimpleProduct: ${isSimpleProduct},
+hasVariants: ${hasVariants},
+isValid: ${isValid},
+validationMessage: ${validationMessage},
+profitMargin: ${profitMargin},
+profitAmount: ${profitAmount}
+    ''';
+  }
+}

@@ -1,0 +1,6 @@
+Handle,Name,Category,Description,Option1 Name,Option1 Value,Option2 Name,Option2 Value,Option3 Name,Option3 Value,Cost Price,Selling Price,Stock,Barcode,Min Stock
+product1,Laptop,Electronics,Gaming Laptop,,,,,,,800,1200,10,LAP001,5
+product2,Mouse,Electronics,Wireless Mouse,,,,,,,10,25,50,MOU001,10
+tshirt,T-Shirt,Clothing,Cotton T-Shirt,Size,Small,Color,Red,,,5,15,20,TS-RED-S,5
+tshirt,T-Shirt,Clothing,Cotton T-Shirt,Size,Medium,Color,Red,,,5,15,15,TS-RED-M,5
+tshirt,T-Shirt,Clothing,Cotton T-Shirt,Size,Large,Color,Blue,,,6,16,10,TS-BLU-L,5

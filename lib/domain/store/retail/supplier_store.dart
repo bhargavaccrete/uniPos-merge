@@ -8,7 +8,7 @@ part 'supplier_store.g.dart';
 class SupplierStore = _SupplierStore with _$SupplierStore;
 
 abstract class _SupplierStore with Store {
-  final SupplierRepository _supplierRepository = SupplierRepository();
+  late final SupplierRepository _supplierRepository;
 
   @observable
   ObservableList<SupplierModel> suppliers = ObservableList<SupplierModel>();
@@ -23,6 +23,7 @@ abstract class _SupplierStore with Store {
   SupplierModel? selectedSupplier;
 
   _SupplierStore() {
+    _supplierRepository = SupplierRepository();
     _init();
   }
 

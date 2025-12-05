@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -26,6 +28,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _addItemToCart(ProductModel product) async {
+
     // Get variants for this product
     final variants = await productStore.getVariantsForProduct(product.productId);
 
@@ -99,12 +102,237 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  void _showProductVariantsDialog(ProductModel product, List<VarianteModel> variants) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.productName,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    product.category,
+                    style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.normal),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () async {
+                Navigator.pop(context);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VariantManagementScreen(product: product),
+                  ),
+                );
+                setState(() {});
+              },
+              tooltip: 'Edit Variants',
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Summary Section
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Column(
+                      children: [
+                        const Icon(Icons.inventory_2, color: Colors.blue, size: 20),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${variants.length}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const Text(
+                          'Variants',
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        const Icon(Icons.storage, color: Colors.green, size: 20),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${variants.fold<int>(0, (sum, v) => sum + v.stockQty)}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const Text(
+                          'Total Stock',
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        const Icon(Icons.attach_money, color: Colors.orange, size: 20),
+                        const SizedBox(height: 4),
+                        Text(
+                          variants.isNotEmpty
+                            ? '₹${variants.first.sellingPrice?.toStringAsFixed(0) ?? '0'}'
+                            : '₹0',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const Text(
+                          'Price',
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Variants List
+              if (variants.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'No variants found',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: variants.length,
+                    itemBuilder: (context, index) {
+                      final variant = variants[index];
+                      final isLowStock = variant.stockQty < (variant.minStock ?? 5);
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isLowStock ? Colors.red.shade100 : Colors.green.shade100,
+                            child: Icon(
+                              Icons.inventory_2,
+                              color: isLowStock ? Colors.red : Colors.green,
+                              size: 20,
+                            ),
+                          ),
+                          title: Text(
+                            _getVariantDisplayName(variant),
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Stock: ${variant.stockQty}',
+                                    style: TextStyle(
+                                      color: isLowStock ? Colors.red : Colors.grey,
+                                      fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  if (isLowStock) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.warning, color: Colors.red, size: 14),
+                                  ],
+                                ],
+                              ),
+                              if (variant.barcode?.isNotEmpty ?? false)
+                                Text(
+                                  'Barcode: ${variant.barcode}',
+                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                ),
+                            ],
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '₹${variant.sellingPrice?.toStringAsFixed(2) ?? '0.00'}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              if (variant.costPrice != null)
+                                Text(
+                                  'Cost: ₹${variant.costPrice!.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          if (variants.isNotEmpty)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _showVariantSelectionDialog(product, variants);
+              },
+              icon: const Icon(Icons.add_shopping_cart, size: 18),
+              label: const Text('Add to Cart'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CAF50),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   String _getVariantDisplayName(VarianteModel variant) {
     final parts = <String>[];
-    if (variant.size != null) parts.add('Size: ${variant.size}');
-    if (variant.color != null) parts.add('Color: ${variant.color}');
-    if (variant.weight != null) parts.add('Weight: ${variant.weight}');
-    return parts.isEmpty ? 'Default' : parts.join(' • ');
+
+    // Check custom attributes first
+    if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
+      variant.customAttributes!.forEach((key, value) {
+        if (value.toString().isNotEmpty) {
+          parts.add('$key: $value');
+        }
+      });
+    }
+
+    // Fallback to legacy fields
+    if (parts.isEmpty) {
+      if (variant.size != null && variant.size!.isNotEmpty) parts.add('Size: ${variant.size}');
+      if (variant.color != null && variant.color!.isNotEmpty) parts.add('Color: ${variant.color}');
+      if (variant.weight != null && variant.weight!.isNotEmpty) parts.add('Weight: ${variant.weight}');
+    }
+
+    return parts.isEmpty ? 'Default Variant' : parts.join(' • ');
   }
 
   @override
@@ -293,16 +521,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
         return InkWell(
           onTap: () => _addItemToCart(product),
-          onLongPress: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => VariantManagementScreen(product: product),
-              ),
-            );
-            // Refresh the screen to reflect any variant changes
-            setState(() {});
-          },
+          onLongPress: () => _showProductVariantsDialog(product, variants),
           borderRadius: BorderRadius.circular(8),
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),

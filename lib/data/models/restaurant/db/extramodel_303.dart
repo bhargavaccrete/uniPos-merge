@@ -1,9 +1,10 @@
 
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 part 'extramodel_303.g.dart';
 
-@HiveType(typeId: 303)
+@HiveType(typeId: HiveTypeIds.restaurantExtra)
 class Extramodel extends HiveObject{
 
   @HiveField(0)

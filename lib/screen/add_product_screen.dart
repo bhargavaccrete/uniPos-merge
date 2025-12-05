@@ -1,0 +1,2868 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
+import 'dart:io';
+
+import '../core/config/app_config.dart';
+import '../core/di/service_locator.dart';
+import '../data/models/retail/hive_model/attribute_model_219.dart';
+import '../data/models/retail/hive_model/attribute_value_model_220.dart';
+import '../domain/store/common/add_product_form_store.dart';
+import '../domain/store/retail/product_store.dart';
+import '../domain/store/retail/attribute_store.dart';
+import '../domain/store/restaurant/item_store.dart';
+import '../domain/store/restaurant/category_store.dart' as restaurant;
+import '../domain/store/restaurant/choice_store.dart';
+import '../domain/store/restaurant/extra_store.dart';
+import '../util/color.dart';
+import '../util/responsive.dart';
+import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
+
+class AddProductScreen extends StatefulWidget {
+  const AddProductScreen({Key? key}) : super(key: key);
+
+  @override
+  State<AddProductScreen> createState() => _AddProductScreenState();
+}
+
+class _AddProductScreenState extends State<AddProductScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  late AddProductFormStore _formStore;
+  final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
+
+  // Text Controllers
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _taxRateController = TextEditingController();
+
+  // Retail Controllers
+  final _brandController = TextEditingController();
+  final _subCategoryController = TextEditingController();
+  final _mrpController = TextEditingController();
+  final _costPriceController = TextEditingController();
+  final _hsnCodeController = TextEditingController();
+  final _skuController = TextEditingController();
+  final _barcodeController = TextEditingController();
+  final _stockController = TextEditingController();
+  final _minStockController = TextEditingController();
+
+  // Restaurant Controllers
+  final _unitController = TextEditingController();
+  final _restaurantStockController = TextEditingController();
+
+  // Bulk variant editing
+  final Set<String> _selectedVariantsForBulk = {};
+  final _bulkCostPriceController = TextEditingController();
+  final _bulkSellingPriceController = TextEditingController();
+  final _bulkStockController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _formStore = AddProductFormStore();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _scrollController.dispose();
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    _taxRateController.dispose();
+    _brandController.dispose();
+    _subCategoryController.dispose();
+    _mrpController.dispose();
+    _costPriceController.dispose();
+    _hsnCodeController.dispose();
+    _skuController.dispose();
+    _barcodeController.dispose();
+    _stockController.dispose();
+    _minStockController.dispose();
+    _unitController.dispose();
+    _restaurantStockController.dispose();
+    _bulkCostPriceController.dispose();
+    _bulkSellingPriceController.dispose();
+    _bulkStockController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      _formStore.setImagePath(image.path);
+    }
+  }
+
+  void _clearForm() {
+    _nameController.clear();
+    _descriptionController.clear();
+    _priceController.clear();
+    _taxRateController.clear();
+    _brandController.clear();
+    _subCategoryController.clear();
+    _mrpController.clear();
+    _costPriceController.clear();
+    _hsnCodeController.clear();
+    _skuController.clear();
+    _barcodeController.clear();
+    _stockController.clear();
+    _minStockController.clear();
+    _unitController.clear();
+    _restaurantStockController.clear();
+    _formStore.reset();
+  }
+
+  Future<void> _submitForm() async {
+    // Sync text controllers to store
+    _formStore.setName(_nameController.text);
+    _formStore.setDescription(_descriptionController.text);
+    _formStore.setPrice(double.tryParse(_priceController.text) ?? 0);
+    _formStore.setTaxRate(double.tryParse(_taxRateController.text) ?? 0);
+
+    if (AppConfig.isRetail) {
+      _formStore.setBrandName(_brandController.text.isEmpty ? null : _brandController.text);
+      _formStore.setSubCategory(_subCategoryController.text.isEmpty ? null : _subCategoryController.text);
+      _formStore.setMrp(double.tryParse(_mrpController.text) ?? 0);
+      _formStore.setCostPrice(double.tryParse(_costPriceController.text) ?? 0);
+      _formStore.setHsnCode(_hsnCodeController.text.isEmpty ? null : _hsnCodeController.text);
+      _formStore.setSku(_skuController.text);
+      _formStore.setBarcode(_barcodeController.text);
+      _formStore.setStockQuantity(int.tryParse(_stockController.text) ?? 0);
+      _formStore.setMinStock(int.tryParse(_minStockController.text) ?? 0);
+    } else {
+      _formStore.setUnit(_unitController.text.isEmpty ? null : _unitController.text);
+      _formStore.setRestaurantStockQuantity(double.tryParse(_restaurantStockController.text) ?? 0);
+    }
+
+    final success = await _formStore.submit();
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppConfig.isRetail ? 'Product added successfully!' : 'Item added successfully!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      _clearForm();
+    } else if (_formStore.errorMessage != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_formStore.errorMessage!),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = Responsive.isDesktop(context);
+    final isTablet = Responsive.isTablet(context);
+    final isMobile = Responsive.isMobile(context);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: _buildAppBar(),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildAddProductTab(isDesktop, isTablet, isMobile),
+          _buildProductListTab(),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    final title = AppConfig.isRetail ? 'Product Management' : 'Menu Management';
+
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      title: Text(
+        title,
+        style: const TextStyle(color: AppColors.darkNeutral),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: AppColors.darkNeutral),
+        onPressed: () => Navigator.pop(context),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.download, color: AppColors.primary),
+          onPressed: () => _downloadTemplate(),
+          tooltip: 'Download Template',
+        ),
+        IconButton(
+          icon: const Icon(Icons.upload_file, color: AppColors.success),
+          onPressed: () => _uploadExcel(),
+          tooltip: 'Upload Excel',
+        ),
+      ],
+      bottom: TabBar(
+        controller: _tabController,
+        labelColor: AppColors.primary,
+        unselectedLabelColor: Colors.grey,
+        indicatorColor: AppColors.primary,
+        tabs: [
+          Tab(
+            text: AppConfig.isRetail ? 'Add Product' : 'Add Item',
+            icon: const Icon(Icons.add_box),
+          ),
+          Tab(
+            text: AppConfig.isRetail ? 'Product List' : 'Item List',
+            icon: const Icon(Icons.inventory),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddProductTab(bool isDesktop, bool isTablet, bool isMobile) {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      child: Center(
+        child: Container(
+          constraints: BoxConstraints(maxWidth: isDesktop ? 1000 : 800),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Excel Import Card
+                if (AppConfig.isRetail) _buildExcelImportCard(),
+                const SizedBox(height: 24),
+
+                // Main Form Card
+                Container(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      _buildSectionHeader(
+                        icon: Icons.edit,
+                        title: AppConfig.isRetail ? 'Add Product Manually' : 'Add Menu Item',
+                      ),
+                      const Divider(height: 30),
+
+                      // Section 1: Basic Information
+                      _buildBasicInfoSection(isMobile),
+                      const SizedBox(height: 24),
+
+                      // Section 2: Pricing & Tax
+                      _buildPricingSection(isMobile),
+                      const SizedBox(height: 24),
+
+                      // Section 3: Variants/Sizes (Dynamic)
+                      if (AppConfig.isRetail)
+                        _buildRetailVariantsSection(isMobile)
+                      else
+                        _buildRestaurantSizesSection(isMobile),
+                      const SizedBox(height: 24),
+
+                      // Section 4: Customization (Restaurant Only)
+                      if (AppConfig.isRestaurant) ...[
+                        _buildCustomizationSection(isMobile),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Section 5: Inventory
+                      _buildInventorySection(isMobile),
+                      const SizedBox(height: 24),
+
+                      // Section 6: Identification (Retail Only)
+                      if (AppConfig.isRetail) ...[
+                        _buildIdentificationSection(isMobile),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Action Buttons
+                      _buildActionButtons(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({required IconData icon, required String title}) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 24),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppColors.darkNeutral,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.darkNeutral,
+        ),
+      ),
+    );
+  }
+
+  // ==================== SECTION 1: BASIC INFO ====================
+
+  Widget _buildBasicInfoSection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSubSectionTitle('Basic Information'),
+
+        // Image Picker
+        _buildImagePicker(),
+        const SizedBox(height: 16),
+
+        // Name & Price Row
+        if (isMobile)
+          Column(
+            children: [
+              _buildTextField(
+                controller: _nameController,
+                label: AppConfig.isRetail ? 'Product Name*' : 'Item Name*',
+                icon: Icons.inventory,
+              ),
+              const SizedBox(height: 16),
+              // Show price field only for Restaurant mode (for Retail, it's in Pricing & Tax section)
+              if (AppConfig.isRestaurant && !_formStore.hasPortionSizes)
+                _buildTextField(
+                  controller: _priceController,
+                  label: 'Price*',
+                  icon: Icons.attach_money,
+                  keyboardType: TextInputType.number,
+                  iconColor: AppColors.success,
+                ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: _buildTextField(
+                  controller: _nameController,
+                  label: AppConfig.isRetail ? 'Product Name*' : 'Item Name*',
+                  icon: Icons.inventory,
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Show price field only for Restaurant mode (for Retail, it's in Pricing & Tax section)
+              Expanded(
+                child: Observer(
+                  builder: (_) => (AppConfig.isRestaurant && !_formStore.hasPortionSizes)
+                      ? _buildTextField(
+                          controller: _priceController,
+                          label: 'Price*',
+                          icon: Icons.attach_money,
+                          keyboardType: TextInputType.number,
+                          iconColor: AppColors.success,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        const SizedBox(height: 16),
+
+        // Category Dropdown
+        _buildCategoryDropdown(),
+        const SizedBox(height: 16),
+
+        // Retail-specific fields
+        if (AppConfig.isRetail) ...[
+          if (isMobile)
+            Column(
+              children: [
+                _buildTextField(
+                  controller: _brandController,
+                  label: 'Brand Name',
+                  icon: Icons.business,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _subCategoryController,
+                  label: 'Sub-category',
+                  icon: Icons.category_outlined,
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: _brandController,
+                    label: 'Brand Name',
+                    icon: Icons.business,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildTextField(
+                    controller: _subCategoryController,
+                    label: 'Sub-category',
+                    icon: Icons.category_outlined,
+                  ),
+                ),
+              ],
+            ),
+        ],
+
+        // Restaurant-specific fields
+        if (AppConfig.isRestaurant) ...[
+          if (isMobile)
+            Column(
+              children: [
+                _buildTextField(
+                  controller: _unitController,
+                  label: 'Unit (e.g., pcs, kg)',
+                  icon: Icons.straighten,
+                ),
+                const SizedBox(height: 16),
+                _buildVegToggle(),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: _unitController,
+                    label: 'Unit (e.g., pcs, kg)',
+                    icon: Icons.straighten,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: _buildVegToggle()),
+              ],
+            ),
+        ],
+
+        const SizedBox(height: 16),
+
+        // Description
+        _buildTextField(
+          controller: _descriptionController,
+          label: 'Description',
+          icon: Icons.description,
+          maxLines: 3,
+          iconColor: AppColors.secondary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImagePicker() {
+    return Observer(
+      builder: (_) => GestureDetector(
+        onTap: _pickImage,
+        child: Container(
+          height: 120,
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: _formStore.imagePath != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(_formStore.imagePath!),
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                  ),
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey[400]),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap to add image',
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVegToggle() {
+    return Observer(
+      builder: (_) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.eco, color: AppColors.success),
+            const SizedBox(width: 12),
+            const Text('Type: '),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Veg'),
+              selected: _formStore.isVeg == 'veg',
+              onSelected: (_) => _formStore.setIsVeg('veg'),
+              selectedColor: AppColors.success.withOpacity(0.2),
+              avatar: _formStore.isVeg == 'veg'
+                  ? const Icon(Icons.check_circle, color: AppColors.success, size: 18)
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('Non-Veg'),
+              selected: _formStore.isVeg == 'non-veg',
+              onSelected: (_) => _formStore.setIsVeg('non-veg'),
+              selectedColor: AppColors.danger.withOpacity(0.2),
+              avatar: _formStore.isVeg == 'non-veg'
+                  ? const Icon(Icons.check_circle, color: AppColors.danger, size: 18)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryDropdown() {
+    if (AppConfig.isRetail) {
+      final productStore = locator<ProductStore>();
+      return Observer(
+        builder: (_) {
+          // Ensure the selected value is valid or null
+          final selectedValue = productStore.categories.contains(_formStore.selectedCategoryId)
+              ? _formStore.selectedCategoryId
+              : null;
+
+          return DropdownButtonFormField<String>(
+            value: selectedValue,
+            decoration: InputDecoration(
+              labelText: 'Category*',
+              prefixIcon: const Icon(Icons.category, color: AppColors.primary),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            items: productStore.categories.map((category) {
+              return DropdownMenuItem(value: category, child: Text(category));
+            }).toList(),
+            onChanged: (value) => _formStore.setSelectedCategoryId(value),
+            hint: const Text('Select category'),
+          );
+        },
+      );
+    } else {
+      final categoryStore = locator<restaurant.CategoryStore>();
+      return Observer(
+        builder: (_) {
+          // Ensure the selected value is valid or null
+          final categoryIds = categoryStore.categories.map((c) => c.id).toList();
+          final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
+              ? _formStore.selectedCategoryId
+              : null;
+
+          return DropdownButtonFormField<String>(
+            value: selectedValue,
+            decoration: InputDecoration(
+              labelText: 'Category*',
+              prefixIcon: const Icon(Icons.category, color: AppColors.primary),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            items: categoryStore.categories.map((category) {
+              return DropdownMenuItem(value: category.id, child: Text(category.name));
+            }).toList(),
+            onChanged: (value) => _formStore.setSelectedCategoryId(value),
+            hint: const Text('Select category'),
+          );
+        },
+      );
+    }
+  }
+
+  Widget _buildGstDropdown() {
+    // Common GST rates in India
+    const gstRates = ['0', '5', '12', '18', '28'];
+
+    return DropdownButtonFormField<String>(
+      value: _taxRateController.text.isEmpty ? null : _taxRateController.text,
+      decoration: InputDecoration(
+        labelText: 'GST Rate (%)',
+        prefixIcon: const Icon(Icons.percent, color: AppColors.primary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      items: gstRates.map((rate) {
+        return DropdownMenuItem(
+          value: rate,
+          child: Text('$rate%'),
+        );
+      }).toList(),
+      onChanged: (value) {
+        setState(() {
+          _taxRateController.text = value ?? '';
+        });
+      },
+      hint: const Text('Select GST rate'),
+    );
+  }
+
+  // ==================== SECTION 2: PRICING ====================
+
+  Widget _buildPricingSection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSubSectionTitle('Pricing & Tax'),
+
+        // GST/Tax Rate Dropdown for Retail, TextField for Restaurant
+        if (isMobile)
+          AppConfig.isRetail
+            ? _buildGstDropdown()
+            : _buildTextField(
+                controller: _taxRateController,
+                label: 'Tax Rate (%)',
+                icon: Icons.percent,
+                keyboardType: TextInputType.number,
+              )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: AppConfig.isRetail
+                  ? _buildGstDropdown()
+                  : _buildTextField(
+                      controller: _taxRateController,
+                      label: 'Tax Rate (%)',
+                      icon: Icons.percent,
+                      keyboardType: TextInputType.number,
+                    ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(child: SizedBox.shrink()),
+            ],
+          ),
+
+        // Retail-specific pricing (only for Simple products, not Variable)
+        if (AppConfig.isRetail) ...[
+          const SizedBox(height: 16),
+          Observer(
+            builder: (_) {
+              // Hide pricing fields for Variable products (prices are set per variant)
+              final isVariable = _formStore.productType == 'variable';
+
+              if (isVariable) {
+                // For variable products, show info message and HSN Code only
+                return Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Prices will be set individually for each variant',
+                              style: TextStyle(
+                                color: Colors.blue.shade900,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _hsnCodeController,
+                      label: 'HSN Code',
+                      icon: Icons.qr_code_2,
+                    ),
+                  ],
+                );
+              }
+
+              // For simple products, show all pricing fields
+              return isMobile
+                ? Column(
+                    children: [
+                      _buildTextField(
+                        controller: _costPriceController,
+                        label: 'Cost Price*',
+                        icon: Icons.money_off,
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _priceController,
+                        label: 'Selling Price*',
+                        icon: Icons.attach_money,
+                        keyboardType: TextInputType.number,
+                        iconColor: AppColors.success,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _mrpController,
+                        label: 'MRP',
+                        icon: Icons.price_check,
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _hsnCodeController,
+                        label: 'HSN Code',
+                        icon: Icons.qr_code_2,
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _costPriceController,
+                              label: 'Cost Price*',
+                              icon: Icons.money_off,
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _priceController,
+                              label: 'Selling Price*',
+                              icon: Icons.attach_money,
+                              keyboardType: TextInputType.number,
+                              iconColor: AppColors.success,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _mrpController,
+                              label: 'MRP',
+                              icon: Icons.price_check,
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _hsnCodeController,
+                              label: 'HSN Code',
+                              icon: Icons.qr_code_2,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          const Expanded(child: SizedBox.shrink()),
+                          const SizedBox(width: 16),
+                          const Expanded(child: SizedBox.shrink()),
+                        ],
+                      ),
+                    ],
+                  );
+            },
+          ),
+
+          // Profit Margin Display
+          const SizedBox(height: 16),
+          Observer(
+            builder: (_) {
+              final costPrice = double.tryParse(_costPriceController.text) ?? 0;
+              final price = double.tryParse(_priceController.text) ?? 0;
+              if (costPrice > 0 && price > 0) {
+                final profit = price - costPrice;
+                final margin = (profit / costPrice) * 100;
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: profit >= 0 ? AppColors.success.withOpacity(0.1) : AppColors.danger.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        profit >= 0 ? Icons.trending_up : Icons.trending_down,
+                        color: profit >= 0 ? AppColors.success : AppColors.danger,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Profit: ₹${profit.toStringAsFixed(2)} (${margin.toStringAsFixed(1)}%)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: profit >= 0 ? AppColors.success : AppColors.danger,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ==================== SECTION 3: VARIANTS ====================
+
+  Widget _buildRetailVariantsSection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSubSectionTitle('Product Variants'),
+
+        // Product Type Toggle
+        Observer(
+          builder: (_) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Text('Product Type: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                const SizedBox(width: 16),
+                ChoiceChip(
+                  label: const Text('Simple'),
+                  selected: _formStore.productType == 'simple',
+                  onSelected: (_) => _formStore.setProductType('simple'),
+                  selectedColor: AppColors.primary.withOpacity(0.2),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Variable'),
+                  selected: _formStore.productType == 'variable',
+                  onSelected: (_) => _formStore.setProductType('variable'),
+                  selectedColor: AppColors.secondary.withOpacity(0.2),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Variable Product Options
+        Observer(
+          builder: (_) {
+            if (_formStore.productType != 'variable') {
+              return const SizedBox.shrink();
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                _buildAttributeSelector(),
+                const SizedBox(height: 16),
+                _buildVariantsList(isMobile),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAttributeSelector() {
+    final attributeStore = locator<AttributeStore>();
+
+    return Observer(
+      builder: (_) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Select Attributes:',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              TextButton.icon(
+                onPressed: () => _showAddAttributeDialog(attributeStore),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add Attribute'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Show message if no attributes
+          if (attributeStore.attributes.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'No attributes found',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Attributes define product variants like Size, Color, Material, etc.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => _createDefaultAttributes(attributeStore),
+                    icon: const Icon(Icons.auto_awesome, size: 16),
+                    label: const Text('Create Default Attributes (Size, Color, Weight)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: attributeStore.attributes.map((attr) {
+                final isSelected = _formStore.selectedAttributeIds.contains(attr.attributeId);
+                return FilterChip(
+                  label: Text(attr.name),
+                  selected: isSelected,
+                  onSelected: (_) => _formStore.toggleAttribute(attr.attributeId),
+                  selectedColor: AppColors.primary.withOpacity(0.2),
+                );
+              }).toList(),
+            ),
+
+          // Show values for selected attributes
+          ..._formStore.selectedAttributeIds.map((attrId) {
+            final attr = attributeStore.attributes.firstWhere((a) => a.attributeId == attrId);
+            final values = attributeStore.getValuesForAttribute(attrId);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Text('${attr.name} Values:', style: const TextStyle(fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: values.map((val) {
+                    final isSelected = _formStore.selectedAttributeValues[attrId]?.contains(val.valueId) ?? false;
+                    return FilterChip(
+                      label: Text(val.value),
+                      selected: isSelected,
+                      onSelected: (_) => _formStore.toggleAttributeValue(attrId, val.valueId),
+                      selectedColor: AppColors.secondary.withOpacity(0.2),
+                      avatar: val.colorCode != null
+                          ? CircleAvatar(
+                              backgroundColor: _parseColor(val.colorCode!),
+                              radius: 10,
+                            )
+                          : null,
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          }),
+
+          // Generate Variants Button
+          if (_formStore.selectedAttributeIds.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                _showVariantGenerationDialog(attributeStore);
+              },
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Generate Variants'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _parseColor(String hexColor) {
+    try {
+      return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
+
+  Widget _buildVariantsList(bool isMobile) {
+    return Observer(
+      builder: (_) {
+        if (_formStore.retailVariants.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: Text(
+                'No variants yet. Select attributes and generate variants.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Variants (${_formStore.retailVariants.length})',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+
+            // Bulk Edit Bar
+            _buildBulkEditBar(isMobile),
+            const SizedBox(height: 12),
+
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _formStore.retailVariants.length,
+              itemBuilder: (context, index) {
+                final variant = _formStore.retailVariants[index];
+                return _buildVariantCard(variant, index, isMobile);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBulkEditBar(bool isMobile) {
+    // Cache variant count to avoid accessing observable list multiple times
+    final variantCount = _formStore.retailVariants.length;
+    final allSelected = variantCount > 0 && _selectedVariantsForBulk.length == variantCount;
+    final noneSelected = _selectedVariantsForBulk.isEmpty;
+    final selectedCount = _selectedVariantsForBulk.length;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFFE082)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with Select All / Unselect All
+          Row(
+            children: [
+              const Icon(Icons.edit_note, color: Color(0xFFF57C00), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Bulk Edit - $selectedCount / $variantCount selected',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFF57C00),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: allSelected
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedVariantsForBulk.clear();
+                          // Create a copy of the list to avoid concurrent modification
+                          final variants = _formStore.retailVariants.toList();
+                          for (var v in variants) {
+                            _selectedVariantsForBulk.add(v.id);
+                          }
+                        });
+                      },
+                child: Text(
+                  'Select All',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: allSelected ? Colors.grey : const Color(0xFFF57C00),
+                  ),
+                ),
+              ),
+              const Text(' | ', style: TextStyle(color: Colors.grey)),
+              TextButton(
+                onPressed: noneSelected
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedVariantsForBulk.clear();
+                        });
+                      },
+                child: Text(
+                  'Unselect All',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: noneSelected ? Colors.grey : Colors.red,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Bulk pricing fields
+          if (isMobile)
+            Column(
+              children: [
+                TextField(
+                  controller: _bulkCostPriceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Cost Price',
+                    hintText: '0.00',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _bulkSellingPriceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Selling Price',
+                    hintText: '0.00',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _bulkStockController,
+                  decoration: const InputDecoration(
+                    labelText: 'Stock',
+                    hintText: '0',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _bulkCostPriceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cost Price',
+                      hintText: '0.00',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _bulkSellingPriceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Selling Price',
+                      hintText: '0.00',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _bulkStockController,
+                    decoration: const InputDecoration(
+                      labelText: 'Stock',
+                      hintText: '0',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+
+          const SizedBox(height: 12),
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: _applyBulkPricing,
+              icon: const Icon(Icons.done_all),
+              label: const Text('Apply to Selected Variants'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF57C00),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Workflow: 1) Enter price/stock above  2) Select variants  3) Click Apply. Fields will clear automatically for next group. You can repeat for different prices.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[600],
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyBulkPricing() {
+    final costPrice = double.tryParse(_bulkCostPriceController.text);
+    final sellingPrice = double.tryParse(_bulkSellingPriceController.text);
+    final stock = int.tryParse(_bulkStockController.text);
+
+    if (costPrice == null && sellingPrice == null && stock == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter at least one value to apply'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedVariantsForBulk.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one variant'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final selectedCount = _selectedVariantsForBulk.length;
+
+    // Create a copy of selected IDs to avoid concurrent modification
+    final selectedIds = Set<String>.from(_selectedVariantsForBulk);
+
+    // Apply to selected variants
+    try {
+      for (int i = 0; i < _formStore.retailVariants.length; i++) {
+        final variant = _formStore.retailVariants[i];
+        if (selectedIds.contains(variant.id)) {
+          _formStore.updateRetailVariant(
+            i,
+            variant.copyWith(
+              costPrice: costPrice ?? variant.costPrice,
+              price: sellingPrice ?? variant.price,
+              stockQuantity: stock ?? variant.stockQuantity,
+            ),
+          );
+        }
+      }
+
+      // Clear inputs and selections for next group
+      setState(() {
+        _bulkCostPriceController.clear();
+        _bulkSellingPriceController.clear();
+        _bulkStockController.clear();
+        _selectedVariantsForBulk.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Applied to $selectedCount variant(s). Ready for next group.'),
+          backgroundColor: const Color(0xFF4CAF50),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error applying bulk pricing: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildVariantCard(VariantFormData variant, int index, bool isMobile) {
+    final isSelected = _selectedVariantsForBulk.contains(variant.id);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: isSelected ? Colors.orange.shade50 : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isSelected ? Colors.orange : Colors.grey.shade300,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: ExpansionTile(
+        leading: Checkbox(
+          value: isSelected,
+          onChanged: (value) {
+            setState(() {
+              if (value == true) {
+                _selectedVariantsForBulk.add(variant.id);
+              } else {
+                _selectedVariantsForBulk.remove(variant.id);
+              }
+            });
+          },
+          activeColor: Colors.orange,
+        ),
+        title: Text(variant.name.isEmpty ? 'Variant ${index + 1}' : variant.name),
+        subtitle: Text('Price: ₹${variant.price} | Stock: ${variant.stockQuantity}'),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: AppColors.danger),
+          onPressed: () => _formStore.removeRetailVariant(index),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                if (isMobile)
+                  Column(
+                    children: [
+                      TextFormField(
+                        initialValue: variant.sku,
+                        decoration: const InputDecoration(
+                          labelText: 'SKU',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (v) => _formStore.updateRetailVariant(
+                          index,
+                          variant.copyWith(sku: v),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: variant.barcode,
+                        decoration: const InputDecoration(
+                          labelText: 'Barcode',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (v) => _formStore.updateRetailVariant(
+                          index,
+                          variant.copyWith(barcode: v),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: variant.price.toString(),
+                        decoration: const InputDecoration(
+                          labelText: 'Price',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (v) => _formStore.updateRetailVariant(
+                          index,
+                          variant.copyWith(price: double.tryParse(v) ?? 0),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        initialValue: variant.stockQuantity.toString(),
+                        decoration: const InputDecoration(
+                          labelText: 'Stock',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (v) => _formStore.updateRetailVariant(
+                          index,
+                          variant.copyWith(stockQuantity: int.tryParse(v) ?? 0),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: variant.sku,
+                          decoration: const InputDecoration(
+                            labelText: 'SKU',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (v) => _formStore.updateRetailVariant(
+                            index,
+                            variant.copyWith(sku: v),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: variant.barcode,
+                          decoration: const InputDecoration(
+                            labelText: 'Barcode',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (v) => _formStore.updateRetailVariant(
+                            index,
+                            variant.copyWith(barcode: v),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: variant.price.toString(),
+                          decoration: const InputDecoration(
+                            labelText: 'Price',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => _formStore.updateRetailVariant(
+                            index,
+                            variant.copyWith(price: double.tryParse(v) ?? 0),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: variant.stockQuantity.toString(),
+                          decoration: const InputDecoration(
+                            labelText: 'Stock',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => _formStore.updateRetailVariant(
+                            index,
+                            variant.copyWith(stockQuantity: int.tryParse(v) ?? 0),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestaurantSizesSection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSubSectionTitle('Portion Sizes'),
+
+        // Has Sizes Toggle
+        Observer(
+          builder: (_) => SwitchListTile(
+            title: const Text('Has Multiple Sizes'),
+            subtitle: const Text('Enable if item has different portion sizes (S, M, L)'),
+            value: _formStore.hasPortionSizes,
+            onChanged: (v) => _formStore.setHasPortionSizes(v),
+            activeColor: AppColors.primary,
+          ),
+        ),
+
+        // Portion Sizes List
+        Observer(
+          builder: (_) {
+            if (!_formStore.hasPortionSizes) {
+              return const SizedBox.shrink();
+            }
+
+            return Column(
+              children: [
+                const SizedBox(height: 16),
+                ..._formStore.portionSizes.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final size = entry.value;
+                  return _buildPortionSizeCard(size, index, isMobile);
+                }),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _formStore.addPortionSize(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Size'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPortionSizeCard(PortionSizeFormData size, int index, bool isMobile) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextFormField(
+                initialValue: size.name,
+                decoration: InputDecoration(
+                  labelText: 'Size Name',
+                  hintText: 'e.g., Small, Medium, Large',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  isDense: true,
+                ),
+                onChanged: (v) => _formStore.updatePortionSize(
+                  index,
+                  size.copyWith(name: v),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextFormField(
+                initialValue: size.price > 0 ? size.price.toString() : '',
+                decoration: InputDecoration(
+                  labelText: 'Price',
+                  prefixText: '₹',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (v) => _formStore.updatePortionSize(
+                  index,
+                  size.copyWith(price: double.tryParse(v) ?? 0),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (_formStore.trackInventory)
+              Expanded(
+                child: TextFormField(
+                  initialValue: size.stockQuantity > 0 ? size.stockQuantity.toString() : '',
+                  decoration: InputDecoration(
+                    labelText: 'Stock',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    isDense: true,
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (v) => _formStore.updatePortionSize(
+                    index,
+                    size.copyWith(stockQuantity: double.tryParse(v) ?? 0),
+                  ),
+                ),
+              ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: AppColors.danger),
+              onPressed: () => _formStore.removePortionSize(index),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== SECTION 4: CUSTOMIZATION (RESTAURANT) ====================
+
+  Widget _buildCustomizationSection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSubSectionTitle('Customization Options'),
+
+        // Choice Groups
+        _buildChoiceGroupsSelector(),
+        const SizedBox(height: 16),
+
+        // Extra Groups
+        _buildExtraGroupsSelector(),
+      ],
+    );
+  }
+
+  Widget _buildChoiceGroupsSelector() {
+    final choiceStore = locator<ChoiceStore>();
+
+    return Observer(
+      builder: (_) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Choice Groups (Free Selections)',
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          if (choiceStore.choices.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'No choice groups available. Create them in settings.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: choiceStore.choices.map((choice) {
+                final isSelected = _formStore.selectedChoiceIds.contains(choice.id);
+                return FilterChip(
+                  label: Text(choice.name),
+                  selected: isSelected,
+                  onSelected: (_) => _formStore.toggleChoiceGroup(choice.id),
+                  selectedColor: AppColors.primary.withOpacity(0.2),
+                  avatar: isSelected
+                      ? const Icon(Icons.check_circle, size: 18, color: AppColors.primary)
+                      : const Icon(Icons.radio_button_unchecked, size: 18),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExtraGroupsSelector() {
+    final extraStore = locator<ExtraStore>();
+
+    return Observer(
+      builder: (_) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Extra Groups (Paid Add-ons)',
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          if (extraStore.extras.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'No extra groups available. Create them in settings.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          else
+            Column(
+              children: extraStore.extras.map((extra) {
+                final isSelected = _formStore.selectedExtraIds.contains(extra.Id);
+                final constraint = _formStore.extraConstraints[extra.Id];
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: CheckboxListTile(
+                    title: Text(extra.Ename),
+                    subtitle: isSelected && constraint != null
+                        ? Row(
+                            children: [
+                              const Text('Min: '),
+                              SizedBox(
+                                width: 50,
+                                child: TextFormField(
+                                  initialValue: constraint.min.toString(),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (v) => _formStore.setExtraConstraint(
+                                    extra.Id,
+                                    int.tryParse(v) ?? 0,
+                                    constraint.max,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              const Text('Max: '),
+                              SizedBox(
+                                width: 50,
+                                child: TextFormField(
+                                  initialValue: constraint.max.toString(),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (v) => _formStore.setExtraConstraint(
+                                    extra.Id,
+                                    constraint.min,
+                                    int.tryParse(v) ?? 5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text('${extra.topping?.length ?? 0} toppings'),
+                    value: isSelected,
+                    onChanged: (_) => _formStore.toggleExtraGroup(extra.Id),
+                    activeColor: AppColors.primary,
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== SECTION 5: INVENTORY ====================
+
+  Widget _buildInventorySection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSubSectionTitle('Inventory Details'),
+
+        if (AppConfig.isRetail) ...[
+          // Retail Inventory (Simple product only)
+          Observer(
+            builder: (_) {
+              if (_formStore.productType == 'variable') {
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue[700]),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Stock is managed per variant for variable products.',
+                          style: TextStyle(color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return isMobile
+                  ? Column(
+                      children: [
+                        _buildTextField(
+                          controller: _stockController,
+                          label: 'Initial Stock',
+                          icon: Icons.inventory_2,
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _minStockController,
+                          label: 'Min Stock (Alert)',
+                          icon: Icons.warning_amber,
+                          keyboardType: TextInputType.number,
+                          iconColor: AppColors.warning,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _stockController,
+                            label: 'Initial Stock',
+                            icon: Icons.inventory_2,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _minStockController,
+                            label: 'Min Stock (Alert)',
+                            icon: Icons.warning_amber,
+                            keyboardType: TextInputType.number,
+                            iconColor: AppColors.warning,
+                          ),
+                        ),
+                      ],
+                    );
+            },
+          ),
+        ] else ...[
+          // Restaurant Inventory Options
+          Observer(
+            builder: (_) => Column(
+              children: [
+                SwitchListTile(
+                  title: const Text('Track Inventory'),
+                  subtitle: const Text('Enable stock tracking for this item'),
+                  value: _formStore.trackInventory,
+                  onChanged: (v) => _formStore.setTrackInventory(v),
+                  activeColor: AppColors.primary,
+                ),
+
+                if (_formStore.trackInventory && !_formStore.hasPortionSizes) ...[
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _restaurantStockController,
+                    label: 'Stock Quantity',
+                    icon: Icons.inventory_2,
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
+
+                SwitchListTile(
+                  title: const Text('Allow Order When Out of Stock'),
+                  subtitle: const Text('Customers can still order when stock is 0'),
+                  value: _formStore.allowOrderWhenOutOfStock,
+                  onChanged: (v) => _formStore.setAllowOrderWhenOutOfStock(v),
+                  activeColor: AppColors.warning,
+                ),
+
+                SwitchListTile(
+                  title: const Text('Sold by Weight'),
+                  subtitle: const Text('Item is priced by weight (kg, grams)'),
+                  value: _formStore.isSoldByWeight,
+                  onChanged: (v) => _formStore.setIsSoldByWeight(v),
+                  activeColor: AppColors.secondary,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ==================== SECTION 6: IDENTIFICATION (RETAIL) ====================
+
+  Widget _buildIdentificationSection(bool isMobile) {
+    return Observer(
+      builder: (_) {
+        if (_formStore.productType == 'variable') {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue[700]),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'SKU and Barcode are managed per variant for variable products.',
+                    style: TextStyle(color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSubSectionTitle('Product Identification'),
+            if (isMobile)
+              Column(
+                children: [
+                  _buildTextField(
+                    controller: _skuController,
+                    label: 'SKU',
+                    icon: Icons.qr_code,
+                    iconColor: AppColors.info,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.auto_awesome),
+                      onPressed: () {
+                        // Auto-generate SKU
+                        final sku = 'SKU-${DateTime.now().millisecondsSinceEpoch}';
+                        _skuController.text = sku;
+                      },
+                      tooltip: 'Auto-generate',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _barcodeController,
+                    label: 'Barcode',
+                    icon: Icons.barcode_reader,
+                    iconColor: AppColors.info,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.qr_code_scanner),
+                      onPressed: () {
+                        // Scan barcode
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Barcode scanner coming soon')),
+                        );
+                      },
+                      tooltip: 'Scan',
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _skuController,
+                      label: 'SKU',
+                      icon: Icons.qr_code,
+                      iconColor: AppColors.info,
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.auto_awesome),
+                        onPressed: () {
+                          final sku = 'SKU-${DateTime.now().millisecondsSinceEpoch}';
+                          _skuController.text = sku;
+                        },
+                        tooltip: 'Auto-generate',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _barcodeController,
+                      label: 'Barcode',
+                      icon: Icons.barcode_reader,
+                      iconColor: AppColors.info,
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.qr_code_scanner),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Barcode scanner coming soon')),
+                          );
+                        },
+                        tooltip: 'Scan',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ==================== ACTION BUTTONS ====================
+
+  Widget _buildActionButtons() {
+    return Observer(
+      builder: (_) => Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _formStore.isLoading ? null : _clearForm,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                side: const BorderSide(color: AppColors.danger),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Clear Form',
+                style: TextStyle(color: AppColors.danger),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: _formStore.isLoading ? null : _submitForm,
+              icon: _formStore.isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.add),
+              label: Text(
+                AppConfig.isRetail ? 'Add Product' : 'Add Item',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== HELPER WIDGETS ====================
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    Color? iconColor,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    Widget? suffixIcon,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: iconColor ?? AppColors.primary),
+        suffixIcon: suffixIcon,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExcelImportCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withOpacity(0.1),
+            AppColors.secondary.withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.table_chart,
+            size: 48,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Bulk Import via Excel',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.darkNeutral,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  AppConfig.isRetail
+                      ? 'Upload multiple products at once using Excel'
+                      : 'Upload multiple menu items at once using Excel',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BulkImportScreen()),
+              );
+            },
+            icon: const Icon(Icons.upload_file, size: 18),
+            label: const Text('Start Import'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _downloadTemplate() {
+    // Only available for Retail mode
+    if (AppConfig.isRetail) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const BulkImportScreen(),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bulk import is only available for Retail mode'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    }
+  }
+
+  void _uploadExcel() {
+    // Only available for Retail mode
+    if (AppConfig.isRetail) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const BulkImportScreen(),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bulk import is only available for Retail mode'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    }
+  }
+
+  // ==================== PRODUCT LIST TAB ====================
+
+  Widget _buildProductListTab() {
+    if (AppConfig.isRetail) {
+      return _buildRetailProductList();
+    } else {
+      return _buildRestaurantItemList();
+    }
+  }
+
+  Widget _buildRetailProductList() {
+    final productStore = locator<ProductStore>();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildListHeader(productStore.products.length, 'Products'),
+            Expanded(
+              child: Observer(
+                builder: (_) => productStore.products.isEmpty
+                    ? _buildEmptyState('products')
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(20),
+                        itemCount: productStore.products.length,
+                        separatorBuilder: (_, __) => const Divider(),
+                        itemBuilder: (context, index) {
+                          final product = productStore.products[index];
+                          return ListTile(
+                            leading: Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: product.imagePath != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        File(product.imagePath!),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : const Icon(Icons.inventory, color: AppColors.primary),
+                            ),
+                            title: Text(
+                              product.productName,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              '${product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  onPressed: () {},
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
+                                  onPressed: () => productStore.deleteProduct(product.productId),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRestaurantItemList() {
+    final itemStore = locator<ItemStore>();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildListHeader(itemStore.items.length, 'Items'),
+            Expanded(
+              child: Observer(
+                builder: (_) => itemStore.items.isEmpty
+                    ? _buildEmptyState('items')
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(20),
+                        itemCount: itemStore.items.length,
+                        separatorBuilder: (_, __) => const Divider(),
+                        itemBuilder: (context, index) {
+                          final item = itemStore.items[index];
+                          return ListTile(
+                            leading: Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: item.isVeg == 'veg'
+                                    ? AppColors.success.withOpacity(0.1)
+                                    : AppColors.danger.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: item.imagePath != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        File(item.imagePath!),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.restaurant,
+                                      color: item.isVeg == 'veg' ? AppColors.success : AppColors.danger,
+                                    ),
+                            ),
+                            title: Text(
+                              item.name,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              '₹${item.price ?? "Multiple sizes"} • ${item.isEnabled ? "Active" : "Disabled"}',
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Switch(
+                                  value: item.isEnabled,
+                                  onChanged: (_) => itemStore.toggleItemEnabled(item.id),
+                                  activeColor: AppColors.success,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  onPressed: () {},
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
+                                  onPressed: () => itemStore.deleteItem(item.id),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListHeader(int count, String type) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.05),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            '$type List',
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.darkNeutral,
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$count items',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                icon: const Icon(Icons.filter_list),
+                onPressed: () {},
+                tooltip: 'Filter',
+              ),
+              IconButton(
+                icon: const Icon(Icons.search),
+                onPressed: () {},
+                tooltip: 'Search',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String type) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inventory_2,
+            size: 80,
+            color: Colors.grey[300],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'No $type added yet',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add $type manually or upload Excel file',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[400],
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => _tabController.animateTo(0),
+            icon: const Icon(Icons.add),
+            label: Text('Add First ${type == 'products' ? 'Product' : 'Item'}'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== ATTRIBUTE HELPER METHODS ====================
+
+  Future<void> _createDefaultAttributes(AttributeStore attributeStore) async {
+    try {
+      // Create Size attribute with values
+      await attributeStore.addAttribute('Size');
+      final sizeAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Size');
+      await attributeStore.addMultipleValues(
+        sizeAttr.attributeId,
+        ['Small', 'Medium', 'Large', 'Extra Large'],
+      );
+
+      // Create Color attribute with values
+      await attributeStore.addAttribute('Color');
+      final colorAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Color');
+      await attributeStore.addMultipleValues(
+        colorAttr.attributeId,
+        ['Red', 'Blue', 'Green', 'Black', 'White'],
+        colorCodes: ['#FF0000', '#0000FF', '#00FF00', '#000000', '#FFFFFF'],
+      );
+
+      // Create Weight attribute with values
+      await attributeStore.addAttribute('Weight');
+      final weightAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Weight');
+      await attributeStore.addMultipleValues(
+        weightAttr.attributeId,
+        ['250g', '500g', '1kg'],
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Default attributes created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating attributes: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAddAttributeDialog(AttributeStore attributeStore) {
+    final nameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Attribute'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Attribute Name',
+                hintText: 'e.g., Size, Color, Material',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'You can add values for this attribute after creating it.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter an attribute name')),
+                );
+                return;
+              }
+
+              final success = await attributeStore.addAttribute(name);
+              if (mounted) {
+                Navigator.pop(context);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Attribute "$name" created successfully!')),
+                  );
+                  _showAddValuesDialog(attributeStore, attributeStore.attributes.last);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(attributeStore.errorMessage ?? 'Failed to create attribute'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddValuesDialog(AttributeStore attributeStore, AttributeModel attribute) {
+    final valueController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Values for ${attribute.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: valueController,
+              decoration: const InputDecoration(
+                labelText: 'Value',
+                hintText: 'e.g., Small, Medium, Large',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (value) async {
+                if (value.trim().isNotEmpty) {
+                  await attributeStore.addValue(attribute.attributeId, value.trim());
+                  valueController.clear();
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Press Enter to add each value. Click Done when finished.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Done'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final value = valueController.text.trim();
+              if (value.isNotEmpty) {
+                await attributeStore.addValue(attribute.attributeId, value);
+                valueController.clear();
+              }
+            },
+            child: const Text('Add Value'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showVariantGenerationDialog(AttributeStore attributeStore) {
+    // Generate preview combinations
+    final selectedAttrs = <String, List<AttributeValueModel>>{};
+    for (final attrId in _formStore.selectedAttributeIds) {
+      final valueIds = _formStore.selectedAttributeValues[attrId] ?? [];
+      if (valueIds.isNotEmpty) {
+        final attr = attributeStore.attributes.firstWhere((a) => a.attributeId == attrId);
+        final values = attributeStore.allValues
+            .where((v) => v.attributeId == attrId && valueIds.contains(v.valueId))
+            .toList();
+        if (values.isNotEmpty) {
+          selectedAttrs[attr.name] = values;
+        }
+      }
+    }
+
+    final combinations = _generateCombinationsPreview(selectedAttrs);
+    final selectedCombinations = List<bool>.filled(combinations.length, true); // All selected by default
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Select Variants to Generate'),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Info message
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Select which variants you want to create. You can set prices and stock after generation using the bulk edit tool.',
+                            style: TextStyle(
+                              color: Colors.blue.shade900,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Variant Selection Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Select Variants to Generate (${combinations.length} total)',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                for (int i = 0; i < selectedCombinations.length; i++) {
+                                  selectedCombinations[i] = true;
+                                }
+                              });
+                            },
+                            child: const Text('Select All'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                for (int i = 0; i < selectedCombinations.length; i++) {
+                                  selectedCombinations[i] = false;
+                                }
+                              });
+                            },
+                            child: const Text('Deselect All'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: combinations.length,
+                      itemBuilder: (context, index) {
+                        final combo = combinations[index];
+                        final variantName = combo.values.map((v) => v.value).join(' - ');
+
+                        return CheckboxListTile(
+                          dense: true,
+                          title: Text(variantName),
+                          value: selectedCombinations[index],
+                          onChanged: (bool? value) {
+                            setState(() {
+                              selectedCombinations[index] = value ?? false;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Count selected variants
+                final selectedCount = selectedCombinations.where((s) => s).length;
+
+                if (selectedCount == 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please select at least one variant'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                // Generate only selected variants with default values (0)
+                // User will set prices using bulk edit bar after generation
+                _formStore.retailVariants.clear();
+                for (int i = 0; i < combinations.length; i++) {
+                  if (selectedCombinations[i]) {
+                    final combo = combinations[i];
+                    final variantName = combo.values.map((v) => v.value).join(' - ');
+
+                    _formStore.retailVariants.add(VariantFormData(
+                      id: const Uuid().v4(),
+                      name: variantName,
+                      attributes: Map.fromEntries(
+                        combo.entries.map((e) => MapEntry(e.key, e.value.value)),
+                      ),
+                      attributeValueIds: Map.fromEntries(
+                        combo.entries.map((e) => MapEntry(e.key, e.value.valueId)),
+                      ),
+                      price: 0, // Will be set using bulk edit
+                      costPrice: 0, // Will be set using bulk edit
+                      mrp: 0,
+                      stockQuantity: 0, // Will be set using bulk edit
+                    ));
+                  }
+                }
+
+                Navigator.pop(context);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('✓ Generated $selectedCount variant(s). Now set prices using bulk edit below.'),
+                    backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+              child: const Text('Generate Selected Variants'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Map<String, AttributeValueModel>> _generateCombinationsPreview(
+    Map<String, List<AttributeValueModel>> attrs,
+  ) {
+    if (attrs.isEmpty) return [];
+
+    final keys = attrs.keys.toList();
+    final result = <Map<String, AttributeValueModel>>[];
+
+    void generate(int index, Map<String, AttributeValueModel> current) {
+      if (index == keys.length) {
+        result.add(Map.from(current));
+        return;
+      }
+
+      final key = keys[index];
+      for (final value in attrs[key]!) {
+        current[key] = value;
+        generate(index + 1, current);
+      }
+    }
+
+    generate(0, {});
+    return result;
+  }
+}

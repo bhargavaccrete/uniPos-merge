@@ -8,7 +8,7 @@ part of 'taxmodel_314.dart';
 
 class TaxAdapter extends TypeAdapter<Tax> {
   @override
-  final int typeId = 314;
+  final int typeId = 114;
 
   @override
   Tax read(BinaryReader reader) {

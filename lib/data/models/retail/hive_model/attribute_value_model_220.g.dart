@@ -8,7 +8,7 @@ part of 'attribute_value_model_220.dart';
 
 class AttributeValueModelAdapter extends TypeAdapter<AttributeValueModel> {
   @override
-  final int typeId = 220;
+  final int typeId = 170;
 
   @override
   AttributeValueModel read(BinaryReader reader) {

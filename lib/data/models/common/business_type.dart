@@ -1,8 +1,9 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'business_type.g.dart';
 
-@HiveType(typeId: 101)
+@HiveType(typeId: HiveTypeIds.businessType)
 class BusinessType extends HiveObject {
   @HiveField(0)
   final String? id;

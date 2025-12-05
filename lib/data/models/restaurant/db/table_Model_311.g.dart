@@ -8,7 +8,7 @@ part of 'table_Model_311.dart';
 
 class TableModelAdapter extends TypeAdapter<TableModel> {
   @override
-  final int typeId = 311;
+  final int typeId = 111;
 
   @override
   TableModel read(BinaryReader reader) {

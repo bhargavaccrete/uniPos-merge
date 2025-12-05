@@ -1,8 +1,9 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'hold_sale_model_209.g.dart';
 
-@HiveType(typeId: 209)
+@HiveType(typeId: HiveTypeIds.retailHoldSale)
 class HoldSaleModel extends HiveObject {
   @HiveField(0)
   final String holdSaleId;

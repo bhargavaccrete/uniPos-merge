@@ -9,7 +9,7 @@ part 'sale_store.g.dart';
 class SaleStore = _SaleStore with _$SaleStore;
 
 abstract class _SaleStore with Store {
-  final SaleRepository _saleRepository = SaleRepository();
+  late final SaleRepository _saleRepository;
 
   @observable
   ObservableList<SaleModel> sales = ObservableList<SaleModel>();
@@ -18,6 +18,7 @@ abstract class _SaleStore with Store {
   Map<String, dynamic> salesStats = {};
 
   _SaleStore() {
+    _saleRepository = SaleRepository();
     _init();
   }
 

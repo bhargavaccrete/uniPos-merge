@@ -11,7 +11,8 @@ class PastOrderStore = _PastOrderStore with _$PastOrderStore;
 abstract class _PastOrderStore with Store {
   final PastOrderRepository _pastOrderRepository = locator<PastOrderRepository>();
 
-  final ObservableList<pastOrderModel> pastOrders = ObservableList<pastOrderModel>();
+  final ObservableList<pastOrderModel> pastOrders =
+      ObservableList<pastOrderModel>();
 
   @observable
   bool isLoading = false;

@@ -2,9 +2,10 @@
 
 
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 part 'expensel_316.g.dart';
 
-@HiveType(typeId: 316)
+@HiveType(typeId: HiveTypeIds.restaurantExpense1)
 class Expense extends HiveObject{
   @HiveField(0)
   final String id;

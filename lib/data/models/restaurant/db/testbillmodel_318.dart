@@ -1,8 +1,9 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'testbillmodel_318.g.dart';
 
-@HiveType(typeId: 318)
+@HiveType(typeId: HiveTypeIds.restaurantTestBill)
 class TestBillModel extends HiveObject {
   @HiveField(0)
   String billNo;

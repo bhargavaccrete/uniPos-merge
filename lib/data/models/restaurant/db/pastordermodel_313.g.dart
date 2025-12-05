@@ -8,7 +8,7 @@ part of 'pastordermodel_313.dart';
 
 class pastOrderModelAdapter extends TypeAdapter<pastOrderModel> {
   @override
-  final int typeId = 313;
+  final int typeId = 113;
 
   @override
   pastOrderModel read(BinaryReader reader) {

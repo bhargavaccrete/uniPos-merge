@@ -9,6 +9,14 @@ part of 'attribute_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$AttributeStore on _AttributeStoreBase, Store {
+  Computed<List<AttributeValueModel>>? _$allValuesComputed;
+
+  @override
+  List<AttributeValueModel> get allValues => (_$allValuesComputed ??=
+          Computed<List<AttributeValueModel>>(() => super.allValues,
+              name: '_AttributeStoreBase.allValues'))
+      .value;
+
   late final _$attributesAtom =
       Atom(name: '_AttributeStoreBase.attributes', context: context);
 
@@ -243,7 +251,8 @@ attributes: ${attributes},
 attributeValues: ${attributeValues},
 isLoading: ${isLoading},
 errorMessage: ${errorMessage},
-selectedAttribute: ${selectedAttribute}
+selectedAttribute: ${selectedAttribute},
+allValues: ${allValues}
     ''';
   }
 }

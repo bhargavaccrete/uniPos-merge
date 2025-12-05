@@ -1,11 +1,12 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'credit_payment_model_218.g.dart';
 
 /// Credit Payment Model
 /// Tracks individual payments made against credit sales
 /// This is separate from PaymentEntryModel which tracks split payments during checkout
-@HiveType(typeId: 218)
+@HiveType(typeId: HiveTypeIds.retailCreditPayment)
 class CreditPaymentModel extends HiveObject {
   @HiveField(0)
   final String paymentId;

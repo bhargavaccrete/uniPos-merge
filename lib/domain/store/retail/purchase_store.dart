@@ -11,8 +11,8 @@ part 'purchase_store.g.dart';
 class PurchaseStore = _PurchaseStore with _$PurchaseStore;
 
 abstract class _PurchaseStore with Store {
-  final PurchaseRepository _purchaseRepository = PurchaseRepository();
-  final PurchaseItemRepository _purchaseItemRepository = PurchaseItemRepository();
+  late final PurchaseRepository _purchaseRepository;
+  late final PurchaseItemRepository _purchaseItemRepository;
 
   @observable
   ObservableList<PurchaseModel> purchases = ObservableList<PurchaseModel>();
@@ -33,6 +33,8 @@ abstract class _PurchaseStore with Store {
   String? selectedSupplierId;
 
   _PurchaseStore() {
+    _purchaseRepository = PurchaseRepository();
+    _purchaseItemRepository = PurchaseItemRepository();
     _init();
   }
 

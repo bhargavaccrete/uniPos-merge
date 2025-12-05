@@ -84,22 +84,6 @@ mixin _$ItemStore on _ItemStore, Store {
     });
   }
 
-  late final _$searchQueryAtom =
-      Atom(name: '_ItemStore.searchQuery', context: context);
-
-  @override
-  String get searchQuery {
-    _$searchQueryAtom.reportRead();
-    return super.searchQuery;
-  }
-
-  @override
-  set searchQuery(String value) {
-    _$searchQueryAtom.reportWrite(value, super.searchQuery, () {
-      super.searchQuery = value;
-    });
-  }
-
   late final _$selectedCategoryIdAtom =
       Atom(name: '_ItemStore.selectedCategoryId', context: context);
 
@@ -113,6 +97,22 @@ mixin _$ItemStore on _ItemStore, Store {
   set selectedCategoryId(String? value) {
     _$selectedCategoryIdAtom.reportWrite(value, super.selectedCategoryId, () {
       super.selectedCategoryId = value;
+    });
+  }
+
+  late final _$searchQueryAtom =
+      Atom(name: '_ItemStore.searchQuery', context: context);
+
+  @override
+  String get searchQuery {
+    _$searchQueryAtom.reportRead();
+    return super.searchQuery;
+  }
+
+  @override
+  set searchQuery(String value) {
+    _$searchQueryAtom.reportWrite(value, super.searchQuery, () {
+      super.searchQuery = value;
     });
   }
 
@@ -222,8 +222,8 @@ mixin _$ItemStore on _ItemStore, Store {
     return '''
 isLoading: ${isLoading},
 errorMessage: ${errorMessage},
-searchQuery: ${searchQuery},
 selectedCategoryId: ${selectedCategoryId},
+searchQuery: ${searchQuery},
 filteredItems: ${filteredItems},
 enabledItems: ${enabledItems},
 lowStockItems: ${lowStockItems},

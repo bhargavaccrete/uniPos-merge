@@ -7,7 +7,6 @@
       "name": "unipos",
       "version": "1.0.0+1",
       "dependencies": [
-        "archive",
         "country_code_picker",
         "country_state_city_picker",
         "crypto",
@@ -15,6 +14,7 @@
         "cupertino_icons",
         "encrypt",
         "equatable",
+        "excel",
         "file_picker",
         "file_selector",
         "fl_chart",
@@ -141,6 +141,16 @@
       ]
     },
     {
+      "name": "excel",
+      "version": "4.0.6",
+      "dependencies": [
+        "archive",
+        "collection",
+        "equatable",
+        "xml"
+      ]
+    },
+    {
       "name": "flutter_phoenix",
       "version": "1.1.1",
       "dependencies": [
@@ -151,15 +161,6 @@
       "name": "path",
       "version": "1.9.1",
       "dependencies": []
-    },
-    {
-      "name": "archive",
-      "version": "4.0.7",
-      "dependencies": [
-        "crypto",
-        "path",
-        "posix"
-      ]
     },
     {
       "name": "encrypt",
@@ -229,7 +230,7 @@
     },
     {
       "name": "lottie",
-      "version": "3.3.2",
+      "version": "3.3.0",
       "dependencies": [
         "archive",
         "flutter",
@@ -902,11 +903,19 @@
       ]
     },
     {
-      "name": "posix",
-      "version": "6.0.3",
+      "name": "xml",
+      "version": "6.6.1",
       "dependencies": [
-        "ffi",
+        "collection",
         "meta",
+        "petitparser"
+      ]
+    },
+    {
+      "name": "archive",
+      "version": "3.6.1",
+      "dependencies": [
+        "crypto",
         "path"
       ]
     },
@@ -1125,7 +1134,7 @@
     },
     {
       "name": "image",
-      "version": "4.5.4",
+      "version": "4.3.0",
       "dependencies": [
         "archive",
         "meta",
@@ -1136,15 +1145,6 @@
       "name": "ffi",
       "version": "2.1.4",
       "dependencies": []
-    },
-    {
-      "name": "xml",
-      "version": "6.6.1",
-      "dependencies": [
-        "collection",
-        "meta",
-        "petitparser"
-      ]
     },
     {
       "name": "path_parsing",

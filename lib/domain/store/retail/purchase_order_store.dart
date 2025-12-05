@@ -15,10 +15,10 @@ part 'purchase_order_store.g.dart';
 class PurchaseOrderStore = _PurchaseOrderStore with _$PurchaseOrderStore;
 
 abstract class _PurchaseOrderStore with Store {
-  final PurchaseOrderRepository _poRepository = PurchaseOrderRepository();
-  final PurchaseOrderItemRepository _poItemRepository = PurchaseOrderItemRepository();
-  final GRNRepository _grnRepository = GRNRepository();
-  final GRNItemRepository _grnItemRepository = GRNItemRepository();
+  late final PurchaseOrderRepository _poRepository;
+  late final PurchaseOrderItemRepository _poItemRepository;
+  late final GRNRepository _grnRepository;
+  late final GRNItemRepository _grnItemRepository;
 
   // ==================== PURCHASE ORDER STATE ====================
 
@@ -55,6 +55,10 @@ abstract class _PurchaseOrderStore with Store {
   ObservableList<GRNModel> currentPOGRNs = ObservableList<GRNModel>();
 
   _PurchaseOrderStore() {
+    _poRepository = PurchaseOrderRepository();
+    _poItemRepository = PurchaseOrderItemRepository();
+    _grnRepository = GRNRepository();
+    _grnItemRepository = GRNItemRepository();
     _init();
   }
 

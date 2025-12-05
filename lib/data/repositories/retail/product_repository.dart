@@ -16,12 +16,16 @@ class ProductRepository {
 
   /// Get all products from Hive
   Future<List<ProductModel>> getAllProducts() async {
+    print('ProductRepository.getAllProducts: _productBox has ${_productBox.length} items');
+    print('ProductRepository.getAllProducts: _productBox.values = ${_productBox.values.map((p) => p.productName).toList()}');
     return _productBox.values.toList();
   }
 
   /// Add a new product to Hive
   Future<void> addProduct(ProductModel product) async {
+    print('ProductRepository.addProduct: Saving product ${product.productName} with ID ${product.productId}');
     await _productBox.put(product.productId, product);
+    print('ProductRepository.addProduct: _productBox now has ${_productBox.length} items');
   }
 
   /// Update an existing product in Hive

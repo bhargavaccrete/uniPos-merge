@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'purchase_order_model_211.g.dart';
 
@@ -16,7 +17,7 @@ enum POStatus {
   cancelled,
 }
 
-@HiveType(typeId: 211)
+@HiveType(typeId: HiveTypeIds.retailPurchaseOrder)
 class PurchaseOrderModel extends HiveObject {
   @HiveField(0)
   final String poId;

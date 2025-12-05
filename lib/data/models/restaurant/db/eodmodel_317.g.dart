@@ -8,7 +8,7 @@ part of 'eodmodel_317.dart';
 
 class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
   @override
-  final int typeId = 317;
+  final int typeId = 117;
 
   @override
   EndOfDayReport read(BinaryReader reader) {

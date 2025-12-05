@@ -8,7 +8,7 @@ part of 'sale_model_203.dart';
 
 class SaleModelAdapter extends TypeAdapter<SaleModel> {
   @override
-  final int typeId = 203;
+  final int typeId = 153;
 
   @override
   SaleModel read(BinaryReader reader) {

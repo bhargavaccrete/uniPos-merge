@@ -4,7 +4,7 @@ import '../../models/restaurant/db/eodmodel_317.dart';
 
 /// Repository layer for End of Day Report data access
 class EodRepository {
-  static const String _boxName = 'eodBox';
+  static const String _boxName = 'eods';
   late Box<EndOfDayReport> _eodBox;
 
   EodRepository() {

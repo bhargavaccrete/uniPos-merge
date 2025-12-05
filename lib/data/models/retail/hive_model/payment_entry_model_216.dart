@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'payment_entry_model_216.g.dart';
 
@@ -43,7 +44,7 @@ extension PaymentMethodExtension on PaymentMethod {
   }
 }
 
-@HiveType(typeId: 216)
+@HiveType(typeId: HiveTypeIds.retailPaymentEntry)
 class PaymentEntryModel extends HiveObject {
   @HiveField(0)
   final String paymentEntryId;

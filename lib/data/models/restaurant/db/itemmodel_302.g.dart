@@ -8,7 +8,7 @@ part of 'itemmodel_302.dart';
 
 class ItemsAdapter extends TypeAdapter<Items> {
   @override
-  final int typeId = 302;
+  final int typeId = 102;
 
   @override
   Items read(BinaryReader reader) {

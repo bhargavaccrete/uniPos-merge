@@ -5,7 +5,7 @@ import '../../models/restaurant/db/toppingmodel_304.dart';
 
 /// Repository layer for Extra data access
 class ExtraRepository {
-  static const String _boxName = 'extra';
+  static const String _boxName = 'extras';
   late Box<Extramodel> _extraBox;
 
   ExtraRepository() {

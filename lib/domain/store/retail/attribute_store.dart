@@ -12,7 +12,7 @@ part 'attribute_store.g.dart';
 class AttributeStore = _AttributeStoreBase with _$AttributeStore;
 
 abstract class _AttributeStoreBase with Store {
-  final AttributeRepository _repository = AttributeRepository();
+  late final AttributeRepository _repository;
   final _uuid = const Uuid();
 
   @observable
@@ -30,6 +30,10 @@ abstract class _AttributeStoreBase with Store {
 
   @observable
   AttributeModel? selectedAttribute;
+
+  _AttributeStoreBase() {
+    _repository = AttributeRepository();
+  }
 
   // ==================== INITIALIZATION ====================
 
@@ -379,6 +383,21 @@ abstract class _AttributeStoreBase with Store {
   /// Get values for attribute from cache
   List<AttributeValueModel> getValues(String attributeId) {
     return attributeValues[attributeId]?.toList() ?? [];
+  }
+
+  /// Alias for getValues - used in AddProductScreen
+  List<AttributeValueModel> getValuesForAttribute(String attributeId) {
+    return getValues(attributeId);
+  }
+
+  /// Get all attribute values across all attributes
+  @computed
+  List<AttributeValueModel> get allValues {
+    final result = <AttributeValueModel>[];
+    for (final values in attributeValues.values) {
+      result.addAll(values);
+    }
+    return result;
   }
 
   /// Get value by ID

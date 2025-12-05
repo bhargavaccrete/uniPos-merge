@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'attribute_model_219.g.dart';
 
@@ -7,7 +8,7 @@ part 'attribute_model_219.g.dart';
 ///
 /// This represents a reusable attribute that can be assigned to multiple products.
 /// Similar to WooCommerce's global product attributes.
-@HiveType(typeId: 219)
+@HiveType(typeId: HiveTypeIds.retailAttribute)
 class AttributeModel extends HiveObject {
   @HiveField(0)
   final String attributeId;

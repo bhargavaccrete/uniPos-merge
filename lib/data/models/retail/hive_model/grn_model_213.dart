@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:uuid/uuid.dart';
 
 part 'grn_model_213.g.dart';
@@ -18,7 +19,7 @@ enum GRNStatus {
 /// GRN - Goods Received Note (Material Receiving)
 /// This is where we record what actually arrived from the supplier
 /// Stock is ONLY updated when GRN is confirmed
-@HiveType(typeId: 213)
+@HiveType(typeId: HiveTypeIds.retailGrn)
 class GRNModel extends HiveObject {
   @HiveField(0)
   final String grnId;

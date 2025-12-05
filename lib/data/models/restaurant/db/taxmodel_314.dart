@@ -2,9 +2,10 @@
 
 
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 part 'taxmodel_314.g.dart';
 
-@HiveType(typeId: 314)
+@HiveType(typeId: HiveTypeIds.restaurantTax)
 class Tax extends HiveObject{
 
   @HiveField(0)

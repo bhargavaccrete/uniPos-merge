@@ -8,7 +8,7 @@ part of 'supplier_model_205.dart';
 
 class SupplierModelAdapter extends TypeAdapter<SupplierModel> {
   @override
-  final int typeId = 205;
+  final int typeId = 155;
 
   @override
   SupplierModel read(BinaryReader reader) {

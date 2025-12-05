@@ -1,7 +1,8 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 part 'itemvariantemodel_312.g.dart';
 
-@HiveType(typeId: 312)
+@HiveType(typeId: HiveTypeIds.restaurantItemVariant)
 class ItemVariante extends HiveObject {
   @HiveField(0)
   final String variantId;

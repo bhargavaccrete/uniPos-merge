@@ -1,9 +1,10 @@
 // import 'package:BillBerry/model/db/variantmodel_305.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:hive/hive.dart';
 part 'toppingmodel_304.g.dart';
 
-@HiveType(typeId: 304)
+@HiveType(typeId: HiveTypeIds.restaurantTopping)
 class Topping extends HiveObject{
   @HiveField(0)
   String name;

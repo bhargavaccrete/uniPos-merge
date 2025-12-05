@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'sale_model_203.g.dart';
 
@@ -12,7 +13,7 @@ class SaleStatus {
   static const String due = 'due';
 }
 
-@HiveType(typeId: 203)
+@HiveType(typeId: HiveTypeIds.retailSale)
 class SaleModel extends HiveObject {
   @HiveField(0)
   final String saleId;

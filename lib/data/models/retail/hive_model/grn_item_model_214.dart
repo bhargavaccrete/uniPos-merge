@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:uuid/uuid.dart';
 
 part 'grn_item_model_214.g.dart';
@@ -15,7 +16,7 @@ enum DamagedHandling {
 
 /// GRN Item - Records what was ordered vs what was actually received
 /// This is where we compare: Ordered 50, Received 45
-@HiveType(typeId: 214)
+@HiveType(typeId: HiveTypeIds.retailGrnItem)
 class GRNItemModel extends HiveObject {
   @HiveField(0)
   final String grnItemId;

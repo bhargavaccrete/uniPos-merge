@@ -1,9 +1,10 @@
 
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 part 'ordermodel_309.g.dart';
 
-@HiveType(typeId: 309)
+@HiveType(typeId: HiveTypeIds.restaurantOrder)
 class OrderModel extends HiveObject {
   @HiveField(0)
   final String id;

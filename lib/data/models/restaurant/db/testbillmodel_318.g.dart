@@ -8,7 +8,7 @@ part of 'testbillmodel_318.dart';
 
 class TestBillModelAdapter extends TypeAdapter<TestBillModel> {
   @override
-  final int typeId = 318;
+  final int typeId = 118;
 
   @override
   TestBillModel read(BinaryReader reader) {

@@ -1,0 +1,232 @@
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$StockAlertStore on _StockAlertStore, Store {
+  Computed<List<Map<String, dynamic>>>? _$criticalItemsComputed;
+
+  @override
+  List<Map<String, dynamic>> get criticalItems => (_$criticalItemsComputed ??=
+          Computed<List<Map<String, dynamic>>>(() => super.criticalItems,
+              name: '_StockAlertStore.criticalItems'))
+      .value;
+  Computed<List<Map<String, dynamic>>>? _$warningItemsComputed;
+
+  @override
+  List<Map<String, dynamic>> get warningItems => (_$warningItemsComputed ??=
+          Computed<List<Map<String, dynamic>>>(() => super.warningItems,
+              name: '_StockAlertStore.warningItems'))
+      .value;
+  Computed<List<Map<String, dynamic>>>? _$outOfStockItemsComputed;
+
+  @override
+  List<Map<String, dynamic>> get outOfStockItems =>
+      (_$outOfStockItemsComputed ??= Computed<List<Map<String, dynamic>>>(
+              () => super.outOfStockItems,
+              name: '_StockAlertStore.outOfStockItems'))
+          .value;
+  Computed<bool>? _$hasAlertsComputed;
+
+  @override
+  bool get hasAlerts =>
+      (_$hasAlertsComputed ??= Computed<bool>(() => super.hasAlerts,
+              name: '_StockAlertStore.hasAlerts'))
+          .value;
+  Computed<bool>? _$hasCriticalAlertsComputed;
+
+  @override
+  bool get hasCriticalAlerts => (_$hasCriticalAlertsComputed ??= Computed<bool>(
+          () => super.hasCriticalAlerts,
+          name: '_StockAlertStore.hasCriticalAlerts'))
+      .value;
+
+  late final _$lowStockItemsAtom =
+      Atom(name: '_StockAlertStore.lowStockItems', context: context);
+
+  @override
+  ObservableList<Map<String, dynamic>> get lowStockItems {
+    _$lowStockItemsAtom.reportRead();
+    return super.lowStockItems;
+  }
+
+  @override
+  set lowStockItems(ObservableList<Map<String, dynamic>> value) {
+    _$lowStockItemsAtom.reportWrite(value, super.lowStockItems, () {
+      super.lowStockItems = value;
+    });
+  }
+
+  late final _$thresholdAtom =
+      Atom(name: '_StockAlertStore.threshold', context: context);
+
+  @override
+  int get threshold {
+    _$thresholdAtom.reportRead();
+    return super.threshold;
+  }
+
+  @override
+  set threshold(int value) {
+    _$thresholdAtom.reportWrite(value, super.threshold, () {
+      super.threshold = value;
+    });
+  }
+
+  late final _$isEnabledAtom =
+      Atom(name: '_StockAlertStore.isEnabled', context: context);
+
+  @override
+  bool get isEnabled {
+    _$isEnabledAtom.reportRead();
+    return super.isEnabled;
+  }
+
+  @override
+  set isEnabled(bool value) {
+    _$isEnabledAtom.reportWrite(value, super.isEnabled, () {
+      super.isEnabled = value;
+    });
+  }
+
+  late final _$isLoadingAtom =
+      Atom(name: '_StockAlertStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$totalAlertsAtom =
+      Atom(name: '_StockAlertStore.totalAlerts', context: context);
+
+  @override
+  int get totalAlerts {
+    _$totalAlertsAtom.reportRead();
+    return super.totalAlerts;
+  }
+
+  @override
+  set totalAlerts(int value) {
+    _$totalAlertsAtom.reportWrite(value, super.totalAlerts, () {
+      super.totalAlerts = value;
+    });
+  }
+
+  late final _$criticalCountAtom =
+      Atom(name: '_StockAlertStore.criticalCount', context: context);
+
+  @override
+  int get criticalCount {
+    _$criticalCountAtom.reportRead();
+    return super.criticalCount;
+  }
+
+  @override
+  set criticalCount(int value) {
+    _$criticalCountAtom.reportWrite(value, super.criticalCount, () {
+      super.criticalCount = value;
+    });
+  }
+
+  late final _$warningCountAtom =
+      Atom(name: '_StockAlertStore.warningCount', context: context);
+
+  @override
+  int get warningCount {
+    _$warningCountAtom.reportRead();
+    return super.warningCount;
+  }
+
+  @override
+  set warningCount(int value) {
+    _$warningCountAtom.reportWrite(value, super.warningCount, () {
+      super.warningCount = value;
+    });
+  }
+
+  late final _$outOfStockCountAtom =
+      Atom(name: '_StockAlertStore.outOfStockCount', context: context);
+
+  @override
+  int get outOfStockCount {
+    _$outOfStockCountAtom.reportRead();
+    return super.outOfStockCount;
+  }
+
+  @override
+  set outOfStockCount(int value) {
+    _$outOfStockCountAtom.reportWrite(value, super.outOfStockCount, () {
+      super.outOfStockCount = value;
+    });
+  }
+
+  late final _$loadSettingsAsyncAction =
+      AsyncAction('_StockAlertStore.loadSettings', context: context);
+
+  @override
+  Future<void> loadSettings() {
+    return _$loadSettingsAsyncAction.run(() => super.loadSettings());
+  }
+
+  late final _$loadLowStockItemsAsyncAction =
+      AsyncAction('_StockAlertStore.loadLowStockItems', context: context);
+
+  @override
+  Future<void> loadLowStockItems() {
+    return _$loadLowStockItemsAsyncAction.run(() => super.loadLowStockItems());
+  }
+
+  late final _$setThresholdAsyncAction =
+      AsyncAction('_StockAlertStore.setThreshold', context: context);
+
+  @override
+  Future<void> setThreshold(int newThreshold) {
+    return _$setThresholdAsyncAction
+        .run(() => super.setThreshold(newThreshold));
+  }
+
+  late final _$setEnabledAsyncAction =
+      AsyncAction('_StockAlertStore.setEnabled', context: context);
+
+  @override
+  Future<void> setEnabled(bool enabled) {
+    return _$setEnabledAsyncAction.run(() => super.setEnabled(enabled));
+  }
+
+  late final _$refreshAsyncAction =
+      AsyncAction('_StockAlertStore.refresh', context: context);
+
+  @override
+  Future<void> refresh() {
+    return _$refreshAsyncAction.run(() => super.refresh());
+  }
+
+  @override
+  String toString() {
+    return '''
+lowStockItems: ${lowStockItems},
+threshold: ${threshold},
+isEnabled: ${isEnabled},
+isLoading: ${isLoading},
+totalAlerts: ${totalAlerts},
+criticalCount: ${criticalCount},
+warningCount: ${warningCount},
+outOfStockCount: ${outOfStockCount},
+criticalItems: ${criticalItems},
+warningItems: ${warningItems},
+outOfStockItems: ${outOfStockItems},
+hasAlerts: ${hasAlerts},
+hasCriticalAlerts: ${hasCriticalAlerts}
+    ''';
+  }
+}

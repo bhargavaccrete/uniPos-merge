@@ -1,8 +1,9 @@
 import "package:hive/hive.dart";
+import "package:unipos/core/constants/hive_type_ids.dart";
 
 part 'product_model_200.g.dart';
 
-@HiveType(typeId: 200)
+@HiveType(typeId: HiveTypeIds.retailProduct)
 class ProductModel extends HiveObject {
   @HiveField(0)
   final String productId;

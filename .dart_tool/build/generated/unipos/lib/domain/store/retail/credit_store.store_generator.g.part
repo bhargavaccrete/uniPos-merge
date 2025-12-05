@@ -1,0 +1,163 @@
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$CreditStore on _CreditStore, Store {
+  Computed<int>? _$totalDueInvoicesComputed;
+
+  @override
+  int get totalDueInvoices => (_$totalDueInvoicesComputed ??= Computed<int>(
+          () => super.totalDueInvoices,
+          name: '_CreditStore.totalDueInvoices'))
+      .value;
+  Computed<double>? _$todayCollectionComputed;
+
+  @override
+  double get todayCollection => (_$todayCollectionComputed ??= Computed<double>(
+          () => super.todayCollection,
+          name: '_CreditStore.todayCollection'))
+      .value;
+
+  late final _$paymentsAtom =
+      Atom(name: '_CreditStore.payments', context: context);
+
+  @override
+  ObservableList<CreditPaymentModel> get payments {
+    _$paymentsAtom.reportRead();
+    return super.payments;
+  }
+
+  @override
+  set payments(ObservableList<CreditPaymentModel> value) {
+    _$paymentsAtom.reportWrite(value, super.payments, () {
+      super.payments = value;
+    });
+  }
+
+  late final _$salesWithDueAtom =
+      Atom(name: '_CreditStore.salesWithDue', context: context);
+
+  @override
+  ObservableList<SaleModel> get salesWithDue {
+    _$salesWithDueAtom.reportRead();
+    return super.salesWithDue;
+  }
+
+  @override
+  set salesWithDue(ObservableList<SaleModel> value) {
+    _$salesWithDueAtom.reportWrite(value, super.salesWithDue, () {
+      super.salesWithDue = value;
+    });
+  }
+
+  late final _$totalOutstandingAtom =
+      Atom(name: '_CreditStore.totalOutstanding', context: context);
+
+  @override
+  double get totalOutstanding {
+    _$totalOutstandingAtom.reportRead();
+    return super.totalOutstanding;
+  }
+
+  @override
+  set totalOutstanding(double value) {
+    _$totalOutstandingAtom.reportWrite(value, super.totalOutstanding, () {
+      super.totalOutstanding = value;
+    });
+  }
+
+  late final _$customersWithDueAtom =
+      Atom(name: '_CreditStore.customersWithDue', context: context);
+
+  @override
+  int get customersWithDue {
+    _$customersWithDueAtom.reportRead();
+    return super.customersWithDue;
+  }
+
+  @override
+  set customersWithDue(int value) {
+    _$customersWithDueAtom.reportWrite(value, super.customersWithDue, () {
+      super.customersWithDue = value;
+    });
+  }
+
+  late final _$isLoadingAtom =
+      Atom(name: '_CreditStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$loadDataAsyncAction =
+      AsyncAction('_CreditStore.loadData', context: context);
+
+  @override
+  Future<void> loadData() {
+    return _$loadDataAsyncAction.run(() => super.loadData());
+  }
+
+  late final _$receivePaymentAsyncAction =
+      AsyncAction('_CreditStore.receivePayment', context: context);
+
+  @override
+  Future<CreditPaymentResult> receivePayment(
+      {required String customerId,
+      required double amount,
+      required String paymentMode,
+      String? referenceId,
+      String? note}) {
+    return _$receivePaymentAsyncAction.run(() => super.receivePayment(
+        customerId: customerId,
+        amount: amount,
+        paymentMode: paymentMode,
+        referenceId: referenceId,
+        note: note));
+  }
+
+  late final _$writeOffDebtAsyncAction =
+      AsyncAction('_CreditStore.writeOffDebt', context: context);
+
+  @override
+  Future<CreditPaymentResult> writeOffDebt(
+      {required String customerId,
+      required String saleId,
+      double? amount,
+      String? note}) {
+    return _$writeOffDebtAsyncAction.run(() => super.writeOffDebt(
+        customerId: customerId, saleId: saleId, amount: amount, note: note));
+  }
+
+  late final _$getCustomerLedgerAsyncAction =
+      AsyncAction('_CreditStore.getCustomerLedger', context: context);
+
+  @override
+  Future<List<LedgerEntry>> getCustomerLedger(String customerId) {
+    return _$getCustomerLedgerAsyncAction
+        .run(() => super.getCustomerLedger(customerId));
+  }
+
+  @override
+  String toString() {
+    return '''
+payments: ${payments},
+salesWithDue: ${salesWithDue},
+totalOutstanding: ${totalOutstanding},
+customersWithDue: ${customersWithDue},
+isLoading: ${isLoading},
+totalDueInvoices: ${totalDueInvoices},
+todayCollection: ${todayCollection}
+    ''';
+  }
+}

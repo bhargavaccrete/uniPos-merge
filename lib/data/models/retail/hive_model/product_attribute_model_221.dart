@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'product_attribute_model_221.g.dart';
 
@@ -11,7 +12,7 @@ part 'product_attribute_model_221.g.dart';
 /// Example:
 /// - Product "T-Shirt" has attribute "Color" with values ["Red", "Blue"]
 /// - Product "T-Shirt" has attribute "Size" with values ["S", "M", "L"]
-@HiveType(typeId: 221)
+@HiveType(typeId: HiveTypeIds.retailProductAttribute)
 class ProductAttributeModel extends HiveObject {
   @HiveField(0)
   final String id;

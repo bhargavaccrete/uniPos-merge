@@ -1,11 +1,12 @@
 import 'dart:io';
 
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'itemvariantemodel_312.dart';
 
 part 'itemmodel_302.g.dart';
 
-@HiveType(typeId: 302)
+@HiveType(typeId: HiveTypeIds.restaurantItem)
 class Items extends HiveObject {
   @HiveField(0)
   final String id;

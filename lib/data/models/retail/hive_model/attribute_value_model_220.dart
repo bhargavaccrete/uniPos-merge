@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'attribute_value_model_220.g.dart';
 
@@ -7,7 +8,7 @@ part 'attribute_value_model_220.g.dart';
 ///
 /// Stores individual values for a global attribute.
 /// One attribute can have many values.
-@HiveType(typeId: 220)
+@HiveType(typeId: HiveTypeIds.retailAttributeValue)
 class AttributeValueModel extends HiveObject {
   @HiveField(0)
   final String valueId;

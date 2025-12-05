@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 part 'cartmodel_308.g.dart';
 
-@HiveType(typeId: 308)
+@HiveType(typeId: HiveTypeIds.restaurantCart)
 class CartItem extends HiveObject {
   @HiveField(0)
   final String id;

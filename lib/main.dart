@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:unipos/models/tax_details.dart';
-import 'package:unipos/data/models/common/business_type.dart';
-import 'package:unipos/data/models/common/business_details.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/config/app_config.dart';
+import 'package:unipos/core/init/hive_init.dart';
 import 'package:unipos/screen/existingUserRestoreScreen.dart';
 import 'package:unipos/screen/setupWizardScreen.dart';
 import 'package:unipos/screen/splashScreen.dart';
@@ -20,34 +17,21 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
 
-  //-----Hive INITIALIZATION----
-   await Hive.initFlutter();
+  // Initialize Hive with Flutter and register common adapters
+  await HiveInit.init();
 
-   // Initialize AppConfig first (stores business mode selection)
-   await AppConfig.init();
+  // Initialize AppConfig (stores business mode selection)
+  await AppConfig.init();
 
-   // Register adapters (check if not already registered to avoid duplicates)
-   // if (!Hive.isAdapterRegistered(0)) {
-   //   Hive.registerAdapter(StoreDetailsAdapter());
-   // }
-   if (!Hive.isAdapterRegistered(2)) {
-     Hive.registerAdapter(TaxDetailsAdapter());
-   }
-   if (!Hive.isAdapterRegistered(101)) {  // BusinessType typeId is 101
-     Hive.registerAdapter(BusinessTypeAdapter());
-   }
-   if (!Hive.isAdapterRegistered(102)) {
-     Hive.registerAdapter(BusinessDetailsAdapter());
-   }
+  // Open common boxes (needed regardless of business mode)
+  await HiveInit.openCommonBoxes();
 
-   // Open boxes
-   await Hive.openBox('storebox');
-   await Hive.openBox<TaxDetails>('taxBox');
-   await Hive.openBox<BusinessType>('businessTypeBox');
-   await Hive.openBox<BusinessDetails>('businessDetailsBox');
+  // Initialize business-specific boxes if business mode is already set
+  // (This handles the case where app is restarted after initial setup)
+  await HiveInit.initializeBusinessBoxes();
 
-   // Setup GetIt dependency injection
-   await setupServiceLocator();
+  // Setup GetIt dependency injection
+  await setupServiceLocator();
 
   runApp(const UniPOSApp());
 }

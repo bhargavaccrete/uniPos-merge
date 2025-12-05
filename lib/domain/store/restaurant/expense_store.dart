@@ -12,8 +12,9 @@ class ExpenseStore = _ExpenseStore with _$ExpenseStore;
 abstract class _ExpenseStore with Store {
   final ExpenseRepository _expenseRepository = locator<ExpenseRepository>();
 
-  final ObservableList<ExpenseCategory> categories = ObservableList<ExpenseCategory>();
   final ObservableList<Expense> expenses = ObservableList<Expense>();
+  final ObservableList<ExpenseCategory> categories =
+      ObservableList<ExpenseCategory>();
 
   @observable
   bool isLoading = false;

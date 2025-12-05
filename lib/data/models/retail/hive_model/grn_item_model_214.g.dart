@@ -8,7 +8,7 @@ part of 'grn_item_model_214.dart';
 
 class GRNItemModelAdapter extends TypeAdapter<GRNItemModel> {
   @override
-  final int typeId = 214;
+  final int typeId = 164;
 
   @override
   GRNItemModel read(BinaryReader reader) {

@@ -10,6 +10,7 @@ import 'package:unipos/screen/taxSetupStep.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
 import 'businessTypeScreen.dart';
+import 'add_product_screen.dart'; // Unified Add Product Screen
 
 /// Setup Wizard Screen
 /// UI Only - uses Observer to listen to store changes
@@ -431,7 +432,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: ProductManagementScreen(),
+          child: AddProductScreen(),
         ),
       ),
 

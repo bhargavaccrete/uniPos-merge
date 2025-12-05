@@ -8,7 +8,7 @@ part of 'business_details.dart';
 
 class BusinessDetailsAdapter extends TypeAdapter<BusinessDetails> {
   @override
-  final int typeId = 102;
+  final int typeId = 4;
 
   @override
   BusinessDetails read(BinaryReader reader) {

@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:uuid/uuid.dart';
 
 part 'purchase_order_item_model_212.g.dart';
@@ -7,7 +8,7 @@ const _uuid = Uuid();
 
 /// PO Item - Just what we ordered from supplier
 /// No receiving tracking here - that's handled by GRN (Goods Received Note)
-@HiveType(typeId: 212)
+@HiveType(typeId: HiveTypeIds.retailPurchaseOrderItem)
 class PurchaseOrderItemModel extends HiveObject {
   @HiveField(0)
   final String poItemId;

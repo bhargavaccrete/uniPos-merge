@@ -1,0 +1,170 @@
+// **************************************************************************
+// StoreGenerator
+// **************************************************************************
+
+// ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
+
+mixin _$BulkImportStore on _BulkImportStore, Store {
+  late final _$isLoadingAtom =
+      Atom(name: '_BulkImportStore.isLoading', context: context);
+
+  @override
+  bool get isLoading {
+    _$isLoadingAtom.reportRead();
+    return super.isLoading;
+  }
+
+  @override
+  set isLoading(bool value) {
+    _$isLoadingAtom.reportWrite(value, super.isLoading, () {
+      super.isLoading = value;
+    });
+  }
+
+  late final _$isProcessingAtom =
+      Atom(name: '_BulkImportStore.isProcessing', context: context);
+
+  @override
+  bool get isProcessing {
+    _$isProcessingAtom.reportRead();
+    return super.isProcessing;
+  }
+
+  @override
+  set isProcessing(bool value) {
+    _$isProcessingAtom.reportWrite(value, super.isProcessing, () {
+      super.isProcessing = value;
+    });
+  }
+
+  late final _$errorMessageAtom =
+      Atom(name: '_BulkImportStore.errorMessage', context: context);
+
+  @override
+  String? get errorMessage {
+    _$errorMessageAtom.reportRead();
+    return super.errorMessage;
+  }
+
+  @override
+  set errorMessage(String? value) {
+    _$errorMessageAtom.reportWrite(value, super.errorMessage, () {
+      super.errorMessage = value;
+    });
+  }
+
+  late final _$successMessageAtom =
+      Atom(name: '_BulkImportStore.successMessage', context: context);
+
+  @override
+  String? get successMessage {
+    _$successMessageAtom.reportRead();
+    return super.successMessage;
+  }
+
+  @override
+  set successMessage(String? value) {
+    _$successMessageAtom.reportWrite(value, super.successMessage, () {
+      super.successMessage = value;
+    });
+  }
+
+  late final _$progressAtom =
+      Atom(name: '_BulkImportStore.progress', context: context);
+
+  @override
+  double get progress {
+    _$progressAtom.reportRead();
+    return super.progress;
+  }
+
+  @override
+  set progress(double value) {
+    _$progressAtom.reportWrite(value, super.progress, () {
+      super.progress = value;
+    });
+  }
+
+  late final _$parsedRowsAtom =
+      Atom(name: '_BulkImportStore.parsedRows', context: context);
+
+  @override
+  ObservableList<List<dynamic>> get parsedRows {
+    _$parsedRowsAtom.reportRead();
+    return super.parsedRows;
+  }
+
+  @override
+  set parsedRows(ObservableList<List<dynamic>> value) {
+    _$parsedRowsAtom.reportWrite(value, super.parsedRows, () {
+      super.parsedRows = value;
+    });
+  }
+
+  late final _$logMessagesAtom =
+      Atom(name: '_BulkImportStore.logMessages', context: context);
+
+  @override
+  ObservableList<String> get logMessages {
+    _$logMessagesAtom.reportRead();
+    return super.logMessages;
+  }
+
+  @override
+  set logMessages(ObservableList<String> value) {
+    _$logMessagesAtom.reportWrite(value, super.logMessages, () {
+      super.logMessages = value;
+    });
+  }
+
+  late final _$downloadTemplateAsyncAction =
+      AsyncAction('_BulkImportStore.downloadTemplate', context: context);
+
+  @override
+  Future<String?> downloadTemplate() {
+    return _$downloadTemplateAsyncAction.run(() => super.downloadTemplate());
+  }
+
+  late final _$pickAndParseFileAsyncAction =
+      AsyncAction('_BulkImportStore.pickAndParseFile', context: context);
+
+  @override
+  Future<void> pickAndParseFile() {
+    return _$pickAndParseFileAsyncAction.run(() => super.pickAndParseFile());
+  }
+
+  late final _$importDataAsyncAction =
+      AsyncAction('_BulkImportStore.importData', context: context);
+
+  @override
+  Future<void> importData() {
+    return _$importDataAsyncAction.run(() => super.importData());
+  }
+
+  late final _$_BulkImportStoreActionController =
+      ActionController(name: '_BulkImportStore', context: context);
+
+  @override
+  void clear() {
+    final _$actionInfo = _$_BulkImportStoreActionController.startAction(
+        name: '_BulkImportStore.clear');
+    try {
+      return super.clear();
+    } finally {
+      _$_BulkImportStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  String toString() {
+    return '''
+isLoading: ${isLoading},
+isProcessing: ${isProcessing},
+errorMessage: ${errorMessage},
+successMessage: ${successMessage},
+progress: ${progress},
+parsedRows: ${parsedRows},
+logMessages: ${logMessages}
+    ''';
+  }
+}

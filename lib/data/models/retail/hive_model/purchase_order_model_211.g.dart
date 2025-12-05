@@ -8,7 +8,7 @@ part of 'purchase_order_model_211.dart';
 
 class PurchaseOrderModelAdapter extends TypeAdapter<PurchaseOrderModel> {
   @override
-  final int typeId = 211;
+  final int typeId = 161;
 
   @override
   PurchaseOrderModel read(BinaryReader reader) {

@@ -4,7 +4,7 @@ import '../../models/restaurant/db/taxmodel_314.dart';
 
 /// Repository layer for Tax data access
 class TaxRepository {
-  static const String _boxName = 'TaxBox';
+  static const String _boxName = 'taxs';
   late Box<Tax> _taxBox;
 
   TaxRepository() {

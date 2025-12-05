@@ -8,7 +8,7 @@ part 'customer_store.g.dart';
 class CustomerStore = _CustomerStore with _$CustomerStore;
 
 abstract class _CustomerStore with Store {
-  final CustomerRepository _customerRepository = CustomerRepository();
+  late final CustomerRepository _customerRepository;
 
   @observable
   ObservableList<CustomerModel> customers = ObservableList<CustomerModel>();
@@ -23,6 +23,7 @@ abstract class _CustomerStore with Store {
   CustomerModel? selectedCustomer;
 
   _CustomerStore() {
+    _customerRepository = CustomerRepository();
     _init();
   }
 

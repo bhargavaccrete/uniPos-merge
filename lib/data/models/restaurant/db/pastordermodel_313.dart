@@ -1,10 +1,11 @@
 // import 'package:BillBerry/model/db/cartmodel_308.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:hive/hive.dart';
 
 part 'pastordermodel_313.g.dart';
 
-@HiveType(typeId: 313)
+@HiveType(typeId: HiveTypeIds.restaurantPastOrder)
 
 class pastOrderModel extends HiveObject{
 

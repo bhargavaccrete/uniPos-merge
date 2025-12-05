@@ -67,8 +67,8 @@ class BusinessTypeStep extends StatelessWidget {
                     description: type['description']!,
                     iconName: type['icon']!,
                     isSelected: isSelected,
-                    onTap: () {
-                      store.selectBusinessType(type['id']!, type['name']!);
+                    onTap: () async {
+                      await store.selectBusinessType(type['id']!, type['name']!);
                     },
                   );
                 },
@@ -100,8 +100,14 @@ class BusinessTypeStep extends StatelessWidget {
                   flex: 2,
                   child: ElevatedButton(
                     onPressed: store.canProceedFromBusinessType
-                        ? () {
-                            store.saveBusinessType();
+                        ? () async {
+                            // Ensure business type is saved and dependencies are initialized
+                            await store.saveBusinessType();
+                            // Re-trigger initialization in case it wasn't done on selection
+                            await store.selectBusinessType(
+                              store.selectedBusinessTypeId!,
+                              store.selectedBusinessTypeName!,
+                            );
                             onNext();
                           }
                         : null,

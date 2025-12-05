@@ -72,9 +72,9 @@ class LedgerEntry {
 class CreditStore = _CreditStore with _$CreditStore;
 
 abstract class _CreditStore with Store {
-  final CreditPaymentRepository _paymentRepository = CreditPaymentRepository();
-  final SaleRepository _saleRepository = SaleRepository();
-  final CustomerRepository _customerRepository = CustomerRepository();
+  late final CreditPaymentRepository _paymentRepository;
+  late final SaleRepository _saleRepository;
+  late final CustomerRepository _customerRepository;
 
   @observable
   ObservableList<CreditPaymentModel> payments = ObservableList<CreditPaymentModel>();
@@ -92,6 +92,9 @@ abstract class _CreditStore with Store {
   bool isLoading = false;
 
   _CreditStore() {
+    _paymentRepository = CreditPaymentRepository();
+    _saleRepository = SaleRepository();
+    _customerRepository = CustomerRepository();
     _init();
   }
 

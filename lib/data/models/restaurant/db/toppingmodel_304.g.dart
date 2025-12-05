@@ -8,7 +8,7 @@ part of 'toppingmodel_304.dart';
 
 class ToppingAdapter extends TypeAdapter<Topping> {
   @override
-  final int typeId = 304;
+  final int typeId = 104;
 
   @override
   Topping read(BinaryReader reader) {

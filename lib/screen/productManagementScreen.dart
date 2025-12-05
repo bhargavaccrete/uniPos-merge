@@ -8,6 +8,8 @@ import 'package:file_picker/file_picker.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
 
+import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
+
 // ============== PRODUCT MANAGEMENT SCREEN ==============
 class ProductManagementScreen extends StatefulWidget {
   const ProductManagementScreen({Key? key}) : super(key: key);
@@ -79,20 +81,10 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   }
 
   Future<void> _uploadExcel() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const BulkImportScreen()),
     );
-
-    if (result != null) {
-      // Process Excel file
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('File uploaded: ${result.files.single.name}'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    }
   }
 
   void _downloadTemplate() {
@@ -559,7 +551,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Bulk Import via Excel',
+                  'Bulk Import Products',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -568,7 +560,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Upload multiple products at once using Excel',
+                  'Download template and upload products via CSV',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -577,20 +569,16 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
               ],
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: _downloadTemplate,
-            icon: const Icon(Icons.download, size: 18),
-            label: const Text('Template'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: BorderSide(color: AppColors.primary),
-            ),
-          ),
           const SizedBox(width: 12),
           ElevatedButton.icon(
-            onPressed: _uploadExcel,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BulkImportScreen()),
+              );
+            },
             icon: const Icon(Icons.upload_file, size: 18),
-            label: const Text('Upload'),
+            label: const Text('Start Import'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.success,
             ),

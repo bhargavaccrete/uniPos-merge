@@ -4,7 +4,7 @@ import '../../models/restaurant/db/table_Model_311.dart';
 
 /// Repository layer for Table data access
 class TableRepository {
-  static const String _boxName = 'tablesBox';
+  static const String _boxName = 'tableBox';
   late Box<TableModel> _tableBox;
 
   TableRepository() {

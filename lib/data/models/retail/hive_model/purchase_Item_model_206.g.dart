@@ -8,7 +8,7 @@ part of 'purchase_Item_model_206.dart';
 
 class PurchaseItemModelAdapter extends TypeAdapter<PurchaseItemModel> {
   @override
-  final int typeId = 206;
+  final int typeId = 156;
 
   @override
   PurchaseItemModel read(BinaryReader reader) {

@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'admin_model_217.g.dart';
 
-@HiveType(typeId: 217)
+@HiveType(typeId: HiveTypeIds.retailAdmin)
 class AdminModel extends HiveObject {
   @HiveField(0)
   final String adminId;

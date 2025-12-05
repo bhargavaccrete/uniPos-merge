@@ -1,0 +1,82 @@
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class CompanyAdapter extends TypeAdapter<Company> {
+  @override
+  final int typeId = 101;
+
+  @override
+  Company read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return Company(
+      comapanyName: fields[0] as String,
+      ownerName: fields[1] as String,
+      mobileNumber: fields[2] as String,
+      mobilenumberaltr: fields[3] as String,
+      email: fields[4] as String,
+      btype: fields[5] as String,
+      gst: fields[6] as String,
+      fssai: fields[7] as String,
+      country: fields[8] as String,
+      state: fields[9] as String,
+      city: fields[10] as String,
+      pincode: fields[12] as String,
+      imagePath: fields[13] as String?,
+      dateofreg: fields[14] as String,
+      pass: fields[15] as String,
+      address: fields[11] as String,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, Company obj) {
+    writer
+      ..writeByte(16)
+      ..writeByte(0)
+      ..write(obj.comapanyName)
+      ..writeByte(1)
+      ..write(obj.ownerName)
+      ..writeByte(2)
+      ..write(obj.mobileNumber)
+      ..writeByte(3)
+      ..write(obj.mobilenumberaltr)
+      ..writeByte(4)
+      ..write(obj.email)
+      ..writeByte(5)
+      ..write(obj.btype)
+      ..writeByte(6)
+      ..write(obj.gst)
+      ..writeByte(7)
+      ..write(obj.fssai)
+      ..writeByte(8)
+      ..write(obj.country)
+      ..writeByte(9)
+      ..write(obj.state)
+      ..writeByte(10)
+      ..write(obj.city)
+      ..writeByte(11)
+      ..write(obj.address)
+      ..writeByte(12)
+      ..write(obj.pincode)
+      ..writeByte(13)
+      ..write(obj.imagePath)
+      ..writeByte(14)
+      ..write(obj.dateofreg)
+      ..writeByte(15)
+      ..write(obj.pass);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CompanyAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}

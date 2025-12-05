@@ -70,7 +70,7 @@ dependencies:
 
   hexcolor: ^3.0.1
   image_picker: ^1.1.2
-  lottie: ^3.3.1
+  lottie: ^3.1.0
   country_code_picker: ^3.3.0
   country_state_city_picker: ^1.2.8
   csv: ^5.1.1           # To create the CSV (Excel) file
@@ -86,9 +86,9 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   encrypt: ^5.0.3
 
-  archive: ^4.0.0
   path: ^1.9.0
   flutter_phoenix: ^1.1.1
+  excel: ^4.0.6
 
 
 

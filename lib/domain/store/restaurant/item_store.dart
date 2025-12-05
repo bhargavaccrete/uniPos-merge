@@ -11,7 +11,6 @@ class ItemStore = _ItemStore with _$ItemStore;
 abstract class _ItemStore with Store {
   final ItemRepository _itemRepository = locator<ItemRepository>();
 
-  // Using final to avoid InvalidType code generation issue
   final ObservableList<Items> items = ObservableList<Items>();
 
   @observable
@@ -21,10 +20,10 @@ abstract class _ItemStore with Store {
   String? errorMessage;
 
   @observable
-  String searchQuery = '';
+  String? selectedCategoryId;
 
   @observable
-  String? selectedCategoryId;
+  String searchQuery = '';
 
   _ItemStore() {
     _init();

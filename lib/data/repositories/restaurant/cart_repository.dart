@@ -7,9 +7,9 @@ import '../../models/restaurant/db/variantmodel_305.dart';
 /// Repository layer for Cart data access
 /// Handles all Hive database operations for cart
 class CartRepository {
-  static const String _boxName = 'cart';
+  static const String _boxName = 'cartItems';
   static const String _itemBoxName = 'itemBoxs';
-  static const String _variantBoxName = 'variante';
+  static const String _variantBoxName = 'variants';
   late Box<CartItem> _cartBox;
   late Box<Items> _itemBox;
   late Box<VariantModel> _variantBox;

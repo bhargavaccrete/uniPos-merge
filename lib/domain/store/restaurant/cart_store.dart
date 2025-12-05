@@ -8,10 +8,9 @@ part 'cart_store.g.dart';
 
 class CartStorer = _CartStorer with _$CartStorer;
 
-abstract class _CartStorer with Store{
+abstract class _CartStorer with Store {
   final CartRepository _cartRepository = locator<CartRepository>();
 
-  // Using final to avoid InvalidType code generation issue
   final ObservableList<CartItem> cartItems = ObservableList<CartItem>();
 
   @observable

@@ -11,7 +11,6 @@ class CategoryStore = _CategoryStore with _$CategoryStore;
 abstract class _CategoryStore with Store {
   final CategoryRepository _categoryRepository = locator<CategoryRepository>();
 
-  // Using late initialization to avoid InvalidType issue
   final ObservableList<Category> categories = ObservableList<Category>();
 
   @observable
