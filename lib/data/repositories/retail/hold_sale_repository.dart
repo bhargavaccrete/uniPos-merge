@@ -7,8 +7,19 @@ class HoldSaleRepository {
   late Box<HoldSaleItemModel> _holdSaleItemBox;
 
   Future<void> init() async {
-    _holdSaleBox = await Hive.openBox<HoldSaleModel>('holdSales');
-    _holdSaleItemBox = await Hive.openBox<HoldSaleItemModel>('holdSaleItems');
+    // Use Hive.box() instead of openBox() since boxes are already opened in main.dart
+    // If box is not open, try to open it
+    if (Hive.isBoxOpen('holdSales')) {
+      _holdSaleBox = Hive.box<HoldSaleModel>('holdSales');
+    } else {
+      _holdSaleBox = await Hive.openBox<HoldSaleModel>('holdSales');
+    }
+
+    if (Hive.isBoxOpen('holdSaleItems')) {
+      _holdSaleItemBox = Hive.box<HoldSaleItemModel>('holdSaleItems');
+    } else {
+      _holdSaleItemBox = await Hive.openBox<HoldSaleItemModel>('holdSaleItems');
+    }
   }
 
   // ==================== HoldSale CRUD ====================

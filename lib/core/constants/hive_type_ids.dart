@@ -15,8 +15,9 @@ class HiveTypeIds {
   // ==================== COMMON MODELS (1-19) ====================
   static const int taxDetails = 2;
   static const int businessType = 3;
-
   static const int businessDetails = 4;
+  static const int taxRateItem = 5;
+  static const int paymentMethod = 6;
 
   // ==================== RESTAURANT MODELS (100-149) ====================
   static const int restaurantCategory = 100;

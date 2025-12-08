@@ -9,6 +9,7 @@ import '../core/config/app_config.dart';
 import '../core/di/service_locator.dart';
 import '../data/models/retail/hive_model/attribute_model_219.dart';
 import '../data/models/retail/hive_model/attribute_value_model_220.dart';
+import '../data/repositories/tax_details_repository.dart';
 import '../domain/store/common/add_product_form_store.dart';
 import '../domain/store/retail/product_store.dart';
 import '../domain/store/retail/attribute_store.dart';
@@ -21,7 +22,14 @@ import '../util/responsive.dart';
 import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({Key? key}) : super(key: key);
+  final VoidCallback? onNext;
+  final VoidCallback? onPrevious;
+
+  const AddProductScreen({
+    Key? key,
+    this.onNext,
+    this.onPrevious,
+  }) : super(key: key);
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -171,11 +179,20 @@ class _AddProductScreenState extends State<AddProductScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: _buildAppBar(),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildAddProductTab(isDesktop, isTablet, isMobile),
-          _buildProductListTab(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildAddProductTab(isDesktop, isTablet, isMobile),
+                _buildProductListTab(),
+              ],
+            ),
+          ),
+          // Setup Wizard Navigation (shown only when callbacks are provided)
+          if (widget.onNext != null && widget.onPrevious != null)
+            _buildSetupWizardNavigation(),
         ],
       ),
     );
@@ -185,16 +202,17 @@ class _AddProductScreenState extends State<AddProductScreen>
     final title = AppConfig.isRetail ? 'Product Management' : 'Menu Management';
 
     return AppBar(
+      automaticallyImplyLeading: false,
       backgroundColor: Colors.white,
       elevation: 0,
       title: Text(
         title,
         style: const TextStyle(color: AppColors.darkNeutral),
       ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: AppColors.darkNeutral),
-        onPressed: () => Navigator.pop(context),
-      ),
+      // leading: IconButton(
+      //   icon: const Icon(Icons.arrow_back, color: AppColors.darkNeutral),
+      //   onPressed: () => Navigator.pop(context),
+      // ),
       actions: [
         IconButton(
           icon: const Icon(Icons.download, color: AppColors.primary),
@@ -498,6 +516,7 @@ class _AddProductScreenState extends State<AddProductScreen>
         onTap: _pickImage,
         child: Container(
           height: 120,
+          width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.grey[100],
             borderRadius: BorderRadius.circular(12),
@@ -621,8 +640,25 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildGstDropdown() {
-    // Common GST rates in India
-    const gstRates = ['0', '5', '12', '18', '28'];
+    // Fetch tax rates from saved tax details
+    final taxDetailsRepo = locator<TaxDetailsRepository>();
+    final savedTax = taxDetailsRepo.get();
+
+    print('_buildGstDropdown: savedTax = $savedTax');
+    print('_buildGstDropdown: savedTax?.taxRates = ${savedTax?.taxRates}');
+
+    // Get tax rates from saved details, or use default if none saved
+    List<String> gstRates = [];
+    if (savedTax != null && savedTax.taxRates != null && savedTax.taxRates!.isNotEmpty) {
+      // Use saved tax rates from setup
+      print('_buildGstDropdown: Using saved tax rates');
+      gstRates = savedTax.taxRates!.map((tax) => tax.rate.toString()).toList();
+      print('_buildGstDropdown: gstRates = $gstRates');
+    } else {
+      // Fallback to common GST rates if no tax rates were added during setup
+      print('_buildGstDropdown: Using fallback default rates');
+      gstRates = ['0', '5', '12', '18', '28'];
+    }
 
     return DropdownButtonFormField<String>(
       value: _taxRateController.text.isEmpty ? null : _taxRateController.text,
@@ -2864,5 +2900,64 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     generate(0, {});
     return result;
+  }
+
+  // ==================== SETUP WIZARD NAVIGATION ====================
+
+  Widget _buildSetupWizardNavigation() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: widget.onPrevious,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  side: BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('Back'),
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton.icon(
+                onPressed: widget.onNext,
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text(
+                  'Next: Payment Setup',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

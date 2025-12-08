@@ -3,7 +3,9 @@ import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/data/repositories/business_type_repository.dart';
 import 'package:unipos/data/repositories/business_details_repository.dart';
 import 'package:unipos/data/repositories/tax_details_repository.dart';
+import 'package:unipos/data/repositories/payment_method_repository.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
+import 'package:unipos/stores/payment_method_store.dart';
 
 // ==================== RETAIL IMPORTS ====================
 import 'package:unipos/data/repositories/retail/admin_repository.dart';
@@ -72,6 +74,7 @@ Future<void> setupServiceLocator() async {
   locator.registerLazySingleton<BusinessTypeRepository>(() => BusinessTypeRepository());
   locator.registerLazySingleton<BusinessDetailsRepository>(() => BusinessDetailsRepository());
   locator.registerLazySingleton<TaxDetailsRepository>(() => TaxDetailsRepository());
+  locator.registerLazySingleton<PaymentMethodRepository>(() => PaymentMethodRepository());
 
   // ==================== COMMON STORES ====================
   // Factory - new instance each time (for screens that need fresh state)
@@ -81,6 +84,11 @@ Future<void> setupServiceLocator() async {
       businessDetailsRepo: locator<BusinessDetailsRepository>(),
       taxDetailsRepo: locator<TaxDetailsRepository>(),
     ),
+  );
+
+  // Singleton for PaymentMethodStore
+  locator.registerLazySingleton<PaymentMethodStore>(
+    () => PaymentMethodStore(locator<PaymentMethodRepository>()),
   );
 
   // Register business-specific dependencies based on mode
@@ -134,6 +142,10 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<HoldSaleStore>(
         () => HoldSaleStore(locator<HoldSaleRepository>()),
   );
+
+  // Initialize HoldSaleStore to open boxes
+  locator<HoldSaleStore>().init();
+
   locator.registerLazySingleton<StockAlertStore>(() => StockAlertStore());
 
   // Credit System

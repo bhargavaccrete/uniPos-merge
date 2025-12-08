@@ -5,6 +5,7 @@ import 'package:unipos/core/constants/hive_type_ids.dart';
 
 // Common Models
 import 'package:unipos/models/tax_details.dart';
+import 'package:unipos/models/payment_method.dart' hide PaymentMethod;
 import 'package:unipos/data/models/common/business_type.dart';
 import 'package:unipos/data/models/common/business_details.dart';
 
@@ -78,6 +79,14 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.businessDetails)) {
       Hive.registerAdapter(BusinessDetailsAdapter());
     }
+    // TaxRateItem - typeId: 5
+    if (!Hive.isAdapterRegistered(HiveTypeIds.taxRateItem)) {
+      Hive.registerAdapter(TaxRateItemAdapter());
+    }
+    // PaymentMethod - typeId: 6
+    if (!Hive.isAdapterRegistered(HiveTypeIds.paymentMethod)) {
+      Hive.registerAdapter(PaymentMethodAdapter());
+    }
   }
 
   /// Open common boxes (needed regardless of business mode)
@@ -86,6 +95,7 @@ class HiveInit {
     await Hive.openBox<TaxDetails>('taxBox');
     await Hive.openBox<BusinessType>('businessTypeBox');
     await Hive.openBox<BusinessDetails>('businessDetailsBox');
+    await Hive.openBox<PaymentMethod>('paymentMethodsBox');
   }
 
   /// Register all retail adapters (typeIds: 150-223)
@@ -199,6 +209,8 @@ class HiveInit {
     await Hive.openBox<GRNItemModel>('grnItems');
     // Note: Retail categories use Box<String> named 'categories', not CategoryModel
     await Hive.openBox<String>('categories');
+    // CategoryModel box for GST support
+    await Hive.openBox<CategoryModel>('category_models');
     await Hive.openBox<PaymentEntryModel>('paymentEntries');
     await Hive.openBox<AdminModel>('admin_box');
     await Hive.openBox<CreditPaymentModel>('credit_payments');

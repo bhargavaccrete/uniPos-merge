@@ -74,6 +74,8 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     );
     widget.store.setTaxName(defaultTax.name);
     widget.store.setTaxRate(defaultTax.rate);
+    // Save all tax rates to store
+    widget.store.setTaxRates(_taxes);
   }
 
   @override

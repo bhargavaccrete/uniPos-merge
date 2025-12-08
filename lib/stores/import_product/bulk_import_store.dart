@@ -297,14 +297,19 @@ abstract class _BulkImportStore with Store {
   /// Execute Import Process
   @action
   Future<void> importData() async {
+    print('importData: Starting import process...');
     if (parsedRows.isEmpty) {
       errorMessage = "No data to import";
+      print('importData: ERROR - No data to import');
       return;
     }
 
     isProcessing = true;
     progress = 0.0;
     logMessages.clear();
+    errorMessage = null;
+    successMessage = null;
+    print('importData: Set isProcessing=true, cleared messages');
 
     try {
       // 1. Group rows by 'Handle' (Column 0)
@@ -370,11 +375,14 @@ abstract class _BulkImportStore with Store {
       } else {
         successMessage = "Import completed with errors. Success: $successCount, Failed: $errorCount";
       }
+      print('importData: Import complete. Success: $successCount, Failed: $errorCount');
+      print('importData: Keeping isProcessing=true to show results screen');
     } catch (e) {
       errorMessage = "Import failed: $e";
-    } finally {
-      isProcessing = false;
+      print('importData: Import FAILED with error: $e');
     }
+    // Note: We keep isProcessing=true so the user stays on the results screen
+    // It will be set to false when they click "Done" and clear() is called
   }
 
   Future<void> _processGroup(String handle, List<List<dynamic>> rows) async {

@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
+
 
 class AppColors {
   static const Color primary = Color(0xFF0D47A1); // Indigo Blue
@@ -12,6 +14,7 @@ class AppColors {
   static const Color orange = Color(0xFFD84315); // Deep Orange
   static const Color info = Color(0xFF2D9CDB);
   static const Color warning = Color(0xFFF57F17);
+  static const Color white =  Color(0xffFFFFFF);
 }
 
 

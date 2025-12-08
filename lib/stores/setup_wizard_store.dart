@@ -105,6 +105,9 @@ abstract class _SetupWizardStore with Store {
   @observable
   String? taxNotes;
 
+  @observable
+  List<dynamic>? taxRates; // List to store TaxItem objects from UI
+
   // ==================== COMPUTED ====================
 
   @computed
@@ -312,6 +315,11 @@ abstract class _SetupWizardStore with Store {
     taxNotes = value;
   }
 
+  @action
+  void setTaxRates(List<dynamic> rates) {
+    taxRates = rates;
+  }
+
   // ==================== ASYNC ACTIONS ====================
 
   @action
@@ -438,6 +446,27 @@ abstract class _SetupWizardStore with Store {
   Future<void> saveTaxDetails() async {
     isLoading = true;
     try {
+      print('saveTaxDetails: taxRates = $taxRates');
+      print('saveTaxDetails: taxRates length = ${taxRates?.length}');
+
+      // Convert taxRates to TaxRateItem list
+      List<TaxRateItem>? rateItems;
+      if (taxRates != null && taxRates!.isNotEmpty) {
+        print('saveTaxDetails: Converting ${taxRates!.length} tax rates');
+        rateItems = taxRates!.map((tax) {
+          print('saveTaxDetails: Converting tax - name: ${tax.name}, rate: ${tax.rate}, isDefault: ${tax.isDefault}');
+          // tax is a TaxItem from UI, convert to TaxRateItem for storage
+          return TaxRateItem(
+            name: tax.name as String,
+            rate: tax.rate as double,
+            isDefault: tax.isDefault as bool,
+          );
+        }).toList();
+        print('saveTaxDetails: Converted rateItems = $rateItems');
+      } else {
+        print('saveTaxDetails: No tax rates to save (taxRates is null or empty)');
+      }
+
       final details = TaxDetails(
         isEnabled: taxEnabled,
         isInclusive: taxInclusive,
@@ -446,9 +475,13 @@ abstract class _SetupWizardStore with Store {
         placeOfSupply: taxPlaceOfSupply,
         applyOnDelivery: taxApplyOnDelivery,
         notes: taxNotes,
+        taxRates: rateItems,
       );
+      print('saveTaxDetails: Saving TaxDetails with ${details.taxRates?.length ?? 0} tax rates');
       await _taxDetailsRepo.save(details);
+      print('saveTaxDetails: Successfully saved tax details');
     } catch (e) {
+      print('saveTaxDetails: ERROR - $e');
       errorMessage = 'Failed to save tax details: $e';
     } finally {
       isLoading = false;
@@ -459,22 +492,28 @@ abstract class _SetupWizardStore with Store {
   Future<void> completeSetup() async {
     isLoading = true;
     try {
-      // 1. Lock business mode in AppConfig (ONE TIME - cannot change later)
+      // 1. Determine business mode
+      final mode = selectedBusinessTypeId == 'restaurant'
+          ? BusinessMode.restaurant
+          : BusinessMode.retail;
+
+      // 2. Lock business mode in AppConfig (ONE TIME - cannot change later)
       // Only set if not already set (prevents errors on re-running setup)
       if (!AppConfig.isBusinessModeSet) {
-        final mode = selectedBusinessTypeId == 'restaurant'
-            ? BusinessMode.restaurant
-            : BusinessMode.retail;
         await AppConfig.setBusinessMode(mode);
       }
 
-      // 2. Save business type to Hive
+      // 3. Ensure business dependencies are registered
+      // This is critical - must happen before navigating to POS screen
+      await _registerBusinessDependencies(mode);
+
+      // 4. Save business type to Hive
       await saveBusinessType();
 
-      // 3. Save tax details
+      // 5. Save tax details
       await saveTaxDetails();
 
-      // 4. Save business details with setup complete flag
+      // 6. Save business details with setup complete flag
       final details = BusinessDetails(
         businessTypeId: selectedBusinessTypeId,
         businessTypeName: selectedBusinessTypeName,
@@ -493,12 +532,13 @@ abstract class _SetupWizardStore with Store {
       );
       await _businessDetailsRepo.save(details);
 
-      // 5. Mark setup complete in AppConfig
+      // 7. Mark setup complete in AppConfig
       await AppConfig.setSetupComplete(true);
 
       isSetupComplete = true;
     } catch (e) {
       errorMessage = 'Failed to complete setup: $e';
+      rethrow; // Re-throw so the UI can handle it
     } finally {
       isLoading = false;
     }

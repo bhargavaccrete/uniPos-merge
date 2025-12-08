@@ -1,8 +1,9 @@
 import 'package:hive/hive.dart';
+import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'tax_details.g.dart';
 
-@HiveType(typeId: 2) // make sure this ID is unique in your app
+@HiveType(typeId: HiveTypeIds.taxDetails) // make sure this ID is unique in your app
 class TaxDetails extends HiveObject {
   @HiveField(0)
   final bool isEnabled;            // enable/disable tax
@@ -25,6 +26,9 @@ class TaxDetails extends HiveObject {
   @HiveField(6)
   final String? notes;             // optional info
 
+  @HiveField(7)
+  final List<TaxRateItem>? taxRates; // List of all tax rates added during setup
+
    TaxDetails({
     this.isEnabled = true,
     this.isInclusive = true,
@@ -33,6 +37,7 @@ class TaxDetails extends HiveObject {
     this.placeOfSupply,
     this.applyOnDelivery = false,
     this.notes,
+    this.taxRates,
   });
 
   TaxDetails copyWith({
@@ -43,6 +48,7 @@ class TaxDetails extends HiveObject {
     String? placeOfSupply,
     bool? applyOnDelivery,
     String? notes,
+    List<TaxRateItem>? taxRates,
   }) {
     return TaxDetails(
       isEnabled: isEnabled ?? this.isEnabled,
@@ -52,6 +58,37 @@ class TaxDetails extends HiveObject {
       placeOfSupply: placeOfSupply ?? this.placeOfSupply,
       applyOnDelivery: applyOnDelivery ?? this.applyOnDelivery,
       notes: notes ?? this.notes,
+      taxRates: taxRates ?? this.taxRates,
+    );
+  }
+}
+
+@HiveType(typeId:  HiveTypeIds.taxRateItem) // Unique type ID for TaxRateItem
+class TaxRateItem extends HiveObject {
+  @HiveField(0)
+  final String name;
+
+  @HiveField(1)
+  final double rate;
+
+  @HiveField(2)
+  final bool isDefault;
+
+  TaxRateItem({
+    required this.name,
+    required this.rate,
+    this.isDefault = false,
+  });
+
+  TaxRateItem copyWith({
+    String? name,
+    double? rate,
+    bool? isDefault,
+  }) {
+    return TaxRateItem(
+      name: name ?? this.name,
+      rate: rate ?? this.rate,
+      isDefault: isDefault ?? this.isDefault,
     );
   }
 }

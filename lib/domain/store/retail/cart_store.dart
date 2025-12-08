@@ -52,7 +52,7 @@ abstract class _CartStore with Store {
   late Box<CartItemModel> _cartBox;
 
   _CartStore() {
-    _cartBox = Hive.box<CartItemModel>('cart');
+    _cartBox = Hive.box<CartItemModel>('cartItems');
     // Load cart items from Hive on initialization
     items.addAll(_cartBox.values);
   }

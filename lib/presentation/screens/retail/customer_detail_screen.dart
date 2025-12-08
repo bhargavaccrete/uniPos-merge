@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model//customer_model_208.dart';
-import 'package:unipos/data/models/retail/hive_model//sale_model_203.dart';
+import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:unipos/presentation/screens/retail/sale_detail_screen.dart';
 import 'package:unipos/presentation/screens/retail/receive_payment_screen.dart';
 import 'package:unipos/presentation/screens/retail/customer_ledger_screen.dart';

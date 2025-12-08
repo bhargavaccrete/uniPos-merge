@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/init/hive_init.dart';
+import 'package:unipos/presentation/screens/retail/home_screen.dart';
+import 'package:unipos/presentation/screens/retail/pos_screen.dart';
 import 'package:unipos/screen/existingUserRestoreScreen.dart';
 import 'package:unipos/screen/setupWizardScreen.dart';
 import 'package:unipos/screen/splashScreen.dart';
@@ -31,7 +33,14 @@ void main() async{
   await HiveInit.initializeBusinessBoxes();
 
   // Setup GetIt dependency injection
+  // IMPORTANT: This must be called AFTER boxes are initialized
   await setupServiceLocator();
+
+  // Debug: Print initialization status
+  print('🔧 App Initialization Complete');
+  print('   Business Mode: ${AppConfig.businessMode.name}');
+  print('   Setup Complete: ${AppConfig.isSetupComplete}');
+  print('   Retail Boxes Open: ${HiveInit.areRetailBoxesOpen}');
 
   runApp(const UniPOSApp());
 }
@@ -70,6 +79,11 @@ class UniPOSApp extends StatelessWidget {
         '/userSelectionScreen': (context) => const UserSelectionScreen(),
         '/existingUserRestoreScreen': (context) => const ExistingUserRestoreScreen(),
         '/setup-wizard': (context) => const SetupWizardScreen(),
+
+        '/retail-billing': (context) => const PosScreen(),
+         '/retail-menu': (context) => const HomeScreen(),
+
+
         // '/outlet-registration': (context) => const OutletRegistrationScreen(),
         // '/tax-setup': (context) => const TaxConfigurationScreen(),
         // '/category-setup': (context) => const CategorySetupScreen(),

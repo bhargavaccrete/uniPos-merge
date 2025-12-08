@@ -6,6 +6,8 @@ import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/screen/productManagementScreen.dart';
 import 'package:unipos/screen/storeDetailsScreen.dart';
 import 'package:unipos/screen/taxSetupStep.dart';
+import 'package:unipos/screen/paymentSetupStep.dart';
+import 'package:unipos/screen/staffSetupStep.dart';
 
 import '../util/color.dart';
 import '../util/responsive.dart';
@@ -114,9 +116,43 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   void _completeSetup() async {
-    await _store.completeSetup();
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/outlet-registration');
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Complete setup (this registers business dependencies)
+      await _store.completeSetup();
+
+      // Wait a bit to ensure all dependencies are fully registered
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (mounted) {
+        // Close loading indicator
+        Navigator.pop(context);
+
+        // Navigate to POS screen
+        Navigator.pushReplacementNamed(context, '/retail-billing');
+      }
+    } catch (e) {
+      if (mounted) {
+        // Close loading indicator
+        Navigator.pop(context);
+
+        // Show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error completing setup: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -432,34 +468,33 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: AddProductScreen(),
-        ),
-      ),
-
-      // Step 5: Payment Methods (Placeholder)
-      SlideTransition(
-        position: _slideAnimation,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: _buildPlaceholderStep(
-            'Payment Methods',
-            Icons.payment,
-            AppColors.accent,
-            'Setup payment options later in Settings',
+          child: AddProductScreen(
+            onNext: _nextStep,
+            onPrevious: _previousStep,
           ),
         ),
       ),
 
-      // Step 6: Staff Setup (Placeholder)
+      // Step 5: Payment Methods
       SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: _buildPlaceholderStep(
-            'Staff Setup',
-            Icons.people,
-            AppColors.orange,
-            'Add staff members later in Settings',
+          child: PaymentSetupStep(
+            onNext: _nextStep,
+            onPrevious: _previousStep,
+          ),
+        ),
+      ),
+
+      // Step 6: Staff Setup
+      SlideTransition(
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: StaffSetupStep(
+            onNext: _nextStep,
+            onPrevious: _previousStep,
           ),
         ),
       ),

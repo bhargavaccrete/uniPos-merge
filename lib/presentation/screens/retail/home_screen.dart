@@ -22,12 +22,13 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('POS'),
+        title: const Text('POS',style: TextStyle(color: Colors.white),),
         centerTitle: true,
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle),
+            icon: const Icon(Icons.account_circle,color:Colors.white,),
             offset: const Offset(0, 50),
             onSelected: (value) async {
               switch (value) {

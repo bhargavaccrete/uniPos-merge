@@ -446,6 +446,22 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     });
   }
 
+  late final _$taxRatesAtom =
+      Atom(name: '_SetupWizardStore.taxRates', context: context);
+
+  @override
+  List<dynamic>? get taxRates {
+    _$taxRatesAtom.reportRead();
+    return super.taxRates;
+  }
+
+  @override
+  set taxRates(List<dynamic>? value) {
+    _$taxRatesAtom.reportWrite(value, super.taxRates, () {
+      super.taxRates = value;
+    });
+  }
+
   late final _$selectBusinessTypeAsyncAction =
       AsyncAction('_SetupWizardStore.selectBusinessType', context: context);
 
@@ -750,6 +766,17 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   }
 
   @override
+  void setTaxRates(List<dynamic> rates) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxRates');
+    try {
+      return super.setTaxRates(rates);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   String toString() {
     return '''
 currentStep: ${currentStep},
@@ -776,6 +803,7 @@ taxName: ${taxName},
 taxPlaceOfSupply: ${taxPlaceOfSupply},
 taxApplyOnDelivery: ${taxApplyOnDelivery},
 taxNotes: ${taxNotes},
+taxRates: ${taxRates},
 hasBusinessType: ${hasBusinessType},
 hasStoreDetails: ${hasStoreDetails},
 canProceedFromBusinessType: ${canProceedFromBusinessType},

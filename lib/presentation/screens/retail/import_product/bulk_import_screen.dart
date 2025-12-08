@@ -20,8 +20,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: const Text("Bulk Import Products"),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -310,17 +311,20 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
           ),
         ),
         Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
+          child: Container(
+            color: Colors.white,
             child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: headers.map((h) => DataColumn(label: Text(h))).toList(),
-                rows: dataRows.take(50).map((row) { // Show max 50 for preview
-                  return DataRow(
-                    cells: row.map((cell) => DataCell(Text(cell.toString()))).toList(),
-                  );
-                }).toList(),
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: headers.map((h) => DataColumn(label: Text(h))).toList(),
+                  rows: dataRows.take(50).map((row) { // Show max 50 for preview
+                    return DataRow(
+                      cells: row.map((cell) => DataCell(Text(cell.toString()))).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ),
@@ -329,7 +333,8 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
         Row(
           children: [
             Expanded(
-              child: OutlinedButton(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: _store.clear,
                 child: const Text("Cancel"),
               ),
@@ -349,110 +354,97 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
   }
 
   Widget _buildProcessingView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(value: _store.progress),
-          const SizedBox(height: 20),
-          Text(
-            "Importing... ${(_store.progress * 100).toStringAsFixed(0)}%",
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            height: 200,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
+    return Container(
+      color: Colors.white,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(value: _store.progress),
+            const SizedBox(height: 20),
+            Text(
+              "Importing... ${(_store.progress * 100).toStringAsFixed(0)}%",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            child: ListView.builder(
-              itemCount: _store.logMessages.length,
-              itemBuilder: (context, index) {
-                final msg = _store.logMessages[index];
-                final isError = msg.startsWith("Error");
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  child: Text(
-                    msg,
-                    style: TextStyle(
-                      color: isError ? Colors.red : Colors.green,
-                      fontSize: 12,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Show success message
-          if (_store.progress >= 1.0 && _store.successMessage != null)
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(12),
+              height: 200,
+              width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green),
-                  const SizedBox(width: 8),
-                  Expanded(
+              child: ListView.builder(
+                itemCount: _store.logMessages.length,
+                itemBuilder: (context, index) {
+                  final msg = _store.logMessages[index];
+                  final isError = msg.startsWith("Error");
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     child: Text(
-                      _store.successMessage!,
-                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                      msg,
+                      style: TextStyle(
+                        color: isError ? Colors.red : Colors.green,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
-          const SizedBox(height: 20),
-          if (_store.progress >= 1.0 || _store.errorMessage != null)
-            Observer(
-              builder: (_) => ElevatedButton(
-                onPressed: _store.isLoading
-                    ? null
-                    : () async {
-                        _store.isLoading = true;
-
-                        // Small delay to show loading state
-                        await Future.delayed(const Duration(milliseconds: 100));
-
-                        _store.clear(); // Reset state
-
-                        // Reload products in ProductStore
-                        try {
-                          print('Done button: Reloading ProductStore...');
-                          final productStore = locator<ProductStore>();
-                          await productStore.loadProducts();
-                          await productStore.loadCategories();
-                          print('Done button: Loaded ${productStore.products.length} products');
-                          print('Done button: Loaded ${productStore.categories.length} categories');
-                        } catch (e) {
-                          print('Done button: Error reloading: $e');
-                        }
-
-                        _store.isLoading = false;
-
-                        if (mounted) {
-                          Navigator.pop(context); // Go back
-                        }
-                      },
-                child: _store.isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text("Done - Go Back to Product List"),
+            const SizedBox(height: 20),
+            // Show success message
+            if (_store.progress >= 1.0 && _store.successMessage != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _store.successMessage!,
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-        ],
+            const SizedBox(height: 20),
+            if (_store.progress >= 1.0 || _store.errorMessage != null)
+              ElevatedButton(
+                onPressed: () async {
+                  print('Done button: Clearing state and reloading products...');
+
+                  // Reload products in ProductStore BEFORE clearing
+                  try {
+                    final productStore = locator<ProductStore>();
+                    print('Done button: Reloading ProductStore...');
+                    await productStore.loadProducts();
+                    await productStore.loadCategories();
+                    print('Done button: Loaded ${productStore.products.length} products');
+                    print('Done button: Loaded ${productStore.categories.length} categories');
+                  } catch (e) {
+                    print('Done button: Error reloading: $e');
+                  }
+
+                  // Clear state after loading
+                  _store.clear(); // Reset state (sets isProcessing=false)
+
+                  if (mounted) {
+                    print('Done button: Navigating back to product list');
+                    Navigator.pop(context); // Go back
+                  }
+                },
+                child: const Text("Done - Go Back to Product List"),
+              ),
+          ],
+        ),
       ),
     );
   }

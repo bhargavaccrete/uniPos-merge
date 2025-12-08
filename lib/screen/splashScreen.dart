@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:unipos/util/images.dart';
+import 'package:unipos/core/config/app_config.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
 
@@ -100,8 +101,23 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   _navigateToHome() async {
-    await Future.delayed(const Duration(seconds: 4), () {
-      Navigator.pushReplacementNamed(context, '/walkthrough');
+    await Future.delayed(const Duration(seconds: 4), () async {
+      // Check if setup is complete
+      if (AppConfig.isSetupComplete) {
+        // Setup is complete - navigate to appropriate screen based on business mode
+        if (AppConfig.isRetail) {
+          Navigator.pushReplacementNamed(context, '/retail-billing');
+        } else if (AppConfig.isRestaurant) {
+          // Navigate to restaurant home (you can add this route later)
+          Navigator.pushReplacementNamed(context, '/retail-billing'); // Temporary
+        } else {
+          // Setup complete but no business mode - navigate to walkthrough
+          Navigator.pushReplacementNamed(context, '/walkthrough');
+        }
+      } else {
+        // Setup not complete - navigate to walkthrough
+        Navigator.pushReplacementNamed(context, '/walkthrough');
+      }
     });
   }
 

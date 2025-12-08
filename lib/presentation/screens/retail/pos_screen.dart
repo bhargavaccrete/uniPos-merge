@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:hive/hive.dart';
+import 'package:unipos/util/color.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/init/hive_init.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:unipos/data/models/retail/hive_model/hold_sale_model_209.dart';
@@ -8,6 +11,7 @@ import 'package:unipos/data/models/retail/hive_model/hold_sale_item_model_210.da
 import 'package:unipos/presentation/screens/retail/scanner_screen.dart';
 import 'package:unipos/presentation/screens/retail/checkout_screen.dart';
 import 'package:unipos/presentation/screens/retail/parked_sales_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -26,6 +30,200 @@ class _PosScreenState extends State<PosScreen> {
   List<ProductModel> _searchResults = [];
   bool _showSearchResults = false;
   bool _isSearchMode = false;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeStores();
+  }
+
+  Future<void> _initializeStores() async {
+    // Wait a frame to ensure stores are registered
+    await Future.delayed(Duration.zero);
+
+    // Verify stores are available
+    try {
+      final _ = productStore;
+      final __ = cartStore;
+      final ___ = holdSaleStore;
+
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+
+        // Check if this is the first time user is visiting POS screen
+        _checkAndShowWelcomeDialog();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error initializing POS: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  Future<void> _checkAndShowWelcomeDialog() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstTime = prefs.getBool('first_time_pos') ?? true;
+
+    if (isFirstTime && mounted) {
+      // Wait a bit for the screen to be fully rendered
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (mounted) {
+        await _showWelcomeDialog();
+        await prefs.setBool('first_time_pos', false);
+      }
+    }
+  }
+
+  Future<void> _showWelcomeDialog() async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: const [
+            Icon(Icons.celebration, color: Color(0xFF4CAF50), size: 28),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Welcome to Your POS!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your store is now ready! Here\'s how to get started:',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B6B6B),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildWelcomeStep(
+                Icons.qr_code_scanner,
+                'Scan Barcodes',
+                'Use the scanner button to quickly add products',
+              ),
+              _buildWelcomeStep(
+                Icons.search,
+                'Search Products',
+                'Type product names in the search bar',
+              ),
+              _buildWelcomeStep(
+                Icons.add_shopping_cart,
+                'Add to Cart',
+                'Tap on products to add them to your cart',
+              ),
+              _buildWelcomeStep(
+                Icons.pause_circle_outline,
+                'Hold Sales',
+                'Park incomplete sales and restore them later',
+              ),
+              _buildWelcomeStep(
+                Icons.payment,
+                'Checkout',
+                'Process payments and complete transactions',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CAF50),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Get Started',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeStep(IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF4CAF50).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              size: 24,
+              color: const Color(0xFF4CAF50),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B6B6B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -309,6 +507,36 @@ class _PosScreenState extends State<PosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFFAFAFA),
+        appBar: AppBar(
+          title: const Text('Billing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.white,
+          automaticallyImplyLeading: false,
+
+
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4CAF50)),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Initializing POS...',
+                style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
@@ -316,6 +544,14 @@ class _PosScreenState extends State<PosScreen> {
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A1A)),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, '/retail-menu');
+
+          },
+          tooltip: 'Back to Home',
+        ),
         actions: [
           Observer(
             builder: (context) => Stack(
@@ -432,7 +668,7 @@ class _PosScreenState extends State<PosScreen> {
             height: 40,
             width: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF4CAF50),
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(6),
             ),
             child: IconButton(
@@ -999,7 +1235,7 @@ class _PosScreenState extends State<PosScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
+                      backgroundColor:  AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
