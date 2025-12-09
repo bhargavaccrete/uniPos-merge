@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:unipos/domain/services/retail/gst_service.dart';
+import 'package:unipos/util/responsive.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -72,79 +73,329 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search categories...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B)),
-                filled: true,
-                fillColor: const Color(0xFFF5F5F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
-            ),
-          ),
-
-          // Category Count
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredCategories.length} categories',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _showAddCategoryDialog,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF4CAF50),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-
-          // Category List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredCategories.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredCategories.length,
-                        itemBuilder: (context, index) {
-                          final category = _filteredCategories[index];
-                          return _buildCategoryCard(category);
-                        },
-                      ),
-          ),
-        ],
+      body: Responsive(
+        mobile: _buildMobileLayout(context),
+        tablet: _buildTabletLayout(context),
+        desktop: _buildDesktopLayout(context),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddCategoryDialog,
         backgroundColor: const Color(0xFF4CAF50),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  // ==================== MOBILE LAYOUT ====================
+  Widget _buildMobileLayout(BuildContext context) {
+    return Column(
+      children: [
+        _buildSearchBar(),
+        _buildCategoryCount(),
+        const Divider(height: 1),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _filteredCategories.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _filteredCategories.length,
+                      itemBuilder: (context, index) {
+                        return _buildCategoryCard(_filteredCategories[index]);
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== TABLET LAYOUT ====================
+  Widget _buildTabletLayout(BuildContext context) {
+    return Column(
+      children: [
+        _buildSearchBar(),
+        _buildCategoryCount(),
+        const Divider(height: 1),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _filteredCategories.isEmpty
+                  ? _buildEmptyState()
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(20),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.8,
+                      ),
+                      itemCount: _filteredCategories.length,
+                      itemBuilder: (context, index) {
+                        return _buildCategoryGridCard(_filteredCategories[index]);
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== DESKTOP LAYOUT ====================
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFE8E8E8), width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Text(
+                'Category Management',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4CAF50).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_categories.length} categories',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4CAF50),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: _buildSearchBar(),
+        ),
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _filteredCategories.isEmpty
+                  ? _buildEmptyState()
+                  : GridView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 24,
+                        mainAxisSpacing: 24,
+                        childAspectRatio: 2.0,
+                      ),
+                      itemCount: _filteredCategories.length,
+                      itemBuilder: (context, index) {
+                        return _buildCategoryGridCard(_filteredCategories[index]);
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== COMMON WIDGETS ====================
+  Widget _buildSearchBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search categories...',
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B)),
+          filled: true,
+          fillColor: const Color(0xFFF5F5F5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+        onChanged: (value) {
+          setState(() => _searchQuery = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryCount() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Text(
+            '${_filteredCategories.length} categories',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+            ),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: _showAddCategoryDialog,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF4CAF50),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== GRID CARD (For Tablet & Desktop) ====================
+  Widget _buildCategoryGridCard(CategoryModel category) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => _showEditCategoryDialog(category),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.category,
+                      color: Color(0xFF4CAF50),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      category.categoryName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showEditCategoryDialog(category);
+                      } else if (value == 'delete') {
+                        _confirmDelete(category);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  if (category.hsnCode != null && category.hsnCode!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'HSN: ${category.hsnCode}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getGstColor(category.gstRate ?? 0).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'GST ${(category.gstRate ?? 0).toInt()}%',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _getGstColor(category.gstRate ?? 0),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (category.description != null && category.description!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  category.description!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

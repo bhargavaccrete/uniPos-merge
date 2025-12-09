@@ -1,8 +1,7 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/util/responsive.dart';
 
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
@@ -357,15 +356,289 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildHeaderRow(),
-          const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
-          Expanded(
-            child: _buildProductListWithSearch(),
-          ),
-        ],
+      body: Responsive(
+        mobile: _buildMobileLayout(context),
+        tablet: _buildTabletLayout(context),
+        desktop: _buildDesktopLayout(context),
       ),
+    );
+  }
+
+  // ==================== MOBILE LAYOUT ====================
+  Widget _buildMobileLayout(BuildContext context) {
+    return Column(
+      children: [
+        _buildHeaderRow(),
+        const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+        Expanded(
+          child: _buildProductListWithSearch(),
+        ),
+      ],
+    );
+  }
+
+  // ==================== TABLET LAYOUT ====================
+  Widget _buildTabletLayout(BuildContext context) {
+    return Column(
+      children: [
+        _buildSearchBarRow(),
+        const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+        Expanded(
+          child: Observer(
+            builder: (context) {
+              final allProducts = productStore.products;
+              final filteredProducts = _searchQuery.isEmpty
+                  ? allProducts
+                  : allProducts.where((product) {
+                      return product.productName.toLowerCase().contains(_searchQuery) ||
+                          product.category.toLowerCase().contains(_searchQuery);
+                    }).toList();
+
+              if (filteredProducts.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 64, color: Color(0xFFD0D0D0)),
+                      SizedBox(height: 16),
+                      Text(
+                        'No products found',
+                        style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(20),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 1.3,
+                ),
+                itemCount: filteredProducts.length,
+                itemBuilder: (context, index) {
+                  return _buildProductGridCard(filteredProducts[index]);
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== DESKTOP LAYOUT ====================
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFE8E8E8), width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Text(
+                'Product Inventory',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Observer(
+                builder: (context) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${productStore.products.length} products',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4CAF50),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: _buildSearchBarRow(),
+        ),
+        Expanded(
+          child: Observer(
+            builder: (context) {
+              final allProducts = productStore.products;
+              final filteredProducts = _searchQuery.isEmpty
+                  ? allProducts
+                  : allProducts.where((product) {
+                      return product.productName.toLowerCase().contains(_searchQuery) ||
+                          product.category.toLowerCase().contains(_searchQuery);
+                    }).toList();
+
+              if (filteredProducts.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'No products found',
+                        style: TextStyle(fontSize: 18, color: Color(0xFF6B6B6B)),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 24,
+                  mainAxisSpacing: 24,
+                  childAspectRatio: 1.4,
+                ),
+                itemCount: filteredProducts.length,
+                itemBuilder: (context, index) {
+                  return _buildProductGridCard(filteredProducts[index]);
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== GRID CARD (For Tablet & Desktop) ====================
+  Widget _buildProductGridCard(ProductModel product) {
+    return FutureBuilder<List<VarianteModel>>(
+      future: productStore.getVariantsForProduct(product.productId),
+      builder: (context, snapshot) {
+        final variants = snapshot.data ?? [];
+        final totalStock = variants.fold<int>(0, (sum, v) => sum + v.stockQty);
+        final price = variants.isNotEmpty && variants.first.costPrice != null
+            ? variants.first.costPrice!
+            : 0.0;
+
+        return InkWell(
+          onTap: () => _addItemToCart(product),
+          onLongPress: () => _showProductVariantsDialog(product, variants),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8E8E8), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product Name
+                  Text(
+                    product.productName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  // Category
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      product.category,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF4CAF50),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Stock and Variants Info
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 14,
+                        color: totalStock < 10 ? Colors.red : const Color(0xFF9E9E9E),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Stock: $totalStock',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: totalStock < 10 ? Colors.red : const Color(0xFF9E9E9E),
+                          fontWeight: totalStock < 10 ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      if (product.hasVariants) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            '${variants.length} variants',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Price
+                  Text(
+                    '₹${price.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF4CAF50),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

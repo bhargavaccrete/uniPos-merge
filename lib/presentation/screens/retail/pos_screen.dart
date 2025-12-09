@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:hive/hive.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/responsive.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/init/hive_init.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
@@ -516,8 +517,6 @@ class _PosScreenState extends State<PosScreen> {
           elevation: 0,
           backgroundColor: Colors.white,
           automaticallyImplyLeading: false,
-
-
         ),
         body: const Center(
           child: Column(
@@ -539,86 +538,275 @@ class _PosScreenState extends State<PosScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Billing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A1A)),
-          onPressed: () {
-            Navigator.pushReplacementNamed(context, '/retail-menu');
+      appBar: _buildAppBar(context),
+      body: Responsive(
+        mobile: _buildMobileLayout(context),
+        tablet: _buildTabletLayout(context),
+        desktop: _buildDesktopLayout(context),
+      ),
+    );
+  }
 
-          },
-          tooltip: 'Back to Home',
-        ),
-        actions: [
-          Observer(
-            builder: (context) => Stack(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.pause_circle_outline, color: Colors.orange),
-                  tooltip: 'View parked sales',
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ParkedSalesScreen(),
+  // ==================== APP BAR ====================
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      title: const Text('Billing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+      centerTitle: true,
+      elevation: 0,
+      backgroundColor: Colors.white,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A1A)),
+        onPressed: () {
+          Navigator.pushReplacementNamed(context, '/retail-menu');
+        },
+        tooltip: 'Back to Home',
+      ),
+      actions: [
+        Observer(
+          builder: (context) => Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.pause_circle_outline, color: Colors.orange),
+                tooltip: 'View parked sales',
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ParkedSalesScreen(),
+                    ),
+                  );
+                },
+              ),
+              if (holdSaleStore.holdSaleCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${holdSaleStore.holdSaleCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-                if (holdSaleStore.holdSaleCount > 0)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.orange,
-                        shape: BoxShape.circle,
+            ],
+          ),
+        ),
+        Observer(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.pause, color: Colors.orange),
+            tooltip: 'Hold current sale',
+            onPressed: cartStore.itemCount > 0 ? _holdCurrentSale : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== MOBILE LAYOUT ====================
+  Widget _buildMobileLayout(BuildContext context) {
+    return Column(
+      children: [
+        _buildSearchBarWithScanner(context),
+        if (_showSearchResults) _buildSearchResults(),
+        if (!_showSearchResults) ...[
+          _buildHeaderRow(context),
+          const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+          Expanded(
+            child: _buildSimpleCart(context),
+          ),
+        ],
+        _buildSimpleSummary(context),
+      ],
+    );
+  }
+
+  // ==================== TABLET LAYOUT ====================
+  Widget _buildTabletLayout(BuildContext context) {
+    return Row(
+      children: [
+        // Left side: Search/Product Panel (40%)
+        Expanded(
+          flex: 4,
+          child: Column(
+            children: [
+              _buildSearchBarWithScanner(context),
+              if (_showSearchResults)
+                _buildSearchResults()
+              else
+                Expanded(
+                  child: Container(
+                    color: Colors.white,
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search, size: 64, color: Color(0xFFD0D0D0)),
+                          SizedBox(height: 16),
+                          Text(
+                            'Search for products',
+                            style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
+                          ),
+                        ],
                       ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Text(
-                        '${holdSaleStore.holdSaleCount}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // Vertical divider
+        Container(
+          width: 1,
+          color: const Color(0xFFE8E8E8),
+        ),
+        // Right side: Cart Panel (60%)
+        Expanded(
+          flex: 6,
+          child: Column(
+            children: [
+              _buildHeaderRow(context),
+              const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+              Expanded(
+                child: _buildSimpleCart(context),
+              ),
+              _buildSimpleSummary(context),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== DESKTOP LAYOUT ====================
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Row(
+      children: [
+        // Left side: Search/Product Panel (35%)
+        Expanded(
+          flex: 35,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                right: BorderSide(color: const Color(0xFFE8E8E8), width: 1),
+              ),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Product Search',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
                         ),
-                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSearchBarWithScanner(context),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+                if (_showSearchResults)
+                  _buildSearchResults()
+                else
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search, size: 80, color: Colors.grey[300]),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Search for products',
+                            style: TextStyle(fontSize: 18, color: Color(0xFF6B6B6B)),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Use the search bar or scanner',
+                            style: TextStyle(fontSize: 14, color: Color(0xFFB0B0B0)),
+                          ),
+                        ],
                       ),
                     ),
                   ),
               ],
             ),
           ),
-          Observer(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.pause, color: Colors.orange),
-              tooltip: 'Hold current sale',
-              onPressed: cartStore.itemCount > 0 ? _holdCurrentSale : null,
-            ),
+        ),
+        // Right side: Cart Panel (65%)
+        Expanded(
+          flex: 65,
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFE8E8E8), width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Shopping Cart',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Observer(
+                      builder: (context) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${cartStore.itemCount} items',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _buildHeaderRow(context),
+              const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+              Expanded(
+                child: _buildSimpleCart(context),
+              ),
+              _buildSimpleSummary(context),
+            ],
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildSearchBarWithScanner(context),
-          if (_showSearchResults) _buildSearchResults(),
-          if (!_showSearchResults) ...[
-            _buildHeaderRow(context),
-            const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
-            Expanded(
-              child: _buildSimpleCart(context),
-            ),
-          ],
-        ],
-      ),
-      bottomNavigationBar: _buildSimpleSummary(context),
+        ),
+      ],
     );
   }
 

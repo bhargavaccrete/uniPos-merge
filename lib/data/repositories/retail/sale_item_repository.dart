@@ -5,12 +5,8 @@ import '../../models/retail/hive_model/sale_item_model_204.dart';
 /// Handles all Hive database operations for sale items
 /// Links individual items to sales with product details, quantities, prices, discounts, and taxes
 class SaleItemRepository {
-  late Box<SaleItemModel> _saleItemBox;
-
-  /// Initialize the repository by opening/getting the Hive box
-  Future<void> init() async {
-    _saleItemBox = Hive.box<SaleItemModel>('saleItems');
-  }
+  /// Get the Hive box (lazy loaded)
+  Box<SaleItemModel> get _saleItemBox => Hive.box<SaleItemModel>('saleItems');
 
   // ==================== Basic CRUD Operations ====================
 

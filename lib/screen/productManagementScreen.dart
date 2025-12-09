@@ -38,6 +38,10 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   String? _selectedChoice;
   String? _selectedTax;
 
+  // Edit mode tracking
+  bool _isEditMode = false;
+  int? _editingIndex;
+
   // Sample data structure
   final Map<String, List<String>> _categories = {
     'Food': ['Pizza', 'Burger', 'Pasta'],
@@ -98,12 +102,233 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
     );
   }
 
+  void _editProduct(int index) {
+    final product = _products[index];
+
+    setState(() {
+      _isEditMode = true;
+      _editingIndex = index;
+
+      // Populate form with product data
+      _productNameController.text = product.name;
+      _productPriceController.text = product.price.toString();
+      _productDescriptionController.text = product.description ?? '';
+      _productSkuController.text = product.sku ?? '';
+      _productBarcodeController.text = product.barcode ?? '';
+      _productStockController.text = product.stock.toString();
+
+      _selectedCategory = product.category;
+      _selectedVariation = product.variation;
+      _selectedExtra = product.extras?.isNotEmpty == true ? product.extras!.first : null;
+      _selectedChoice = product.choices?.values.firstOrNull;
+    });
+
+    // Switch to Add Product tab
+    _tabController.animateTo(0);
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _isEditMode = false;
+      _editingIndex = null;
+      _clearForm();
+    });
+  }
+
+  void _clearForm() {
+    _productNameController.clear();
+    _productPriceController.clear();
+    _productDescriptionController.clear();
+    _productSkuController.clear();
+    _productBarcodeController.clear();
+    _productStockController.clear();
+    _selectedCategory = null;
+    _selectedVariation = null;
+    _selectedExtra = null;
+    _selectedChoice = null;
+  }
+
+  void _showProductOptions(int index) {
+    final product = _products[index];
+    final hasVariation = product.variation != null;
+    final hasExtras = product.extras?.isNotEmpty == true;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(Icons.inventory, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          product.category,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 30),
+
+              // Edit Product Option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.edit, color: AppColors.primary),
+                ),
+                title: const Text('Edit Product'),
+                subtitle: const Text('Edit basic product information'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editProduct(index);
+                },
+              ),
+
+              // Edit Variation Option (only if has variation)
+              if (hasVariation)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.tune, color: AppColors.secondary),
+                  ),
+                  title: const Text('Edit Variation'),
+                  subtitle: Text('Current: ${product.variation}'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editProduct(index);
+                    // Could add specific variation editing logic here
+                  },
+                ),
+
+              // Edit Extras Option (only if has extras)
+              if (hasExtras)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.add_circle, color: AppColors.accent),
+                  ),
+                  title: const Text('Edit Extras'),
+                  subtitle: Text('Extras: ${product.extras!.join(", ")}'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editProduct(index);
+                    // Could add specific extras editing logic here
+                  },
+                ),
+
+              const SizedBox(height: 8),
+
+              // Delete Option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.delete, color: AppColors.danger),
+                ),
+                title: Text(
+                  'Delete Product',
+                  style: TextStyle(color: AppColors.danger),
+                ),
+                subtitle: const Text('Permanently remove this product'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteConfirmation(index);
+                },
+              ),
+
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmation(int index) {
+    final product = _products[index];
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Product'),
+          content: Text(
+            'Are you sure you want to delete "${product.name}"? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _products.removeAt(index);
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Product deleted successfully'),
+                    backgroundColor: AppColors.danger,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _addProduct() {
     if (_productNameController.text.isNotEmpty &&
         _productPriceController.text.isNotEmpty &&
         _selectedCategory != null) {
       setState(() {
-        _products.add(Product(
+        final product = Product(
           name: _productNameController.text,
           category: _selectedCategory!,
           variation: _selectedVariation,
@@ -114,22 +339,34 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
           barcode: _productBarcodeController.text,
           stock: int.tryParse(_productStockController.text) ?? 0,
           description: _productDescriptionController.text,
-        ));
+        );
+
+        if (_isEditMode && _editingIndex != null) {
+          // Update existing product
+          _products[_editingIndex!] = product;
+          _isEditMode = false;
+          _editingIndex = null;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Product updated successfully'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        } else {
+          // Add new product
+          _products.add(product);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Product added successfully'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
 
         // Clear form
-        _productNameController.clear();
-        _productPriceController.clear();
-        _productDescriptionController.clear();
-        _productSkuController.clear();
-        _productBarcodeController.clear();
-        _productStockController.clear();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Product added successfully'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        _clearForm();
       });
     }
   }
@@ -227,10 +464,14 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.edit, color: AppColors.primary, size: 24),
+                        Icon(
+                          _isEditMode ? Icons.edit : Icons.add_box,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          'Add Product Manually',
+                          _isEditMode ? 'Edit Product' : 'Add Product Manually',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -482,18 +723,12 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () {
-                              // Clear form
-                              _productNameController.clear();
-                              _productPriceController.clear();
-                              _productDescriptionController.clear();
-                              _productSkuController.clear();
-                              _productBarcodeController.clear();
-                              _productStockController.clear();
                               setState(() {
-                                _selectedCategory = null;
-                                _selectedVariation = null;
-                                _selectedExtra = null;
-                                _selectedChoice = null;
+                                if (_isEditMode) {
+                                  _cancelEdit();
+                                } else {
+                                  _clearForm();
+                                }
                               });
                             },
                             style: OutlinedButton.styleFrom(
@@ -504,7 +739,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                               ),
                             ),
                             child: Text(
-                              'Clear Form',
+                              _isEditMode ? 'Cancel Edit' : 'Clear Form',
                               style: TextStyle(color: AppColors.danger),
                             ),
                           ),
@@ -514,8 +749,8 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                           flex: 2,
                           child: ElevatedButton.icon(
                             onPressed: _addProduct,
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Product'),
+                            icon: Icon(_isEditMode ? Icons.save : Icons.add),
+                            label: Text(_isEditMode ? 'Update Product' : 'Add Product'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -718,6 +953,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                 itemBuilder: (context, index) {
                   final product = _products[index];
                   return ListTile(
+                    onLongPress: () => _showProductOptions(index),
                     leading: Container(
                       width: 50,
                       height: 50,
@@ -734,8 +970,25 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                       product.name,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: Text(
-                      '${product.category}${product.variation != null ? ' • ${product.variation}' : ''} • \$${product.price}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${product.category}${product.variation != null ? ' • ${product.variation}' : ''} • \$${product.price}',
+                        ),
+                        if (product.variation != null || product.extras?.isNotEmpty == true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Long press for more options',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary.withOpacity(0.7),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -762,15 +1015,13 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                         const SizedBox(width: 8),
                         IconButton(
                           icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () {},
+                          onPressed: () => _editProduct(index),
+                          tooltip: 'Edit Product',
                         ),
                         IconButton(
                           icon: Icon(Icons.delete, size: 20, color: AppColors.danger),
-                          onPressed: () {
-                            setState(() {
-                              _products.removeAt(index);
-                            });
-                          },
+                          onPressed: () => _showDeleteConfirmation(index),
+                          tooltip: 'Delete Product',
                         ),
                       ],
                     ),
