@@ -57,7 +57,7 @@ class _VariantTabState extends State<VariantTab> {
     }
 
     // ADD THESE TWO LINES TO CHECK THE BOX IMMEDIATELY AFTER SAVING
-    final variantBox = Hive.box<VariantModel>('variante');
+    final variantBox = Hive.box<VariantModel>('variants');
     print("--- VARIANT TAB: Box contents immediately after saving: ${variantBox.values.map((v) => v.name).toList()} ---");
 
     VariantController.clear();
@@ -85,7 +85,7 @@ class _VariantTabState extends State<VariantTab> {
           child: Column(
             children: [
               ValueListenableBuilder(
-                  valueListenable: Hive.box<VariantModel>('variante').listenable(),
+                  valueListenable: Hive.box<VariantModel>('variants').listenable(),
                   builder: (context, variantebox, _) {
                     final allvariante = variantebox.values.toList();
 

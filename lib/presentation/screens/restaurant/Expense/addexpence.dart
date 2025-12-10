@@ -212,7 +212,7 @@ class _AddexpenceState extends State<Addexpence> {
                   )),
               SizedBox(height: 10),
               ValueListenableBuilder(
-                valueListenable: Hive.box<ExpenseCategory>('expenseCategory').listenable(),
+                valueListenable: Hive.box<ExpenseCategory>('expenseCategories').listenable(),
                 builder: (context, Box<ExpenseCategory> box, _) {
                   final categories = box.values.where((cat) => cat.isEnabled).toList();
 

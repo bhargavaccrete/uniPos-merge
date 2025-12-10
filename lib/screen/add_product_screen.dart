@@ -13,6 +13,7 @@ import '../data/models/retail/hive_model/attribute_value_model_220.dart';
 import '../data/models/retail/hive_model/variante_model_201.dart';
 import '../data/repositories/tax_details_repository.dart';
 import '../domain/store/common/add_product_form_store.dart';
+import '../domain/store/restaurant/category_store.dart';
 import '../domain/store/retail/product_store.dart';
 import '../domain/store/retail/attribute_store.dart';
 import '../domain/store/restaurant/item_store.dart';
@@ -22,6 +23,7 @@ import '../domain/store/restaurant/extra_store.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
 import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
+import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback? onNext;
@@ -43,6 +45,13 @@ class _AddProductScreenState extends State<AddProductScreen>
   late AddProductFormStore _formStore;
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
+  RestaurantBulkImportService? _restaurantImportService;
+
+  // Lazy getter for restaurant import service
+  RestaurantBulkImportService get restaurantImportService {
+    _restaurantImportService ??= RestaurantBulkImportService();
+    return _restaurantImportService!;
+  }
 
   // Text Controllers
   final _nameController = TextEditingController();
@@ -82,10 +91,13 @@ class _AddProductScreenState extends State<AddProductScreen>
     _formStore = AddProductFormStore();
 
     // Load attributes from repository (including imported attributes)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final attributeStore = locator<AttributeStore>();
-      attributeStore.loadAttributes();
-    });
+    // Only for retail mode
+    if (AppConfig.isRetail) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final attributeStore = locator<AttributeStore>();
+        attributeStore.loadAttributes();
+      });
+    }
   }
 
   @override
@@ -2385,8 +2397,7 @@ class _AddProductScreenState extends State<AddProductScreen>
     );
   }
 
-  void _downloadTemplate() {
-    // Only available for Retail mode
+  void _downloadTemplate() async {
     if (AppConfig.isRetail) {
       Navigator.push(
         context,
@@ -2394,18 +2405,29 @@ class _AddProductScreenState extends State<AddProductScreen>
           builder: (context) => const BulkImportScreen(),
         ),
       );
+    } else if (AppConfig.isRestaurant) {
+      final message = await restaurantImportService.downloadTemplate();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: message.startsWith('Error') || message == 'Permission denied'
+                ? AppColors.danger
+                : AppColors.success,
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Bulk import is only available for Retail mode'),
+          content: Text('Bulk import is not available for this mode'),
           backgroundColor: AppColors.warning,
         ),
       );
     }
   }
 
-  void _uploadExcel() {
-    // Only available for Retail mode
+  void _uploadExcel() async {
     if (AppConfig.isRetail) {
       Navigator.push(
         context,
@@ -2413,10 +2435,135 @@ class _AddProductScreenState extends State<AddProductScreen>
           builder: (context) => const BulkImportScreen(),
         ),
       );
+    } else if (AppConfig.isRestaurant) {
+      try {
+        final allSheets = await restaurantImportService.pickAndParseFile();
+        if (allSheets.isNotEmpty) {
+          // Count total rows from Items sheet
+          final itemsSheet = allSheets['Items'];
+          final itemCount = (itemsSheet?.length ?? 1) - 1; // Subtract header row
+
+          // Show confirmation dialog with preview
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Import Data from ${allSheets.length} Sheets?'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Sheets found: ${allSheets.keys.join(', ')}'),
+                    const SizedBox(height: 10),
+                    if (itemCount > 0) Text('Items to import: $itemCount'),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    // Get the navigator before closing any dialogs
+                    final navigator = Navigator.of(context, rootNavigator: true);
+
+                    Navigator.pop(context);
+
+                    // Show loading
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const Center(child: CircularProgressIndicator()),
+                    );
+
+                    try {
+                      final result = await restaurantImportService.importData(allSheets);
+
+                      // Close loading dialog using the saved navigator reference
+                      try {
+                        navigator.pop();
+                      } catch (e) {
+                        print('Error closing loading dialog: $e');
+                      }
+
+                      if (!mounted) return;
+
+                      // Show detailed result dialog
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(result.success ? '✅ Import Successful' : '⚠️ Import Completed with Issues'),
+                          content: SingleChildScrollView(
+                            child: Text(result.getSummary()),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      // Refresh stores
+                      try {
+                        final itemStore = locator<ItemStore>();
+                        final categoryStore = locator<CategoryStore>();
+                        final choiceStore = locator<ChoiceStore>();
+                        final extraStore = locator<ExtraStore>();
+
+                        await itemStore.loadItems();
+                        await categoryStore.loadCategories();
+                        await choiceStore.loadChoices();
+                        await extraStore.loadExtras();
+                      } catch (e) {
+                        print('Error refreshing stores: $e');
+                      }
+                    } catch (e) {
+                      if (!mounted) return;
+
+                      // Close loading dialog
+                      Navigator.of(context, rootNavigator: true).pop();
+
+                      // Show error dialog
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('❌ Import Failed'),
+                          content: Text('Error during import: $e'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Import'),
+                ),
+              ],
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Import failed: $e'),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Bulk import is only available for Retail mode'),
+          content: Text('Bulk import is not available for this mode'),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -2655,7 +2802,9 @@ class _AddProductScreenState extends State<AddProductScreen>
         ),
         child: Column(
           children: [
-            _buildListHeader(itemStore.items.length, 'Items'),
+            Observer(
+              builder: (_) => _buildListHeader(itemStore.items.length, 'Items'),
+            ),
             Expanded(
               child: Observer(
                 builder: (_) => itemStore.items.isEmpty

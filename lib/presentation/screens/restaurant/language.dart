@@ -7,7 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../../data/models/restaurant/db/companymodel_301.dart';
 
 class CompanyListScreen extends StatelessWidget {
-  final Box companyBox = Hive.box<Company>('companybox');
+  final Box companyBox = Hive.box<Company>('companyBox'); // Fixed: was 'companybox'
 
   @override
   Widget build(BuildContext context) {

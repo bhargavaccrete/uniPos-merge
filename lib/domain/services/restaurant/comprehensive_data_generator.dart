@@ -534,7 +534,7 @@ class ComprehensiveDataGenerator {
 
   // Helper methods
   static Future<void> _generateCategories(int count) async {
-    final box = Hive.box<Category>('categories');
+    final box = Hive.box<Category>('restaurant_categories');
     final categoryNames = [
       'Appetizers', 'Main Course', 'Desserts', 'Beverages', 'Salads',
       'Soups', 'Sides', 'Breakfast', 'Lunch Specials', 'Dinner Specials',
@@ -560,7 +560,7 @@ class ComprehensiveDataGenerator {
   }
 
   static Future<void> _generateVariants() async {
-    final box = Hive.box<VariantModel>('variante');
+    final box = Hive.box<VariantModel>('variants');
     final sizes = ['Small', 'Medium', 'Large', 'Extra Large'];
 
     for (final size in sizes) {
@@ -574,7 +574,7 @@ class ComprehensiveDataGenerator {
   }
 
   static Future<void> _generateExtras() async {
-    final box = Hive.box<Extramodel>('extra');
+    final box = Hive.box<Extramodel>('extras');
     final groups = ['Cheese Options', 'Meat Toppings', 'Vegetable Toppings'];
 
     for (final group in groups) {
@@ -603,7 +603,7 @@ class ComprehensiveDataGenerator {
 
   static Future<void> _generateItems(int count, {bool withImages = false}) async {
     final itemBox = Hive.box<Items>('itemBoxs');
-    final categoryBox = Hive.box<Category>('categories');
+    final categoryBox = Hive.box<Category>('restaurant_categories');
     final categories = categoryBox.values.toList();
 
     List<Items> batch = [];
@@ -811,17 +811,17 @@ class ComprehensiveDataGenerator {
   // Get statistics for all boxes
   static Map<String, int> getAllStats() {
     return {
-      'categories': Hive.box<Category>('categories').length,
+      'categories': Hive.box<Category>('restaurant_categories').length,
       'items': Hive.box<Items>('itemBoxs').length,
-      'variants': Hive.box<VariantModel>('variante').length,
-      'extras': Hive.box<Extramodel>('extra').length,
+      'variants': Hive.box<VariantModel>('variants').length,
+      'extras': Hive.box<Extramodel>('extras').length,
       'activeOrders': Hive.box<OrderModel>('orderBox').length,
       'pastOrders': Hive.box<pastOrderModel>('pastorderBox').length,
       'tables': Hive.box<TableModel>('tablesBox').length,
       'staff': Hive.box<StaffModel>('staffBox').length,
       'taxRates': Hive.box<Tax>('TaxBox').length,
       'eodReports': Hive.box<EndOfDayReport>('eodBox').length,
-      'cart': Hive.box<CartItem>('cart').length,
+      'cart': Hive.box<CartItem>('restaurant_cart').length,
     };
   }
 

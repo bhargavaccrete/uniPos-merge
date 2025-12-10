@@ -863,7 +863,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
     );
 
     if (confirmed == true) {
-      await Hive.box<Category>('categories').delete(categoryId);
+      await Hive.box<Category>('restaurant_categories').delete(categoryId);
       // Refresh the list inside the sheet
       setState(() {
         _currentCategories.removeWhere((cat) => cat.id == categoryId);
@@ -879,7 +879,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
 
     if (newCategoryName != null && newCategoryName.isNotEmpty) {
       final newCategory = Category(id: const Uuid().v4(), name: newCategoryName);
-      await Hive.box<Category>('categories').put(newCategory.id, newCategory);
+      await Hive.box<Category>('restaurant_categories').put(newCategory.id, newCategory);
       // Refresh the list inside this sheet to show the new category
       setState(() {
         _currentCategories.add(newCategory);

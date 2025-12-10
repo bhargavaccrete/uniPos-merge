@@ -11,6 +11,8 @@ import 'package:unipos/screen/staffSetupStep.dart';
 
 import '../util/color.dart';
 import '../util/responsive.dart';
+import '../core/config/app_config.dart';
+import '../presentation/screens/restaurant/welcome_Admin.dart';
 import 'businessTypeScreen.dart';
 import 'add_product_screen.dart'; // Unified Add Product Screen
 
@@ -136,8 +138,17 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         // Close loading indicator
         Navigator.pop(context);
 
-        // Navigate to POS screen
-        Navigator.pushReplacementNamed(context, '/retail-billing');
+        // Navigate to appropriate screen based on business mode
+        if (AppConfig.isRestaurant) {
+          // Navigate to Restaurant Admin Welcome screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminWelcome()),
+          );
+        } else {
+          // Navigate to Retail POS screen
+          Navigator.pushReplacementNamed(context, '/retail-billing');
+        }
       }
     } catch (e) {
       if (mounted) {

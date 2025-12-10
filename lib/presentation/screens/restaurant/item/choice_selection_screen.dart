@@ -34,7 +34,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
   }
 
   void _loadChoices() {
-    final choiceBox = Hive.box<ChoicesModel>('choice');
+    final choiceBox = Hive.box<ChoicesModel>('choices');
     setState(() {
       availableChoices = choiceBox.values.toList();
     });
@@ -445,7 +445,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                       choiceOption: options,
                     );
 
-                    final choiceBox = Hive.box<ChoicesModel>('choice');
+                    final choiceBox = Hive.box<ChoicesModel>('choices');
                     await choiceBox.put(newChoice.id, newChoice);
 
                     _loadChoices();

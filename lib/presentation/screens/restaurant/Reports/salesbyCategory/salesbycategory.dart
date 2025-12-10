@@ -200,7 +200,7 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
 
     // Build fast lookups once
     final itemBox = Hive.box<Items>('itemBoxs');
-    final categoryBox = Hive.box<Category>('categories');
+    final categoryBox = Hive.box<Category>('restaurant_categories');
 
     final Map<String, String> categoryNameById = {
       for (final c in categoryBox.values) c.id: c.name.trim(),

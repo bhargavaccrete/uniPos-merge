@@ -43,7 +43,7 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   void _loadAvailableVariants() {
-    final variantBox = Hive.box<VariantModel>('variante');
+    final variantBox = Hive.box<VariantModel>('variants');
     _availableVariants = variantBox.values.toList();
   }
 
@@ -77,7 +77,7 @@ class _ExtraTabState extends State<ExtraTab> {
 
   Widget _buildExtrasList(Size size) {
     return ValueListenableBuilder(
-      valueListenable: Hive.box<Extramodel>('extra').listenable(),
+      valueListenable: Hive.box<Extramodel>('extras').listenable(),
       builder: (context, Box<Extramodel> extraBox, _) {
         final allExtras = extraBox.values.toList();
 
@@ -642,7 +642,7 @@ class _ExtraTabState extends State<ExtraTab> {
     try {
       if (editingIndex != null) {
         // Get the current extra from ValueListenableBuilder data
-        final box = Hive.box<Extramodel>('extra');
+        final box = Hive.box<Extramodel>('extras');
         final allExtras = box.values.toList();
         final currentExtra = allExtras[editingIndex!];
 

@@ -33,7 +33,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   }
 
   void _loadVariants() {
-    final variantBox = Hive.box<VariantModel>('variante');
+    final variantBox = Hive.box<VariantModel>('variants');
     setState(() {
       availableVariants = variantBox.values.toList();
     });
@@ -390,7 +390,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   name: variantNameController.text.trim(),
                 );
 
-                final variantBox = Hive.box<VariantModel>('variante');
+                final variantBox = Hive.box<VariantModel>('variants');
                 await variantBox.put(newVariant.id, newVariant);
 
                 _loadVariants();

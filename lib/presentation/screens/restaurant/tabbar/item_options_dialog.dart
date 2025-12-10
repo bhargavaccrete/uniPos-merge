@@ -64,7 +64,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   void _prepareVariants() {
     if (widget.item.variant == null || widget.item.variant!.isEmpty) return;
-    final variantBox = Hive.box<VariantModel>('variante');
+    final variantBox = Hive.box<VariantModel>('variants');
     // ... (This logic is the same as before)
     for (ItemVariante itemVariant in widget.item.variant!) {
       final variantDetails = variantBox.values.firstWhere((v) => v.id == itemVariant.variantId, orElse: () => VariantModel(id: '', name: 'Unknown'));
@@ -79,7 +79,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   void _prepareChoices() {
     if (widget.item.choiceIds == null || widget.item.choiceIds!.isEmpty) return;
-    final choiceBox = Hive.box<ChoicesModel>('choice'); // Use your choice group box name
+    final choiceBox = Hive.box<ChoicesModel>('choices'); // Use your choice group box name
     for (String choiceId in widget.item.choiceIds!) {
       final choiceGroup = choiceBox.values.firstWhere((c) => c.id == choiceId, orElse: () => ChoicesModel(id: '', name: 'Unknown'));
       if (choiceGroup.name != 'Unknown') {
@@ -90,7 +90,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   void _prepareExtra(){
     if(widget.item.extraId == null || widget.item.extraId!.isEmpty) return ;
-    final ExtraBox = Hive.box<Extramodel>('extra');
+    final ExtraBox = Hive.box<Extramodel>('extras');
     for(String extraId in widget.item.extraId!){
       final extraGroup = ExtraBox.values.firstWhere((e)=> e.Id == extraId, orElse:  ()=> Extramodel(Id: '', Ename: 'Unknown'));
       if(extraGroup.Ename != 'Unknown'){

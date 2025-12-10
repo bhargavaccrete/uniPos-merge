@@ -244,7 +244,7 @@ void _navigateAndAddMoreItems() async {
             if (item.variantName != null && inventoryItem.variant != null) {
               // Check variant stock
               try {
-                final variantBox = Hive.box<VariantModel>('variante');
+                final variantBox = Hive.box<VariantModel>('variants');
                 final variant = inventoryItem.variant!.firstWhere(
                   (v) => variantBox.get(v.variantId)?.name == item.variantName,
                 );

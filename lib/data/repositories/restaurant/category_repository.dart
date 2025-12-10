@@ -6,7 +6,7 @@ import '../../models/restaurant/db/itemmodel_302.dart';
 /// Repository layer for Category data access
 /// Handles all Hive database operations for categories
 class CategoryRepository {
-  static const String _boxName = 'categories';
+  static const String _boxName = 'restaurant_categories';
   static const String _itemBoxName = 'itemBoxs';
   late Box<Category> _categoryBox;
   late Box<Items> _itemBox;

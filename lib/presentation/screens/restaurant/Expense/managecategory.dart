@@ -159,7 +159,7 @@ class _ManageCategoryState extends State<ManageCategory> {
 
               Column(children: [
 
-                ValueListenableBuilder(valueListenable: Hive.box<ExpenseCategory>('expenseCategory').listenable(),
+                ValueListenableBuilder(valueListenable: Hive.box<ExpenseCategory>('expenseCategories').listenable(),
                     builder: (context,ecatgory,_){
 
                  final  allcategory = ecatgory.values.toList();

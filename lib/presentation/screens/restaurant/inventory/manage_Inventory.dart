@@ -602,7 +602,7 @@ class _ManageInventoryState extends State<ManageInventory> {
           ),
           Expanded(
             child: ValueListenableBuilder(
-              valueListenable: Hive.box<Category>('categories').listenable(),
+              valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
               builder: (context, categoryBox, _) {
                 return ValueListenableBuilder(
                   valueListenable: Hive.box<Items>('itemBoxs').listenable(),

@@ -34,7 +34,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   }
 
   void _loadExtras() {
-    final extraBox = Hive.box<Extramodel>('extra');
+    final extraBox = Hive.box<Extramodel>('extras');
     setState(() {
       availableExtras = extraBox.values.toList();
     });
@@ -547,7 +547,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       topping: toppings,
                     );
 
-                    final extraBox = Hive.box<Extramodel>('extra');
+                    final extraBox = Hive.box<Extramodel>('extras');
                     await extraBox.put(newExtra.Id, newExtra);
 
                     _loadExtras();

@@ -108,7 +108,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
           child: Column(
             children: [
               ValueListenableBuilder(
-                  valueListenable: Hive.box<ChoicesModel>('choice').listenable(),
+                  valueListenable: Hive.box<ChoicesModel>('choices').listenable(),
                   builder: (context, choicebox, _) {
                     final allchoice = choicebox.values.toList();
 

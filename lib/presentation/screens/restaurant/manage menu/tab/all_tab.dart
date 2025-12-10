@@ -95,7 +95,7 @@ class _AllTabState extends State<AllTab> {
               // ✅ This builder automatically listens for any changes in your Hive boxes
               ValueListenableBuilder(
                 // Listens to the 'categories' box
-                valueListenable: Hive.box<Category>('categories').listenable(),
+                valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
                 builder: (context, categoryBox, _) {
                   return ValueListenableBuilder(
                     // Listens to the 'items' box
@@ -103,7 +103,7 @@ class _AllTabState extends State<AllTab> {
                     builder: (context, itemBox, _) {
                       return ValueListenableBuilder(
                         // Listens to the 'variants' box
-                        valueListenable: Hive.box<VariantModel>('variante').listenable(),
+                        valueListenable: Hive.box<VariantModel>('variants').listenable(),
                         builder: (context, variantBox, _) {
                       final allCategories = categoryBox.values.toList();
 
@@ -370,13 +370,13 @@ class _AllTabState extends State<AllTab> {
 
                 // ---- Reactive lists (unchanged functionality) ----
                 ValueListenableBuilder(
-                  valueListenable: Hive.box<Category>('categories').listenable(),
+                  valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
                   builder: (context, categoryBox, _) {
                     return ValueListenableBuilder(
                       valueListenable: Hive.box<Items>('itemBoxs').listenable(),
                       builder: (context, itemBox, _) {
                         return ValueListenableBuilder(
-                          valueListenable: Hive.box<VariantModel>('variante').listenable(),
+                          valueListenable: Hive.box<VariantModel>('variants').listenable(),
                           builder: (context, variantBox, _) {
                             final allCategories = categoryBox.values.toList();
 

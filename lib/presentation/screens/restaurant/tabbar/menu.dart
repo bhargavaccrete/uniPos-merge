@@ -86,7 +86,7 @@ class _MenuScreenState extends State<MenuScreen> {
     // --- 1. Find the category name for the tapped item ---
     String? categoryName;
     try {
-      final categoryBox = Hive.box<Category>('categories');
+      final categoryBox = Hive.box<Category>('restaurant_categories');
       final category = categoryBox.values.firstWhere((cat) => cat.id == item.categoryOfItem);
       categoryName = category.name;
     } catch (e) {
@@ -342,7 +342,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                       height: 20,
                                     ),
 
-                                    ValueListenableBuilder(valueListenable:Hive.box<Category>('categories').listenable(),
+                                    ValueListenableBuilder(valueListenable:Hive.box<Category>('restaurant_categories').listenable(),
                                         builder: (context , categorys , _)
                                         {
                                           final  allcat = categorys.values.toList();
@@ -528,7 +528,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                     // color: Colors.blue,
                                     child:
 
-                                        ValueListenableBuilder(valueListenable: Hive.box<Category>('categories').listenable(),
+                                        ValueListenableBuilder(valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
                                             builder: (context , categorys , _){
 
 

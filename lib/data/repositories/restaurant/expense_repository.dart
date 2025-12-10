@@ -5,8 +5,8 @@ import '../../models/restaurant/db/expensemodel_315.dart';
 
 /// Repository layer for Expense data access
 class ExpenseRepository {
-  static const String _categoryBoxName = 'expenseCategory';
-  static const String _expenseBoxName = 'expenseBox';
+  static const String _categoryBoxName = 'expenseCategories'; // Fixed: was 'expenseCategory'
+  static const String _expenseBoxName = 'expenses'; // Fixed: was 'expenseBox'
   late Box<ExpenseCategory> _categoryBox;
   late Box<Expense> _expenseBox;
 

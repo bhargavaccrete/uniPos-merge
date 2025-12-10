@@ -93,6 +93,7 @@ class HiveInit {
   /// Open common boxes (needed regardless of business mode)
   static Future<void> openCommonBoxes() async {
     await Hive.openBox('storebox');
+    await Hive.openBox('app_state');
     await Hive.openBox<TaxDetails>('taxBox');
     await Hive.openBox<BusinessType>('businessTypeBox');
     await Hive.openBox<BusinessDetails>('businessDetailsBox');
@@ -401,7 +402,7 @@ class HiveInit {
 
   /// Open all restaurant Hive boxes
   static Future<void> openRestaurantBoxes() async {
-    await Hive.openBox<Category>('categories');
+    await Hive.openBox<Category>('restaurant_categories');
     await Hive.openBox<Company>('companyBox');
     await Hive.openBox<Items>('itemBoxs');
     await Hive.openBox<Extramodel>('extras');
@@ -409,17 +410,37 @@ class HiveInit {
     await Hive.openBox<VariantModel>('variants');
     await Hive.openBox<ChoicesModel>('choices');
     await Hive.openBox<ChoiceOption>('choiceOptions');
-    await Hive.openBox<CartItem>('cartItems');
+
+    // Restaurant cart - use unique name to avoid conflict with retail 'cartItems'
+    await Hive.openBox<CartItem>('restaurant_cart');
+
     await Hive.openBox<OrderModel>('orderBox');
     await Hive.openBox<StaffModel>('staffBox');
+
+    // Tables - open both legacy 'tablesBox' and new 'tableBox' for compatibility
     await Hive.openBox<TableModel>('tableBox');
+    await Hive.openBox<TableModel>('tablesBox');
+
     await Hive.openBox<ItemVariante>('itemVariants');
+
+    // Past Orders - open both legacy 'pastorderBox' and new 'pastOrders'
     await Hive.openBox<pastOrderModel>('pastOrders');
+    await Hive.openBox<pastOrderModel>('pastorderBox');
+
+    // Tax - open both legacy 'TaxBox' and new 'taxs'
     await Hive.openBox<Tax>('taxs');
+    await Hive.openBox<Tax>('TaxBox');
+
     await Hive.openBox<ExpenseCategory>('expenseCategories');
     await Hive.openBox<Expense>('expenses');
+
+    // EOD - open both legacy 'eodBox' and new 'eods'
     await Hive.openBox<EndOfDayReport>('eods');
+    await Hive.openBox<EndOfDayReport>('eodBox');
+
     await Hive.openBox<TestBillModel>('testBills');
+
+    print('✅ All restaurant boxes opened successfully (including legacy box names)');
   }
 
   /// Initialize boxes based on business mode
@@ -468,7 +489,7 @@ class HiveInit {
   /// Check if restaurant boxes are open
   static bool get areRestaurantBoxesOpen {
     try {
-      return Hive.isBoxOpen('categories');
+      return Hive.isBoxOpen('restaurant_categories');
     } catch (_) {
       return false;
     }

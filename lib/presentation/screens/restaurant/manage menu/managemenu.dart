@@ -79,16 +79,16 @@ class _ManagemenuState extends State<Managemenu>
               valueListenable: Hive.box<Items>('itemBoxs').listenable(),
               builder: (context, Box<Items> itemBox, _) {
                 return ValueListenableBuilder(
-                  valueListenable: Hive.box<Category>('categories').listenable(),
+                  valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
                   builder: (context, Box<Category> categoryBox, _) {
                     return ValueListenableBuilder(
-                      valueListenable: Hive.box<VariantModel>('variante').listenable(),
+                      valueListenable: Hive.box<VariantModel>('variants').listenable(),
                       builder: (context, Box<VariantModel> variantBox, _) {
                         return ValueListenableBuilder(
-                          valueListenable: Hive.box<ChoicesModel>('choice').listenable(),
+                          valueListenable: Hive.box<ChoicesModel>('choices').listenable(),
                           builder: (context, Box<ChoicesModel> choiceBox, _) {
                             return ValueListenableBuilder(
-                              valueListenable: Hive.box<Extramodel>('extra').listenable(),
+                              valueListenable: Hive.box<Extramodel>('extras').listenable(),
                               builder: (context, Box<Extramodel> extraBox, _) {
                                 // Get counts
                                 final itemCount = itemBox.length;

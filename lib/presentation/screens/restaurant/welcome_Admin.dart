@@ -55,7 +55,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     // final height = MediaQuery.of(context).size.height * 1;
     // final width = MediaQuery.of(context).size.width * 1;
     return LayoutBuilder(builder: (context , constraints){
-      if(constraints.maxWidth <700 ){
+      // if(constraints.maxWidth <700 ){
         return Scaffold(
           backgroundColor: screenBGColor,
           appBar: AppBar(
@@ -366,7 +366,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
             ),
           ),
         );
-      }else{
+      // }
+     /* else{
        return Scaffold(
           appBar: AppBar(
             backgroundColor: screenBGColor,
@@ -600,7 +601,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
             ),
           ),
         );
-      }
+      }*/
     });
   }
 }

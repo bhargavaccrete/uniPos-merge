@@ -113,8 +113,8 @@ class InventoryService {
     try {
       // Try to get the box if it's already open, otherwise open it
       Box<VariantModel> variantBox;
-      if (Hive.isBoxOpen('variante')) {
-        variantBox = Hive.box<VariantModel>('variante');
+      if (Hive.isBoxOpen('variants')) {
+        variantBox = Hive.box<VariantModel>('variants');
       } else {
         // This shouldn't happen in normal flow since the box should already be open
         print('⚠️ WARNING: Variant box was not open, opening it now');
