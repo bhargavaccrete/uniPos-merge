@@ -22,6 +22,7 @@ class PaymentSetupStep extends StatefulWidget {
 
 class _PaymentSetupStepState extends State<PaymentSetupStep> {
   late PaymentMethodStore _store;
+  bool _isInitialized = false;
 
   // Available icon options
   static const Map<String, IconData> _availableIcons = {
@@ -41,7 +42,28 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
   void initState() {
     super.initState();
     _store = locator<PaymentMethodStore>();
-    _store.init();
+    _initializeStore();
+  }
+
+  Future<void> _initializeStore() async {
+    print('🔧 PaymentSetupStep: Starting initialization...');
+    try {
+      await _store.init();
+      print('🔧 PaymentSetupStep: Store initialized');
+      print('🔧 PaymentSetupStep: Payment methods count: ${_store.paymentMethods.length}');
+      if (_store.paymentMethods.isNotEmpty) {
+        print('🔧 PaymentSetupStep: First method: ${_store.paymentMethods.first.name}');
+      }
+    } catch (e) {
+      print('❌ PaymentSetupStep: Error during init: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+      print('🔧 PaymentSetupStep: Initialization complete, rebuilding UI');
+    }
   }
 
   Future<void> _showAddMethodDialog() async {
@@ -169,6 +191,26 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while initializing
+    if (!_isInitialized) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 20),
+            Text(
+              'Loading payment methods...',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(

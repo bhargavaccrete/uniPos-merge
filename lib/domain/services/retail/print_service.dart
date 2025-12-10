@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
 
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
@@ -90,7 +92,7 @@ class PrintService {
       MaterialPageRoute(
         builder: (context) => Scaffold(
           appBar: AppBar(
-            title: Text(format == ReceiptFormat.thermal ? 'Receipt Preview' : 'Invoice Preview'),
+            title: Text(format == ReceiptFormat.thermal ? 'Receipt Preview' : 'Invoice Preview',style: TextStyle(color: Colors.white),),
             actions: [
               IconButton(
                 icon: const Icon(Icons.share),
@@ -151,6 +153,14 @@ class PrintService {
 
     final bytes = await pdf.save();
 
+    if (kIsWeb) {
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'Receipt_${sale.saleId.substring(0, 8)}.pdf',
+      );
+      return;
+    }
+
     // Save to temp file
     final tempDir = await getTemporaryDirectory();
     final fileName = 'Receipt_${sale.saleId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.pdf';
@@ -164,7 +174,7 @@ class PrintService {
     );
   }
 
-  /// Save PDF to downloads
+  /// Save PDF to downloads or let user select location
   Future<String?> savePdfToDownloads({
     required SaleModel sale,
     required List<SaleItemModel> items,
@@ -192,15 +202,63 @@ class PrintService {
         : await _receiptPdfService.generateInvoice(receiptData);
 
     final bytes = await pdf.save();
+    final fileName = 'Receipt_${sale.saleId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
-    // Get the documents directory
-    final dir = await getApplicationDocumentsDirectory();
+    if (kIsWeb) {
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
+      return null;
+    }
+
+    // Try using file_selector for Desktop (Windows, MacOS, Linux)
+    // Check kIsWeb first to avoid Platform errors on web
+    if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      try {
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: fileName,
+          acceptedTypeGroups: [
+            const XTypeGroup(
+              label: 'PDF',
+              extensions: ['pdf'],
+              mimeTypes: ['application/pdf'],
+            ),
+          ],
+        );
+
+        if (result != null) {
+          final file = File(result.path);
+          await file.writeAsBytes(bytes);
+          return file.path;
+        } else {
+          // User cancelled
+          return null;
+        }
+      } catch (e) {
+        debugPrint('Error using file_selector: $e');
+        // Fallback to default logic
+      }
+    }
+
+    // Default Fallback (Mobile or if file_selector fails)
+    Directory? dir;
+    try {
+      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+        dir = await getApplicationDocumentsDirectory();
+      } else {
+        // Use downloads directory for desktop fallback
+        dir = await getDownloadsDirectory();
+      }
+    } catch (e) {
+      // Ignore
+    }
+    
+    // Final fallback
+    dir ??= await getApplicationDocumentsDirectory();
+    
     final receiptsDir = Directory('${dir.path}/receipts');
     if (!await receiptsDir.exists()) {
       await receiptsDir.create(recursive: true);
     }
 
-    final fileName = 'Receipt_${sale.saleId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${receiptsDir.path}/$fileName');
     await file.writeAsBytes(bytes);
 

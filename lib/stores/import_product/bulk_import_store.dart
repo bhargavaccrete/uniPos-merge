@@ -7,12 +7,16 @@ import 'package:flutter/foundation.dart';
 import 'package:mobx/mobx.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:unipos/data/models/retail/hive_model/attribute_model_219.dart';
+import 'package:unipos/data/models/retail/hive_model/attribute_value_model_220.dart';
+import 'package:unipos/data/models/retail/hive_model/product_attribute_model_221.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
-import 'package:unipos/data/repositories/retail/attribute_repository.dart';
 import 'package:unipos/data/repositories/retail/category_repository.dart';
 import 'package:unipos/data/repositories/retail/product_repository.dart';
 import 'package:unipos/data/repositories/retail/variant_repository.dart';
+import 'package:unipos/domain/store/retail/attribute_store.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:uuid/uuid.dart';
 
 part 'bulk_import_store.g.dart';
@@ -24,15 +28,16 @@ abstract class _BulkImportStore with Store {
   late final ProductRepository _productRepository;
   late final VariantRepository _variantRepository;
   late final CategoryRepository _categoryRepository;
-  late final AttributeRepository _attributeRepository;
 
   _BulkImportStore() {
     // Lazy initialization to prevent early Hive access
     _productRepository = ProductRepository();
     _variantRepository = VariantRepository();
     _categoryRepository = CategoryRepository();
-    _attributeRepository = AttributeRepository();
   }
+
+  // Get AttributeStore from injector (MobX store with observable lists)
+  AttributeStore get _attributeStore => locator<AttributeStore>();
 
   // Observables
   @observable
@@ -311,6 +316,15 @@ abstract class _BulkImportStore with Store {
     successMessage = null;
     print('importData: Set isProcessing=true, cleared messages');
 
+    // Ensure AttributeStore has loaded existing attributes before we start importing
+    try {
+      await _attributeStore.loadAttributes();
+      print('importData: Loaded existing attributes from AttributeStore');
+    } catch (e) {
+      print('importData: Warning - could not preload attributes: $e');
+      // Continue anyway - attributes will be created as needed
+    }
+
     try {
       // 1. Group rows by 'Handle' (Column 0)
       final dataRows = parsedRows.skip(1).toList();
@@ -422,6 +436,19 @@ abstract class _BulkImportStore with Store {
     await _productRepository.addProduct(product);
     print('Product saved to repository');
 
+    // Collect all unique attributes from all variants
+    Set<String> allAttributeNames = {};
+    for (var row in rows) {
+      if (row[4].toString().isNotEmpty) allAttributeNames.add(row[4].toString().trim());
+      if (row[6].toString().isNotEmpty) allAttributeNames.add(row[6].toString().trim());
+      if (row[8].toString().isNotEmpty) allAttributeNames.add(row[8].toString().trim());
+    }
+
+    // Link attributes to product in global attribute system
+    if (allAttributeNames.isNotEmpty) {
+      await _linkAttributesToProduct(productId, allAttributeNames, rows);
+    }
+
     for (var row in rows) {
       await _createVariant(productId, row);
     }
@@ -430,6 +457,209 @@ abstract class _BulkImportStore with Store {
 
   bool _rowHasVariants(List<dynamic> row) {
     return row[4].toString().isNotEmpty;
+  }
+
+  /// Ensure an attribute exists in the global attribute system
+  /// Returns the attribute ID (existing or newly created)
+  Future<String?> _ensureAttributeExists(String attributeName) async {
+    final trimmedName = attributeName.trim();
+
+    try {
+      // Check existing attributes from the observable store
+      final existingAttr = _attributeStore.attributes.cast<AttributeModel?>().firstWhere(
+        (attr) => attr != null && attr.name.toLowerCase() == trimmedName.toLowerCase(),
+        orElse: () => null,
+      );
+
+      if (existingAttr != null) {
+        print('✓ Using existing attribute: $trimmedName (ID: ${existingAttr.attributeId})');
+        return existingAttr.attributeId;
+      }
+    } catch (e) {
+      print('⚠️ Could not check existing attributes: $e');
+    }
+
+    // Create new attribute using AttributeStore (updates both DB and observable list)
+    try {
+      final success = await _attributeStore.addAttribute(trimmedName);
+      if (success) {
+        // Find the newly created attribute
+        final newAttr = _attributeStore.attributes.cast<AttributeModel?>().firstWhere(
+          (attr) => attr != null && attr.name.toLowerCase() == trimmedName.toLowerCase(),
+          orElse: () => null,
+        );
+        if (newAttr != null) {
+          print('✅ Created new attribute: $trimmedName (ID: ${newAttr.attributeId})');
+          return newAttr.attributeId;
+        }
+      } else {
+        print('⚠️ Attribute "$trimmedName" already exists or failed to create');
+        // Try to find it again in case it already existed
+        final existingAttr = _attributeStore.attributes.cast<AttributeModel?>().firstWhere(
+          (attr) => attr != null && attr.name.toLowerCase() == trimmedName.toLowerCase(),
+          orElse: () => null,
+        );
+        return existingAttr?.attributeId;
+      }
+    } catch (e) {
+      print('❌ Error creating attribute "$trimmedName": $e');
+    }
+    return null;
+  }
+
+  /// Ensure an attribute value exists in the global attribute system
+  /// Returns the value ID (existing or newly created), or null if failed
+  Future<String?> _ensureAttributeValueExists(String attributeId, String valueName) async {
+    final trimmedValue = valueName.trim();
+
+    try {
+      // Get values from AttributeStore's observable list
+      final existingValues = _attributeStore.getValuesForAttribute(attributeId);
+
+      // Check if value already exists (case-insensitive)
+      for (var value in existingValues) {
+        if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
+          print('✓ Using existing value: $trimmedValue (ID: ${value.valueId})');
+          return value.valueId;
+        }
+      }
+    } catch (e) {
+      print('⚠️ Could not check existing values for "$trimmedValue": $e');
+    }
+
+    // Create new value using AttributeStore (updates both DB and observable list)
+    try {
+      final success = await _attributeStore.addValue(attributeId, trimmedValue);
+      if (success) {
+        // Find the newly created value
+        final values = _attributeStore.getValuesForAttribute(attributeId);
+        for (var value in values) {
+          if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
+            print('✅ Created new attribute value: $trimmedValue (ID: ${value.valueId})');
+            return value.valueId;
+          }
+        }
+      } else {
+        print('⚠️ Value "$trimmedValue" already exists or failed to create');
+        // Try to find it again
+        final values = _attributeStore.getValuesForAttribute(attributeId);
+        for (var value in values) {
+          if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
+            return value.valueId;
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ Error creating attribute value "$trimmedValue": $e');
+    }
+    return null;
+  }
+
+  /// Link attributes to product in the global attribute system
+  /// Returns true if successful, false if attributes couldn't be synced
+  Future<bool> _linkAttributesToProduct(
+    String productId,
+    Set<String> attributeNames,
+    List<List<dynamic>> rows,
+  ) async {
+    try {
+      // Map to store attribute IDs and their value IDs
+      Map<String, Set<String>> attributeValueMap = {};
+
+      // Process each row to collect all attribute values
+      for (var row in rows) {
+        // Process Option1 (columns 4-5)
+        if (row[4].toString().isNotEmpty && row[5].toString().isNotEmpty) {
+          final attrName = row[4].toString().trim();
+          final attrValue = row[5].toString().trim();
+
+          final attrId = await _ensureAttributeExists(attrName);
+          if (attrId != null) {
+            final valueId = await _ensureAttributeValueExists(attrId, attrValue);
+            if (valueId != null) {
+              attributeValueMap.putIfAbsent(attrId, () => {});
+              attributeValueMap[attrId]!.add(valueId);
+            }
+          }
+        }
+
+        // Process Option2 (columns 6-7)
+        if (row[6].toString().isNotEmpty && row[7].toString().isNotEmpty) {
+          final attrName = row[6].toString().trim();
+          final attrValue = row[7].toString().trim();
+
+          final attrId = await _ensureAttributeExists(attrName);
+          if (attrId != null) {
+            final valueId = await _ensureAttributeValueExists(attrId, attrValue);
+            if (valueId != null) {
+              attributeValueMap.putIfAbsent(attrId, () => {});
+              attributeValueMap[attrId]!.add(valueId);
+            }
+          }
+        }
+
+        // Process Option3 (columns 8-9)
+        if (row[8].toString().isNotEmpty && row[9].toString().isNotEmpty) {
+          final attrName = row[8].toString().trim();
+          final attrValue = row[9].toString().trim();
+
+          final attrId = await _ensureAttributeExists(attrName);
+          if (attrId != null) {
+            final valueId = await _ensureAttributeValueExists(attrId, attrValue);
+            if (valueId != null) {
+              attributeValueMap.putIfAbsent(attrId, () => {});
+              attributeValueMap[attrId]!.add(valueId);
+            }
+          }
+        }
+      }
+
+      if (attributeValueMap.isEmpty) {
+        print('⚠️ No attributes could be synced to global system (data might be corrupted)');
+        return false;
+      }
+
+      // Create assignment data for AttributeStore
+      List<Map<String, dynamic>> attributeAssignments = [];
+      for (var entry in attributeValueMap.entries) {
+        attributeAssignments.add({
+          'attributeId': entry.key,
+          'valueIds': entry.value.toList(),
+          'usedForVariants': true,
+          'isVisible': true,
+        });
+      }
+
+      // Assign all attributes to the product using AttributeStore
+      try {
+        final success = await _attributeStore.assignAttributesToProduct(
+          productId,
+          attributeAssignments,
+        );
+        if (success) {
+          print('✅ Linked ${attributeAssignments.length} attribute(s) to product $productId');
+          return true;
+        } else {
+          print('⚠️ Failed to link attributes to product');
+          return false;
+        }
+      } catch (e) {
+        print('❌ Error assigning attributes to product: $e');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error linking attributes to product: $e');
+      return false;
+    }
+  }
+
+  /// Generate URL-friendly slug from name
+  String _generateSlug(String name) {
+    return name
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
+        .replaceAll(RegExp(r'\s+'), '-');
   }
 
   Future<void> _createVariant(String productId, List<dynamic> row) async {

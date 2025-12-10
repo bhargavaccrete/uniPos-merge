@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/stores/payment_method_store.dart';
 
 /// Payment entry for split payment
 class PaymentEntry {
@@ -82,19 +85,28 @@ class SplitPaymentWidget extends StatefulWidget {
 
 class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   final List<PaymentEntry> _payments = [];
+  late PaymentMethodStore _paymentMethodStore;
 
-  static const List<Map<String, dynamic>> _paymentMethods = [
-    {'value': 'cash', 'label': 'Cash', 'icon': Icons.money},
-    {'value': 'card', 'label': 'Card', 'icon': Icons.credit_card},
-    {'value': 'upi', 'label': 'UPI', 'icon': Icons.qr_code_2},
-    {'value': 'wallet', 'label': 'Wallet', 'icon': Icons.account_balance_wallet},
-    {'value': 'credit', 'label': 'Credit', 'icon': Icons.receipt_long},
-    {'value': 'other', 'label': 'Other', 'icon': Icons.more_horiz},
-  ];
+  // Icon mapping from string names to IconData
+  static const Map<String, IconData> _iconMap = {
+    'money': Icons.money,
+    'credit_card': Icons.credit_card,
+    'qr_code_2': Icons.qr_code_2,
+    'account_balance_wallet': Icons.account_balance_wallet,
+    'receipt_long': Icons.receipt_long,
+    'more_horiz': Icons.more_horiz,
+    'payment': Icons.payment,
+    'account_balance': Icons.account_balance,
+    'attach_money': Icons.attach_money,
+    'phone_android': Icons.phone_android,
+  };
 
   @override
   void initState() {
     super.initState();
+    _paymentMethodStore = locator<PaymentMethodStore>();
+    _paymentMethodStore.loadPaymentMethods();
+
     // Add initial payment entry with full amount (without notifying parent during build)
     final entry = PaymentEntry(amount: widget.billTotal);
     if (widget.billTotal > 0) {
@@ -106,6 +118,11 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _notifyChanges();
     });
+  }
+
+  /// Get icon from string name
+  IconData _getIcon(String iconName) {
+    return _iconMap[iconName] ?? Icons.payment;
   }
 
   @override
@@ -329,32 +346,53 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: payment.method,
-                      isExpanded: true,
-                      icon: const Icon(Icons.keyboard_arrow_down, size: 20),
-                      items: _paymentMethods.map((method) {
-                        return DropdownMenuItem<String>(
-                          value: method['value'] as String,
-                          child: Row(
-                            children: [
-                              Icon(method['icon'] as IconData, size: 18, color: const Color(0xFF6B6B6B)),
-                              const SizedBox(width: 8),
-                              Text(
-                                method['label'] as String,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ],
+                  child: Observer(
+                    builder: (_) {
+                      final enabledMethods = _paymentMethodStore.enabledMethods;
+
+                      // If no enabled methods, show empty state
+                      if (enabledMethods.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'No payment methods configured',
+                            style: TextStyle(fontSize: 13, color: Colors.grey),
                           ),
                         );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          _updatePaymentMethod(index, value);
-                        }
-                      },
-                    ),
+                      }
+
+                      return DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: payment.method,
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                          items: enabledMethods.map((method) {
+                            return DropdownMenuItem<String>(
+                              value: method.value,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getIcon(method.iconName),
+                                    size: 18,
+                                    color: const Color(0xFF6B6B6B),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    method.name,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              _updatePaymentMethod(index, value);
+                            }
+                          },
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),

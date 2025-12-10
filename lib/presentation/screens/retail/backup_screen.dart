@@ -79,8 +79,8 @@ class _BackupScreenState extends State<BackupScreen> {
             const SizedBox(height: 8),
             const Text(
               '• File Manager app on your device\n'
-              '• Connect device to computer via USB\n'
-              '• Share button to export to cloud storage',
+                  '• Connect device to computer via USB\n'
+                  '• Share button to export to cloud storage',
               style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
             ),
           ],
@@ -103,12 +103,25 @@ class _BackupScreenState extends State<BackupScreen> {
 
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Backup created successfully: ${backupFile.path.split('/').last}'),
-            backgroundColor: Colors.green,
-          ),
-        );
+
+        if (backupFile != null) {
+          // Mobile/Desktop - file was saved to disk
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Backup created successfully: ${backupFile.path.split('/').last}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          // Web - file was shared via download
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Backup shared successfully! Check your downloads.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
         _loadData();
       }
     } catch (e) {
@@ -537,149 +550,149 @@ class _BackupScreenState extends State<BackupScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Auto Backup Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE8E8E8)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Auto Backup Card
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE8E8E8)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Row(
+                  children: [
+                    Icon(Icons.backup, color: Colors.blue.shade700, size: 24),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.backup, color: Colors.blue.shade700, size: 24),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Auto Backup',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Automatically backup data once per day',
-                                  style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                                ),
-                              ],
-                            ),
+                          Text(
+                            'Auto Backup',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                           ),
-                          Switch(
-                            value: _autoBackupEnabled,
-                            onChanged: _toggleAutoBackup,
+                          SizedBox(height: 4),
+                          Text(
+                            'Automatically backup data once per day',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
                           ),
                         ],
                       ),
-                      if (_lastBackupDate != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          'Last backup: ${DateFormat('MMM dd, yyyy hh:mm a').format(_lastBackupDate!)}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Create Backup Button
-                ElevatedButton.icon(
-                  onPressed: _createBackup,
-                  icon: const Icon(Icons.add_circle_outline),
-                  label: const Text('Create New Backup'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A1A1A),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Import Backup Button
-                OutlinedButton.icon(
-                  onPressed: _importBackup,
-                  icon: const Icon(Icons.file_upload),
-                  label: const Text('Import Backup File'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Backups List Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Local Backups',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                    Row(
-                      children: [
-                        TextButton.icon(
-                          onPressed: _showBackupLocation,
-                          icon: const Icon(Icons.folder_outlined, size: 16),
-                          label: const Text('Location', style: TextStyle(fontSize: 12)),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${_backups.length} backups',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                        ),
-                      ],
+                    Switch(
+                      value: _autoBackupEnabled,
+                      onChanged: _toggleAutoBackup,
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 12),
-
-                // Backups List
-                if (_backups.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(40),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE8E8E8)),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(Icons.folder_open, size: 64, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No backups found',
-                          style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Create your first backup to get started',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF9B9B9B)),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  ..._backups.map((file) => _buildBackupCard(file)),
+                if (_lastBackupDate != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Last backup: ${DateFormat('MMM dd, yyyy hh:mm a').format(_lastBackupDate!)}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                  ),
+                ],
               ],
             ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Create Backup Button
+          ElevatedButton.icon(
+            onPressed: _createBackup,
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Create New Backup'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A1A1A),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Import Backup Button
+          OutlinedButton.icon(
+            onPressed: _importBackup,
+            icon: const Icon(Icons.file_upload),
+            label: const Text('Import Backup File'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Backups List Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Local Backups',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: _showBackupLocation,
+                    icon: const Icon(Icons.folder_outlined, size: 16),
+                    label: const Text('Location', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_backups.length} backups',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Backups List
+          if (_backups.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE8E8E8)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.folder_open, size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No backups found',
+                    style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Create your first backup to get started',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9B9B9B)),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._backups.map((file) => _buildBackupCard(file)),
+        ],
+      ),
     );
   }
 

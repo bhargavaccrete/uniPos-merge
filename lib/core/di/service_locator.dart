@@ -129,6 +129,10 @@ Future<void> _registerRetailDependencies() async {
         () => AuthService(locator<AdminRepository>()),
   );
 
+  // Ensure default admin account exists
+  await locator<AuthService>().ensureDefaultAdmin();
+  print('✓ Default admin account initialized (username: admin, password: admin123)');
+
   // Register Stores (Singletons - lazy loaded)
   locator.registerLazySingleton<retail.CartStore>(() => retail.CartStore());
   locator.registerLazySingleton<ProductStore>(() => ProductStore());

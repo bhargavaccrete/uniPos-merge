@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html show AnchorElement, Blob, Url;
 
 import 'package:uuid/uuid.dart';
 
@@ -124,10 +128,32 @@ class BackupService {
   }
 
   /// Save backup to a file
-  Future<File> saveBackupToFile(Map<String, dynamic> backupData, {String? customPath}) async {
+  Future<File?> saveBackupToFile(Map<String, dynamic> backupData, {String? customPath}) async {
     final jsonString = const JsonEncoder.withIndent('  ').convert(backupData);
 
     final fileName = 'rpos_backup_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.json';
+
+    if (kIsWeb) {
+      // On web, trigger download directly using HTML anchor element
+      final bytes = utf8.encode(jsonString);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+
+      // Clean up the URL after a short delay
+      Future.delayed(const Duration(milliseconds: 100), () {
+        html.Url.revokeObjectUrl(url);
+      });
+
+      // Update last backup date on web too
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lastBackupKey, DateTime.now().toIso8601String());
+
+      // Return null since we can't create File objects on web
+      return null;
+    }
 
     File backupFile;
     if (customPath != null) {
@@ -137,7 +163,7 @@ class BackupService {
       Directory? backupDir;
 
       // For Android: Use external storage that won't be deleted on uninstall
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         // Try to get external storage directory (Downloads/Documents)
         final externalDirs = await getExternalStorageDirectory();
         if (externalDirs != null) {
@@ -182,8 +208,8 @@ class BackupService {
     return backupFile;
   }
 
-  /// Export backup and return the file
-  Future<File> createBackup({String? customPath}) async {
+  /// Export backup and return the file (null on web)
+  Future<File?> createBackup({String? customPath}) async {
     final backupData = await exportData();
     return await saveBackupToFile(backupData, customPath: customPath);
   }
@@ -240,11 +266,13 @@ class BackupService {
 
   /// Get all local backups
   Future<List<File>> getLocalBackups() async {
+    if (kIsWeb) return [];
+
     try {
       Directory? backupDir;
 
       // For Android: Check public storage first
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         final externalDirs = await getExternalStorageDirectory();
         if (externalDirs != null) {
           final pathParts = externalDirs.path.split('/');
@@ -292,6 +320,8 @@ class BackupService {
 
   /// Check if daily backup is needed
   Future<bool> isDailyBackupNeeded() async {
+    if (kIsWeb) return false;
+
     final prefs = await SharedPreferences.getInstance();
     final autoBackupEnabled = prefs.getBool(_autoBackupEnabledKey) ?? true;
 
@@ -305,8 +335,8 @@ class BackupService {
 
     // Check if last backup was on a different day
     return lastBackup.year != today.year ||
-           lastBackup.month != today.month ||
-           lastBackup.day != today.day;
+        lastBackup.month != today.month ||
+        lastBackup.day != today.day;
   }
 
   /// Perform daily auto backup
@@ -355,8 +385,10 @@ class BackupService {
 
   /// Get the backup directory path
   Future<String> getBackupDirectoryPath() async {
+    if (kIsWeb) return '';
+
     // For Android: Return public storage path
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       final externalDirs = await getExternalStorageDirectory();
       if (externalDirs != null) {
         final pathParts = externalDirs.path.split('/');

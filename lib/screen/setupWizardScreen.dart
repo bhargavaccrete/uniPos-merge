@@ -746,8 +746,8 @@ class SetupSidebar extends StatelessWidget {
                   color: isActive
                       ? Colors.white.withOpacity(0.2)
                       : isCompleted
-                          ? Colors.white.withOpacity(0.1)
-                          : Colors.transparent,
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isActive ? Colors.white.withOpacity(0.3) : Colors.transparent,
@@ -763,15 +763,15 @@ class SetupSidebar extends StatelessWidget {
                         color: isCompleted
                             ? AppColors.success.withOpacity(0.2)
                             : isActive
-                                ? Colors.white.withOpacity(0.2)
-                                : Colors.white.withOpacity(0.1),
+                            ? Colors.white.withOpacity(0.2)
+                            : Colors.white.withOpacity(0.1),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isCompleted
                               ? AppColors.success
                               : isActive
-                                  ? Colors.white
-                                  : Colors.white.withOpacity(0.3),
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.3),
                           width: 2,
                         ),
                       ),
@@ -779,10 +779,10 @@ class SetupSidebar extends StatelessWidget {
                         child: isCompleted
                             ? const Icon(Icons.check, color: AppColors.success, size: 18)
                             : Icon(
-                                step.icon,
-                                color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
-                                size: 18,
-                              ),
+                          step.icon,
+                          color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
+                          size: 18,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),

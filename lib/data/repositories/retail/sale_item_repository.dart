@@ -23,6 +23,7 @@ class SaleItemRepository {
   /// Add a single sale item
   Future<void> addSaleItem(SaleItemModel item) async {
     await _saleItemBox.put(item.saleItemId, item);
+
   }
 
   /// Add multiple sale items (for a sale transaction)

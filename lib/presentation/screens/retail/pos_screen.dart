@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/responsive.dart';
 import '../../../core/di/service_locator.dart';
-import '../../../core/init/hive_init.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:unipos/data/models/retail/hive_model/hold_sale_model_209.dart';
@@ -827,6 +825,7 @@ class _PosScreenState extends State<PosScreen> {
               ),
               child: TextField(
                 controller: _searchController,
+                textAlignVertical: TextAlignVertical.center,
                 onChanged: _onSearchChanged,
                 onSubmitted: (value) async {
                   // On Enter/Submit - try barcode first, then search
@@ -838,11 +837,11 @@ class _PosScreenState extends State<PosScreen> {
                   hintText: 'Search product or enter barcode...',
                   hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFB0B0B0)),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B), size: 20),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 15,vertical: 16),
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B), size: 16),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: Color(0xFF6B6B6B), size: 18),
+                          icon: const Icon(Icons.clear, color: Color(0xFF6B6B6B), size: 15),
                           onPressed: _clearSearch,
                         )
                       : null,
@@ -936,7 +935,18 @@ class _PosScreenState extends State<PosScreen> {
       builder: (context, snapshot) {
         final variants = snapshot.data ?? [];
         final firstVariant = variants.isNotEmpty ? variants.first : null;
-        final price = firstVariant?.mrp ?? 0;
+        
+        // Calculate price with fallbacks
+        double price = 0;
+        if (firstVariant != null) {
+          price = firstVariant.effectivePrice;
+        }
+        
+        // If price is still 0 (no variants or variant has 0 price), try product defaults
+        if (price == 0) {
+          price = product.defaultPrice ?? product.defaultMrp ?? 0;
+        }
+
         final stock = variants.fold<int>(0, (sum, v) => sum + v.stockQty);
 
         return Container(

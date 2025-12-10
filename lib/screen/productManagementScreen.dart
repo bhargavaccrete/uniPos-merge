@@ -284,6 +284,401 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
     );
   }
 
+  void _showEditDialog(int index) {
+    print('Edit dialog called for index: $index');
+
+    if (index < 0 || index >= _products.length) {
+      print('Invalid index: $index');
+      return;
+    }
+
+    final product = _products[index];
+    print('Editing product: ${product.name}');
+
+    // Create local controllers for the dialog
+    final nameController = TextEditingController(text: product.name);
+    final priceController = TextEditingController(text: product.price.toString());
+    final descriptionController = TextEditingController(text: product.description ?? '');
+    final skuController = TextEditingController(text: product.sku ?? '');
+    final barcodeController = TextEditingController(text: product.barcode ?? '');
+    final stockController = TextEditingController(text: product.stock.toString());
+
+    String? selectedCategory = product.category;
+    String? selectedVariation = product.variation;
+    String? selectedExtra = product.extras?.isNotEmpty == true ? product.extras!.first : null;
+    String? selectedChoice = product.choices?.values.isNotEmpty == true
+        ? product.choices!.values.first
+        : null;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: AppColors.primary, size: 24),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Edit Product',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              nameController.dispose();
+                              priceController.dispose();
+                              descriptionController.dispose();
+                              skuController.dispose();
+                              barcodeController.dispose();
+                              stockController.dispose();
+                              Navigator.pop(dialogContext);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Form Content
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Product Name and Price
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: TextField(
+                                    controller: nameController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Product Name*',
+                                      prefixIcon: Icon(Icons.inventory, color: AppColors.primary),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: TextField(
+                                    controller: priceController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: 'Price*',
+                                      prefixIcon: Icon(Icons.attach_money, color: AppColors.success),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Description
+                            TextField(
+                              controller: descriptionController,
+                              maxLines: 2,
+                              decoration: InputDecoration(
+                                labelText: 'Description',
+                                prefixIcon: Icon(Icons.description, color: AppColors.secondary),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Category
+                            DropdownButtonFormField<String>(
+                              value: selectedCategory,
+                              decoration: InputDecoration(
+                                labelText: 'Category*',
+                                prefixIcon: Icon(Icons.category, color: AppColors.primary),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              items: _categories.keys.map((category) {
+                                return DropdownMenuItem(
+                                  value: category,
+                                  child: Text(category),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  selectedCategory = value;
+                                  selectedVariation = null;
+                                  selectedExtra = null;
+                                  selectedChoice = null;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Variation and Extra
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: selectedVariation,
+                                    decoration: InputDecoration(
+                                      labelText: 'Variation',
+                                      prefixIcon: Icon(Icons.tune, color: AppColors.secondary),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    items: selectedCategory != null && _variations.containsKey(selectedCategory)
+                                        ? _variations[selectedCategory]!.map((variation) {
+                                      return DropdownMenuItem(
+                                        value: variation,
+                                        child: Text(variation),
+                                      );
+                                    }).toList()
+                                        : [],
+                                    onChanged: selectedCategory != null ? (value) {
+                                      setDialogState(() {
+                                        selectedVariation = value;
+                                      });
+                                    } : null,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: selectedExtra,
+                                    decoration: InputDecoration(
+                                      labelText: 'Extra',
+                                      prefixIcon: Icon(Icons.add_circle, color: AppColors.accent),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    items: selectedCategory != null && _extras.containsKey(selectedCategory)
+                                        ? _extras[selectedCategory]!.map((extra) {
+                                      return DropdownMenuItem(
+                                        value: extra,
+                                        child: Text(extra),
+                                      );
+                                    }).toList()
+                                        : [],
+                                    onChanged: selectedCategory != null ? (value) {
+                                      setDialogState(() {
+                                        selectedExtra = value;
+                                        selectedChoice = null;
+                                      });
+                                    } : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Choice (if extra is selected)
+                            if (selectedExtra != null && _choices.containsKey(selectedExtra))
+                              Column(
+                                children: [
+                                  DropdownButtonFormField<String>(
+                                    value: selectedChoice,
+                                    decoration: InputDecoration(
+                                      labelText: 'Choice',
+                                      prefixIcon: Icon(Icons.check_circle, color: AppColors.orange),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    items: _choices[selectedExtra]!.map((choice) {
+                                      return DropdownMenuItem(
+                                        value: choice,
+                                        child: Text(choice),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setDialogState(() {
+                                        selectedChoice = value;
+                                      });
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                ],
+                              ),
+
+                            // SKU, Barcode, Stock
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: skuController,
+                                    decoration: InputDecoration(
+                                      labelText: 'SKU',
+                                      prefixIcon: Icon(Icons.qr_code, color: AppColors.info),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: TextField(
+                                    controller: barcodeController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Barcode',
+                                      prefixIcon: Icon(Icons.barcode_reader, color: AppColors.info),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Stock
+                            TextField(
+                              controller: stockController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Stock',
+                                prefixIcon: Icon(Icons.storage, color: AppColors.warning),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Action Buttons
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                nameController.dispose();
+                                priceController.dispose();
+                                descriptionController.dispose();
+                                skuController.dispose();
+                                barcodeController.dispose();
+                                stockController.dispose();
+                                Navigator.pop(dialogContext);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                side: BorderSide(color: AppColors.danger),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(color: AppColors.danger),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                if (nameController.text.isNotEmpty &&
+                                    priceController.text.isNotEmpty &&
+                                    selectedCategory != null) {
+                                  setState(() {
+                                    _products[index] = Product(
+                                      name: nameController.text,
+                                      category: selectedCategory!,
+                                      variation: selectedVariation,
+                                      extras: selectedExtra != null ? [selectedExtra!] : null,
+                                      choices: selectedChoice != null ? {selectedExtra ?? '': selectedChoice!} : null,
+                                      price: double.parse(priceController.text),
+                                      sku: skuController.text,
+                                      barcode: barcodeController.text,
+                                      stock: int.tryParse(stockController.text) ?? 0,
+                                      description: descriptionController.text,
+                                    );
+                                  });
+
+                                  nameController.dispose();
+                                  priceController.dispose();
+                                  descriptionController.dispose();
+                                  skuController.dispose();
+                                  barcodeController.dispose();
+                                  stockController.dispose();
+
+                                  Navigator.pop(dialogContext);
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Product updated successfully'),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.save),
+                              label: const Text('Update Product'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showDeleteConfirmation(int index) {
     final product = _products[index];
     showDialog(
@@ -838,6 +1233,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   }
 
   Widget _buildProductListTab() {
+    print('Building product list tab. Product count: ${_products.length}');
     return Container(
       padding: const EdgeInsets.all(20),
       child: Container(
@@ -1015,12 +1411,18 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                         const SizedBox(width: 8),
                         IconButton(
                           icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () => _editProduct(index),
+                          onPressed: () {
+                            print('Edit button tapped for index: $index');
+                            _showEditDialog(index);
+                          },
                           tooltip: 'Edit Product',
                         ),
                         IconButton(
                           icon: Icon(Icons.delete, size: 20, color: AppColors.danger),
-                          onPressed: () => _showDeleteConfirmation(index),
+                          onPressed: () {
+                            print('Delete button tapped for index: $index');
+                            _showDeleteConfirmation(index);
+                          },
                           tooltip: 'Delete Product',
                         ),
                       ],

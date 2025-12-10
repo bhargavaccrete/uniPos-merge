@@ -7,20 +7,31 @@ class PaymentMethodRepository {
   Box<PaymentMethod>? _box;
 
   Future<void> init() async {
+    print('🗄️  PaymentMethodRepository: init() called');
     if (!Hive.isBoxOpen(_boxName)) {
+      print('🗄️  PaymentMethodRepository: Opening box $_boxName');
       _box = await Hive.openBox<PaymentMethod>(_boxName);
+      print('🗄️  PaymentMethodRepository: Box opened successfully');
     } else {
+      print('🗄️  PaymentMethodRepository: Box already open');
       _box = Hive.box<PaymentMethod>(_boxName);
     }
 
+    print('🗄️  PaymentMethodRepository: Box has ${_box!.length} items');
+
     // Initialize with default payment methods if box is empty
     if (_box!.isEmpty) {
+      print('🗄️  PaymentMethodRepository: Box is empty, initializing default methods');
       await _initializeDefaultMethods();
+      print('🗄️  PaymentMethodRepository: Default methods created, box now has ${_box!.length} items');
+    } else {
+      print('🗄️  PaymentMethodRepository: Box already has data, skipping initialization');
     }
   }
 
   /// Initialize default payment methods
   Future<void> _initializeDefaultMethods() async {
+    print('🗄️  PaymentMethodRepository: Creating 6 default payment methods...');
     final defaultMethods = [
       PaymentMethod(
         id: const Uuid().v4(),
@@ -73,8 +84,10 @@ class PaymentMethodRepository {
     ];
 
     for (var method in defaultMethods) {
+      print('🗄️  PaymentMethodRepository: Adding ${method.name}...');
       await _box!.add(method);
     }
+    print('🗄️  PaymentMethodRepository: All default methods added');
   }
 
   /// Get all payment methods

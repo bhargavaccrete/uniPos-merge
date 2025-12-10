@@ -42,15 +42,26 @@ abstract class _AttributeStoreBase with Store {
     isLoading = true;
     errorMessage = null;
     try {
+      // Auto-fix corruption if detected
+      await _repository.checkAndFixCorruption();
+
       final loadedAttributes = await _repository.getAllAttributes();
       attributes = ObservableList.of(loadedAttributes);
 
       // Load values for each attribute
       for (final attr in loadedAttributes) {
-        await loadValuesForAttribute(attr.attributeId);
+        try {
+          await loadValuesForAttribute(attr.attributeId);
+        } catch (e) {
+          print('⚠️ Error loading values for attribute ${attr.name}: $e');
+          // Continue with other attributes
+        }
       }
     } catch (e) {
+      print('❌ Error loading attributes: $e');
       errorMessage = 'Failed to load attributes: $e';
+      // Initialize with empty list on error
+      attributes = ObservableList<AttributeModel>();
     } finally {
       isLoading = false;
     }
@@ -71,9 +82,18 @@ abstract class _AttributeStoreBase with Store {
   @action
   Future<bool> addAttribute(String name, {int sortOrder = 0}) async {
     try {
+      // Auto-fix corruption before checking
+      final wasCorrupted = await _repository.checkAndFixCorruption();
+      if (wasCorrupted) {
+        print('🔧 Fixed corrupted data, reloading attributes...');
+        await loadAttributes();
+      }
+
       // Check for duplicate
-      if (await _repository.attributeNameExists(name)) {
-        errorMessage = 'Attribute "$name" already exists';
+      final exists = await _repository.attributeNameExists(name);
+      if (exists) {
+        errorMessage = 'Attribute "$name" already exists from imported data';
+        print('ℹ️ Attribute "$name" already exists, skipping creation');
         return false;
       }
 
@@ -84,15 +104,18 @@ abstract class _AttributeStoreBase with Store {
         sortOrder: sortOrder,
         isActive: true,
         createdAt: DateTime.now().toIso8601String(),
+        updatedAt: null,
       );
 
       await _repository.addAttribute(attribute);
       attributes.add(attribute);
       attributeValues[attribute.attributeId] = ObservableList<AttributeValueModel>();
 
+      print('✅ Created attribute: $name');
       return true;
     } catch (e) {
-      errorMessage = 'Failed to add attribute: $e';
+      print('❌ Error adding attribute "$name": $e');
+      errorMessage = 'Failed to add attribute "$name": ${e.toString()}';
       return false;
     }
   }
@@ -181,6 +204,7 @@ abstract class _AttributeStoreBase with Store {
         sortOrder: sortOrder,
         isActive: true,
         createdAt: DateTime.now().toIso8601String(),
+        updatedAt: null,
       );
 
       await _repository.addValue(attributeValue);
@@ -223,6 +247,7 @@ abstract class _AttributeStoreBase with Store {
           sortOrder: i,
           isActive: true,
           createdAt: DateTime.now().toIso8601String(),
+          updatedAt: null,
         );
 
         await _repository.addValue(attributeValue);

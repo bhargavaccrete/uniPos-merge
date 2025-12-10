@@ -18,6 +18,8 @@ import 'package:unipos/presentation/screens/retail/category_management_screen.da
 import 'package:unipos/presentation/screens/retail/login_screen.dart';
 import 'package:unipos/presentation/screens/retail/change_password_screen.dart';
 
+import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -284,11 +286,30 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildStatItem(Icons.receipt_long, 'Today\'s Sales', '0', Colors.white),
+                Observer(
+                  builder: (context) {
+                    final now = DateTime.now();
+                    final todayStart = DateTime(now.year, now.month, now.day);
+                    final todaySales = saleStore.sales.where((sale) {
+                      try {
+                        final saleDate = DateTime.parse(sale.createdAt);
+                        return saleDate.isAfter(todayStart) || saleDate.isAtSameMomentAs(todayStart);
+                      } catch (_) {
+                        return false;
+                      }
+                    });
+                    final total = todaySales.fold(0.0, (sum, sale) => sum + (sale.grandTotal ?? sale.totalAmount));
+                    return _buildStatItem(Icons.receipt_long, 'Today\'s Sales', '₹${total.toStringAsFixed(2)}', Colors.white);
+                  },
+                ),
                 const SizedBox(height: 12),
-                _buildStatItem(Icons.inventory, 'Products', '0', Colors.white),
+                Observer(
+                  builder: (context) => _buildStatItem(Icons.inventory, 'Products', '${productStore.products.length}', Colors.white),
+                ),
                 const SizedBox(height: 12),
-                _buildStatItem(Icons.people, 'Customers', '0', Colors.white),
+                Observer(
+                  builder: (context) => _buildStatItem(Icons.people, 'Customers', '${customerStore.customers.length}', Colors.white),
+                ),
               ],
             ),
           ),

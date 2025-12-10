@@ -30,13 +30,72 @@ class AttributeRepository {
     return _productAttributesBox!;
   }
 
+  /// Check if boxes are corrupted and auto-reset if needed
+  Future<bool> checkAndFixCorruption() async {
+    try {
+      final box = await attributesBox;
+      // Try to access values - this will throw if corrupted
+      box.values.length;
+      return false; // Not corrupted
+    } catch (e) {
+      if (e.toString().contains('Bad state') || e.toString().contains('No element')) {
+        print('🔧 Detected corrupted attribute data, auto-resetting...');
+        await resetAllBoxes();
+        return true; // Was corrupted, now fixed
+      }
+      return false;
+    }
+  }
+
+  /// Reset all attribute boxes
+  Future<void> resetAllBoxes() async {
+    try {
+      // Close boxes
+      if (_attributesBox?.isOpen ?? false) await _attributesBox!.close();
+      if (_valuesBox?.isOpen ?? false) await _valuesBox!.close();
+      if (_productAttributesBox?.isOpen ?? false) await _productAttributesBox!.close();
+
+      // Delete from disk
+      await Hive.deleteBoxFromDisk(_attributesBoxName);
+      await Hive.deleteBoxFromDisk(_attributeValuesBoxName);
+      await Hive.deleteBoxFromDisk(_productAttributesBoxName);
+
+      // Reopen
+      _attributesBox = await Hive.openBox<AttributeModel>(_attributesBoxName);
+      _valuesBox = await Hive.openBox<AttributeValueModel>(_attributeValuesBoxName);
+      _productAttributesBox = await Hive.openBox<ProductAttributeModel>(_productAttributesBoxName);
+
+      print('✅ Attribute boxes reset successfully');
+    } catch (e) {
+      print('❌ Error resetting boxes: $e');
+    }
+  }
+
   // ==================== ATTRIBUTES ====================
 
   /// Get all global attributes
   Future<List<AttributeModel>> getAllAttributes() async {
     final box = await attributesBox;
-    return box.values.where((a) => a.isActive).toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    try {
+      return box.values.where((a) => a.isActive).toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    } catch (e) {
+      print('Error loading attributes: $e');
+      // Try to recover by loading one by one
+      final List<AttributeModel> validAttributes = [];
+      for (var key in box.keys) {
+        try {
+          final attr = box.get(key);
+          if (attr != null && attr.isActive) {
+            validAttributes.add(attr);
+          }
+        } catch (itemError) {
+          print('Skipping corrupted attribute with key $key: $itemError');
+        }
+      }
+      validAttributes.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return validAttributes;
+    }
   }
 
   /// Get attribute by ID
@@ -101,10 +160,28 @@ class AttributeRepository {
   /// Get all values for an attribute
   Future<List<AttributeValueModel>> getValuesForAttribute(String attributeId) async {
     final box = await valuesBox;
-    return box.values
-        .where((v) => v.attributeId == attributeId && v.isActive)
-        .toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    try {
+      return box.values
+          .where((v) => v.attributeId == attributeId && v.isActive)
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    } catch (e) {
+      print('Error loading values for attribute $attributeId: $e');
+      // Try to recover by loading one by one
+      final List<AttributeValueModel> validValues = [];
+      for (var key in box.keys) {
+        try {
+          final value = box.get(key);
+          if (value != null && value.attributeId == attributeId && value.isActive) {
+            validValues.add(value);
+          }
+        } catch (itemError) {
+          print('Skipping corrupted value with key $key: $itemError');
+        }
+      }
+      validValues.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return validValues;
+    }
   }
 
   /// Get value by ID
@@ -167,8 +244,26 @@ class AttributeRepository {
   /// Get all attributes assigned to a product
   Future<List<ProductAttributeModel>> getProductAttributes(String productId) async {
     final box = await productAttributesBox;
-    return box.values.where((pa) => pa.productId == productId).toList()
-      ..sort((a, b) => a.position.compareTo(b.position));
+    try {
+      return box.values.where((pa) => pa.productId == productId).toList()
+        ..sort((a, b) => a.position.compareTo(b.position));
+    } catch (e) {
+      print('Error loading product attributes for $productId: $e');
+      // Try to recover by loading one by one
+      final List<ProductAttributeModel> validProductAttrs = [];
+      for (var key in box.keys) {
+        try {
+          final prodAttr = box.get(key);
+          if (prodAttr != null && prodAttr.productId == productId) {
+            validProductAttrs.add(prodAttr);
+          }
+        } catch (itemError) {
+          print('Skipping corrupted product attribute with key $key: $itemError');
+        }
+      }
+      validProductAttrs.sort((a, b) => a.position.compareTo(b.position));
+      return validProductAttrs;
+    }
   }
 
   /// Assign an attribute to a product
@@ -275,10 +370,35 @@ class AttributeRepository {
 
   /// Check if attribute name exists
   Future<bool> attributeNameExists(String name, {String? excludeId}) async {
-    final box = await attributesBox;
-    return box.values.any((a) =>
-        a.name.toLowerCase() == name.toLowerCase() &&
-        (excludeId == null || a.attributeId != excludeId));
+    try {
+      final box = await attributesBox;
+      return box.values.any((a) =>
+          a.name.toLowerCase() == name.toLowerCase() &&
+          (excludeId == null || a.attributeId != excludeId));
+    } catch (e) {
+      print('⚠️ Error checking attribute name exists: $e');
+      // If we can't read the box, try to check one by one
+      try {
+        final box = await attributesBox;
+        for (var key in box.keys) {
+          try {
+            final attr = box.get(key);
+            if (attr != null &&
+                attr.name.toLowerCase() == name.toLowerCase() &&
+                (excludeId == null || attr.attributeId != excludeId)) {
+              return true;
+            }
+          } catch (_) {
+            // Skip corrupted entry
+            continue;
+          }
+        }
+        return false;
+      } catch (e2) {
+        print('❌ Cannot check attribute existence: $e2');
+        return false; // Assume doesn't exist if we can't check
+      }
+    }
   }
 
   /// Check if value exists for attribute

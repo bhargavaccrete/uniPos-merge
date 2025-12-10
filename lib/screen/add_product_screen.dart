@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
 
@@ -9,6 +10,7 @@ import '../core/config/app_config.dart';
 import '../core/di/service_locator.dart';
 import '../data/models/retail/hive_model/attribute_model_219.dart';
 import '../data/models/retail/hive_model/attribute_value_model_220.dart';
+import '../data/models/retail/hive_model/variante_model_201.dart';
 import '../data/repositories/tax_details_repository.dart';
 import '../domain/store/common/add_product_form_store.dart';
 import '../domain/store/retail/product_store.dart';
@@ -69,11 +71,21 @@ class _AddProductScreenState extends State<AddProductScreen>
   final _bulkSellingPriceController = TextEditingController();
   final _bulkStockController = TextEditingController();
 
+  // Edit mode tracking
+  String? _editingProductId;
+  String? _editingRestaurantItemId;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _formStore = AddProductFormStore();
+
+    // Load attributes from repository (including imported attributes)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final attributeStore = locator<AttributeStore>();
+      attributeStore.loadAttributes();
+    });
   }
 
   @override
@@ -126,6 +138,12 @@ class _AddProductScreenState extends State<AddProductScreen>
     _unitController.clear();
     _restaurantStockController.clear();
     _formStore.reset();
+
+    // Clear edit mode
+    setState(() {
+      _editingProductId = null;
+      _editingRestaurantItemId = null;
+    });
   }
 
   Future<void> _submitForm() async {
@@ -150,12 +168,29 @@ class _AddProductScreenState extends State<AddProductScreen>
       _formStore.setRestaurantStockQuantity(double.tryParse(_restaurantStockController.text) ?? 0);
     }
 
-    final success = await _formStore.submit();
+    bool success = false;
+
+    // Check if we're in edit mode
+    if (_editingProductId != null && AppConfig.isRetail) {
+      // Update existing retail product
+      success = await _updateRetailProduct();
+    } else if (_editingRestaurantItemId != null && AppConfig.isRestaurant) {
+      // Update existing restaurant item
+      success = await _updateRestaurantItem();
+    } else {
+      // Add new product/item
+      success = await _formStore.submit();
+    }
 
     if (success && mounted) {
+      final isEditMode = _editingProductId != null || _editingRestaurantItemId != null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppConfig.isRetail ? 'Product added successfully!' : 'Item added successfully!'),
+          content: Text(
+            isEditMode
+                ? (AppConfig.isRetail ? 'Product updated successfully!' : 'Item updated successfully!')
+                : (AppConfig.isRetail ? 'Product added successfully!' : 'Item added successfully!'),
+          ),
           backgroundColor: AppColors.success,
         ),
       );
@@ -167,6 +202,132 @@ class _AddProductScreenState extends State<AddProductScreen>
           backgroundColor: AppColors.danger,
         ),
       );
+    }
+  }
+
+  // ==================== UPDATE METHODS ====================
+
+  Future<bool> _updateRetailProduct() async {
+    try {
+      final productStore = locator<ProductStore>();
+
+      // Create updated product
+      final product = ProductModel.fromProduct(
+        productId: _editingProductId!,
+        productName: _formStore.name.trim(),
+        category: _formStore.selectedCategoryId!,
+        subCategory: _formStore.subCategory,
+        brandName: _formStore.brandName,
+        imagePath: _formStore.imagePath,
+        description: _formStore.description.isNotEmpty ? _formStore.description : null,
+        hasVariants: _formStore.isVariableProduct,
+        productType: _formStore.productType,
+        defaultPrice: _formStore.isSimpleProduct ? _formStore.price : null,
+        defaultMrp: _formStore.isSimpleProduct ? _formStore.mrp : null,
+        defaultCostPrice: _formStore.isSimpleProduct ? _formStore.costPrice : null,
+        gstRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+        hsnCode: _formStore.hsnCode,
+      );
+
+      // Update product in database
+      await productStore.updateProduct(product);
+
+      // Update or create variants
+      if (_formStore.isVariableProduct) {
+        // For variable products, update/create all variants from the form
+        for (final variantData in _formStore.retailVariants) {
+          final variant = VarianteModel.create(
+            varianteId: variantData.id,
+            productId: _editingProductId!,
+            sku: variantData.sku,
+            barcode: variantData.barcode,
+            size: variantData.attributes['Size'],
+            color: variantData.attributes['Color'],
+            weight: variantData.attributes['Weight'],
+            customAttributes: variantData.attributes,
+            attributeValueIds: variantData.attributeValueIds,
+            mrp: variantData.mrp,
+            costPrice: variantData.costPrice,
+            sellingPrice: variantData.price,
+            stockQty: variantData.stockQuantity,
+            minStock: _formStore.minStock,
+            taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+          );
+
+          // Check if variant exists, if so update, otherwise add
+          final existingVariant = await productStore.getVariantById(variantData.id);
+          if (existingVariant != null) {
+            await productStore.updateVariant(variant);
+          } else {
+            await productStore.addVariant(variant);
+          }
+        }
+      } else {
+        // For simple products, update the default variant
+        final variants = await productStore.getVariantsForProduct(_editingProductId!);
+        if (variants.isNotEmpty) {
+          final defaultVariant = variants.firstWhere(
+            (v) => v.isDefault,
+            orElse: () => variants.first,
+          );
+
+          final updatedVariant = defaultVariant.copyWith(
+            sku: _formStore.sku,
+            barcode: _formStore.barcode,
+            mrp: _formStore.mrp,
+            costPrice: _formStore.costPrice,
+            sellingPrice: _formStore.price,
+            stockQty: _formStore.stockQuantity,
+            minStock: _formStore.minStock,
+            taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+          );
+
+          await productStore.updateVariant(updatedVariant);
+        }
+      }
+
+      return true;
+    } catch (e) {
+      _formStore.errorMessage = 'Failed to update product: $e';
+      return false;
+    }
+  }
+
+  Future<bool> _updateRestaurantItem() async {
+    try {
+      final itemStore = locator<ItemStore>();
+
+      // Get the existing item to preserve fields not in the form
+      final existingItem = itemStore.items.firstWhere(
+        (item) => item.id == _editingRestaurantItemId,
+      );
+
+      // Create updated item
+      final updatedItem = existingItem.copyWith(
+        name: _formStore.name.trim(),
+        description: _formStore.description.isNotEmpty ? _formStore.description : null,
+        categoryOfItem: _formStore.selectedCategoryId,
+        imagePath: _formStore.imagePath,
+        price: _formStore.hasPortionSizes ? null : _formStore.price,
+        taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+        unit: _formStore.unit,
+        isVeg: _formStore.isVeg,
+        trackInventory: _formStore.trackInventory,
+        stockQuantity: _formStore.trackInventory && !_formStore.hasPortionSizes
+            ? _formStore.restaurantStockQuantity
+            : null,
+        allowOrderWhenOutOfStock: _formStore.allowOrderWhenOutOfStock,
+        isSoldByWeight: _formStore.isSoldByWeight,
+        lastEditedTime: DateTime.now(),
+      );
+
+      // Update item in database
+      await itemStore.updateItem(updatedItem);
+
+      return true;
+    } catch (e) {
+      _formStore.errorMessage = 'Failed to update item: $e';
+      return false;
     }
   }
 
@@ -409,12 +570,12 @@ class _AddProductScreenState extends State<AddProductScreen>
                 child: Observer(
                   builder: (_) => (AppConfig.isRestaurant && !_formStore.hasPortionSizes)
                       ? _buildTextField(
-                          controller: _priceController,
-                          label: 'Price*',
-                          icon: Icons.attach_money,
-                          keyboardType: TextInputType.number,
-                          iconColor: AppColors.success,
-                        )
+                    controller: _priceController,
+                    label: 'Price*',
+                    icon: Icons.attach_money,
+                    keyboardType: TextInputType.number,
+                    iconColor: AppColors.success,
+                  )
                       : const SizedBox.shrink(),
                 ),
               ),
@@ -524,24 +685,24 @@ class _AddProductScreenState extends State<AddProductScreen>
           ),
           child: _formStore.imagePath != null
               ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(_formStore.imagePath!),
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                  ),
-                )
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(
+              File(_formStore.imagePath!),
+              fit: BoxFit.cover,
+              width: double.infinity,
+            ),
+          )
               : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey[400]),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tap to add image',
-                      style: TextStyle(color: Colors.grey[500]),
-                    ),
-                  ],
-                ),
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey[400]),
+              const SizedBox(height: 8),
+              Text(
+                'Tap to add image',
+                style: TextStyle(color: Colors.grey[500]),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -695,25 +856,25 @@ class _AddProductScreenState extends State<AddProductScreen>
         // GST/Tax Rate Dropdown for Retail, TextField for Restaurant
         if (isMobile)
           AppConfig.isRetail
-            ? _buildGstDropdown()
-            : _buildTextField(
-                controller: _taxRateController,
-                label: 'Tax Rate (%)',
-                icon: Icons.percent,
-                keyboardType: TextInputType.number,
-              )
+              ? _buildGstDropdown()
+              : _buildTextField(
+            controller: _taxRateController,
+            label: 'Tax Rate (%)',
+            icon: Icons.percent,
+            keyboardType: TextInputType.number,
+          )
         else
           Row(
             children: [
               Expanded(
                 child: AppConfig.isRetail
-                  ? _buildGstDropdown()
-                  : _buildTextField(
-                      controller: _taxRateController,
-                      label: 'Tax Rate (%)',
-                      icon: Icons.percent,
-                      keyboardType: TextInputType.number,
-                    ),
+                    ? _buildGstDropdown()
+                    : _buildTextField(
+                  controller: _taxRateController,
+                  label: 'Tax Rate (%)',
+                  icon: Icons.percent,
+                  keyboardType: TextInputType.number,
+                ),
               ),
               const SizedBox(width: 16),
               const Expanded(child: SizedBox.shrink()),
@@ -767,88 +928,88 @@ class _AddProductScreenState extends State<AddProductScreen>
 
               // For simple products, show all pricing fields
               return isMobile
-                ? Column(
+                  ? Column(
+                children: [
+                  _buildTextField(
+                    controller: _costPriceController,
+                    label: 'Cost Price*',
+                    icon: Icons.money_off,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _priceController,
+                    label: 'Selling Price*',
+                    icon: Icons.attach_money,
+                    keyboardType: TextInputType.number,
+                    iconColor: AppColors.success,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _mrpController,
+                    label: 'MRP',
+                    icon: Icons.price_check,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _hsnCodeController,
+                    label: 'HSN Code',
+                    icon: Icons.qr_code_2,
+                  ),
+                ],
+              )
+                  : Column(
+                children: [
+                  Row(
                     children: [
-                      _buildTextField(
-                        controller: _costPriceController,
-                        label: 'Cost Price*',
-                        icon: Icons.money_off,
-                        keyboardType: TextInputType.number,
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _costPriceController,
+                          label: 'Cost Price*',
+                          icon: Icons.money_off,
+                          keyboardType: TextInputType.number,
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _priceController,
-                        label: 'Selling Price*',
-                        icon: Icons.attach_money,
-                        keyboardType: TextInputType.number,
-                        iconColor: AppColors.success,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _priceController,
+                          label: 'Selling Price*',
+                          icon: Icons.attach_money,
+                          keyboardType: TextInputType.number,
+                          iconColor: AppColors.success,
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _mrpController,
-                        label: 'MRP',
-                        icon: Icons.price_check,
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _hsnCodeController,
-                        label: 'HSN Code',
-                        icon: Icons.qr_code_2,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _mrpController,
+                          label: 'MRP',
+                          icon: Icons.price_check,
+                          keyboardType: TextInputType.number,
+                        ),
                       ),
                     ],
-                  )
-                : Column(
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _costPriceController,
-                              label: 'Cost Price*',
-                              icon: Icons.money_off,
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _priceController,
-                              label: 'Selling Price*',
-                              icon: Icons.attach_money,
-                              keyboardType: TextInputType.number,
-                              iconColor: AppColors.success,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _mrpController,
-                              label: 'MRP',
-                              icon: Icons.price_check,
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                        ],
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _hsnCodeController,
+                          label: 'HSN Code',
+                          icon: Icons.qr_code_2,
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _hsnCodeController,
-                              label: 'HSN Code',
-                              icon: Icons.qr_code_2,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          const Expanded(child: SizedBox.shrink()),
-                          const SizedBox(width: 16),
-                          const Expanded(child: SizedBox.shrink()),
-                        ],
-                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(child: SizedBox.shrink()),
+                      const SizedBox(width: 16),
+                      const Expanded(child: SizedBox.shrink()),
                     ],
-                  );
+                  ),
+                ],
+              );
             },
           ),
 
@@ -1056,9 +1217,9 @@ class _AddProductScreenState extends State<AddProductScreen>
                       selectedColor: AppColors.secondary.withOpacity(0.2),
                       avatar: val.colorCode != null
                           ? CircleAvatar(
-                              backgroundColor: _parseColor(val.colorCode!),
-                              radius: 10,
-                            )
+                        backgroundColor: _parseColor(val.colorCode!),
+                        radius: 10,
+                      )
                           : null,
                     );
                   }).toList(),
@@ -1177,15 +1338,15 @@ class _AddProductScreenState extends State<AddProductScreen>
                 onPressed: allSelected
                     ? null
                     : () {
-                        setState(() {
-                          _selectedVariantsForBulk.clear();
-                          // Create a copy of the list to avoid concurrent modification
-                          final variants = _formStore.retailVariants.toList();
-                          for (var v in variants) {
-                            _selectedVariantsForBulk.add(v.id);
-                          }
-                        });
-                      },
+                  setState(() {
+                    _selectedVariantsForBulk.clear();
+                    // Create a copy of the list to avoid concurrent modification
+                    final variants = _formStore.retailVariants.toList();
+                    for (var v in variants) {
+                      _selectedVariantsForBulk.add(v.id);
+                    }
+                  });
+                },
                 child: Text(
                   'Select All',
                   style: TextStyle(
@@ -1199,10 +1360,10 @@ class _AddProductScreenState extends State<AddProductScreen>
                 onPressed: noneSelected
                     ? null
                     : () {
-                        setState(() {
-                          _selectedVariantsForBulk.clear();
-                        });
-                      },
+                  setState(() {
+                    _selectedVariantsForBulk.clear();
+                  });
+                },
                 child: Text(
                   'Unselect All',
                   style: TextStyle(
@@ -1785,44 +1946,44 @@ class _AddProductScreenState extends State<AddProductScreen>
                     title: Text(extra.Ename),
                     subtitle: isSelected && constraint != null
                         ? Row(
-                            children: [
-                              const Text('Min: '),
-                              SizedBox(
-                                width: 50,
-                                child: TextFormField(
-                                  initialValue: constraint.min.toString(),
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (v) => _formStore.setExtraConstraint(
-                                    extra.Id,
-                                    int.tryParse(v) ?? 0,
-                                    constraint.max,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              const Text('Max: '),
-                              SizedBox(
-                                width: 50,
-                                child: TextFormField(
-                                  initialValue: constraint.max.toString(),
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (v) => _formStore.setExtraConstraint(
-                                    extra.Id,
-                                    constraint.min,
-                                    int.tryParse(v) ?? 5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
+                      children: [
+                        const Text('Min: '),
+                        SizedBox(
+                          width: 50,
+                          child: TextFormField(
+                            initialValue: constraint.min.toString(),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) => _formStore.setExtraConstraint(
+                              extra.Id,
+                              int.tryParse(v) ?? 0,
+                              constraint.max,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Text('Max: '),
+                        SizedBox(
+                          width: 50,
+                          child: TextFormField(
+                            initialValue: constraint.max.toString(),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) => _formStore.setExtraConstraint(
+                              extra.Id,
+                              constraint.min,
+                              int.tryParse(v) ?? 5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
                         : Text('${extra.topping?.length ?? 0} toppings'),
                     value: isSelected,
                     onChanged: (_) => _formStore.toggleExtraGroup(extra.Id),
@@ -1872,45 +2033,45 @@ class _AddProductScreenState extends State<AddProductScreen>
 
               return isMobile
                   ? Column(
-                      children: [
-                        _buildTextField(
-                          controller: _stockController,
-                          label: 'Initial Stock',
-                          icon: Icons.inventory_2,
-                          keyboardType: TextInputType.number,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _minStockController,
-                          label: 'Min Stock (Alert)',
-                          icon: Icons.warning_amber,
-                          keyboardType: TextInputType.number,
-                          iconColor: AppColors.warning,
-                        ),
-                      ],
-                    )
+                children: [
+                  _buildTextField(
+                    controller: _stockController,
+                    label: 'Initial Stock',
+                    icon: Icons.inventory_2,
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _minStockController,
+                    label: 'Min Stock (Alert)',
+                    icon: Icons.warning_amber,
+                    keyboardType: TextInputType.number,
+                    iconColor: AppColors.warning,
+                  ),
+                ],
+              )
                   : Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _stockController,
-                            label: 'Initial Stock',
-                            icon: Icons.inventory_2,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _minStockController,
-                            label: 'Min Stock (Alert)',
-                            icon: Icons.warning_amber,
-                            keyboardType: TextInputType.number,
-                            iconColor: AppColors.warning,
-                          ),
-                        ),
-                      ],
-                    );
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _stockController,
+                      label: 'Initial Stock',
+                      icon: Icons.inventory_2,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildTextField(
+                      controller: _minStockController,
+                      label: 'Min Stock (Alert)',
+                      icon: Icons.warning_amber,
+                      keyboardType: TextInputType.number,
+                      iconColor: AppColors.warning,
+                    ),
+                  ),
+                ],
+              );
             },
           ),
         ] else ...[
@@ -2075,6 +2236,9 @@ class _AddProductScreenState extends State<AddProductScreen>
   // ==================== ACTION BUTTONS ====================
 
   Widget _buildActionButtons() {
+    // Determine if we're in edit mode
+    final isEditMode = _editingProductId != null || _editingRestaurantItemId != null;
+
     return Observer(
       builder: (_) => Row(
         children: [
@@ -2101,16 +2265,18 @@ class _AddProductScreenState extends State<AddProductScreen>
               onPressed: _formStore.isLoading ? null : _submitForm,
               icon: _formStore.isLoading
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.add),
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : Icon(isEditMode ? Icons.update : Icons.add),
               label: Text(
-                AppConfig.isRetail ? 'Add Product' : 'Add Item',
+                isEditMode
+                    ? (AppConfig.isRetail ? 'Update Product' : 'Update Item')
+                    : (AppConfig.isRetail ? 'Add Product' : 'Add Item'),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -2257,6 +2423,130 @@ class _AddProductScreenState extends State<AddProductScreen>
     }
   }
 
+  // ==================== EDIT FUNCTIONS ====================
+
+  Future<void> _editRetailProduct(ProductModel product) async {
+    // Set edit mode
+    setState(() {
+      _editingProductId = product.productId;
+    });
+
+    // Populate form with product data
+    _nameController.text = product.productName;
+    _descriptionController.text = product.description ?? '';
+    _brandController.text = product.brandName ?? '';
+    _subCategoryController.text = product.subCategory ?? '';
+    _hsnCodeController.text = product.hsnCode ?? '';
+
+    // For simple products, use default price/mrp/cost from ProductModel
+    if (product.defaultPrice != null) {
+      _priceController.text = product.defaultPrice.toString();
+    }
+    if (product.defaultMrp != null) {
+      _mrpController.text = product.defaultMrp.toString();
+    }
+    if (product.defaultCostPrice != null) {
+      _costPriceController.text = product.defaultCostPrice.toString();
+    }
+
+    // Update form store
+    _formStore.setSelectedCategoryId(product.category);
+    _formStore.setTaxRate(product.gstRate ?? 0);
+    _formStore.setProductType(product.hasVariants ? 'variable' : 'simple');
+
+    // Load variants from the database
+    final productStore = locator<ProductStore>();
+    final variants = await productStore.getVariantsForProduct(product.productId);
+
+    if (product.hasVariants && variants.isNotEmpty) {
+      // Variable product: Load all variants into the form
+      _formStore.retailVariants.clear();
+      for (final variant in variants) {
+        _formStore.retailVariants.add(VariantFormData(
+          id: variant.varianteId,
+          name: variant.shortDescription,
+          attributes: variant.customAttributes ?? {},
+          attributeValueIds: variant.attributeValueIds ?? {},
+          sku: variant.sku ?? '',
+          barcode: variant.barcode ?? '',
+          price: variant.sellingPrice ?? 0,
+          costPrice: variant.costPrice ?? 0,
+          mrp: variant.mrp ?? 0,
+          stockQuantity: variant.stockQty,
+        ));
+      }
+    } else if (!product.hasVariants && variants.isNotEmpty) {
+      // Simple product: Load default variant data into form fields
+      final defaultVariant = variants.firstWhere(
+        (v) => v.isDefault,
+        orElse: () => variants.first,
+      );
+
+      _skuController.text = defaultVariant.sku ?? '';
+      _barcodeController.text = defaultVariant.barcode ?? '';
+      _stockController.text = defaultVariant.stockQty.toString();
+      _minStockController.text = defaultVariant.minStock?.toString() ?? '';
+
+      // Override prices with variant data if available
+      if (defaultVariant.sellingPrice != null) {
+        _priceController.text = defaultVariant.sellingPrice.toString();
+      }
+      if (defaultVariant.mrp != null) {
+        _mrpController.text = defaultVariant.mrp.toString();
+      }
+      if (defaultVariant.costPrice != null) {
+        _costPriceController.text = defaultVariant.costPrice.toString();
+      }
+    }
+
+    // Switch to Add Product tab
+    _tabController.animateTo(0);
+
+    // Scroll to top
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Editing: ${product.productName}${product.hasVariants ? " (${variants.length} variants)" : ""}'),
+        backgroundColor: AppColors.info,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _editRestaurantItem(dynamic item) {
+    // Set edit mode
+    setState(() {
+      _editingRestaurantItemId = item.id;
+    });
+
+    // Populate form with item data
+    _nameController.text = item.name;
+    _descriptionController.text = item.description ?? '';
+    _priceController.text = item.price?.toString() ?? '';
+    _unitController.text = item.unit ?? '';
+    _restaurantStockController.text = item.stock?.toString() ?? '';
+
+    // Update form store with correct method names
+    _formStore.setSelectedCategoryId(item.category ?? '');
+    _formStore.setTaxRate(item.taxRate ?? 0);
+
+    // Switch to Add Product tab
+    _tabController.animateTo(0);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Editing: ${item.name}'),
+        backgroundColor: AppColors.info,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   // ==================== PRODUCT LIST TAB ====================
 
   Widget _buildProductListTab() {
@@ -2292,52 +2582,52 @@ class _AddProductScreenState extends State<AddProductScreen>
                 builder: (_) => productStore.products.isEmpty
                     ? _buildEmptyState('products')
                     : ListView.separated(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: productStore.products.length,
-                        separatorBuilder: (_, __) => const Divider(),
-                        itemBuilder: (context, index) {
-                          final product = productStore.products[index];
-                          return ListTile(
-                            leading: Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: product.imagePath != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(
-                                        File(product.imagePath!),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : const Icon(Icons.inventory, color: AppColors.primary),
-                            ),
-                            title: Text(
-                              product.productName,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              '${product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20),
-                                  onPressed: () {},
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
-                                  onPressed: () => productStore.deleteProduct(product.productId),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                  padding: const EdgeInsets.all(20),
+                  itemCount: productStore.products.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final product = productStore.products[index];
+                    return ListTile(
+                      leading: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: product.imagePath != null
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            File(product.imagePath!),
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                            : const Icon(Icons.inventory, color: AppColors.primary),
                       ),
+                      title: Text(
+                        product.productName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '${product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20),
+                            onPressed: () => _editRetailProduct(product),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
+                            onPressed: () => productStore.deleteProduct(product.productId),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -2371,62 +2661,62 @@ class _AddProductScreenState extends State<AddProductScreen>
                 builder: (_) => itemStore.items.isEmpty
                     ? _buildEmptyState('items')
                     : ListView.separated(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: itemStore.items.length,
-                        separatorBuilder: (_, __) => const Divider(),
-                        itemBuilder: (context, index) {
-                          final item = itemStore.items[index];
-                          return ListTile(
-                            leading: Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: item.isVeg == 'veg'
-                                    ? AppColors.success.withOpacity(0.1)
-                                    : AppColors.danger.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: item.imagePath != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(
-                                        File(item.imagePath!),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.restaurant,
-                                      color: item.isVeg == 'veg' ? AppColors.success : AppColors.danger,
-                                    ),
-                            ),
-                            title: Text(
-                              item.name,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              '₹${item.price ?? "Multiple sizes"} • ${item.isEnabled ? "Active" : "Disabled"}',
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Switch(
-                                  value: item.isEnabled,
-                                  onChanged: (_) => itemStore.toggleItemEnabled(item.id),
-                                  activeColor: AppColors.success,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20),
-                                  onPressed: () {},
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
-                                  onPressed: () => itemStore.deleteItem(item.id),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                  padding: const EdgeInsets.all(20),
+                  itemCount: itemStore.items.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final item = itemStore.items[index];
+                    return ListTile(
+                      leading: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: item.isVeg == 'veg'
+                              ? AppColors.success.withOpacity(0.1)
+                              : AppColors.danger.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: item.imagePath != null
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            File(item.imagePath!),
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                            : Icon(
+                          Icons.restaurant,
+                          color: item.isVeg == 'veg' ? AppColors.success : AppColors.danger,
+                        ),
                       ),
+                      title: Text(
+                        item.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '₹${item.price ?? "Multiple sizes"} • ${item.isEnabled ? "Active" : "Disabled"}',
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: item.isEnabled,
+                            onChanged: (_) => itemStore.toggleItemEnabled(item.id),
+                            activeColor: AppColors.success,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20),
+                            onPressed: () => _editRestaurantItem(item),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
+                            onPressed: () => itemStore.deleteItem(item.id),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -2534,39 +2824,50 @@ class _AddProductScreenState extends State<AddProductScreen>
   Future<void> _createDefaultAttributes(AttributeStore attributeStore) async {
     try {
       // Create Size attribute with values
-      await attributeStore.addAttribute('Size');
-      final sizeAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Size');
-      await attributeStore.addMultipleValues(
-        sizeAttr.attributeId,
-        ['Small', 'Medium', 'Large', 'Extra Large'],
-      );
+      final sizeCreated = await attributeStore.addAttribute('Size');
+      if (sizeCreated) {
+        final sizeAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Size');
+        await attributeStore.addMultipleValues(
+          sizeAttr.attributeId,
+          ['Small', 'Medium', 'Large', 'Extra Large'],
+        );
+      }
 
       // Create Color attribute with values
-      await attributeStore.addAttribute('Color');
-      final colorAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Color');
-      await attributeStore.addMultipleValues(
-        colorAttr.attributeId,
-        ['Red', 'Blue', 'Green', 'Black', 'White'],
-        colorCodes: ['#FF0000', '#0000FF', '#00FF00', '#000000', '#FFFFFF'],
-      );
+      final colorCreated = await attributeStore.addAttribute('Color');
+      if (colorCreated) {
+        final colorAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Color');
+        await attributeStore.addMultipleValues(
+          colorAttr.attributeId,
+          ['Red', 'Blue', 'Green', 'Black', 'White'],
+          colorCodes: ['#FF0000', '#0000FF', '#00FF00', '#000000', '#FFFFFF'],
+        );
+      }
 
       // Create Weight attribute with values
-      await attributeStore.addAttribute('Weight');
-      final weightAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Weight');
-      await attributeStore.addMultipleValues(
-        weightAttr.attributeId,
-        ['250g', '500g', '1kg'],
-      );
+      final weightCreated = await attributeStore.addAttribute('Weight');
+      if (weightCreated) {
+        final weightAttr = attributeStore.attributes.firstWhere((a) => a.name == 'Weight');
+        await attributeStore.addMultipleValues(
+          weightAttr.attributeId,
+          ['250g', '500g', '1kg'],
+        );
+      }
 
+      // Force UI update by triggering a rebuild
       if (mounted) {
+        setState(() {});
+
+        final message = attributeStore.errorMessage ?? 'Default attributes created successfully!';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Default attributes created successfully!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text(message),
+            backgroundColor: attributeStore.errorMessage != null ? Colors.orange : Colors.green,
           ),
         );
       }
     } catch (e) {
+      print('❌ Error in _createDefaultAttributes: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2878,8 +3179,8 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   List<Map<String, AttributeValueModel>> _generateCombinationsPreview(
-    Map<String, List<AttributeValueModel>> attrs,
-  ) {
+      Map<String, List<AttributeValueModel>> attrs,
+      ) {
     if (attrs.isEmpty) return [];
 
     final keys = attrs.keys.toList();

@@ -1,11 +1,12 @@
 
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:uuid/uuid.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/constants/hive_type_ids.dart';
 
 // Common Models
+import 'package:unipos/models/payment_method.dart' as pm;
 import 'package:unipos/models/tax_details.dart';
-import 'package:unipos/models/payment_method.dart' hide PaymentMethod;
 import 'package:unipos/data/models/common/business_type.dart';
 import 'package:unipos/data/models/common/business_details.dart';
 
@@ -85,7 +86,7 @@ class HiveInit {
     }
     // PaymentMethod - typeId: 6
     if (!Hive.isAdapterRegistered(HiveTypeIds.paymentMethod)) {
-      Hive.registerAdapter(PaymentMethodAdapter());
+      Hive.registerAdapter(pm.PaymentMethodAdapter());
     }
   }
 
@@ -95,7 +96,80 @@ class HiveInit {
     await Hive.openBox<TaxDetails>('taxBox');
     await Hive.openBox<BusinessType>('businessTypeBox');
     await Hive.openBox<BusinessDetails>('businessDetailsBox');
-    await Hive.openBox<PaymentMethod>('paymentMethodsBox');
+
+    // Open and initialize payment methods box with defaults
+    final paymentBox = await Hive.openBox<pm.PaymentMethod>('paymentMethodsBox');
+    print('📦 HiveInit: Opened paymentMethodsBox, has ${paymentBox.length} items');
+
+    // Initialize with defaults if empty
+    if (paymentBox.isEmpty) {
+      print('📦 HiveInit: Payment box is empty, initializing defaults...');
+      await _initializeDefaultPaymentMethods(paymentBox);
+      print('📦 HiveInit: Initialized ${paymentBox.length} default payment methods');
+    } else {
+      print('📦 HiveInit: Payment box already has ${paymentBox.length} methods');
+    }
+  }
+
+  /// Initialize default payment methods
+  static Future<void> _initializeDefaultPaymentMethods(Box<pm.PaymentMethod> box) async {
+    // Import uuid
+    const uuid = Uuid();
+
+    final defaultMethods = [
+      pm.PaymentMethod(
+        id: uuid.v4(),
+        name: 'Cash',
+        value: 'cash',
+        iconName: 'money',
+        isEnabled: true,
+        sortOrder: 1,
+      ),
+      pm.PaymentMethod(
+        id: uuid.v4(),
+        name: 'Card',
+        value: 'card',
+        iconName: 'credit_card',
+        isEnabled: true,
+        sortOrder: 2,
+      ),
+      pm.PaymentMethod(
+        id: uuid.v4(),
+        name: 'UPI',
+        value: 'upi',
+        iconName: 'qr_code_2',
+        isEnabled: true,
+        sortOrder: 3,
+      ),
+      pm.PaymentMethod(
+        id: uuid.v4(),
+        name: 'Wallet',
+        value: 'wallet',
+        iconName: 'account_balance_wallet',
+        isEnabled: false,
+        sortOrder: 4,
+      ),
+      pm.PaymentMethod(
+        id: uuid.v4(),
+        name: 'Credit',
+        value: 'credit',
+        iconName: 'receipt_long',
+        isEnabled: false,
+        sortOrder: 5,
+      ),
+      pm.PaymentMethod(
+        id: uuid.v4(),
+        name: 'Other',
+        value: 'other',
+        iconName: 'more_horiz',
+        isEnabled: false,
+        sortOrder: 6,
+      ),
+    ];
+
+    for (var method in defaultMethods) {
+      await box.add(method);
+    }
   }
 
   /// Register all retail adapters (typeIds: 150-223)
@@ -190,8 +264,32 @@ class HiveInit {
     }
   }
 
+  /// Clean up old incorrectly-named attribute boxes
+  /// This is a one-time migration to fix box naming inconsistency
+  static Future<void> _cleanupOldAttributeBoxes() async {
+    try {
+      // Delete old camelCase boxes if they exist
+      final oldBoxNames = ['attributeValues', 'productAttributes'];
+
+      for (final boxName in oldBoxNames) {
+        if (Hive.isBoxOpen(boxName)) {
+          await Hive.box(boxName).clear();
+          await Hive.box(boxName).close();
+        }
+        await Hive.deleteBoxFromDisk(boxName);
+        print('🗑️ Deleted old attribute box: $boxName');
+      }
+    } catch (e) {
+      print('⚠️ Error cleaning up old boxes (may not exist): $e');
+      // It's okay if boxes don't exist
+    }
+  }
+
   /// Open all retail Hive boxes
   static Future<void> openRetailBoxes() async {
+    // Clean up old incorrectly-named boxes first (one-time migration)
+    await _cleanupOldAttributeBoxes();
+
     await Hive.openBox<ProductModel>('products');
     await Hive.openBox<VarianteModel>('variants');
     await Hive.openBox<CartItemModel>('cartItems');
@@ -215,8 +313,10 @@ class HiveInit {
     await Hive.openBox<AdminModel>('admin_box');
     await Hive.openBox<CreditPaymentModel>('credit_payments');
     await Hive.openBox<AttributeModel>('attributes');
-    await Hive.openBox<AttributeValueModel>('attributeValues');
-    await Hive.openBox<ProductAttributeModel>('productAttributes');
+    await Hive.openBox<AttributeValueModel>('attribute_values');
+    await Hive.openBox<ProductAttributeModel>('product_attributes');
+
+    print('✅ All retail boxes opened successfully');
   }
 
   /// Register all restaurant adapters (typeIds: 100-149)
@@ -356,7 +456,10 @@ class HiveInit {
   /// Check if retail boxes are open
   static bool get areRetailBoxesOpen {
     try {
-      return Hive.isBoxOpen('products');
+      return Hive.isBoxOpen('products') &&
+             Hive.isBoxOpen('attributes') &&
+             Hive.isBoxOpen('attribute_values') &&
+             Hive.isBoxOpen('product_attributes');
     } catch (_) {
       return false;
     }
@@ -368,6 +471,50 @@ class HiveInit {
       return Hive.isBoxOpen('categories');
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Force reset all attribute boxes (use this to fix "bad element" errors)
+  /// WARNING: This will delete ALL attribute data!
+  static Future<void> resetAttributeBoxes() async {
+    try {
+      print('🔄 Resetting attribute boxes...');
+
+      final boxNames = [
+        'attributes',
+        'attribute_values',
+        'product_attributes',
+        'attributeValues',  // old name
+        'productAttributes',  // old name
+      ];
+
+      for (final boxName in boxNames) {
+        try {
+          if (Hive.isBoxOpen(boxName)) {
+            final box = Hive.box(boxName);
+            await box.clear();
+            await box.close();
+            print('  ✓ Cleared and closed: $boxName');
+          }
+          await Hive.deleteBoxFromDisk(boxName);
+          print('  ✓ Deleted from disk: $boxName');
+        } catch (e) {
+          print('  ⚠️ Error with box $boxName: $e');
+        }
+      }
+
+      // Re-register adapters
+      await registerRetailAdapters();
+
+      // Re-open the correct boxes
+      await Hive.openBox<AttributeModel>('attributes');
+      await Hive.openBox<AttributeValueModel>('attribute_values');
+      await Hive.openBox<ProductAttributeModel>('product_attributes');
+
+      print('✅ Attribute boxes reset complete!');
+    } catch (e) {
+      print('❌ Error resetting attribute boxes: $e');
+      rethrow;
     }
   }
 }

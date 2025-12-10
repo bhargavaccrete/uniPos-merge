@@ -3,6 +3,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 
 import 'package:unipos/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:unipos/data/models/retail/hive_model/attribute_value_model_220.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../domain/store/retail/attribute_store.dart';
@@ -29,8 +30,10 @@ class _AttributesScreenState extends State<AttributesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-        title: const Text('Product Attributes'),
+        centerTitle: true,
+        title: const Text('Product Attributes',style: TextStyle(color: Colors.white),),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
