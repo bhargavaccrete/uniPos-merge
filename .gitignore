@@ -6,4 +6,4 @@ build/
 .idea/
 ios/Flutter/
 android/.gradle/
-android/.gradle/
+android/.gradle
