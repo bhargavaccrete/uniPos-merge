@@ -85,7 +85,7 @@ class _MonthbyDiscountState extends State<MonthbyDiscount> {
                                         items,
                                         textScaler: TextScaler.linear(1),
                                         style:
-                                            GoogleFonts.poppins(fontSize: 14),
+                                        GoogleFonts.poppins(fontSize: 14),
                                       ));
                                 }).toList(),
                                 onChanged: (String? newValue) {
@@ -128,7 +128,7 @@ class _MonthbyDiscountState extends State<MonthbyDiscount> {
                                         items.toString(),
                                         textScaler: TextScaler.linear(1),
                                         style:
-                                            GoogleFonts.poppins(fontSize: 14),
+                                        GoogleFonts.poppins(fontSize: 14),
                                       ));
                                 }).toList(),
                                 onChanged: (dynamic? newValue) {

@@ -33,7 +33,7 @@ class VariantModel{
     this.lastEditedTime,
     this.editedBy,
     this.editCount = 0,
-});
+  });
 
   VariantModel copyWith({
     String? id,
@@ -42,7 +42,7 @@ class VariantModel{
     DateTime? lastEditedTime,
     String? editedBy,
     int? editCount,
-}){
+  }){
     return VariantModel(
       id: id?? this.id,
       name: name ?? this.name,

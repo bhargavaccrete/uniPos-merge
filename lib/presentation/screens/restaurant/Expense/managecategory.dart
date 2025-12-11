@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:uuid/uuid.dart';
@@ -37,16 +38,16 @@ class _ManageCategoryState extends State<ManageCategory> {
         id: Uuid().v4(),
         name: categoryController.text.trim());
 
-    await expenseStore.addCategory(category);
-     _clear();
+    await HiveExpenseCat.addECategory(category);
+    _clear();
     Navigator.pop(context);
   }
 
 
   void _clear(){
-   setState(() {
-     categoryController.clear();
-   });
+    setState(() {
+      categoryController.clear();
+    });
   }
 
   @override
@@ -58,17 +59,17 @@ class _ManageCategoryState extends State<ManageCategory> {
         leading: IconButton(onPressed: (){
           Navigator.pop(context);
         }, icon: Icon(Icons.arrow_back_ios)),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              Icon(Icons.person_2_outlined),
-              Text('Admin')
-            ],
-          ),
-        )
-      ],  
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Icon(Icons.person_2_outlined),
+                Text('Admin')
+              ],
+            ),
+          )
+        ],
       ),
       body: SingleChildScrollView(
         child: Container(
@@ -159,61 +160,61 @@ class _ManageCategoryState extends State<ManageCategory> {
 
               Column(children: [
 
-                ValueListenableBuilder(valueListenable: Hive.box<ExpenseCategory>('expenseCategories').listenable(),
+                ValueListenableBuilder(valueListenable: Hive.box<ExpenseCategory>('expenseCategory').listenable(),
                     builder: (context,ecatgory,_){
 
-                 final  allcategory = ecatgory.values.toList();
+                      final  allcategory = ecatgory.values.toList();
 
-                  return Container(
-                    // color: Colors.red,
-                    width: width,
-                    height: height * 0.45,
+                      return Container(
+                        // color: Colors.red,
+                        width: width,
+                        height: height * 0.45,
                         child: ListView.builder(
                             itemCount: allcategory.length,
                             itemBuilder:(context,index){
-                          final category = allcategory[index];
-                          return Container(
-                            padding: EdgeInsets.all(10),
-                            margin: EdgeInsets.all(5),
-                            decoration:BoxDecoration(
-                               border: Border.all(color: Colors.grey)
-                            ),
-                            // color: Colors.green,
-                            height: height * 0.07,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(category.name),
-                                Row(
+                              final category = allcategory[index];
+                              return Container(
+                                padding: EdgeInsets.all(10),
+                                margin: EdgeInsets.all(5),
+                                decoration:BoxDecoration(
+                                    border: Border.all(color: Colors.grey)
+                                ),
+                                // color: Colors.green,
+                                height: height * 0.07,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
+                                    Text(category.name),
+                                    Row(
+                                      children: [
 
 
 
-                                    InkWell(
-                                        onTap: (){
-                                          delete(category.id);
+                                        InkWell(
+                                            onTap: (){
+                                              delete(category.id);
 
-                                        },
-                                        child: Icon(Icons.delete)),
+                                            },
+                                            child: Icon(Icons.delete)),
 
-                                    Transform.scale(
-                                      scale: 0.8,
-                                      child: Switch(
-                                          value: category.isEnabled,
-                                          onChanged: (bool value)async{
-                                            category.isEnabled = value;
-                                            await category.save();
-                                          }),
+                                        Transform.scale(
+                                          scale: 0.8,
+                                          child: Switch(
+                                              value: category.isEnabled,
+                                              onChanged: (bool value)async{
+                                                category.isEnabled = value;
+                                                await category.save();
+                                              }),
+                                        )
+                                      ],
                                     )
                                   ],
-                                )
-                              ],
-                            ),
-                          );
-                        }),
-                        );
+                                ),
+                              );
+                            }),
+                      );
 
-                        })
+                    })
 
               ],)
 
@@ -226,6 +227,6 @@ class _ManageCategoryState extends State<ManageCategory> {
     );
   }
   void delete(String id)async{
-    await expenseStore.deleteCategory(id);
+    await HiveExpenseCat.deleteECategory(id);
   }
 }

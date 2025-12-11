@@ -48,7 +48,7 @@ class taxSetting extends StatelessWidget {
                     child: Center(
                       child: Text(
                         'Add Text Name & Number',
-                          textScaler: TextScaler.linear(1.2),
+                        textScaler: TextScaler.linear(1.2),
                         style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -59,23 +59,23 @@ class taxSetting extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(10),
                 child: CommonButton(
-                  bordercircular: 10,
+                    bordercircular: 10,
                     width: width ,
                     height: height * 0.05,
                     onTap: () {
                       Navigator.of(context).push(MaterialPageRoute(builder: (context)=>Addtax()));
-                                          },
+                    },
                     child:Center(
                       child: Text(
-                      'Add Multiple Tax to be applied on items',
-                          textScaler: TextScaler.linear(1.2),
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15.0,
-                          fontWeight: FontWeight.bold),
-                    ),
+                        'Add Multiple Tax to be applied on items',
+                        textScaler: TextScaler.linear(1.2),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.0,
+                            fontWeight: FontWeight.bold),
+                      ),
                     )
-                     ),
+                ),
               ),
             ],
           ),

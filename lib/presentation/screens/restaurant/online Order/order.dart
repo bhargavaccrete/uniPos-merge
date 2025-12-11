@@ -31,7 +31,7 @@ class Online_order extends StatelessWidget {
                     width:width * 0.2,
                     height: height * 0.04,
                     decoration: BoxDecoration(
-                      border: Border.all(color: primarycolor)
+                        border: Border.all(color: primarycolor)
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,

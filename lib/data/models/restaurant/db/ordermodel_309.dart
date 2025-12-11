@@ -108,8 +108,8 @@ class OrderModel extends HiveObject {
     required this.itemCountAtLastKot,
     required this.kotBoundaries,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
-       assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
-       assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
+        assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
+        assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
 
   // --- A COMPLETE AND MORE FLEXIBLE copyWith METHOD ---
   OrderModel copyWith({

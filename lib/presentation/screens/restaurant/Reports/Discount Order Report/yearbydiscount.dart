@@ -51,14 +51,14 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                     height: height * 0.05,
                     padding: EdgeInsets.all(5),
                     decoration:
-                        BoxDecoration(border: Border.all(color: primarycolor)),
+                    BoxDecoration(border: Border.all(color: primarycolor)),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton(
                           value: dropdownvalue2,
                           isExpanded: true,
                           items: yearitem.map((
-                            dynamic items,
-                          ) {
+                              dynamic items,
+                              ) {
                             return DropdownMenuItem(
                                 value: items,
                                 child: Text(
@@ -78,7 +78,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                     width: 10,
                   ),
                   Container(
-                      // width: width ,
+                    // width: width ,
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
                           color: primarycolor, shape: BoxShape.circle),
@@ -126,13 +126,13 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                     columnSpacing: 2,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
                     border: TableBorder.all(
-                        // borderRadius: BorderRadius.circular(5),
+                      // borderRadius: BorderRadius.circular(5),
                         color: Colors.white),
                     decoration: BoxDecoration(
-                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                        // color: Colors.green,
+                      // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                      // color: Colors.green,
 
-                        ),
+                    ),
                     columns: [
                       DataColumn(
                           columnWidth: FixedColumnWidth(width * 0.25),

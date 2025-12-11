@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart' hide Expense;
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/managecategory.dart';
@@ -67,7 +68,8 @@ class _AddexpenceState extends State<Addexpence> {
         paymentType: Dropvalue2,
       );
 
-      await expenseStore.addExpense(expense);
+
+      await HiveExpenceL.addItem(expense);
       NotificationService.instance.showSuccess('Expense added successfully');
       _clearForm();
     } catch (e) {
@@ -156,15 +158,15 @@ class _AddexpenceState extends State<Addexpence> {
                                 border: Border.all(color: primarycolor)),
                             child: Center(
                                 child: Text(
-                              _dateselect == null
-                                  ? "Select Date"
-                                  : "${_dateselect!.day}/${_dateselect!.month}/${_dateselect!.year}",
-                              textAlign: TextAlign.start,
-                              style: GoogleFonts.poppins(
-                                  color: Colors.grey,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600),
-                            )),
+                                  _dateselect == null
+                                      ? "Select Date"
+                                      : "${_dateselect!.day}/${_dateselect!.month}/${_dateselect!.year}",
+                                  textAlign: TextAlign.start,
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.grey,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600),
+                                )),
                           ),
                         )
                       ],
@@ -212,7 +214,7 @@ class _AddexpenceState extends State<Addexpence> {
                   )),
               SizedBox(height: 10),
               ValueListenableBuilder(
-                valueListenable: Hive.box<ExpenseCategory>('expenseCategories').listenable(),
+                valueListenable: Hive.box<ExpenseCategory>('expenseCategory').listenable(),
                 builder: (context, Box<ExpenseCategory> box, _) {
                   final categories = box.values.where((cat) => cat.isEnabled).toList();
 
@@ -255,9 +257,9 @@ class _AddexpenceState extends State<Addexpence> {
               Text('Reasone',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(
-                fontSize: 18,
-              )),
-SizedBox(height:10),
+                    fontSize: 18,
+                  )),
+              SizedBox(height:10),
               Container(
                 // width: width * 0.45,
                 height: height * 0.07,
@@ -275,8 +277,8 @@ SizedBox(height:10),
               Text('Payment Type',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(
-                fontSize: 18,
-              )),
+                    fontSize: 18,
+                  )),
               SizedBox(height:10),
 
               Container(
@@ -285,21 +287,21 @@ SizedBox(height:10),
                 width: width,
                 height: height * 0.06,
                 decoration: BoxDecoration(
-                  border: Border.all(color: primarycolor)
+                    border: Border.all(color: primarycolor)
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton(
-                    value: Dropvalue2,
+                      value: Dropvalue2,
                       items: items2.map((String itemm){
-                      return DropdownMenuItem(
-                        value: itemm,
-                          child: Text(itemm,textScaler: TextScaler.linear(1),
-                            style: GoogleFonts.poppins(fontSize: 14),));
+                        return DropdownMenuItem(
+                            value: itemm,
+                            child: Text(itemm,textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),));
                       }). toList(),
                       onChanged: (String? value){
-                      setState(() {
-                        Dropvalue2 = value!;
-                      });
+                        setState(() {
+                          Dropvalue2 = value!;
+                        });
                       }),
                 ),
               ),

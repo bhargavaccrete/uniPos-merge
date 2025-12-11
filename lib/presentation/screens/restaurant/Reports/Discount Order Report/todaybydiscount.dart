@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
+
 class TodayByDiscount extends StatefulWidget {
   const TodayByDiscount({super.key});
 
@@ -72,13 +73,13 @@ class _TodayByDiscountState extends State<TodayByDiscount> {
                     columnSpacing: 2,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
                     border: TableBorder.all(
-                        // borderRadius: BorderRadius.circular(5),
+                      // borderRadius: BorderRadius.circular(5),
                         color: Colors.white),
                     decoration: BoxDecoration(
-                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                        // color: Colors.green,
+                      // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                      // color: Colors.green,
 
-                        ),
+                    ),
                     columns: [
                       DataColumn(
                           columnWidth: FixedColumnWidth(width * 0.25),
@@ -263,3 +264,4 @@ class _TodayByDiscountState extends State<TodayByDiscount> {
     );
   }
 }
+

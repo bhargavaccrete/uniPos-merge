@@ -20,10 +20,10 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     switch(selectedFilter){
       case "Add Expense":
         return Addexpence();
-        case "View Expense":
-          return ViewExpense();
-          default:
-            return  Addexpence();
+      case "View Expense":
+        return ViewExpense();
+      default:
+        return  Addexpence();
     }
   }
 
@@ -78,9 +78,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                     title: "Add Expense",
                     selectedFilter: selectedFilter,
                     onpressed: (){
-                  setState(() {
-                    selectedFilter = "Add Expense";
-                  });
+                      setState(() {
+                        selectedFilter = "Add Expense";
+                      });
                     }),
                 SizedBox(width:20),
                 Filterbutton(
@@ -88,11 +88,11 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                     title: "View Expense",
                     selectedFilter: selectedFilter,
                     onpressed: (){
-                  setState(() {
-                    selectedFilter = "View Expense";
-                  });
+                      setState(() {
+                        selectedFilter = "View Expense";
+                      });
                     })
-                         ],
+              ],
             ),
             Divider(),
             Expanded(child: _getBody())
@@ -104,3 +104,4 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     );
   }
 }
+

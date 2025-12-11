@@ -48,7 +48,7 @@ class Topping extends HiveObject{
     this.lastEditedTime,
     this.editedBy,
     this.editCount = 0,
-});
+  });
 
 
   Topping copyWith({
@@ -64,16 +64,16 @@ class Topping extends HiveObject{
     int? editCount,
   }){
     return Topping(
-        name: name?? this.name,
-        isveg: isveg?? this.isveg,
-        price: price ?? this.price,
-        isContainSize: isContainSize ?? this.isContainSize,
-        variantion: variantion ?? this.variantion,
-        variantPrices: variantPrices ?? this.variantPrices,
-        createdTime: createdTime ?? this.createdTime,
-        lastEditedTime: lastEditedTime ?? this.lastEditedTime,
-        editedBy: editedBy ?? this.editedBy,
-        editCount: editCount ?? this.editCount,
+      name: name?? this.name,
+      isveg: isveg?? this.isveg,
+      price: price ?? this.price,
+      isContainSize: isContainSize ?? this.isContainSize,
+      variantion: variantion ?? this.variantion,
+      variantPrices: variantPrices ?? this.variantPrices,
+      createdTime: createdTime ?? this.createdTime,
+      lastEditedTime: lastEditedTime ?? this.lastEditedTime,
+      editedBy: editedBy ?? this.editedBy,
+      editCount: editCount ?? this.editCount,
     );
   }
 
@@ -103,8 +103,8 @@ class Topping extends HiveObject{
       isContainSize: map['isContainSize'] as bool?,
       variantion: map['variantion'] as List<VariantModel>?,
       variantPrices: map['variantPrices'] != null
-        ? Map<String, double>.from(map['variantPrices'])
-        : null,
+          ? Map<String, double>.from(map['variantPrices'])
+          : null,
       createdTime: map['createdTime'] != null ? DateTime.parse(map['createdTime']) : null,
       lastEditedTime: map['lastEditedTime'] != null ? DateTime.parse(map['lastEditedTime']) : null,
       editedBy: map['editedBy'],

@@ -82,24 +82,24 @@ class _CustomerListReportState extends State<CustomerListReport> {
 
               Container(
                 decoration: BoxDecoration(
-                    // color: Colors.red[200],
-                    // borderRadius: BorderRadiusDirectional.only(topStart: Radius.circular(50),bottomStart: Radius.circular(15)),
+                  // color: Colors.red[200],
+                  // borderRadius: BorderRadiusDirectional.only(topStart: Radius.circular(50),bottomStart: Radius.circular(15)),
 
-                    ),
+                ),
                 child: SingleChildScrollView(
                   child: DataTable(
                       headingRowHeight: 50,
                       columnSpacing: 2,
                       headingRowColor:
-                          WidgetStateProperty.all(Colors.grey[300]),
+                      WidgetStateProperty.all(Colors.grey[300]),
                       border: TableBorder.all(
-                          // borderRadius: BorderRadius.circular(5),
+                        // borderRadius: BorderRadius.circular(5),
                           color: Colors.white),
                       decoration: BoxDecoration(
-                          // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                          // color: Colors.green,
+                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                        // color: Colors.green,
 
-                          ),
+                      ),
                       columns: [
                         DataColumn(
                             columnWidth: FixedColumnWidth(width * 0.25),

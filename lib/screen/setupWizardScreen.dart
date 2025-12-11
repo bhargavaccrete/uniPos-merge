@@ -15,6 +15,7 @@ import '../core/config/app_config.dart';
 import '../presentation/screens/restaurant/welcome_Admin.dart';
 import 'businessTypeScreen.dart';
 import 'add_product_screen.dart'; // Unified Add Product Screen
+import '../presentation/screens/restaurant/auth/setup_add_item_screen.dart'; // Restaurant-specific Add Item Screen
 
 /// Setup Wizard Screen
 /// UI Only - uses Observer to listen to store changes
@@ -474,14 +475,21 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 4: Product Setup
+      // Step 4: Product Setup - Restaurant or Retail specific
       SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: AddProductScreen(
-            onNext: _nextStep,
-            onPrevious: _previousStep,
+          child: Observer(
+            builder: (_) => AppConfig.isRestaurant
+                ? SetupAddItemScreen(
+                    onNext: _nextStep,
+                    onPrevious: _previousStep,
+                  )
+                : AddProductScreen(
+                    onNext: _nextStep,
+                    onPrevious: _previousStep,
+                  ),
           ),
         ),
       ),

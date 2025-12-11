@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:hive_flutter/adapters.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:unipos/presentation/screens/restaurant/inventory/stockHistoy.dart';
 
 import '../../../../constants/restaurant/color.dart';
@@ -13,6 +14,7 @@ import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
+
 
 class ManageInventory extends StatefulWidget {
   const ManageInventory({
@@ -46,7 +48,7 @@ class _ManageInventoryState extends State<ManageInventory> {
 
   Future<void> _loadVariants() async {
     try {
-      final variants = variantStore.variants.toList();
+      final variants = await HiveVariante.getAllVariante();
       setState(() {
         _variantCache = {for (var variant in variants) variant.id: variant};
       });
@@ -124,16 +126,16 @@ class _ManageInventoryState extends State<ManageInventory> {
       }
 
       controller.clear();
-      
+
       // Force UI refresh
       if (mounted) {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              isWeightBased
-                  ? 'Added ${stockToAdd.toStringAsFixed(2)} $unit to stock'
-                  : 'Added ${stockToAdd.toStringAsFixed(0)} $unit to stock'
+                isWeightBased
+                    ? 'Added ${stockToAdd.toStringAsFixed(2)} $unit to stock'
+                    : 'Added ${stockToAdd.toStringAsFixed(0)} $unit to stock'
             ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
@@ -327,12 +329,12 @@ class _ManageInventoryState extends State<ManageInventory> {
                   ],
                 ),
                 SizedBox(height: 8),
-                
+
                 // Show item stock management if no variants or item-level tracking
                 if (!item.hasVariants) ...[
                   _buildStockRow(item: item),
                 ],
-                
+
                 // Show variants if available
                 if (item.hasVariants) ...[
                   Text(
@@ -602,7 +604,7 @@ class _ManageInventoryState extends State<ManageInventory> {
           ),
           Expanded(
             child: ValueListenableBuilder(
-              valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
+              valueListenable: Hive.box<Category>('categories').listenable(),
               builder: (context, categoryBox, _) {
                 return ValueListenableBuilder(
                   valueListenable: Hive.box<Items>('itemBoxs').listenable(),
@@ -723,3 +725,4 @@ class _ManageInventoryState extends State<ManageInventory> {
     );
   }
 }
+

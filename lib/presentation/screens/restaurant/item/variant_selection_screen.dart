@@ -8,6 +8,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 
+
 class VariantSelectionScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedVariants;
 
@@ -24,7 +25,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   List<VariantModel> availableVariants = [];
   Map<String, bool> selectedVariantIds = {};
   Map<String, TextEditingController> priceControllers = {};
-  
+
   @override
   void initState() {
     super.initState();
@@ -33,7 +34,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   }
 
   void _loadVariants() {
-    final variantBox = Hive.box<VariantModel>('variants');
+    final variantBox = Hive.box<VariantModel>('variante');
     setState(() {
       availableVariants = variantBox.values.toList();
     });
@@ -47,7 +48,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
         text: selectedVariant['price'].toString(),
       );
     }
-    
+
     // Initialize controllers for all variants
     for (var variant in availableVariants) {
       if (!priceControllers.containsKey(variant.id)) {
@@ -69,14 +70,14 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
   List<Map<String, dynamic>> _getSelectedVariants() {
     List<Map<String, dynamic>> result = [];
-    
+
     selectedVariantIds.forEach((variantId, isSelected) {
       if (isSelected) {
         final variant = availableVariants.firstWhere(
-          (v) => v.id == variantId,
+              (v) => v.id == variantId,
           orElse: () => VariantModel(id: '', name: ''),
         );
-        
+
         if (variant.id.isNotEmpty) {
           final price = double.tryParse(priceControllers[variantId]?.text ?? '') ?? 0.0;
           result.add({
@@ -87,7 +88,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
         }
       }
     });
-    
+
     return result;
   }
 
@@ -202,11 +203,11 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             ),
           ),
           SizedBox(height: 20),
-          
+
           ...availableVariants.map<Widget>((variant) {
             final isSelected = selectedVariantIds[variant.id] ?? false;
             final controller = priceControllers[variant.id]!;
-            
+
             return Container(
               margin: EdgeInsets.only(bottom: 15),
               padding: EdgeInsets.all(15),
@@ -246,7 +247,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                       ),
                     ],
                   ),
-                  
+
                   if (isSelected) ...[
                     SizedBox(height: 10),
                     TextField(
@@ -390,7 +391,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   name: variantNameController.text.trim(),
                 );
 
-                final variantBox = Hive.box<VariantModel>('variants');
+                final variantBox = Hive.box<VariantModel>('variante');
                 await variantBox.put(newVariant.id, newVariant);
 
                 _loadVariants();

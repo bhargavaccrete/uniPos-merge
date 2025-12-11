@@ -137,7 +137,7 @@ class _signUpState extends State<Signup> {
                               if (value == null || value.isEmpty) {
                                 return "plase Enter the Email";
                               } else if (!RegExp(
-                                      r'^[\ -\.]+@([\w-]+\.)+[\w]{2,4}$')
+                                  r'^[\ -\.]+@([\w-]+\.)+[\w]{2,4}$')
                                   .hasMatch(value)) {
                                 return "enter the valid email address";
                               }
@@ -273,7 +273,7 @@ class _signUpState extends State<Signup> {
                             onTap: () async {
                               if (_fromKey.currentState!.validate()) {
                                 SharedPreferences prefs =
-                                    await SharedPreferences.getInstance();
+                                await SharedPreferences.getInstance();
                                 await prefs.setString(
                                     "fullname", fullnameController.text);
                                 await prefs.setString(
@@ -289,7 +289,7 @@ class _signUpState extends State<Signup> {
                             child: Text(
                               "Continue",
                               style:
-                                  TextStyle(color: Colors.white, fontSize: 20),
+                              TextStyle(color: Colors.white, fontSize: 20),
                             ),
                           ),
                           Padding(

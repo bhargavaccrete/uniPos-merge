@@ -64,11 +64,11 @@ class _MonthWisebytradingState extends State<MonthWisebytrading> {
                       children: [
                         Container(
                             child: Text(
-                          'Select Month',
-                          textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(
-                              fontSize: 16, fontWeight: FontWeight.w500),
-                        )),
+                              'Select Month',
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(
+                                  fontSize: 16, fontWeight: FontWeight.w500),
+                            )),
                         SizedBox(
                           height: 5,
                         ),
@@ -89,7 +89,7 @@ class _MonthWisebytradingState extends State<MonthWisebytrading> {
                                         items,
                                         textScaler: TextScaler.linear(1),
                                         style:
-                                            GoogleFonts.poppins(fontSize: 14),
+                                        GoogleFonts.poppins(fontSize: 14),
                                       ));
                                 }).toList(),
                                 onChanged: (String? newValue) {
@@ -133,7 +133,7 @@ class _MonthWisebytradingState extends State<MonthWisebytrading> {
                                         items.toString(),
                                         textScaler: TextScaler.linear(1),
                                         style:
-                                            GoogleFonts.poppins(fontSize: 14),
+                                        GoogleFonts.poppins(fontSize: 14),
                                       ));
                                 }).toList(),
                                 onChanged: (dynamic? newValue) {
@@ -196,13 +196,13 @@ class _MonthWisebytradingState extends State<MonthWisebytrading> {
                     columnSpacing: 2,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
                     border: TableBorder.all(
-                        // borderRadius: BorderRadius.circular(5),
+                      // borderRadius: BorderRadius.circular(5),
                         color: Colors.white),
                     decoration: BoxDecoration(
-                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                        // color: Colors.green,
+                      // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                      // color: Colors.green,
 
-                        ),
+                    ),
                     columns: [
                       DataColumn(
                           columnWidth: FixedColumnWidth(width * 0.2),

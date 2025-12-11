@@ -32,7 +32,6 @@ String getDeviceCategory(BuildContext context, {double ppi = 160}) {
     return "Unknown";
   }
 }
-
 // String getDeviceCategory(BuildContext context) {
 //   final size = MediaQuery.of(context).size;
 //   final width = size.width;  // Logical width (in dp)

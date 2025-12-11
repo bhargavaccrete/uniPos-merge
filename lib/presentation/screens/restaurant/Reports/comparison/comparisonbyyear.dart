@@ -199,7 +199,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
                           DataCell(
 
                             Container(
-                                // color: Colors.red,
+                              // color: Colors.red,
                                 child: Text('Total Amount',textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),)),
                           ),

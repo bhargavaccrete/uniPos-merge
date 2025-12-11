@@ -63,55 +63,55 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Text('Customer Details ',style: GoogleFonts.poppins(fontWeight: FontWeight.w500),),
-            SizedBox(height: 10,),
+              Text('Customer Details ',style: GoogleFonts.poppins(fontWeight: FontWeight.w500),),
+              SizedBox(height: 10,),
               CommonTextForm(
-              obsecureText: false,
-              borderc: 10,
-              BorderColor: primarycolor,
-              controller: nameController,
-              // HintColor: primarycolor,
-              // hintText: 'Name',
-              labelText: 'Name',
-              LabelColor: primarycolor,
-            ),
+                obsecureText: false,
+                borderc: 10,
+                BorderColor: primarycolor,
+                controller: nameController,
+                // HintColor: primarycolor,
+                // hintText: 'Name',
+                labelText: 'Name',
+                LabelColor: primarycolor,
+              ),
               SizedBox(height: 10,),
 
               CommonTextForm(
-              obsecureText: false,
-              controller: emailController,
-              borderc: 10,
-              BorderColor: primarycolor,
-              // HintColor: primarycolor,
-              // hintText: 'Name',
-              labelText: 'Email ID (optional)',
-              LabelColor: primarycolor,
-            ),
+                obsecureText: false,
+                controller: emailController,
+                borderc: 10,
+                BorderColor: primarycolor,
+                // HintColor: primarycolor,
+                // hintText: 'Name',
+                labelText: 'Email ID (optional)',
+                LabelColor: primarycolor,
+              ),
               SizedBox(height: 10,),
 
               CommonTextForm(
-              obsecureText: false,
-              controller: numberController,
-              borderc: 10,
-              BorderColor: primarycolor,
-              // HintColor: primarycolor,
-              // hintText: 'Name',
-              labelText: 'Mobile No',
-              LabelColor: primarycolor,
-            ),
+                obsecureText: false,
+                controller: numberController,
+                borderc: 10,
+                BorderColor: primarycolor,
+                // HintColor: primarycolor,
+                // hintText: 'Name',
+                labelText: 'Mobile No',
+                LabelColor: primarycolor,
+              ),
               SizedBox(height: 25,),
 
               CommonTextForm(
-              obsecureText: false,
-              controller: remarkController,
-              borderc: 10,
-              BorderColor: primarycolor,
-              // HintColor: primarycolor,
-              // hintText: 'Name',
-              labelText: 'Remarks',
-              LabelColor: primarycolor,
-            ),
-                Divider(),
+                obsecureText: false,
+                controller: remarkController,
+                borderc: 10,
+                BorderColor: primarycolor,
+                // HintColor: primarycolor,
+                // hintText: 'Name',
+                labelText: 'Remarks',
+                LabelColor: primarycolor,
+              ),
+              Divider(),
 
               Text('Address',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.w600),),
               Divider(),
@@ -179,16 +179,16 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                       controller: deliveryController,
                       BorderColor: Colors.grey,
                       obsecureText: false,
-                        labelText: 'Delivery Charge',
+                      labelText: 'Delivery Charge',
                       LabelColor: Colors.grey,
                     ),
                   ),
 
                   CommonButton(
-                    bgcolor: Colors.grey.shade300,
-                    bordercircular: 5,
-                    bordercolor: Colors.grey.shade300,
-                    height: heigth * 0.05,
+                      bgcolor: Colors.grey.shade300,
+                      bordercircular: 5,
+                      bordercolor: Colors.grey.shade300,
+                      height: heigth * 0.05,
                       width: width *0.3,
                       onTap: (){},
                       child: Text('Apply'))
@@ -205,7 +205,7 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        border: Border.all(width: 1, color: Colors.grey)
+                          border: Border.all(width: 1, color: Colors.grey)
                       ),
                       child: ListTile(
                         title: Text('Pay Now',style: GoogleFonts.poppins(fontWeight: FontWeight.w600, ),),
@@ -233,7 +233,7 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                       child: ListTile(
                         title: Text('Pay Later'),
                         leading: Radio<PaymentMode>(
-                        activeColor: Colors.black,
+                            activeColor: Colors.black,
                             value: PaymentMode.paylater,
                             groupValue: _character,
                             onChanged:(PaymentMode? value){
@@ -247,53 +247,53 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                   ),
                 ],
               ),
-              
+
               SizedBox(
                 height: 10,
-              ), 
-           _character == PaymentMode.paynow?
-                ExpansionTile(
+              ),
+              _character == PaymentMode.paynow?
+              ExpansionTile(
                 childrenPadding: EdgeInsets.all(10),
-                  title:  Text('Payment Type'),
+                title:  Text('Payment Type'),
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                   Filterbutton(
-                       borderc: 5,
-                       title: 'Cash',
-                       selectedFilter: selectedFilter,
-                       onpressed:() {
-                         setState(() {
-                           selectedFilter = 'Cash';
-                         });
-                       }),
-                   SizedBox(width: 10,),
-                   Filterbutton(
-                       borderc: 5,
-                       title: 'Card',
-                       selectedFilter: selectedFilter,
-                       onpressed:() {
-                         setState(() {
-                           selectedFilter = 'Card';
-                         });
-                       }),
-                  ],)
+                      Filterbutton(
+                          borderc: 5,
+                          title: 'Cash',
+                          selectedFilter: selectedFilter,
+                          onpressed:() {
+                            setState(() {
+                              selectedFilter = 'Cash';
+                            });
+                          }),
+                      SizedBox(width: 10,),
+                      Filterbutton(
+                          borderc: 5,
+                          title: 'Card',
+                          selectedFilter: selectedFilter,
+                          onpressed:() {
+                            setState(() {
+                              selectedFilter = 'Card';
+                            });
+                          }),
+                    ],)
                 ],
 
               ) :
-                SizedBox(),
+              SizedBox(),
               SizedBox(
                 height: 10,
               ),
               CommonButton(
-                bordercircular: 5,
+                  bordercircular: 5,
                   height: heigth * 0.05,
                   onTap: (){},
                   child: Text('Procced',style: GoogleFonts.poppins(fontWeight: FontWeight.w600,color: Colors.white),))
 
 
-          ],),
+            ],),
         ),
       ),
     );

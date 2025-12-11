@@ -402,45 +402,40 @@ class HiveInit {
 
   /// Open all restaurant Hive boxes
   static Future<void> openRestaurantBoxes() async {
-    await Hive.openBox<Category>('restaurant_categories');
+    // Core restaurant boxes - use actual box names from database files
+    await Hive.openBox<Category>('categories');  // ✅ Actual name used in HiveBoxes
     await Hive.openBox<Company>('companyBox');
     await Hive.openBox<Items>('itemBoxs');
-    await Hive.openBox<Extramodel>('extras');
-    await Hive.openBox<Topping>('toppings');
-    await Hive.openBox<VariantModel>('variants');
-    await Hive.openBox<ChoicesModel>('choices');
-    await Hive.openBox<ChoiceOption>('choiceOptions');
+    await Hive.openBox<Extramodel>('extra');  // ✅ Changed from 'extras' to 'extra'
+    await Hive.openBox<VariantModel>('variante');  // ✅ Changed from 'variants' to 'variante'
+    await Hive.openBox<ChoicesModel>('choice');  // ✅ Changed from 'choices' to 'choice'
 
-    // Restaurant cart - use unique name to avoid conflict with retail 'cartItems'
-    await Hive.openBox<CartItem>('restaurant_cart');
+    // Restaurant cart
+    await Hive.openBox<CartItem>('cart_box');  // ✅ Fixed: actual name is 'cart_box'
 
+    // Orders
     await Hive.openBox<OrderModel>('orderBox');
-    await Hive.openBox<StaffModel>('staffBox');
+    await Hive.openBox('appCounters');  // ✅ Added: order counter box
 
-    // Tables - open both legacy 'tablesBox' and new 'tableBox' for compatibility
-    await Hive.openBox<TableModel>('tableBox');
+    await Hive.openBox<StaffModel>('staffBox');
     await Hive.openBox<TableModel>('tablesBox');
 
-    await Hive.openBox<ItemVariante>('itemVariants');
-
-    // Past Orders - open both legacy 'pastorderBox' and new 'pastOrders'
-    await Hive.openBox<pastOrderModel>('pastOrders');
+    // Past Orders
     await Hive.openBox<pastOrderModel>('pastorderBox');
 
-    // Tax - open both legacy 'TaxBox' and new 'taxs'
-    await Hive.openBox<Tax>('taxs');
-    await Hive.openBox<Tax>('TaxBox');
+    // Tax - use unique name to avoid conflict with retail 'taxBox'
+    await Hive.openBox<Tax>('restaurant_taxes');
 
-    await Hive.openBox<ExpenseCategory>('expenseCategories');
-    await Hive.openBox<Expense>('expenses');
+    // Expenses
+    await Hive.openBox<ExpenseCategory>('expenseCategory');
+    await Hive.openBox<Expense>('expenseBox');
 
-    // EOD - open both legacy 'eodBox' and new 'eods'
-    await Hive.openBox<EndOfDayReport>('eods');
+    // EOD
     await Hive.openBox<EndOfDayReport>('eodBox');
 
-    await Hive.openBox<TestBillModel>('testBills');
+    await Hive.openBox<TestBillModel>('testBillBox');
 
-    print('✅ All restaurant boxes opened successfully (including legacy box names)');
+    print('✅ All restaurant boxes opened successfully with correct names');
   }
 
   /// Initialize boxes based on business mode
@@ -489,7 +484,12 @@ class HiveInit {
   /// Check if restaurant boxes are open
   static bool get areRestaurantBoxesOpen {
     try {
-      return Hive.isBoxOpen('restaurant_categories');
+      return Hive.isBoxOpen('categories') &&
+             Hive.isBoxOpen('itemBoxs') &&
+             Hive.isBoxOpen('restaurant_taxes') &&
+             Hive.isBoxOpen('extra') &&
+             Hive.isBoxOpen('variante') &&
+             Hive.isBoxOpen('choice');
     } catch (_) {
       return false;
     }

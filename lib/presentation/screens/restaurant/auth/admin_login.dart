@@ -35,8 +35,8 @@ class _AdminLoginState extends State<AdminLogin> {
           height: height,
           // color: Colors.red,
           padding: ResponsiveHelper.responsiveSymmetricPadding(context,
-          horizontalPercent: 0.03,
-            verticalPercent: 0.01
+              horizontalPercent: 0.03,
+              verticalPercent: 0.01
 
           ),
           // color: Color(0xff1C3F6FF),
@@ -100,13 +100,13 @@ class _AdminLoginState extends State<AdminLogin> {
                             },
                             child: obsecurepass.value == true
                                 ? Icon(
-                                    Icons.visibility_off,
-                                    color: primarycolor,
-                                  )
+                              Icons.visibility_off,
+                              color: primarycolor,
+                            )
                                 : Icon(
-                                    Icons.visibility,
-                                    color: primarycolor,
-                                  )),
+                              Icons.visibility,
+                              color: primarycolor,
+                            )),
                       );
                     },
                   ),
@@ -126,11 +126,11 @@ class _AdminLoginState extends State<AdminLogin> {
                   },
                   child: Center(
                       child: Text(
-                    'Login',
-                    style: GoogleFonts.poppins(color: Colors.white,
-                        fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
-                        fontWeight: FontWeight.w400),
-                  )),
+                        'Login',
+                        style: GoogleFonts.poppins(color: Colors.white,
+                            fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                            fontWeight: FontWeight.w400),
+                      )),
                   height: ResponsiveHelper.responsiveHeight(context, 0.065),
                 ),
 
@@ -147,13 +147,13 @@ class _AdminLoginState extends State<AdminLogin> {
                             fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
                             color: Colors.grey.shade700),
                         children: [
-                      TextSpan(
-                        text: '123456',
-                        style: GoogleFonts.poppins(
-                            fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-                            color: Primarysecond, fontWeight: FontWeight.bold, letterSpacing: 1),
-                      )
-                    ])),
+                          TextSpan(
+                            text: '123456',
+                            style: GoogleFonts.poppins(
+                                fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                                color: Primarysecond, fontWeight: FontWeight.bold, letterSpacing: 1),
+                          )
+                        ])),
 
                 SizedBox(
                   height: ResponsiveHelper.responsiveHeight(context, 0.02),
@@ -168,13 +168,13 @@ class _AdminLoginState extends State<AdminLogin> {
                   height: height * 0.065,
                   child: Center(
                       child: Text(
-                    'Back',
-                    style: GoogleFonts.poppins(
-                      fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
-                      fontWeight: FontWeight.w600,
-                      color: primarycolor,
-                    ),
-                  )),
+                        'Back',
+                        style: GoogleFonts.poppins(
+                          fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                          fontWeight: FontWeight.w600,
+                          color: primarycolor,
+                        ),
+                      )),
                   bgcolor: Colors.white,
                   bordercolor: primarycolor,
                 )

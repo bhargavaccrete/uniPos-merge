@@ -709,7 +709,7 @@ class CategoryImportExport {
       await _restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m), data);
       await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
       await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
-      await _restoreBox("taxes", Hive.box<Tax>("TaxBox"), (m) => Tax.fromMap(m), data);
+      await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
       await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
       await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
       await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
@@ -1085,7 +1085,7 @@ class CategoryImportExport {
       await Hive.openBox<VariantModel>('variante', encryptionCipher: cipher);
       await Hive.openBox<ChoicesModel>('choice', encryptionCipher: cipher);
       await Hive.openBox<pastOrderModel>('pastorderBox', encryptionCipher: cipher);
-      await Hive.openBox<Tax>('TaxBox', encryptionCipher: cipher);
+      await Hive.openBox<Tax>('restaurant_taxes', encryptionCipher: cipher);
       await Hive.openBox<ExpenseCategory>('expenseCategory', encryptionCipher: cipher);
       await Hive.openBox<Expense>('expenseBox', encryptionCipher: cipher);
       await Hive.openBox<EndOfDayReport>('eodBox', encryptionCipher: cipher);

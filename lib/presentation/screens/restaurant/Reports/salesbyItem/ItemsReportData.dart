@@ -14,7 +14,7 @@ class ItemReportData{
     required this.itemName,
     required this.totalQuantity,
     required this.totalRevenue,
-});
+  });
 }
 
 

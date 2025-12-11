@@ -11,15 +11,10 @@ import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/choice_
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/extra_tab.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/items_tab.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/variant_tab.dart';
-import 'package:uuid/uuid.dart';
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
+
 import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
 import 'package:unipos/constants/restaurant/color.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
-import 'package:uuid/uuid.dart';
+
 
 import '../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
@@ -27,7 +22,6 @@ import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
-
 
 class Managemenu extends StatefulWidget {
   const Managemenu({super.key});
@@ -53,7 +47,7 @@ class _ManagemenuState extends State<Managemenu>
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;  
+    final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
       appBar: AppBar(
         // automaticallyImplyLeading: false,
@@ -79,16 +73,16 @@ class _ManagemenuState extends State<Managemenu>
               valueListenable: Hive.box<Items>('itemBoxs').listenable(),
               builder: (context, Box<Items> itemBox, _) {
                 return ValueListenableBuilder(
-                  valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
+                  valueListenable: Hive.box<Category>('categories').listenable(),
                   builder: (context, Box<Category> categoryBox, _) {
                     return ValueListenableBuilder(
-                      valueListenable: Hive.box<VariantModel>('variants').listenable(),
+                      valueListenable: Hive.box<VariantModel>('variante').listenable(),
                       builder: (context, Box<VariantModel> variantBox, _) {
                         return ValueListenableBuilder(
-                          valueListenable: Hive.box<ChoicesModel>('choices').listenable(),
+                          valueListenable: Hive.box<ChoicesModel>('choice').listenable(),
                           builder: (context, Box<ChoicesModel> choiceBox, _) {
                             return ValueListenableBuilder(
-                              valueListenable: Hive.box<Extramodel>('extras').listenable(),
+                              valueListenable: Hive.box<Extramodel>('extra').listenable(),
                               builder: (context, Box<Extramodel> extraBox, _) {
                                 // Get counts
                                 final itemCount = itemBox.length;
@@ -108,8 +102,8 @@ class _ManagemenuState extends State<Managemenu>
                                   indicatorColor: primarycolor,
                                   indicatorSize: TabBarIndicatorSize.tab,
                                   indicator: UnderlineTabIndicator(
-                                    borderSide: BorderSide(width: 3.0, color: primarycolor),
-                                    insets: EdgeInsets.symmetric(horizontal: 20)
+                                      borderSide: BorderSide(width: 3.0, color: primarycolor),
+                                      insets: EdgeInsets.symmetric(horizontal: 20)
                                   ),
                                   tabs: [
                                     Tab(
@@ -192,9 +186,9 @@ class _ManagemenuState extends State<Managemenu>
         AllTab(),
         ItemsTab(),
         CategoryTab(),
-          VariantTab(),
-          ChoiceTab(),
-          ExtraTab(),
+        VariantTab(),
+        ChoiceTab(),
+        ExtraTab(),
       ]),
     );
   }

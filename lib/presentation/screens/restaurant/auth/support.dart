@@ -51,10 +51,10 @@ class Support extends StatelessWidget {
                     child: Icon(Icons.phone,color: Colors.white,),
                   ),
                   CommonButton(
-                    width: 50.0,
-                    height: 50.0,
+                      width: 50.0,
+                      height: 50.0,
                       onTap: () {},
-                      
+
                       child: Icon(
                         Icons.email,
                         color: Colors.white,
@@ -89,7 +89,7 @@ class Support extends StatelessWidget {
 
                     child:Text("Write us ",style: TextStyle(color: Colors.black),),
                   ),
-                  
+
                 ],
               ),
             ),

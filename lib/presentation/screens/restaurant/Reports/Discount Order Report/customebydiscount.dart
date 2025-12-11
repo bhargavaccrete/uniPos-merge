@@ -40,14 +40,14 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
     if (pickedDate != null) {
       setState(() {
         _fromDate = pickedDate;
-      //   Ensure "To Date" is after "from Date"
+        //   Ensure "To Date" is after "from Date"
         if(_toDate != null && _toDate!.isBefore(_fromDate!)){
           _toDate =null;
         }
       });
     }
   }
- // Function to  pick To Date"
+  // Function to  pick To Date"
   Future<void> _pickToDate(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
         context: context,
@@ -133,9 +133,9 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                          border: Border.all(color: primarycolor),
-                          // color: Colors.red,
-                          borderRadius: BorderRadius.circular(5)
+                            border: Border.all(color: primarycolor),
+                            // color: Colors.red,
+                            borderRadius: BorderRadius.circular(5)
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../data/models/restaurant/db/database/hive_tax.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
@@ -56,14 +57,14 @@ class _AddtaxState extends State<Addtax> {
     if(existingTax != null){
       existingTax.taxname = taxName;
       existingTax.taxperecentage = taxPercentage;
-      await taxStore.updateTax(existingTax);
+      await TaxBox.updateTax(existingTax);
     }else {
       final newTax = Tax(
         id: Uuid().v4(),
         taxname: taxName,
         taxperecentage: taxPercentage,
       );
-      await taxStore.addTax(newTax);
+      await TaxBox.addTax(newTax);
 
       // Apply tax to all items if checkbox is checked
       if(_ischecked1) {
@@ -79,7 +80,7 @@ class _AddtaxState extends State<Addtax> {
 
 
   void _delete(String id)async{
-    await taxStore.deleteTax(id);
+    await TaxBox.deleteTax(id);
     Navigator.pop(context);
   }
 
@@ -123,131 +124,134 @@ class _AddtaxState extends State<Addtax> {
                   width: width * 0.9,
                   height: height * 0.6,
                   child:
-                  ValueListenableBuilder(
-                      valueListenable:Hive.box<Tax>('TaxBox').listenable(),
-                      builder: (context, tax,_){
+                  FutureBuilder<Box<Tax>>(
+                      future: TaxBox.getTaxBox(),
+                      builder: (context, snapshot){
+                        if (!snapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
 
-                    final allTax = tax.values.toList();
+                        final allTax = snapshot.data!.values.toList();
 
-                    if (allTax.isEmpty) {
-                      return Column(
-                        children: [
-                          Container(
-                            height: height * 0.1,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10.0),
-                                border: Border.all(color: Colors.grey)),
-                            child: ListTile(
-                              leading: Icon(Icons.calculate, size: 50),
-                              title: Text(
-                                "Add Tax to your items",
-                                style: TextStyle(
-                                    color: Colors.orange,
-                                    fontSize: 20.0,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                "You have not configured any taxes yet.",
-                                style: TextStyle(
-                                    color: Colors.blueGrey[200], fontSize: 15.0),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 20),
-                          Image.asset(
-                            'assets/images/taximage.png',
-                            height: height * 0.5,
-                          ),
-                          SizedBox(height: 25),
-                        ],
-                      );
-                    }
-
-
-                    return Container(
-                      width: 200,
-                      height: 100,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                          itemCount: allTax.length,
-                          itemBuilder: (context,index){
-                        final tax = allTax[index];
-                        return Card(
-                          elevation: 5,
-                          child: Container(
-                            padding: EdgeInsets.all(10),
-                            width: width,
-                            height: height * 0.2,
-                            child: Column(
-                              children: [
-
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text('TaxName:',style: GoogleFonts.poppins(color: Colors.deepOrange,fontWeight: FontWeight.w500),),
-                                       SizedBox(width: 5),
-                                        Text(tax.taxname,style: GoogleFonts.poppins(color: Colors.black,fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
-
-                                   Row(
-                                     children: [
-                                       InkWell(
-                                         onTap: (){
-                                           _model(height, width,existingTax: tax);
-                                         },
-                                         child: Container(
-                                           padding: EdgeInsets.all(5),
-                                             decoration: BoxDecoration(color: Colors.grey.shade200),
-                                             child: Icon(Icons.edit,color: Colors.grey.shade500,)),
-                                       ),
-                                       SizedBox(width: 5,),
-                                       InkWell(
-                                         onTap: ()=> _showDeleteConfirmation(context, height, width, tax.id),
-                                         child: Container(
-                                           padding: EdgeInsets.all(5),
-                                           decoration: BoxDecoration(color: Colors.red),
-                                           child:Icon(Icons.delete,color: Colors.white,),),
-                                       )
-                                     ],
-                                   )
-                                  ],
-                                ),
-                                RichText(
-                                  text: TextSpan(
-                                    style: GoogleFonts.poppins(color: Colors.black, fontSize: 16),
-                                    children: [
-                                      TextSpan(text: 'Tax Rate: ', style: TextStyle(color: Colors.deepOrange)),
-                                      TextSpan(text: '${tax.taxperecentage}%'),
-                                    ],
+                        if (allTax.isEmpty) {
+                          return Column(
+                            children: [
+                              Container(
+                                height: height * 0.1,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10.0),
+                                    border: Border.all(color: Colors.grey)),
+                                child: ListTile(
+                                  leading: Icon(Icons.calculate, size: 50),
+                                  title: Text(
+                                    "Add Tax to your items",
+                                    style: TextStyle(
+                                        color: Colors.orange,
+                                        fontSize: 20.0,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text(
+                                    "You have not configured any taxes yet.",
+                                    style: TextStyle(
+                                        color: Colors.blueGrey[200], fontSize: 15.0),
                                   ),
                                 ),
-
-                                SizedBox(height: 20,),
-
-                                CommonButton(
-
-                                  bordercircular: 5,
-                                  width: width * 0.7,
-                                    height:  height * 0.06,
-                                    onTap: (){
-
-                                        // TODO: Navigate to the item selection screen
-                                        Navigator.push(context, MaterialPageRoute(builder: (_) => ApplyTaxScreen(taxToApply: tax,)));
+                              ),
+                              SizedBox(height: 20),
+                              Image.asset(
+                                'assets/images/taximage.png',
+                                height: height * 0.5,
+                              ),
+                              SizedBox(height: 25),
+                            ],
+                          );
+                        }
 
 
-                                    },
-                                    child:Text('Apply Tax on items',style: GoogleFonts.poppins(color: Colors.white,fontSize: 14),))
+                        return Container(
+                          width: 200,
+                          height: 100,
+                          child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: allTax.length,
+                              itemBuilder: (context,index){
+                                final tax = allTax[index];
+                                return Card(
+                                  elevation: 5,
+                                  child: Container(
+                                    padding: EdgeInsets.all(10),
+                                    width: width,
+                                    height: height * 0.2,
+                                    child: Column(
+                                      children: [
 
-                              ],
-                            ),
-                          ),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text('TaxName:',style: GoogleFonts.poppins(color: Colors.deepOrange,fontWeight: FontWeight.w500),),
+                                                SizedBox(width: 5),
+                                                Text(tax.taxname,style: GoogleFonts.poppins(color: Colors.black,fontWeight: FontWeight.w500)),
+                                              ],
+                                            ),
+
+                                            Row(
+                                              children: [
+                                                InkWell(
+                                                  onTap: (){
+                                                    _model(height, width,existingTax: tax);
+                                                  },
+                                                  child: Container(
+                                                      padding: EdgeInsets.all(5),
+                                                      decoration: BoxDecoration(color: Colors.grey.shade200),
+                                                      child: Icon(Icons.edit,color: Colors.grey.shade500,)),
+                                                ),
+                                                SizedBox(width: 5,),
+                                                InkWell(
+                                                  onTap: ()=> _showDeleteConfirmation(context, height, width, tax.id),
+                                                  child: Container(
+                                                    padding: EdgeInsets.all(5),
+                                                    decoration: BoxDecoration(color: Colors.red),
+                                                    child:Icon(Icons.delete,color: Colors.white,),),
+                                                )
+                                              ],
+                                            )
+                                          ],
+                                        ),
+                                        RichText(
+                                          text: TextSpan(
+                                            style: GoogleFonts.poppins(color: Colors.black, fontSize: 16),
+                                            children: [
+                                              TextSpan(text: 'Tax Rate: ', style: TextStyle(color: Colors.deepOrange)),
+                                              TextSpan(text: '${tax.taxperecentage}%'),
+                                            ],
+                                          ),
+                                        ),
+
+                                        SizedBox(height: 20,),
+
+                                        CommonButton(
+
+                                            bordercircular: 5,
+                                            width: width * 0.7,
+                                            height:  height * 0.06,
+                                            onTap: (){
+
+                                              // TODO: Navigate to the item selection screen
+                                              Navigator.push(context, MaterialPageRoute(builder: (_) => ApplyTaxScreen(taxToApply: tax,)));
+
+
+                                            },
+                                            child:Text('Apply Tax on items',style: GoogleFonts.poppins(color: Colors.white,fontSize: 14),))
+
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
                         );
-                      }),
-                    );
 
                       }),
                 ),
@@ -256,27 +260,27 @@ class _AddtaxState extends State<Addtax> {
 // Spacer(),
 
 
-                    CommonButton(
-                      bgcolor: primarycolor,
-                      bordercircular: 10,
-                      height: height * 0.06,
-                      width: width * 0.8,
-                      onTap: () {
-                        _model(height,width);
-                      },
+                CommonButton(
+                  bgcolor: primarycolor,
+                  bordercircular: 10,
+                  height: height * 0.06,
+                  width: width * 0.8,
+                  onTap: () {
+                    _model(height,width);
+                  },
 
-                      child: Text(
-                        "Add Tax ",
-                        textScaler: TextScaler.linear(1.2),
-                        style: TextStyle(
-                          fontSize: 12.0,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  child: Text(
+                    "Add Tax ",
+                    textScaler: TextScaler.linear(1.2),
+                    style: TextStyle(
+                      fontSize: 12.0,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
+                  ),
+                ),
 
-                
+
               ],
             ),
           ),

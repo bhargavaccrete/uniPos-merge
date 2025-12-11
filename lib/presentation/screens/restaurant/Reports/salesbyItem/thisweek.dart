@@ -134,12 +134,12 @@ class _ThisWeekItemsState extends State<ThisWeekItems> {
                             final item = entry.value;
                             return DataRow(
                               color: MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (index.isEven) {
-                                  return Colors.white;
-                                }
-                                return Colors.grey.withOpacity(0.1);
-                              }),
+                                      (Set<MaterialState> states) {
+                                    if (index.isEven) {
+                                      return Colors.white;
+                                    }
+                                    return Colors.grey.withOpacity(0.1);
+                                  }),
                               cells: [
                                 DataCell(Text(item.itemName)),
                                 DataCell(Center(

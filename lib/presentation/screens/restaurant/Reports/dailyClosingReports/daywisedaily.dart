@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 
 import '../../../../../constants/restaurant/color.dart';
@@ -33,7 +34,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
     });
 
     try {
-      final report = eodStore.getReportByDate(_fromDate!);
+      final report = await HiveEOD.getEODByDate(_fromDate!);
       setState(() {
         _report = report;
         _isLoading = false;
@@ -69,123 +70,123 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Select Date:',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: () => _pickDate(context),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10),
-                            width: width * 0.6,
-                            height: height * 0.05,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: primarycolor),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _fromDate == null
-                                      ? 'DD/MM/YYYY'
-                                      : '${_fromDate!.day.toString().padLeft(2, '0')}-${_fromDate!.month.toString().padLeft(2, '0')}-${_fromDate!.year}',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                ),
-                                Icon(Icons.date_range, color: primarycolor)
-                              ],
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        InkWell(
-                          onTap: _loadReport,
-                          child: Container(
-                            padding: EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: primarycolor,
-                              borderRadius: BorderRadius.circular(50),
-                            ),
-                            child: Icon(
-                              Icons.search,
-                              size: 25,
-                              color: Colors.white,
-                            ),
-                          ),
-                        )
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    CommonButton(
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Select Date:',
+                textScaler: TextScaler.linear(1),
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () => _pickDate(context),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10),
                       width: width * 0.6,
-                      height: height * 0.06,
-                      bordercircular: 5,
-                      onTap: () {},
+                      height: height * 0.05,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: primarycolor),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.note_add_outlined, color: Colors.white),
-                          SizedBox(width: 8),
                           Text(
-                            'Export To Excel',
+                            _fromDate == null
+                                ? 'DD/MM/YYYY'
+                                : '${_fromDate!.day.toString().padLeft(2, '0')}-${_fromDate!.month.toString().padLeft(2, '0')}-${_fromDate!.year}',
                             textScaler: TextScaler.linear(1),
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          )
+                            style: GoogleFonts.poppins(fontSize: 14),
+                          ),
+                          Icon(Icons.date_range, color: primarycolor)
                         ],
                       ),
                     ),
-                    SizedBox(height: 25),
-                    if (_report != null) ...[
-                      Text(
-                        'Total Sales : ${_report!.totalSales.toStringAsFixed(1)}',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  ),
+                  SizedBox(width: 10),
+                  InkWell(
+                    onTap: _loadReport,
+                    child: Container(
+                      padding: EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: primarycolor,
+                        borderRadius: BorderRadius.circular(50),
                       ),
-                      SizedBox(height: 20),
-                      _buildOrderTable(width),
-                      SizedBox(height: 30),
-                      _buildPaymentTable(width),
-                      SizedBox(height: 30),
-                      _buildExpenseSection(width),
-                    ] else ...[
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Text(
-                            'No Data Available for Selected Date',
-                            textScaler: TextScaler.linear(1),
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
+                      child: Icon(
+                        Icons.search,
+                        size: 25,
+                        color: Colors.white,
                       ),
-                    ],
+                    ),
+                  )
+                ],
+              ),
+              SizedBox(height: 20),
+              CommonButton(
+                width: width * 0.6,
+                height: height * 0.06,
+                bordercircular: 5,
+                onTap: () {},
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.note_add_outlined, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      'Export To Excel',
+                      textScaler: TextScaler.linear(1),
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    )
                   ],
                 ),
               ),
-            ),
+              SizedBox(height: 25),
+              if (_report != null) ...[
+                Text(
+                  'Total Sales : ${_report!.totalSales.toStringAsFixed(1)}',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 20),
+                _buildOrderTable(width),
+                SizedBox(height: 30),
+                _buildPaymentTable(width),
+                SizedBox(height: 30),
+                _buildExpenseSection(width),
+              ] else ...[
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text(
+                      'No Data Available for Selected Date',
+                      textScaler: TextScaler.linear(1),
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 

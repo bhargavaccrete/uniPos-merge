@@ -14,6 +14,7 @@ import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart'
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import 'customebyrefund.dart';
+
 class RefundDetails extends StatefulWidget {
   const RefundDetails({super.key});
 
@@ -118,9 +119,9 @@ class _RefundDetailsState extends State<RefundDetails> {
         },
         style: ElevatedButton.styleFrom(
             backgroundColor:
-                selectedFilter == title ? primarycolor: Colors.white,
+            selectedFilter == title ? primarycolor: Colors.white,
             foregroundColor:
-                selectedFilter == title ? Colors.white : primarycolor,
+            selectedFilter == title ? Colors.white : primarycolor,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: BorderSide(color: primarycolor))),

@@ -56,14 +56,14 @@ class _DailyClosingReportState extends State<DailyClosingReport> {
         padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
         child: Column(
           children: [
-          //   Container(
-          //     alignment: Alignment.bottomLeft,
-          //     child: Text('Daily Closing Report',
-          //         textScaler: TextScaler.linear(1)
-          // ,style: GoogleFonts.poppins(
-          //       fontSize: 18,fontWeight: FontWeight.w600,
-          //     ),),
-          //   ),
+            //   Container(
+            //     alignment: Alignment.bottomLeft,
+            //     child: Text('Daily Closing Report',
+            //         textScaler: TextScaler.linear(1)
+            // ,style: GoogleFonts.poppins(
+            //       fontSize: 18,fontWeight: FontWeight.w600,
+            //     ),),
+            //   ),
 
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,

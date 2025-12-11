@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -33,7 +34,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
       _isLoading = true;
     });
 
-    final allOrders = pastOrderStore.pastOrders.toList();
+    final allOrders = await HivePastOrder.getAllPastOrderModel();
 
     List<pastOrderModel> filteredOrders = [];
 
@@ -49,7 +50,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
           final toDate = DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
 
           return (refundDate.isAtSameMomentAs(fromDate) || refundDate.isAfter(fromDate)) &&
-                 (refundDate.isAtSameMomentAs(toDate) || refundDate.isBefore(toDate));
+              (refundDate.isAtSameMomentAs(toDate) || refundDate.isBefore(toDate));
         }
         return false;
       }).toList();
@@ -212,7 +213,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
                       Expanded(
                         child: InkWell(
                           onTap:
-                              _fromDate == null ? null : () => _pickToDate(context),
+                          _fromDate == null ? null : () => _pickToDate(context),
                           child: Container(
                               padding: EdgeInsets.symmetric(horizontal: 10),
                               height: height * 0.05,
@@ -289,220 +290,220 @@ class _CustomByRefundState extends State<CustomByRefund> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
-                    headingRowHeight: 50,
-                    columnSpacing: 2,
-                    headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
-                    border: TableBorder.all(
-                      // borderRadius: BorderRadius.circular(5),
-                        color: Colors.white),
-                    decoration: BoxDecoration(
-                      // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                      // color: Colors.green,
+                  headingRowHeight: 50,
+                  columnSpacing: 2,
+                  headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
+                  border: TableBorder.all(
+                    // borderRadius: BorderRadius.circular(5),
+                      color: Colors.white),
+                  decoration: BoxDecoration(
+                    // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                    // color: Colors.green,
 
-                    ),
-                    columns: [
+                  ),
+                  columns: [
 
-                      DataColumn(
-                          columnWidth:FixedColumnWidth(width *0.25),
+                    DataColumn(
+                        columnWidth:FixedColumnWidth(width *0.25),
 
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(50),
-                                  bottomLeft: Radius.circular(50),
-                                ),
+                        label: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(50),
+                                bottomLeft: Radius.circular(50),
                               ),
+                            ),
 
-                              child: Text('Date',textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth:FixedColumnWidth(width *0.2),
+                            child: Text('Date',textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),))),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+                        columnWidth:FixedColumnWidth(width *0.2),
 
-                          // columnWidth:FlexColumnWidth(width * 0.1),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
+                        // columnWidth:FlexColumnWidth(width * 0.1),
+                        label: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
                               ),
-                              child: Text("Order ID",
+                            ),
+                            child: Text("Order ID",
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),
+                              textAlign: TextAlign.center,))),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
+
+                        columnWidth:FixedColumnWidth(width *0.4),
+
+                        label: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
+                              ),
+                            ),
+                            child: Text('Customer Name',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(fontSize: 14),
-                                textAlign: TextAlign.center,))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
+                                textAlign: TextAlign.center))),
+                    DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
 
-                          columnWidth:FixedColumnWidth(width *0.4),
+                        columnWidth:FixedColumnWidth(width *0.3),
 
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
+                        label: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
                               ),
-                              child: Text('Customer Name',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
+                            ),
+                            child: Text('Payment Type',
+                                textScaler: TextScaler.linear(1),
+                                style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
 
-                          columnWidth:FixedColumnWidth(width *0.3),
+                        columnWidth:FixedColumnWidth(width *0.3),
 
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
+                        label: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
                               ),
-                              child: Text('Payment Type',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
+                            ),
+                            child: Text('Order Type',textScaler: TextScaler.linear(1),
+                                style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
 
-                          columnWidth:FixedColumnWidth(width *0.3),
+                        columnWidth:FixedColumnWidth(width *0.3),
 
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
+                        label: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
                               ),
-                              child: Text('Order Type',textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
+                            ),
+                            child: Text('Refund(Rs.)',
+                                textScaler: TextScaler.linear(1),
+                                style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
+                        headingRowAlignment: MainAxisAlignment.center,
 
-                          columnWidth:FixedColumnWidth(width *0.3),
+                        columnWidth:FixedColumnWidth(width *0.3),
 
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
+                        label: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
                               ),
-                              child: Text('Refund(Rs.)',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
+                            ),
+                            child: Text('Reason',
+                                textScaler: TextScaler.linear(1),
+                                style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
+                  ],
 
-                          columnWidth:FixedColumnWidth(width *0.3),
+                  rows: _isLoading
+                      ? []
+                      : _refundedOrders.isEmpty
+                      ? []
+                      : _refundedOrders.map((order) {
+                    String reason = '';
+                    if (order.refundReason != null && order.refundReason!.isNotEmpty) {
+                      final lines = order.refundReason!.split('\n');
+                      reason = lines.isNotEmpty ? lines.last.trim() : '';
+                    }
 
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Reason',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
-                    ],
-
-                    rows: _isLoading
-                        ? []
-                        : _refundedOrders.isEmpty
-                            ? []
-                            : _refundedOrders.map((order) {
-                                String reason = '';
-                                if (order.refundReason != null && order.refundReason!.isNotEmpty) {
-                                  final lines = order.refundReason!.split('\n');
-                                  reason = lines.isNotEmpty ? lines.last.trim() : '';
-                                }
-
-                                return DataRow(
-                                  onSelectChanged: (selected) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => Orderdetails(Order: order),
-                                      ),
-                                    );
-                                  },
-                                  cells: [
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          order.refundedAt != null
-                                              ? DateFormat('dd/MM/yyyy').format(order.refundedAt!)
-                                              : '',
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          order.id,
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          order.customerName,
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          order.paymentmode ?? '',
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          order.orderType ?? '',
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          order.refundAmount != null
-                                              ? '₹${order.refundAmount!.toStringAsFixed(2)}'
-                                              : '₹0.00',
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          reason,
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
+                    return DataRow(
+                      onSelectChanged: (selected) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => Orderdetails(Order: order),
+                          ),
+                        );
+                      },
+                      cells: [
+                        DataCell(
+                          Center(
+                            child: Text(
+                              order.refundedAt != null
+                                  ? DateFormat('dd/MM/yyyy').format(order.refundedAt!)
+                                  : '',
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              order.id,
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              order.customerName,
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              order.paymentmode ?? '',
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              order.orderType ?? '',
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              order.refundAmount != null
+                                  ? '₹${order.refundAmount!.toStringAsFixed(2)}'
+                                  : '₹0.00',
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              reason,
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
 
                 ),
               ),

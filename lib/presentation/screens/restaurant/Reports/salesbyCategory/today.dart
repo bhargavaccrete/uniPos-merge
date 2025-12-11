@@ -27,7 +27,7 @@ class _TodayByCategoryState extends State<TodayByCategory> {
               Container(
                 width: width * 0.6,
                 child: CommonTextForm(
-                  controller: SearchCategory,
+                    controller: SearchCategory,
                     hintText: "Search Category",
                     HintColor: Colors.grey,
                     icon: Icon(
@@ -73,13 +73,13 @@ class _TodayByCategoryState extends State<TodayByCategory> {
                     columnSpacing: 2,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
                     border: TableBorder.all(
-                        // borderRadius: BorderRadius.circular(5),
+                      // borderRadius: BorderRadius.circular(5),
                         color: Colors.white),
                     decoration: BoxDecoration(
-                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                        // color: Colors.green,
+                      // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                      // color: Colors.green,
 
-                        ),
+                    ),
                     columns: [
                       DataColumn(
                           columnWidth: FixedColumnWidth(width * 0.2),
@@ -92,8 +92,8 @@ class _TodayByCategoryState extends State<TodayByCategory> {
                                 ),
                               ),
                               child: Text('Date',
-                                  textScaler: TextScaler.linear(1),
-                            style: GoogleFonts.poppins(fontSize: 14),))),
+                                textScaler: TextScaler.linear(1),
+                                style: GoogleFonts.poppins(fontSize: 14),))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           columnWidth: FixedColumnWidth(width * 0.3),

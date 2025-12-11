@@ -83,7 +83,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                   const SizedBox(height: 16),
                   Text(
                     "Settings",
-                      textScaler: TextScaler.linear(1.2),
+                    textScaler: TextScaler.linear(1.2),
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
@@ -119,14 +119,14 @@ class _settingsScreenState extends State<Settingsscreen> {
                     displayTitle: 'Online Order Notification Settings',
                     displayicon: Icons.keyboard_arrow_right,
                     onTap: () {
-                       Navigator.push(context, MaterialPageRoute(builder: (context) => OrderNotificationsettings()));
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => OrderNotificationsettings()));
                     },
                   ),
                   MultipleListViewWithNavigation(
                     displayTitle: 'Performance Test Data Generator',
                     displayicon: Icons.keyboard_arrow_right,
                     onTap: () {
-                       Navigator.push(context, MaterialPageRoute(builder: (context) => DataGeneratorScreen()));
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => DataGeneratorScreen()));
                     },
                   ),
                   // 👇 Fix the Decimal point section

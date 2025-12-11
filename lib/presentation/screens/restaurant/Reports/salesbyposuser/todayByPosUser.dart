@@ -198,7 +198,7 @@ class _TodayByposUserState extends State<TodayByposUser> {
                               child: Text('Order Type',textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
-                      
+
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           columnWidth: FixedColumnWidth(width * 0.4),

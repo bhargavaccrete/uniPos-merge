@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../../../data/models/restaurant/db/database/hive_db.dart';
 import '../componets/Button.dart';
 import 'image_picker_sheet.dart';
 
@@ -75,7 +75,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       editCount: 0,
     );
 
-    await categoryStore.addCategory(newCategory);
+    await HiveBoxes.addCategory(newCategory);
 
     widget.onCategoryAdded?.call();
     Navigator.pop(context);

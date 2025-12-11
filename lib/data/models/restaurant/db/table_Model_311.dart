@@ -34,7 +34,7 @@ class TableModel extends HiveObject{
     this.timeStamp,
     this.tableCapacity
 
-});
+  });
 
   // Convert to Map for export
   Map<String, dynamic> toMap() {

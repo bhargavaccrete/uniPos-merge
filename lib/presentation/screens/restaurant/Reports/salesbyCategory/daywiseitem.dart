@@ -51,7 +51,7 @@ class _DayWiseCategoryState extends State<DayWiseCategory> {
               Container(
                 width: width * 0.6,
                 child: CommonTextForm(
-controller: SearchCategory,
+                    controller: SearchCategory,
                     hintText: "Search Category",
                     HintColor: Colors.grey,
                     icon: Icon(Icons.search,color: primarycolor,size: 30,),
@@ -92,16 +92,16 @@ controller: SearchCategory,
                         )),
                   ),
                   SizedBox(width: 10,),
-                   Container(
-                     padding: EdgeInsets.all(5),
-                       decoration: BoxDecoration(
-                         color: primarycolor,
-                         shape: BoxShape.circle),
-                       child: Icon(Icons.search,size: 30,color: Colors.white,))
+                  Container(
+                      padding: EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                          color: primarycolor,
+                          shape: BoxShape.circle),
+                      child: Icon(Icons.search,size: 30,color: Colors.white,))
                 ],
               ),
 
-              
+
 
               SizedBox(height: 20,),
               CommonButton(
@@ -116,7 +116,7 @@ controller: SearchCategory,
                       Text('Export TO Excel',
                         textScaler: TextScaler.linear(1),
                         style: GoogleFonts.poppins(
-                          color: Colors.white, fontWeight: FontWeight.w500),)
+                            color: Colors.white, fontWeight: FontWeight.w500),)
                     ],)),
 
               SizedBox(height: 25,),

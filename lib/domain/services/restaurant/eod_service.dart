@@ -1,4 +1,7 @@
 
+import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
@@ -14,7 +17,7 @@ class EODService {
     required double actualCash,
     String? remarks,
   }) async {
-    final pastOrders = pastOrderStore.pastOrders.toList();
+    final pastOrders = await HivePastOrder.getAllPastOrderModel();
 
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
@@ -56,7 +59,7 @@ class EODService {
     final totalOrderCount = activeDayOrders.length; // Count only active orders
 
     // Calculate expenses for the day
-    final allExpenses = expenseStore.expenses.toList();
+    final allExpenses = await HiveExpenceL.getAllItems();
     final dayExpenses = allExpenses.where((expense) {
       return (expense.dateandTime.isAfter(startOfDay) || expense.dateandTime.isAtSameMomentAs(startOfDay)) &&
           (expense.dateandTime.isBefore(endOfDay) || expense.dateandTime.isAtSameMomentAs(endOfDay));
@@ -255,20 +258,20 @@ class EODService {
   }
 
   static Future<void> saveEODReport(EndOfDayReport report) async {
-    await eodStore.addReport(report);
+    await HiveEOD.addEODReport(report);
   }
 
   static Future<List<EndOfDayReport>> getAllEODReports() async {
-    return eodStore.reports.toList();
+    return await HiveEOD.getAllEODReports();
   }
 
   static Future<EndOfDayReport?> getTodaysEOD() async {
     final today = DateTime.now();
-    return eodStore.getReportByDate(today);
+    return await HiveEOD.getEODByDate(today);
   }
 
   static Future<double> getLastClosingBalance() async {
-    final latestEOD = eodStore.latestReport;
+    final latestEOD = await HiveEOD.getLatestEOD();
     return latestEOD?.closingBalance ?? 0.0;
   }
 }

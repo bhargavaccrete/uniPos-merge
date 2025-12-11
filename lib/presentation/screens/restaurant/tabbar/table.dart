@@ -6,6 +6,8 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../data/models/restaurant/db/database/hive_Table.dart';
+import '../../../../data/models/restaurant/db/database/hive_order.dart';
 import '../../../../data/models/restaurant/db/table_Model_311.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -13,7 +15,7 @@ import '../start order/cart/cart.dart';
 import '../start order/startorder.dart';
 
 class TableScreen extends StatefulWidget {
- final bool? isfromcart;
+  final bool? isfromcart;
   const TableScreen({super.key, this.isfromcart= false});
 
   @override
@@ -33,7 +35,7 @@ class _TableScreenState extends State<TableScreen> {
   /// Loads or reloads the list of tables from the database.
   void _loadTables() {
     setState(() {
-      _tablesFuture = Future.value(tableStore.tables.toList());
+      _tablesFuture = HiveTables.getAllTables();
     });
   }
 
@@ -68,10 +70,10 @@ class _TableScreenState extends State<TableScreen> {
             onPressed: () async {
               if (Tcontroller.text.isNotEmpty) {
                 final newTable = TableModel(
-                    id: Tcontroller.text.trim(),
+                  id: Tcontroller.text.trim(),
 
                 );
-                await tableStore.addTable(newTable);
+                await HiveTables.addTable(newTable);
                 Navigator.pop(context);
                 _loadTables(); // Refresh the list after adding
               }
@@ -285,7 +287,7 @@ class _TableScreenState extends State<TableScreen> {
 
                           // SCENARIO 1: Table is OCCUPIED ('Cooking' or 'Served')
                           if (table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running') {
-                            final existingOrder = orderStore.getActiveOrderByTableId(table.id);
+                            final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
                             // if (!mounted) return;
 
                             if (existingOrder != null) {
@@ -296,7 +298,7 @@ class _TableScreenState extends State<TableScreen> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => CartScreen(
-                                     // tableid: table.id,
+                                    // tableid: table.id,
                                     existingOrder: existingOrder,
                                     // cartItems: existingOrder.items,
                                     selectedTableNo: table.id,

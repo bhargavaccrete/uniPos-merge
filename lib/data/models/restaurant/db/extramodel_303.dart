@@ -8,9 +8,9 @@ part 'extramodel_303.g.dart';
 class Extramodel extends HiveObject{
 
   @HiveField(0)
- final String Id;
+  final String Id;
   @HiveField(1)
- final String Ename;
+  final String Ename;
 
   @HiveField(2)
   bool? isEnabled;
@@ -61,18 +61,18 @@ class Extramodel extends HiveObject{
     int? editCount,
     int? minimum,
     int? maximum,
-}){
+  }){
     return Extramodel(
-        Id: id?? this.Id,
-        Ename: name ?? this.Ename,
-        isEnabled: isEnabled ?? this.isEnabled,
-        topping: topping?? this.topping,
-        createdTime: createdTime ?? this.createdTime,
-        lastEditedTime: lastEditedTime ?? this.lastEditedTime,
-        editedBy: editedBy ?? this.editedBy,
-        editCount: editCount ?? this.editCount,
-        minimum: minimum ?? this.minimum,
-        maximum: maximum ?? this.maximum,
+      Id: id?? this.Id,
+      Ename: name ?? this.Ename,
+      isEnabled: isEnabled ?? this.isEnabled,
+      topping: topping?? this.topping,
+      createdTime: createdTime ?? this.createdTime,
+      lastEditedTime: lastEditedTime ?? this.lastEditedTime,
+      editedBy: editedBy ?? this.editedBy,
+      editCount: editCount ?? this.editCount,
+      minimum: minimum ?? this.minimum,
+      maximum: maximum ?? this.maximum,
     );
   }
 

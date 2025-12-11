@@ -47,46 +47,46 @@ class _SalesbytradingState extends State<Salesbytrading> {
             textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
         ),
-         centerTitle: true,
+        centerTitle: true,
         leading: IconButton(onPressed: (){
           Navigator.pop(context);
         }, icon: Icon(Icons.arrow_back_ios,color: Colors.white,)),
       ),
-    body: Container(
-      padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
-      child: Column(
-        children: [
-          // Container(
-          //   alignment: Alignment.bottomLeft,
-          //   child: Text('Sales By Session',
-          //     textScaler: TextScaler.linear(1),
-          //     style: GoogleFonts.poppins(
-          //     fontSize: 18,fontWeight: FontWeight.w500,
-          //   ),),
-          // ),
+      body: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
+        child: Column(
+          children: [
+            // Container(
+            //   alignment: Alignment.bottomLeft,
+            //   child: Text('Sales By Session',
+            //     textScaler: TextScaler.linear(1),
+            //     style: GoogleFonts.poppins(
+            //     fontSize: 18,fontWeight: FontWeight.w500,
+            //   ),),
+            // ),
 
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _filterButton('Today'),
-                SizedBox(width: 10,),
-                _filterButton('Day Wise'),
-                SizedBox(width: 10,),
-                _filterButton('This Week'),
-                SizedBox(width: 10,),
-                _filterButton('Month Wise'),
-                SizedBox(width: 10,),
-                _filterButton('Year Wise'),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _filterButton('Today'),
+                  SizedBox(width: 10,),
+                  _filterButton('Day Wise'),
+                  SizedBox(width: 10,),
+                  _filterButton('This Week'),
+                  SizedBox(width: 10,),
+                  _filterButton('Month Wise'),
+                  SizedBox(width: 10,),
+                  _filterButton('Year Wise'),
+                ],
+              ),
             ),
-          ),
-          Expanded(child: _getBody())
+            Expanded(child: _getBody())
 
 
-        ],
+          ],
+        ),
       ),
-    ),
     );
 
   }
@@ -101,16 +101,16 @@ class _SalesbytradingState extends State<Salesbytrading> {
         },
 
         style: ElevatedButton.styleFrom(
-          backgroundColor: selectedFilter==title ? primarycolor: Colors.white,
-          foregroundColor: selectedFilter==title ? Colors.white : primarycolor,
-       shape: RoundedRectangleBorder(
-         borderRadius: BorderRadius.circular(8),
-         side: BorderSide(color: primarycolor)
-       )
+            backgroundColor: selectedFilter==title ? primarycolor: Colors.white,
+            foregroundColor: selectedFilter==title ? Colors.white : primarycolor,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: primarycolor)
+            )
         ),
         child: Text(title));
   }
 
-  // CommonButton;
+// CommonButton;
 
 }

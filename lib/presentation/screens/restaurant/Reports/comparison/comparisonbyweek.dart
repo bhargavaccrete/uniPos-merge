@@ -90,25 +90,25 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
 
               Container(
                 decoration: BoxDecoration(
-                    // color: Colors.red[200],
-                    // borderRadius: BorderRadiusDirectional.only(topStart: Radius.circular(50),bottomStart: Radius.circular(15)),
+                  // color: Colors.red[200],
+                  // borderRadius: BorderRadiusDirectional.only(topStart: Radius.circular(50),bottomStart: Radius.circular(15)),
 
-                    ),
+                ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                       headingRowHeight: 50,
                       columnSpacing: 2,
                       headingRowColor:
-                          WidgetStateProperty.all(Colors.grey[300]),
+                      WidgetStateProperty.all(Colors.grey[300]),
                       border: TableBorder.all(
-                          // borderRadius: BorderRadius.circular(5),
+                        // borderRadius: BorderRadius.circular(5),
                           color: Colors.white),
                       decoration: BoxDecoration(
-                          // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                          // color: Colors.green,
+                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                        // color: Colors.green,
 
-                          ),
+                      ),
                       columns: [
                         DataColumn(
                             columnWidth: FixedColumnWidth(width * 0.2),
@@ -182,34 +182,34 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
                             DataCell(
                               Center(
                                   child: Text(
-                                '1',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              )),
+                                    '1',
+                                    textScaler: TextScaler.linear(1),
+                                    style: GoogleFonts.poppins(fontSize: 14),
+                                  )),
                             ),
                             DataCell(
                               Center(
                                   child: Text(
-                                'Guest',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              )),
+                                    'Guest',
+                                    textScaler: TextScaler.linear(1),
+                                    style: GoogleFonts.poppins(fontSize: 14),
+                                  )),
                             ),
                             DataCell(
                               Center(
                                   child: Text(
-                                '-',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              )),
+                                    '-',
+                                    textScaler: TextScaler.linear(1),
+                                    style: GoogleFonts.poppins(fontSize: 14),
+                                  )),
                             ),
                             DataCell(
                               Center(
                                   child: Text(
-                                '1784',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              )),
+                                    '1784',
+                                    textScaler: TextScaler.linear(1),
+                                    style: GoogleFonts.poppins(fontSize: 14),
+                                  )),
                             ),
                           ],
                         ),

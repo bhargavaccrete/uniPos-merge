@@ -27,25 +27,25 @@ class _orderSettingsState extends State<Ordersettings> {
 
   @override
   Widget build(BuildContext context) {
-   final screenWidth = MediaQuery.of(context).size.width * 1;
+    final screenWidth = MediaQuery.of(context).size.width * 1;
     final screenheight = MediaQuery.of(context).size.height * 1;
     return Scaffold(
       appBar: AppBar(
         elevation: 1,
         actions: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Text(
-                  "Order Settings ",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                ),
-                Icon(Icons.person),
-                Text('Admin'),
-              ],
-            )
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Text(
+                    "Order Settings ",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
+                  Icon(Icons.person),
+                  Text('Admin'),
+                ],
+              )
           )
         ],
       ),
@@ -99,31 +99,31 @@ class _orderSettingsState extends State<Ordersettings> {
   Widget takeAway() {
     return Column(
       children: [
-              ToggleSwitch(widthc:0.9,initialValue: false, label:"Enable Take Away  ? "),
+        ToggleSwitch(widthc:0.9,initialValue: false, label:"Enable Take Away  ? "),
         SizedBox(height: 10,),
 
         ToggleSwitch(widthc:0.9 ,initialValue: false, label:"Enable place Order Diallog ? ")
       ],
     );
-}
+  }
 
   Widget dineIn() {
     return  Column(
-        children: [
+      children: [
         ToggleSwitch(widthc:0.5,initialValue: false, label:"dine in ? "),
         // SizedBox(height: 10,),
         ToggleSwitch(widthc:1,initialValue: false, label:"Enable place Order Diallog ? ")
-        ],
-      );
-    
+      ],
+    );
+
   }
 
-Widget homeDelivery() {
-  return Column(
-    children: [
-    ToggleSwitch(
-      widthc:0.95, initialValue: false, label:" Enabel Home Delivery  ? ")
-    ],
-  );
-}
+  Widget homeDelivery() {
+    return Column(
+      children: [
+        ToggleSwitch(
+            widthc:0.95, initialValue: false, label:" Enabel Home Delivery  ? ")
+      ],
+    );
+  }
 }

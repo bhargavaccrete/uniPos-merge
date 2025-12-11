@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/presentation/screens/restaurant/Reports/reports.dart';
 
 
 
@@ -11,7 +12,6 @@ import '../../../util/restaurant/responsive_helper.dart';
 import '../../widget/componets/restaurant/componets/Button.dart';
 import '../../widget/componets/restaurant/componets/listmenu.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
-import '../retail/reports_screen.dart';
 import 'Desktop/componets/ListMenuD.dart';
 import 'Desktop/online_Order_desktop/online.dart';
 import 'Expense/Expense.dart';
@@ -55,11 +55,11 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     // final height = MediaQuery.of(context).size.height * 1;
     // final width = MediaQuery.of(context).size.width * 1;
     return LayoutBuilder(builder: (context , constraints){
-      // if(constraints.maxWidth <700 ){
+      if(constraints.maxWidth <700 ){
         return Scaffold(
           backgroundColor: screenBGColor,
           appBar: AppBar(
-            backgroundColor: screenBGColor,
+              backgroundColor: screenBGColor,
               automaticallyImplyLeading: false,
               // toolbarHeight: 50,
               // backgroundColor: Colors.red,
@@ -366,9 +366,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
             ),
           ),
         );
-      // }
-     /* else{
-       return Scaffold(
+      }else{
+        return Scaffold(
           appBar: AppBar(
             backgroundColor: screenBGColor,
             elevation: 10,
@@ -601,7 +600,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
             ),
           ),
         );
-      }*/
+      }
     });
   }
 }

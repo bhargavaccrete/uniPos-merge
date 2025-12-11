@@ -12,6 +12,7 @@ import 'auth/admin_login.dart';
 import 'auth/cashier_waiter.dart';
 import 'auth/login.dart';
 import 'need help/needhelp.dart';
+
 class Dashboard extends StatelessWidget {
   Dashboard({super.key});
 
@@ -36,17 +37,17 @@ class Dashboard extends StatelessWidget {
         child: Container(
           width: width,
           height: height,
-           padding: ResponsiveHelper.responsiveSymmetricPadding(context,
-           horizontalPercent: 0.03,
-             verticalPercent: 0.01,
-           ),
+          padding: ResponsiveHelper.responsiveSymmetricPadding(context,
+            horizontalPercent: 0.03,
+            verticalPercent: 0.01,
+          ),
           // color: Colors.red,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 alignment: Alignment.bottomCenter,
-               height: ResponsiveHelper.responsiveHeight(context, 0.15),
+                height: ResponsiveHelper.responsiveHeight(context, 0.15),
 
                 width: ResponsiveHelper.responsiveWidth(context, 0.5),
 
@@ -59,11 +60,11 @@ class Dashboard extends StatelessWidget {
 
               ),
               Text(
-                'DashBoard',
-                textScaler: TextScaler.linear(1),
-                style: GoogleFonts.poppins(
-                  fontSize: ResponsiveHelper.responsiveTextSize(context, 20),
-                  fontWeight: FontWeight.w600,)
+                  'DashBoard',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(
+                    fontSize: ResponsiveHelper.responsiveTextSize(context, 20),
+                    fontWeight: FontWeight.w600,)
               ),
               SizedBox(
                 height: ResponsiveHelper.responsiveHeight(context, 0.02),
@@ -191,50 +192,50 @@ class Dashboard extends StatelessWidget {
                         showDialog(
                             context: context,
                             builder: (BuildContext context) => AlertDialog(
-                                  title: Text('Are you sure you want to logout?',
-                                      style: TextStyle(
-                                        fontSize: ResponsiveHelper.responsiveTextSize(context, 15),
-                                      )),
-                                  actions: <Widget>[
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        CommonButton(
-                                          bordercolor: Colors.red,
-                                          bordercircular: 2,
-                                          width: ResponsiveHelper.responsiveWidth(context, 0.3),
+                              title: Text('Are you sure you want to logout?',
+                                  style: TextStyle(
+                                    fontSize: ResponsiveHelper.responsiveTextSize(context, 15),
+                                  )),
+                              actions: <Widget>[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    CommonButton(
+                                      bordercolor: Colors.red,
+                                      bordercircular: 2,
+                                      width: ResponsiveHelper.responsiveWidth(context, 0.3),
 
-                                          height: ResponsiveHelper.responsiveHeight(context, 0.05),
+                                      height: ResponsiveHelper.responsiveHeight(context, 0.05),
 
-                                          bgcolor: Colors.red,
-                                          onTap: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                          child: Text("Cancel",style: GoogleFonts.poppins(
-                                            fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-                                          ),),
-                                        ),
-                                        SizedBox(
-                                          width: ResponsiveHelper.responsiveWidth(context, 0.01),
+                                      bgcolor: Colors.red,
+                                      onTap: () {
+                                        Navigator.of(context).pop();
+                                      },
+                                      child: Text("Cancel",style: GoogleFonts.poppins(
+                                        fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                                      ),),
+                                    ),
+                                    SizedBox(
+                                      width: ResponsiveHelper.responsiveWidth(context, 0.01),
 
-                                        ),
-                                        CommonButton(
-                                          bordercircular: 2,
-                                          width: width * 0.3,
-                                          height: height * 0.05,
-                                          bgcolor: primarycolor,
-                                          onTap: () {
-                                            Navigator.push(context,
-                                                MaterialPageRoute(builder: (context) => AuthSelectionScreen()));
-                                            ;
-                                          },
-                                          child: Text("Yes",style: GoogleFonts.poppins(  fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-                                          ),),
-                                        ),
-                                      ],
+                                    ),
+                                    CommonButton(
+                                      bordercircular: 2,
+                                      width: width * 0.3,
+                                      height: height * 0.05,
+                                      bgcolor: primarycolor,
+                                      onTap: () {
+                                        Navigator.push(context,
+                                            MaterialPageRoute(builder: (context) => AuthSelectionScreen()));
+                                        ;
+                                      },
+                                      child: Text("Yes",style: GoogleFonts.poppins(  fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                                      ),),
                                     ),
                                   ],
-                                ));
+                                ),
+                              ],
+                            ));
                       },
                       child: Container(
                         height: ResponsiveHelper.responsiveHeight(context, 0.12),
@@ -275,3 +276,4 @@ class Dashboard extends StatelessWidget {
     );
   }
 }
+

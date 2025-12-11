@@ -55,7 +55,7 @@ class _ordernotificationsettingsState extends State<OrderNotificationsettings> {
                     width: 10,
                     height: 10,
                     decoration:
-                        BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                   ),
                   Text(
                     "Inactive Decives ",
@@ -68,8 +68,8 @@ class _ordernotificationsettingsState extends State<OrderNotificationsettings> {
                 child: Container(
                   decoration: BoxDecoration(
                     // border: Border.all()
-                  // borderRadius: BorderRadius.only(bottomLeft: Radius.circular(10),bottomRight: Radius.circular(10))
-                  borderRadius: BorderRadius.circular(10)
+                    // borderRadius: BorderRadius.only(bottomLeft: Radius.circular(10),bottomRight: Radius.circular(10))
+                      borderRadius: BorderRadius.circular(10)
                   ),
                   child: Container(
                     width:width*0.9,
@@ -124,7 +124,7 @@ class _ordernotificationsettingsState extends State<OrderNotificationsettings> {
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color:
-                                                _isonline1 ? Colors.green : Colors.white,
+                                            _isonline1 ? Colors.green : Colors.white,
                                             borderRadius: const BorderRadius.horizontal(
                                                 left: Radius.circular(30)),
                                           ),
@@ -152,7 +152,7 @@ class _ordernotificationsettingsState extends State<OrderNotificationsettings> {
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color:
-                                                !_isonline1 ? Colors.red : Colors.white,
+                                            !_isonline1 ? Colors.red : Colors.white,
                                             borderRadius: const BorderRadius.horizontal(
                                                 right: Radius.circular(30)),
                                           ),
@@ -200,7 +200,7 @@ class _ordernotificationsettingsState extends State<OrderNotificationsettings> {
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color:
-                                                _isonline2 ? Colors.green : Colors.white,
+                                            _isonline2 ? Colors.green : Colors.white,
                                             borderRadius: const BorderRadius.horizontal(
                                                 left: Radius.circular(30)),
                                           ),
@@ -228,7 +228,7 @@ class _ordernotificationsettingsState extends State<OrderNotificationsettings> {
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color:
-                                                !_isonline2 ? Colors.red : Colors.white,
+                                            !_isonline2 ? Colors.red : Colors.white,
                                             borderRadius: const BorderRadius.horizontal(
                                                 right: Radius.circular(30)),
                                           ),

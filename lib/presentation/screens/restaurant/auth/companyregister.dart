@@ -6,8 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/data/models/restaurant/db/companymodel_301.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/login.dart';
-import 'dart:io';
-import '../dashboard.dart';
+
 import 'package:hive/hive.dart';
 import 'package:flutter/widgets.dart';
 import 'package:unipos/constants/restaurant/color.dart';
@@ -111,16 +110,16 @@ class _CompanyregisterState extends State<Companyregister> {
     ownernameController.dispose();
     mobileController.dispose();
     alternatemobileController.dispose();
-     emailController.dispose();
-     businesstypeController.dispose();
-     gstinController.dispose();
-     fssaiController.dispose();
-     panController.dispose();
-     addressController.dispose();
-     cityController.dispose();
-     stateController.dispose();
-     pincodeController.dispose();
-     countryController.dispose();
+    emailController.dispose();
+    businesstypeController.dispose();
+    gstinController.dispose();
+    fssaiController.dispose();
+    panController.dispose();
+    addressController.dispose();
+    cityController.dispose();
+    stateController.dispose();
+    pincodeController.dispose();
+    countryController.dispose();
   }
 
 
@@ -143,18 +142,18 @@ class _CompanyregisterState extends State<Companyregister> {
     double iconSize = forMobile
         ? 24
         : fortablet
-            ? 36
-            : 48;
+        ? 36
+        : 48;
     double title = forMobile
         ? 16
         : fortablet
-            ? 20
-            : 26;
+        ? 20
+        : 26;
     double padding = forMobile
         ? 12
         : fortablet
-            ? 20
-            : 32;
+        ? 20
+        : 32;
     double spaceing = forMobile ? 5 : 20;
     double forfont = forMobile ? 16: fortablet? 15 : 35;
 
@@ -275,13 +274,13 @@ class _CompanyregisterState extends State<Companyregister> {
                                     fontWeight: FontWeight.w400,
                                     color: Colors.black),
                                 children: [
-                              TextSpan(
-                                  text: ' *',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ))
-                            ])),
+                                  TextSpan(
+                                      text: ' *',
+                                      style: TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                      ))
+                                ])),
                         SizedBox(
                           height: 5,
                         ),
@@ -363,21 +362,21 @@ class _CompanyregisterState extends State<Companyregister> {
                               ),
                               Expanded(
                                   child: TextFormField(
-                                decoration:
+                                    decoration:
                                     InputDecoration(border: InputBorder.none),
-                                keyboardType: TextInputType.number,
-                                controller: alternatemobileController,
-                                focusNode: alternatemobileFocus,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return "Enter the Mobile Number";
-                                  }
-                                },
-                                onFieldSubmitted: (value) {
-                                  FocusScope.of(context)
-                                      .requestFocus(emailFocus);
-                                },
-                              )),
+                                    keyboardType: TextInputType.number,
+                                    controller: alternatemobileController,
+                                    focusNode: alternatemobileFocus,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return "Enter the Mobile Number";
+                                      }
+                                    },
+                                    onFieldSubmitted: (value) {
+                                      FocusScope.of(context)
+                                          .requestFocus(emailFocus);
+                                    },
+                                  )),
                             ],
                           ),
                         ),
@@ -395,12 +394,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                   fontWeight: FontWeight.w400,
                                 ),
                                 children: [
-                              TextSpan(
-                                  text: ' *',
-                                  style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold))
-                            ])),
+                                  TextSpan(
+                                      text: ' *',
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold))
+                                ])),
                         SizedBox(
                           height: 5,
                         ),
@@ -436,12 +435,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                   fontWeight: FontWeight.w400,
                                 ),
                                 children: [
-                              TextSpan(
-                                  text: ' *',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red))
-                            ])),
+                                  TextSpan(
+                                      text: ' *',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red))
+                                ])),
                         SizedBox(
                           height: 5,
                         ),
@@ -548,12 +547,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                     color: Colors.black,
                                     fontWeight: FontWeight.w400),
                                 children: [
-                              TextSpan(
-                                  text: '*',
-                                  style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold))
-                            ])),
+                                  TextSpan(
+                                      text: '*',
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold))
+                                ])),
                         SizedBox(
                           height: 5,
                         ),
@@ -594,12 +593,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                               color: Colors.black,
                                               fontWeight: FontWeight.w400),
                                           children: [
-                                        TextSpan(
-                                            text: '*',
-                                            style: TextStyle(
-                                                color: Colors.red,
-                                                fontWeight: FontWeight.bold))
-                                      ])),
+                                            TextSpan(
+                                                text: '*',
+                                                style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontWeight: FontWeight.bold))
+                                          ])),
                                   SizedBox(
                                     height: 5,
                                   ),
@@ -640,12 +639,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                               color: Colors.black,
                                               fontWeight: FontWeight.w400),
                                           children: [
-                                        TextSpan(
-                                            text: '*',
-                                            style: TextStyle(
-                                                color: Colors.red,
-                                                fontWeight: FontWeight.bold))
-                                      ])),
+                                            TextSpan(
+                                                text: '*',
+                                                style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontWeight: FontWeight.bold))
+                                          ])),
                                   SizedBox(
                                     height: 5,
                                   ),
@@ -687,12 +686,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                     color: Colors.black,
                                     fontWeight: FontWeight.w400),
                                 children: [
-                              TextSpan(
-                                  text: '*',
-                                  style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold))
-                            ])),
+                                  TextSpan(
+                                      text: '*',
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold))
+                                ])),
                         SizedBox(
                           height: 5,
                         ),
@@ -761,12 +760,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                     color: Colors.black,
                                     fontWeight: FontWeight.w400),
                                 children: [
-                              TextSpan(
-                                  text: '*',
-                                  style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold))
-                            ])),
+                                  TextSpan(
+                                      text: '*',
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold))
+                                ])),
                         SizedBox(
                           height: 5,
                         ),
@@ -784,7 +783,7 @@ class _CompanyregisterState extends State<Companyregister> {
                                   borderRadius: BorderRadius.circular(5)),
                               child: Row(
                                 mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     _fromDate == null
@@ -809,12 +808,12 @@ class _CompanyregisterState extends State<Companyregister> {
                                     color: Colors.black,
                                     fontWeight: FontWeight.w400),
                                 children: [
-                              TextSpan(
-                                  text: ' *',
-                                  style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.bold))
-                            ])),
+                                  TextSpan(
+                                      text: ' *',
+                                      style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold))
+                                ])),
                         SizedBox(
                           height: 5,
                         ),

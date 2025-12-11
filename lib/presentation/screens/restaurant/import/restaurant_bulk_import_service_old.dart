@@ -8,19 +8,14 @@ import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/domain/store/restaurant/category_store.dart';
-import 'package:unipos/domain/store/restaurant/item_store.dart';
-import 'package:unipos/domain/store/restaurant/choice_store.dart';
-import 'package:unipos/domain/store/restaurant/extra_store.dart';
-import 'package:unipos/data/repositories/restaurant/variant_repository.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:uuid/uuid.dart';
 
 class RestaurantBulkImportService {
-  final ItemStore _itemStore = locator<ItemStore>();
-  final CategoryStore _categoryStore = locator<CategoryStore>();
-  final ChoiceStore _choiceStore = locator<ChoiceStore>();
-  final ExtraStore _extraStore = locator<ExtraStore>();
-  final VariantRepository _variantRepository = locator<VariantRepository>();
+  // No need for store instances - using Hive directly
 
   // Template Headers
   static const List<String> headers = [
@@ -136,11 +131,11 @@ class RestaurantBulkImportService {
   Future<void> importData(List<List<dynamic>> rows) async {
     if (rows.length < 2) return; // Only headers
 
-    // Ensure all data is loaded
-    await _categoryStore.loadCategories();
-    await _choiceStore.loadChoices();
-    await _extraStore.loadExtras();
-    await _itemStore.loadItems();
+    // Data is available directly from Hive - no need to load
+    final categories = await HiveBoxes.getAllCategories();
+    final choices = await HiveChoice.getAllChoice();
+    final extras = await HiveExtra.getAllExtra();
+    final items = await itemsBoxes.getAllItems();
 
     // Skip headers
     final dataRows = rows.skip(1).toList();
@@ -230,7 +225,7 @@ class RestaurantBulkImportService {
       taxRate: 0,
     );
 
-    await _itemStore.addItem(newItem);
+    await itemsBoxes.addItem(newItem);
   }
 
   String _getValue(List<dynamic> row, int index) {
@@ -248,7 +243,8 @@ class RestaurantBulkImportService {
     if (name.isEmpty) return 'Uncategorized';
 
     try {
-      var existing = _categoryStore.categories.firstWhere(
+      final allCategories = await HiveBoxes.getAllCategories();
+      var existing = allCategories.firstWhere(
         (c) => c.name.toLowerCase() == name.toLowerCase(),
         orElse: () => Category(id: '', name: ''),
       );
@@ -262,7 +258,7 @@ class RestaurantBulkImportService {
         id: newId,
         name: name,
       );
-      await _categoryStore.addCategory(newCat);
+      await HiveBoxes.addCategory(newCat);
       return newId;
     } catch (e) {
       print('Error finding/creating category: $e');
@@ -274,7 +270,7 @@ class RestaurantBulkImportService {
     if (name.isEmpty) return const Uuid().v4(); // Fallback
 
     try {
-      List<VariantModel> allVariants = _variantRepository.getAllVariants();
+      List<VariantModel> allVariants = await HiveVariante.getAllVariante();
       var existing = allVariants.firstWhere(
         (v) => v.name.toLowerCase() == name.toLowerCase(),
         orElse: () => VariantModel(id: '', name: ''),
@@ -291,7 +287,7 @@ class RestaurantBulkImportService {
         name: name,
         createdTime: DateTime.now(),
       );
-      await _variantRepository.addVariant(newVariant);
+      await HiveVariante.addVariante(newVariant);
       return newId;
     } catch (e) {
       print('Error finding/creating variant: $e');
@@ -306,9 +302,10 @@ class RestaurantBulkImportService {
     List<String> ids = [];
 
     if (isExtra) {
+      final allExtras = await HiveExtra.getAllExtra();
       for (String name in names) {
         try {
-          var extra = _extraStore.extras.firstWhere(
+          var extra = allExtras.firstWhere(
             (e) => e.Ename.toLowerCase() == name.toLowerCase(),
             orElse: () => null as dynamic,
           );
@@ -316,9 +313,10 @@ class RestaurantBulkImportService {
         } catch (e) { /* ignore */ }
       }
     } else {
+      final allChoices = await HiveChoice.getAllChoice();
       for (String name in names) {
         try {
-          var choice = _choiceStore.choices.firstWhere(
+          var choice = allChoices.firstWhere(
             (c) => c.name.toLowerCase() == name.toLowerCase(),
             orElse: () => null as dynamic,
           );

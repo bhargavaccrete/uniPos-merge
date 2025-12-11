@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive/hive.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
@@ -16,7 +18,6 @@ import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../widget/componets/restaurant/componets/custom_category.dart';
 
-
 class CategoryTab extends StatefulWidget {
   const CategoryTab({super.key});
 
@@ -25,8 +26,8 @@ class CategoryTab extends StatefulWidget {
 }
 
 class _CategoryTabState extends State<CategoryTab> {
- final TextEditingController _searchController = TextEditingController();
- final  TextEditingController _categoryController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+  final  TextEditingController _categoryController = TextEditingController();
 
 
   // List<Map<String, dynamic>> CategoyList = [];
@@ -39,11 +40,15 @@ class _CategoryTabState extends State<CategoryTab> {
 
   Map<String , List<Items>> categoryItemsMap = {};
 
-Map<String , bool>  toggleState = {};
+  Map<String , bool>  toggleState = {};
 
   Future<void> loadCategoriesAndItems ()async {
-    final allCategories = categoryStore.categories.toList();
-    final allItems = itemStore.items.toList();
+    final categoryBox = await Hive.openBox<Category>('categories');
+    final itemBox = await itemsBoxes.getItemBox();
+
+    final allCategories = categoryBox.values.toList();
+    final allItems = itemBox.values.toList();
+
 
     //group items by categoryid
     final Map<String, List<Items>> tempMap = {};
@@ -173,8 +178,8 @@ Map<String , bool>  toggleState = {};
         id: const Uuid().v4(),
         name: _categoryController.text.trim());
 
-    await categoryStore.addCategory(newcategory);
-    await loadCategoriesAndItems();
+    await HiveBoxes.addCategory(newcategory);
+    await loadHive();
     _clearImage();
     Navigator.pop(context);
 
@@ -185,15 +190,16 @@ Map<String , bool>  toggleState = {};
 
   /// to load hive data
   Future<void> loadHive() async {
+    final box = await HiveBoxes.getCategory();
     setState(() {
-      categorieshive = categoryStore.categories.toList();
+      categorieshive = box.values.toList();
     });
   }
 
   /// delete category
   void _deleteCategoryhive(dynamic id) async {
-    await categoryStore.deleteCategory(id);
-    await loadCategoriesAndItems();
+    await HiveBoxes.deleteCategory(id);
+    await loadHive();
   }
 
   // void _addcategory (){
@@ -263,137 +269,146 @@ Map<String , bool>  toggleState = {};
                 children: [
                   categorieshive.isEmpty
                       ? Container(
-                          height:
-                              ResponsiveHelper.responsiveHeight(context, 0.6),
-                          width: width,
-                          // color: Colors.green,
-                          // color: Colors.red,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Lottie.asset(
-                                notfoundanimation,
-                                height: ResponsiveHelper.responsiveHeight(
-                                    context, 0.3),
-                              ),
-                              Text(
-                                'No Category Found',
-                                style: GoogleFonts.poppins(
-                                    fontSize:
-                                        ResponsiveHelper.responsiveTextSize(
-                                            context, 20),
-                                    fontWeight: FontWeight.w500),
-                              )
-                            ],
-                          ),
+                    height:
+                    ResponsiveHelper.responsiveHeight(context, 0.6),
+                    width: width,
+                    // color: Colors.green,
+                    // color: Colors.red,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Lottie.asset(
+                          notfoundanimation,
+                          height: ResponsiveHelper.responsiveHeight(
+                              context, 0.3),
+                        ),
+                        Text(
+                          'No Category Found',
+                          style: GoogleFonts.poppins(
+                              fontSize:
+                              ResponsiveHelper.responsiveTextSize(
+                                  context, 20),
+                              fontWeight: FontWeight.w500),
                         )
+                      ],
+                    ),
+                  )
                       : Container(
-                          // color: Colors.purple,
-                          height:
-                              ResponsiveHelper.responsiveHeight(context, 0.6),
+                    // color: Colors.purple,
+                    height:
+                    ResponsiveHelper.responsiveHeight(context, 0.6),
 
-                          width: ResponsiveHelper.maxContentWidth(context),
+                    width: ResponsiveHelper.maxContentWidth(context),
 
-                          child: ListView.builder(
-                              itemCount: categorieshive.length,
-                              itemBuilder: (context, index) {
-                                var category = categorieshive[index];
+                    child: ListView.builder(
+                        itemCount: categorieshive.length,
+                        itemBuilder: (context, index) {
+                          var category = categorieshive[index];
 
-                                // final cat = categoriesitem[index];
-                                final items = categoryItemsMap[category.id] ?? [];
+                          // final cat = categoriesitem[index];
+                          final items = categoryItemsMap[category.id] ?? [];
 
-                               toggleState.putIfAbsent(category.id ,()=>  true);
-                                return Card(
-                                  // margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  shape: RoundedRectangleBorder(),
-                                  child: Container(
-                                      // color: Colors.redAccent,
-                                      width: double.infinity,
-                                      height: ResponsiveHelper.responsiveHeight(
-                                          context, 0.14),
-                                      child: CustomCategory(
-                                          imagePath: category.imagePath,
-                                          // _selectedImage != null
-                                          //     ?Image.file(_selectedImage!, height:50,width: 50,)
-                                          // : Icon(Icons.image,size: 50,color: Colors.grey,),
-                                          // itemCount: items.length.toString(),
-                                      itemCount:items.length.toString() ?? '0',
-                                          title: category.name,
-                                          isActive: toggleState[category.id]?? false,
-                                          // 🔍 AUDIT TRAIL: Pass audit trail data to widget
-                                          createdTime: category.createdTime,
-                                          lastEditedTime: category.lastEditedTime,
-                                          editedBy: category.editedBy,
-                                          editCount: category.editCount,
-                                          onDelet: () {
-                                            showDialog(context: context,
-                                                builder:(_)=> AlertDialog(
-                                                  title: Text('Delete Category'),
-                                                  content: Text("Are you sure want to delete this category and all its items?"),
-                                                  actions: [
-                                                    TextButton(onPressed: (){},
-                                                        child: Text("Cancel"),),
-                                                    TextButton(onPressed: (){
-                                                      _deleteCategoryhive(category.id);
-                                                      Navigator.pop(context);
-                                                      
-                                                    }, child: Text('Delete',style:TextStyle(color: Colors.red)))
-                                                    
-                                                  ],
-                                                ));
-                                            
-                                            
-                                            
-                                            // _deleteCategoryhive(category.id);
-                                            // HiveBoxes.deleteCategory(category.id);
-                                          },
-                                          // onEdit: (){
-                                          //   Navigator.push(context, MaterialPageRoute(builder: (context)=> EditCategory(category: Category.fromMap(CategoyList[index]),
-                                          //   )));
-                                          //
-                                          //   // setState(() {
-                                          //   //   CategoryController.text = category.name;
-                                          //   //   _selectedImage = category.imagePath != null ? File(category.imagePath!):null;
-                                          //   // });
-                                          // },
-                                          onEdit: () async {
-                                            final categoryList = categoryStore.categories.toList();
+                          toggleState.putIfAbsent(category.id ,()=>  true);
+                          return Card(
+                            // margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            shape: RoundedRectangleBorder(),
+                            child: Container(
+                              // color: Colors.redAccent,
+                                width: double.infinity,
+                                height: ResponsiveHelper.responsiveHeight(
+                                    context, 0.14),
+                                child: CustomCategory(
+                                    imagePath: category.imagePath,
+                                    // _selectedImage != null
+                                    //     ?Image.file(_selectedImage!, height:50,width: 50,)
+                                    // : Icon(Icons.image,size: 50,color: Colors.grey,),
+                                    // itemCount: items.length.toString(),
+                                    itemCount:items.length.toString() ?? '0',
+                                    title: category.name,
+                                    isActive: toggleState[category.id]?? false,
+                                    // 🔍 AUDIT TRAIL: Pass audit trail data to widget
+                                    createdTime: category.createdTime,
+                                    lastEditedTime: category.lastEditedTime,
+                                    editedBy: category.editedBy,
+                                    editCount: category.editCount,
+                                    onDelet: () {
+                                      showDialog(context: context,
+                                          builder:(_)=> AlertDialog(
+                                            title: Text('Delete Category'),
+                                            content: Text("Are you sure want to delete this category and all its items?"),
+                                            actions: [
+                                              TextButton(onPressed: (){},
+                                                child: Text("Cancel"),),
+                                              TextButton(onPressed: (){
+                                                _deleteCategoryhive(category.id);
+                                                Navigator.pop(context);
 
-                                            if (categoryList.isNotEmpty && index < categoryList.length) {
-                                              final result =
-                                                  await Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      EditCategory(
-                                                    category:
-                                                        categoryList[index],
-                                                  ),
+                                              }, child: Text('Delete',style:TextStyle(color: Colors.red)))
+
+                                            ],
+                                          ));
+
+
+
+                                      // _deleteCategoryhive(category.id);
+                                      // HiveBoxes.deleteCategory(category.id);
+                                    },
+                                    // onEdit: (){
+                                    //   Navigator.push(context, MaterialPageRoute(builder: (context)=> EditCategory(category: Category.fromMap(CategoyList[index]),
+                                    //   )));
+                                    //
+                                    //   // setState(() {
+                                    //   //   CategoryController.text = category.name;
+                                    //   //   _selectedImage = category.imagePath != null ? File(category.imagePath!):null;
+                                    //   // });
+                                    // },
+                                    onEdit: () async {
+                                      List<Category> categoryList =
+                                      await HiveBoxes
+                                          .getAllCategories();
+
+                                      if (categoryList.isNotEmpty) {
+                                        final result =
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                EditCategory(
+                                                  category:
+                                                  categoryList[index],
                                                 ),
-                                              );
+                                          ),
+                                        );
 
-                                              if (result == true) {
-                                                // Refresh the list
-                                                setState(() {
-                                                  loadCategoriesAndItems();
-                                                  // Optionally re-fetch the data
-                                                });
-                                              }
-                                            } else {
+                                        if (result == true) {
+                                          // Refresh the list
+                                          setState(() {
+                                            loadHive();
+                                            // Optionally re-fetch the data
+                                          });
+                                        }
+                                      } else {
 
-                                              NotificationService.instance.showInfo(
-                                                'No category available to edit',
-                                              );
-                                            }
-                                          },
-                                          onToggle: ( value) {
-                                            setState(() {
-                                           toggleState[category.id] = value;
-                                            });
-                                          })),
-                                );
-                              }),
-                        )
+                                        NotificationService.instance.showInfo(
+                                          'No category available to edit',
+                                        );
+
+                                        // ScaffoldMessenger.of(context)
+                                        //     .showSnackBar(
+                                        //   SnackBar(
+                                        //       content: Text(
+                                        //           "No category available to edit")),
+                                        // );
+                                      }
+                                    },
+                                    onToggle: ( value) {
+                                      setState(() {
+                                        toggleState[category.id] = value;
+                                      });
+                                    })),
+                          );
+                        }),
+                  )
                 ],
               ),
               // Button  Add Category
@@ -409,7 +424,7 @@ Map<String , bool>  toggleState = {};
                           return Padding(
                               padding: EdgeInsets.only(
                                 bottom:
-                                    MediaQuery.of(context).viewInsets.bottom,
+                                MediaQuery.of(context).viewInsets.bottom,
                               ),
                               child: Container(
                                 width: double.infinity,
@@ -436,7 +451,7 @@ Map<String , bool>  toggleState = {};
                                         decoration: InputDecoration(
                                           focusedBorder: OutlineInputBorder(
                                               borderRadius:
-                                                  BorderRadius.circular(2)),
+                                              BorderRadius.circular(2)),
                                           labelStyle: GoogleFonts.poppins(
                                             color: Colors.grey,
                                           ),
@@ -452,73 +467,73 @@ Map<String , bool>  toggleState = {};
                                           children: [
 
                                             Container(
-                                                // color:Colors.red,
+                                              // color:Colors.red,
                                                 height: ResponsiveHelper
                                                     .responsiveHeight(
-                                                        context, 0.16),
+                                                    context, 0.16),
                                                 decoration: BoxDecoration(
                                                   border: Border.all(
                                                       color: Colors.grey),
                                                   borderRadius:
-                                                      BorderRadius.circular(10),
+                                                  BorderRadius.circular(10),
                                                 ),
                                                 child: _selectedImage != null
                                                     ? Image.file(
-                                                        _selectedImage!,
-                                                        fit: BoxFit.cover,
-                                                        height: 50,
-                                                        width: 150,
-                                                      )
+                                                  _selectedImage!,
+                                                  fit: BoxFit.cover,
+                                                  height: 50,
+                                                  width: 150,
+                                                )
                                                     : Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .center,
-                                                        children: [
-                                                          Center(
-                                                              child: Icon(
-                                                                  Icons.image,
-                                                                  color: Colors
-                                                                      .grey,
-                                                                  size: 50)),
-                                                          SizedBox(
-                                                            height: 5,
-                                                          ),
-                                                          Text(
-                                                            'Upload Image',
-                                                            textScaler:
-                                                                TextScaler
-                                                                    .linear(1),
-                                                            style: GoogleFonts.poppins(
-                                                                fontSize: ResponsiveHelper
-                                                                    .responsiveTextSize(
-                                                                        context,
-                                                                        16),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500),
-                                                          ),
-                                                          Text(
-                                                            '600X400',
-                                                            textScaler:
-                                                                TextScaler
-                                                                    .linear(1),
-                                                            style: GoogleFonts
-                                                                .poppins(
-                                                              fontSize: ResponsiveHelper
-                                                                  .responsiveTextSize(
-                                                                      context,
-                                                                      12),
-                                                            ),
-                                                          )
-                                                        ],
-                                                      )),
+                                                  mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .center,
+                                                  children: [
+                                                    Center(
+                                                        child: Icon(
+                                                            Icons.image,
+                                                            color: Colors
+                                                                .grey,
+                                                            size: 50)),
+                                                    SizedBox(
+                                                      height: 5,
+                                                    ),
+                                                    Text(
+                                                      'Upload Image',
+                                                      textScaler:
+                                                      TextScaler
+                                                          .linear(1),
+                                                      style: GoogleFonts.poppins(
+                                                          fontSize: ResponsiveHelper
+                                                              .responsiveTextSize(
+                                                              context,
+                                                              16),
+                                                          fontWeight:
+                                                          FontWeight
+                                                              .w500),
+                                                    ),
+                                                    Text(
+                                                      '600X400',
+                                                      textScaler:
+                                                      TextScaler
+                                                          .linear(1),
+                                                      style: GoogleFonts
+                                                          .poppins(
+                                                        fontSize: ResponsiveHelper
+                                                            .responsiveTextSize(
+                                                            context,
+                                                            12),
+                                                      ),
+                                                    )
+                                                  ],
+                                                )),
                                             Text(
                                               'Upload Image (png , .jpg, .jpeg) upto 3mb',
                                               textScaler: TextScaler.linear(1),
                                               style: GoogleFonts.poppins(
                                                 fontSize: ResponsiveHelper
                                                     .responsiveTextSize(
-                                                        context, 14),
+                                                    context, 14),
                                               ),
                                             )
                                           ],
@@ -536,18 +551,18 @@ Map<String , bool>  toggleState = {};
                                         width: ResponsiveHelper.responsiveWidth(
                                             context, 0.9),
                                         height:
-                                            ResponsiveHelper.responsiveHeight(
-                                                context, 0.07),
+                                        ResponsiveHelper.responsiveHeight(
+                                            context, 0.07),
                                         child: Row(
                                           mainAxisAlignment:
-                                              MainAxisAlignment.center,
+                                          MainAxisAlignment.center,
                                           children: [
                                             Container(
                                                 decoration: BoxDecoration(
                                                     color: Colors.white,
                                                     borderRadius:
-                                                        BorderRadius.circular(
-                                                            10)),
+                                                    BorderRadius.circular(
+                                                        10)),
                                                 child: Icon(Icons.add)),
                                             SizedBox(
                                               width: 5,
@@ -557,7 +572,7 @@ Map<String , bool>  toggleState = {};
                                               style: GoogleFonts.poppins(
                                                   fontSize: ResponsiveHelper
                                                       .responsiveTextSize(
-                                                          context, 16),
+                                                      context, 16),
                                                   color: Colors.white),
                                             )
                                           ],
@@ -584,7 +599,7 @@ Map<String , bool>  toggleState = {};
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize:
-                              ResponsiveHelper.responsiveTextSize(context, 16),
+                          ResponsiveHelper.responsiveTextSize(context, 16),
                         ),
                       )
                     ],

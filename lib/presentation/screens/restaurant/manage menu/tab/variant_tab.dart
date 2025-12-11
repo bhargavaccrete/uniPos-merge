@@ -10,6 +10,8 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../../data/models/restaurant/db/database/hive_variante.dart';
+
 
 class VariantTab extends StatefulWidget {
   const VariantTab({super.key});
@@ -50,14 +52,14 @@ class _VariantTabState extends State<VariantTab> {
       final updateVariante = VariantModel(
           id: editingVariante!.id,
           name: trimmedName);
-      await variantStore.updateVariant(updateVariante);
+      await HiveVariante.updateVariante(updateVariante);
     } else {
       final newvariante = VariantModel(id: Uuid().v4(), name: trimmedName);
-      await variantStore.addVariant(newvariante);
+      await HiveVariante.addVariante(newvariante);
     }
 
     // ADD THESE TWO LINES TO CHECK THE BOX IMMEDIATELY AFTER SAVING
-    final variantBox = Hive.box<VariantModel>('variants');
+    final variantBox = Hive.box<VariantModel>('variante');
     print("--- VARIANT TAB: Box contents immediately after saving: ${variantBox.values.map((v) => v.name).toList()} ---");
 
     VariantController.clear();
@@ -68,7 +70,7 @@ class _VariantTabState extends State<VariantTab> {
   }
 
   Future<void> _delete(String id) async {
-    await variantStore.deleteVariant(id);
+    await HiveVariante.deleteVariante(id);
     Navigator.pop(context);
   }
 
@@ -85,12 +87,12 @@ class _VariantTabState extends State<VariantTab> {
           child: Column(
             children: [
               ValueListenableBuilder(
-                  valueListenable: Hive.box<VariantModel>('variants').listenable(),
+                  valueListenable: Hive.box<VariantModel>('variante').listenable(),
                   builder: (context, variantebox, _) {
                     final allvariante = variantebox.values.toList();
 
                     if (allvariante.isEmpty) {
-                     return Container(
+                      return Container(
                         height: height * 0.7,
                         width: width,
                         // color: Colors.green,
@@ -505,8 +507,8 @@ class _VariantTabState extends State<VariantTab> {
                 child: Center(
                     child: Text(
                       editingVariante == null ? 'Add' : 'update',
-                  style: GoogleFonts.poppins(color: Colors.white),
-                )))
+                      style: GoogleFonts.poppins(color: Colors.white),
+                    )))
           ],
         ),
       ),

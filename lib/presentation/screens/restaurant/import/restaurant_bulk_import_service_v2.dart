@@ -12,21 +12,16 @@ import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/domain/store/restaurant/category_store.dart';
-import 'package:unipos/domain/store/restaurant/item_store.dart';
-import 'package:unipos/domain/store/restaurant/choice_store.dart';
-import 'package:unipos/domain/store/restaurant/extra_store.dart';
-import 'package:unipos/data/repositories/restaurant/variant_repository.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:uuid/uuid.dart';
 
 /// Improved Restaurant Bulk Import Service
 /// Supports multi-sheet Excel import with full model coverage
 class RestaurantBulkImportServiceV2 {
-  final ItemStore _itemStore = locator<ItemStore>();
-  final CategoryStore _categoryStore = locator<CategoryStore>();
-  final ChoiceStore _choiceStore = locator<ChoiceStore>();
-  final ExtraStore _extraStore = locator<ExtraStore>();
-  final VariantRepository _variantRepository = locator<VariantRepository>();
+  // No need for store instances - using Hive directly
 
   // Sheet names
   static const String SHEET_CATEGORIES = 'Categories';
@@ -278,11 +273,11 @@ class RestaurantBulkImportServiceV2 {
     ImportResult result = ImportResult();
 
     try {
-      // Ensure all data is loaded
-      await _categoryStore.loadCategories();
-      await _choiceStore.loadChoices();
-      await _extraStore.loadExtras();
-      await _itemStore.loadItems();
+      // Data is available directly from Hive - no need to load
+      final categories = await HiveBoxes.getAllCategories();
+      final choices = await HiveChoice.getAllChoice();
+      final extras = await HiveExtra.getAllExtra();
+      final items = await itemsBoxes.getAllItems();
 
       // Import in order (dependencies first)
       await _importCategories(allSheets[SHEET_CATEGORIES], result);
@@ -317,7 +312,8 @@ class RestaurantBulkImportServiceV2 {
         String imagePath = _getValue(row, 2);
 
         // Check if already exists
-        var existing = _categoryStore.categories.where((c) => c.id == id).firstOrNull;
+        final allCategories = await HiveBoxes.getAllCategories();
+        var existing = allCategories.where((c) => c.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Category $id already exists, skipping');
           continue;
@@ -330,7 +326,7 @@ class RestaurantBulkImportServiceV2 {
           createdTime: DateTime.now(),
         );
 
-        await _categoryStore.addCategory(category);
+        await HiveBoxes.addCategory(category);
         imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Categories: $e');
@@ -352,7 +348,8 @@ class RestaurantBulkImportServiceV2 {
         String name = _getValue(row, 1);
 
         // Check if already exists
-        var existing = _variantRepository.getAllVariants().where((v) => v.id == id).firstOrNull;
+        final allVariants = await HiveVariante.getAllVariante();
+        var existing = allVariants.where((v) => v.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Variant $id already exists, skipping');
           continue;
@@ -364,7 +361,7 @@ class RestaurantBulkImportServiceV2 {
           createdTime: DateTime.now(),
         );
 
-        await _variantRepository.addVariant(variant);
+        await HiveVariante.addVariante(variant);
         imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Variants: $e');
@@ -389,7 +386,8 @@ class RestaurantBulkImportServiceV2 {
         int? maximum = _getInt(row, 4);
 
         // Check if already exists
-        var existing = _extraStore.extras.where((e) => e.Id == id).firstOrNull;
+        final allExtras = await HiveExtra.getAllExtra();
+        var existing = allExtras.where((e) => e.Id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Extra $id already exists, skipping');
           continue;
@@ -405,7 +403,7 @@ class RestaurantBulkImportServiceV2 {
           createdTime: DateTime.now(),
         );
 
-        await _extraStore.addExtra(extra);
+        await HiveExtra.addextra(extra);
         imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Extras: $e');
@@ -442,7 +440,8 @@ class RestaurantBulkImportServiceV2 {
     for (var extraId in toppingGroups.keys) {
       try {
         // Find the extra
-        var extra = _extraStore.extras.where((e) => e.Id == extraId).firstOrNull;
+        final allExtras = await HiveExtra.getAllExtra();
+        var extra = allExtras.where((e) => e.Id == extraId).firstOrNull;
         if (extra == null) {
           result.errors.add('Extra $extraId not found for toppings');
           continue;
@@ -473,7 +472,8 @@ class RestaurantBulkImportServiceV2 {
                 variantPrices[variantId] = variantPrice;
 
                 // Get variant model
-                var variantModel = _variantRepository.getAllVariants()
+                final allVariants = await HiveVariante.getAllVariante();
+                var variantModel = allVariants
                     .where((v) => v.id == variantId)
                     .firstOrNull;
                 if (variantModel != null && !variantModels.any((v) => v.id == variantId)) {
@@ -499,7 +499,7 @@ class RestaurantBulkImportServiceV2 {
 
         // Update extra with new toppings
         var updatedExtra = extra.copyWith(topping: toppings);
-        await _extraStore.updateExtra(updatedExtra);
+        await HiveExtra.updateExtra(updatedExtra);
 
       } catch (e) {
         result.errors.add('Error importing toppings for extra $extraId: $e');
@@ -521,7 +521,8 @@ class RestaurantBulkImportServiceV2 {
         String name = _getValue(row, 1);
 
         // Check if already exists
-        var existing = _choiceStore.choices.where((c) => c.id == id).firstOrNull;
+        final allChoices = await HiveChoice.getAllChoice();
+        var existing = allChoices.where((c) => c.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Choice $id already exists, skipping');
           continue;
@@ -534,7 +535,7 @@ class RestaurantBulkImportServiceV2 {
           createdTime: DateTime.now(),
         );
 
-        await _choiceStore.addChoice(choice);
+        await HiveChoice.addChoice(choice);
         imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Choices: $e');
@@ -566,7 +567,8 @@ class RestaurantBulkImportServiceV2 {
     for (var choiceId in optionGroups.keys) {
       try {
         // Find the choice
-        var choice = _choiceStore.choices.where((c) => c.id == choiceId).firstOrNull;
+        final allChoices = await HiveChoice.getAllChoice();
+        var choice = allChoices.where((c) => c.id == choiceId).firstOrNull;
         if (choice == null) {
           result.errors.add('Choice $choiceId not found for options');
           continue;
@@ -591,7 +593,7 @@ class RestaurantBulkImportServiceV2 {
 
         // Update choice with new options
         var updatedChoice = choice.copyWith(option: options);
-        await _choiceStore.updateChoice(updatedChoice);
+        await HiveChoice.updateChoice(updatedChoice);
 
       } catch (e) {
         result.errors.add('Error importing options for choice $choiceId: $e');
@@ -628,7 +630,8 @@ class RestaurantBulkImportServiceV2 {
         String imagePath = _getValue(row, 16);
 
         // Check if already exists
-        var existing = _itemStore.items.where((item) => item.id == id).firstOrNull;
+        final allItems = await itemsBoxes.getAllItems();
+        var existing = allItems.where((item) => item.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Item $id already exists, skipping');
           continue;
@@ -664,7 +667,7 @@ class RestaurantBulkImportServiceV2 {
           lastEditedTime: DateTime.now(),
         );
 
-        await _itemStore.addItem(item);
+        await itemsBoxes.addItem(item);
         imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Items: $e');
@@ -696,7 +699,8 @@ class RestaurantBulkImportServiceV2 {
     for (var itemId in variantGroups.keys) {
       try {
         // Find the item
-        var item = _itemStore.items.where((i) => i.id == itemId).firstOrNull;
+        final allItems = await itemsBoxes.getAllItems();
+        var item = allItems.where((i) => i.id == itemId).firstOrNull;
         if (item == null) {
           result.errors.add('Item $itemId not found for variants');
           continue;
@@ -725,7 +729,7 @@ class RestaurantBulkImportServiceV2 {
 
         // Update item with variants
         var updatedItem = item.copyWith(variant: variants);
-        await _itemStore.updateItem(updatedItem);
+        await itemsBoxes.updateItem(updatedItem);
 
       } catch (e) {
         result.errors.add('Error importing variants for item $itemId: $e');

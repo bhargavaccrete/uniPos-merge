@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/dropdown.dart';
-
 class Changepassword extends StatefulWidget {
   @override
   State<Changepassword> createState() => _ChangepasswordState();
@@ -42,16 +41,16 @@ class _ChangepasswordState extends State<Changepassword> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
-           
+
             children: [
-          
+
               Padding(
                 padding: EdgeInsets.only(top: 10,bottom: 10),
                 child: Row(
-                   children: [
-                     Text("User type",style: TextStyle(fontSize: 15,fontWeight: FontWeight.bold),),
-                   ],
-                 ),
+                  children: [
+                    Text("User type",style: TextStyle(fontSize: 15,fontWeight: FontWeight.bold),),
+                  ],
+                ),
               ),
               Container(
                 width: MediaQuery.of(context).size.width * 1,
@@ -69,7 +68,7 @@ class _ChangepasswordState extends State<Changepassword> {
                     }),
               ),
               SizedBox(height: 15.0),
-          
+
               Padding(
                 padding: EdgeInsets.only(top: 10,bottom: 10),
                 child: Row(
@@ -80,7 +79,7 @@ class _ChangepasswordState extends State<Changepassword> {
               ),
               Container(
                 width: MediaQuery.of(context).size.width * 1,
-                
+
                 child: TextFormField(
                   obscureText: obscurePass,
                   decoration: InputDecoration(
@@ -102,7 +101,7 @@ class _ChangepasswordState extends State<Changepassword> {
                 ),
               ),
               SizedBox(height: 15.0),
-          
+
               Padding(
                 padding: EdgeInsets.only(top: 10,bottom: 10),
                 child: Row(
@@ -144,7 +143,7 @@ class _ChangepasswordState extends State<Changepassword> {
                   child: Text(
                     "Submit",
                     style:
-                        TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
               )
@@ -155,3 +154,4 @@ class _ChangepasswordState extends State<Changepassword> {
     );
   }
 }
+

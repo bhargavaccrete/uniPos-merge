@@ -1,6 +1,10 @@
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../../constants/restaurant/color.dart';
@@ -15,9 +19,7 @@ import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../startorder.dart';
-
 enum DiscountType { amount, percentage }
-
 class Customerdetails extends StatefulWidget {
   final OrderModel? existingModel;
   final String? tableid;
@@ -78,9 +80,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
     _amountpercentageContorller.addListener(() => setState(() {}));
     _serviceChargeController.addListener(() => setState(() {}));
 
-     _nameController = TextEditingController(text: widget.existingModel?.customerName ?? '') ;
-     _emailController = TextEditingController(text: widget.existingModel?.customerEmail ?? '') ;
-     _mobileController = TextEditingController(text: widget.existingModel?.customerNumber??  '') ;
+    _nameController = TextEditingController(text: widget.existingModel?.customerName ?? '') ;
+    _emailController = TextEditingController(text: widget.existingModel?.customerEmail ?? '') ;
+    _mobileController = TextEditingController(text: widget.existingModel?.customerNumber??  '') ;
 
   }
 
@@ -129,12 +131,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
     // ✅ Step 2: Create the service to do all the math.
     final calculations = CartCalculationService(
-        items: widget.cartitems ?? widget.existingModel?.items ?? [],
-        discountType: _selectedDiscountType,
-        discountValue: discountInputValue,
-        serviceChargePercentage: isDelivery ? 0.0 : serviceChargeValue,
-        deliveryCharge: isDelivery ? serviceChargeValue : 0.0,
-        isDeliveryOrder: isDelivery,
+      items: widget.cartitems ?? widget.existingModel?.items ?? [],
+      discountType: _selectedDiscountType,
+      discountValue: discountInputValue,
+      serviceChargePercentage: isDelivery ? 0.0 : serviceChargeValue,
+      deliveryCharge: isDelivery ? serviceChargeValue : 0.0,
+      isDeliveryOrder: isDelivery,
     );
 
     // ✅ Step 3: Build the UI using the final, calculated values.
@@ -196,68 +198,68 @@ class _CustomerdetailsState extends State<Customerdetails> {
               ),
               SizedBox(height: 10),
 
-             widget.orderType == 'Delivery'
-                 ?Column(children: [
-               Divider(),
-               Text('Address',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.w600),),
-               SizedBox(height: 5,),
-               CommonTextForm(
-                 obsecureText: false,
-                 controller: _houseController,
-                 borderc: 10,
-                 BorderColor: primarycolor,
-                 // HintColor: primarycolor,
-                 // hintText: 'Name',
-                 labelText: 'House NO',
-                 LabelColor: primarycolor,
-               ),
-               SizedBox(height: 10,),
-               CommonTextForm(
-                 obsecureText: false,
-                 controller: _stateController,
-                 borderc: 10,
-                 BorderColor: primarycolor,
-                 // HintColor: primarycolor,
-                 // hintText: 'Name',
-                 labelText: 'State',
-                 LabelColor: primarycolor,
-               ),
-               SizedBox(height: 10,),
-               CommonTextForm(
-                 obsecureText: false,
-                 borderc: 10,
-                 BorderColor: primarycolor,
-                 // HintColor: primarycolor,
-                 // hintText: 'Name',
-                 controller: _cityController,
-                 labelText: 'City',
-                 LabelColor: primarycolor,
-               ),
-               SizedBox(height: 10,),
-               CommonTextForm(
-                 obsecureText: false,
-                 borderc: 10,
-                 BorderColor: primarycolor,
-                 // HintColor: primarycolor,
-                 // hintText: 'Name',
-                 controller: _areaController,
-                 labelText: 'Area',
-                 LabelColor: primarycolor,
-               ),
-               SizedBox(height: 10,),
-               CommonTextForm(
-                 obsecureText: false,
-                 borderc: 10,
-                 BorderColor: primarycolor,
-                 // HintColor: primarycolor,
-                 // hintText: 'Name',
-                 controller: _postCodeController,
-                 labelText: 'Post Code',
-                 LabelColor: primarycolor,
-               ),
-               SizedBox(height: 10,),
-               Divider(),
-             ],):SizedBox(),
+              widget.orderType == 'Delivery'
+                  ?Column(children: [
+                Divider(),
+                Text('Address',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.w600),),
+                SizedBox(height: 5,),
+                CommonTextForm(
+                  obsecureText: false,
+                  controller: _houseController,
+                  borderc: 10,
+                  BorderColor: primarycolor,
+                  // HintColor: primarycolor,
+                  // hintText: 'Name',
+                  labelText: 'House NO',
+                  LabelColor: primarycolor,
+                ),
+                SizedBox(height: 10,),
+                CommonTextForm(
+                  obsecureText: false,
+                  controller: _stateController,
+                  borderc: 10,
+                  BorderColor: primarycolor,
+                  // HintColor: primarycolor,
+                  // hintText: 'Name',
+                  labelText: 'State',
+                  LabelColor: primarycolor,
+                ),
+                SizedBox(height: 10,),
+                CommonTextForm(
+                  obsecureText: false,
+                  borderc: 10,
+                  BorderColor: primarycolor,
+                  // HintColor: primarycolor,
+                  // hintText: 'Name',
+                  controller: _cityController,
+                  labelText: 'City',
+                  LabelColor: primarycolor,
+                ),
+                SizedBox(height: 10,),
+                CommonTextForm(
+                  obsecureText: false,
+                  borderc: 10,
+                  BorderColor: primarycolor,
+                  // HintColor: primarycolor,
+                  // hintText: 'Name',
+                  controller: _areaController,
+                  labelText: 'Area',
+                  LabelColor: primarycolor,
+                ),
+                SizedBox(height: 10,),
+                CommonTextForm(
+                  obsecureText: false,
+                  borderc: 10,
+                  BorderColor: primarycolor,
+                  // HintColor: primarycolor,
+                  // hintText: 'Name',
+                  controller: _postCodeController,
+                  labelText: 'Post Code',
+                  LabelColor: primarycolor,
+                ),
+                SizedBox(height: 10,),
+                Divider(),
+              ],):SizedBox(),
 
 
               Row(
@@ -485,7 +487,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 child: Text('Procced ', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
                 height: height * 0.06,
                 onTap: () =>
-                  _submitOrder(calculations),
+                    _submitOrder(calculations),
               )
             ],
           ),
@@ -527,7 +529,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
           if (calcs.totalGST > 0.009)
             (AppSettings.isTaxInclusive?
             _buildSummaryRow('Total GST(Inclusive):', '₹${calcs.totalGST.toStringAsFixed(2)}')
-            :  _buildSummaryRow('Total GST:', '₹${calcs.totalGST.toStringAsFixed(2)}')
+                :  _buildSummaryRow('Total GST:', '₹${calcs.totalGST.toStringAsFixed(2)}')
             ),
 
 
@@ -550,8 +552,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
           if(calcs.serviceChargeAmount > 0.009)
             _buildSummaryRow(
-              widget.orderType == 'Delivery' ? 'Delivery Charge:' : 'Service Charge:', 
-              '₹${calcs.serviceChargeAmount.toStringAsFixed(2)}'
+                widget.orderType == 'Delivery' ? 'Delivery Charge:' : 'Service Charge:',
+                '₹${calcs.serviceChargeAmount.toStringAsFixed(2)}'
             ),
 
 
@@ -757,7 +759,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     );
     try {
       await completeOrder(completedOrder, calculations);
-      await tableStore.updateTableStatus(widget.tableid!, 'Available');
+      await HiveTables.updateTableStatus(widget.tableid!, 'Available');
       // _showSnackBar('Order Completed Successfully!');
 
       NotificationService.instance.showSuccess(
@@ -782,7 +784,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
 
   Future<void> completeOrder(OrderModel activeModel, CartCalculationService calculations) async {
-  print('============this is complete order function=============');
+    print('============this is complete order function=============');
 
     double preTaxSubtotal = AppSettings.isTaxInclusive
         ? calculations.subtotal - calculations.totalGST
@@ -804,8 +806,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
       kotNumbers: activeModel.kotNumbers, // Always present in new orders
       kotBoundaries: activeModel.kotBoundaries, // KOT boundaries for grouping items
     );
-    await pastOrderStore.addOrder(pastOrder);
-    await orderStore.deleteOrder(activeModel.id);
+    await HivePastOrder.addOrder(pastOrder);
+    await HiveOrders.deleteOrder(activeModel.id);
   }
 
   Future<void> _placeOrder(CartCalculationService calculations) async {
@@ -817,31 +819,31 @@ class _CustomerdetailsState extends State<Customerdetails> {
         : calculations.subtotal;
 
 
-    final int newKotNumber = await orderStore.getNextKotNumber();
+    final int newKotNumber = await HiveOrders.getNextKotNumber();
     final String newId = Uuid().v4();
     final List<CartItem> orderItems = widget.cartitems ?? [];
     final newOrder = OrderModel(
-        id: newId,
-        // kotNumber removed - using kotNumbers only
-        customerName: _nameController.text.trim(),
-        customerNumber: _mobileController.text.trim(),
-        customerEmail: _emailController.text.trim(),
-        items: orderItems,
-        status: 'Cooking',
-        timeStamp: DateTime.now(),
-        orderType: widget.orderType ?? 'Take Away',
-        tableNo: widget.tableid ?? '',
-        subTotal:preTaxSubtotal,
-        discount: calculations.discountAmount,
-        serviceCharge: calculations.serviceChargeAmount,
-        gstRate: 0,
-        gstAmount: calculations.totalGST
-        ,
-        totalPrice: calculations.grandTotal,
-        paymentMethod: SelectedFilter,
-        completedAt: null,
-        paymentStatus: "Paid",
-        isPaid: true,
+      id: newId,
+      // kotNumber removed - using kotNumbers only
+      customerName: _nameController.text.trim(),
+      customerNumber: _mobileController.text.trim(),
+      customerEmail: _emailController.text.trim(),
+      items: orderItems,
+      status: 'Cooking',
+      timeStamp: DateTime.now(),
+      orderType: widget.orderType ?? 'Take Away',
+      tableNo: widget.tableid ?? '',
+      subTotal:preTaxSubtotal,
+      discount: calculations.discountAmount,
+      serviceCharge: calculations.serviceChargeAmount,
+      gstRate: 0,
+      gstAmount: calculations.totalGST
+      ,
+      totalPrice: calculations.grandTotal,
+      paymentMethod: SelectedFilter,
+      completedAt: null,
+      paymentStatus: "Paid",
+      isPaid: true,
       remark:  calculations.discountAmount>  0.009 ? SelectedRemark : 'no Remark',
       // Initialize KOT tracking fields - single source of truth
       kotNumbers: [newKotNumber],
@@ -850,9 +852,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
     );
     try {
-      await orderStore.addOrder(newOrder);
+      await HiveOrders.addOrder(newOrder);
       if (widget.tableid != null && widget.tableid!.isNotEmpty) {
-        await tableStore.updateTableStatus(
+        await HiveTables.updateTableStatus(
           widget.tableid!,
           'Running',
           total: newOrder.totalPrice,
@@ -864,7 +866,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         'New Order Placed Successfully',
       );
 
-      await cartStore.clearCart();
+      await HiveCart.clearCart();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
@@ -882,7 +884,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   Future<void> clearCart() async {
     try {
-      await cartStore.clearCart();
+      await HiveCart.clearCart();
       if (mounted) {
 
         NotificationService.instance.showInfo(

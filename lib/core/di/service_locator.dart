@@ -35,32 +35,22 @@ import 'package:unipos/domain/store/retail/stock_alert_store.dart';
 import 'package:unipos/domain/store/retail/supplier_store.dart';
 
 // ==================== RESTAURANT IMPORTS ====================
-import '../../data/repositories/restaurant/cart_repository.dart';
-import '../../data/repositories/restaurant/category_repository.dart' as restaurant;
-import '../../data/repositories/restaurant/choice_repository.dart';
-import '../../data/repositories/restaurant/eod_repository.dart';
-import '../../data/repositories/restaurant/expense_repository.dart';
-import '../../data/repositories/restaurant/extra_repository.dart';
-import '../../data/repositories/restaurant/item_repository.dart';
-import '../../data/repositories/restaurant/order_repository.dart';
-import '../../data/repositories/restaurant/past_order_repository.dart';
-import '../../data/repositories/restaurant/staff_repository.dart';
-import '../../data/repositories/restaurant/table_repository.dart';
-import '../../data/repositories/restaurant/tax_repository.dart';
-import '../../data/repositories/restaurant/variant_repository.dart' as restaurant;
-import '../../domain/store/restaurant/cart_store.dart' as restaurant;
-import '../../domain/store/restaurant/category_store.dart' as restaurant;
-import '../../domain/store/restaurant/choice_store.dart';
-import '../../domain/store/restaurant/eod_store.dart';
-import '../../domain/store/restaurant/expense_store.dart';
-import '../../domain/store/restaurant/extra_store.dart';
-import '../../domain/store/restaurant/item_store.dart';
-import '../../domain/store/restaurant/order_store.dart';
-import '../../domain/store/restaurant/past_order_store.dart';
-import '../../domain/store/restaurant/staff_store.dart';
-import '../../domain/store/restaurant/table_store.dart';
-import '../../domain/store/restaurant/tax_store.dart';
-import '../../domain/store/restaurant/variant_store.dart';
+// All restaurant repositories and stores have been removed
+// Restaurant functionality now uses direct Hive database access via:
+// - HiveBoxes (for categories and items)
+// - itemsBoxes (for items)
+// - HiveChoice (for choices)
+// - HiveExtra (for extras)
+// - HiveVariante (for variants)
+// - HiveCart (for cart operations)
+// - HiveTable (for table management)
+// - HiveOrder (for order management)
+// - HivePastOrder (for past orders)
+// - HiveStaff (for staff management)
+// - HiveEOD (for end of day operations)
+// - HiveExpenseCategory (for expense categories)
+// - HiveTax (for tax management)
+// - HiveTestBill (for test bills)
 
 final locator = GetIt.instance;
 
@@ -167,44 +157,11 @@ Future<void> _registerRetailDependencies() async {
 Future<void> _registerRestaurantDependencies() async {
   // ignore: avoid_print
   print('_registerRestaurantDependencies: checking if already registered');
-  // Skip if already registered
-  if (locator.isRegistered<ItemStore>()) {
-    // ignore: avoid_print
-    print('_registerRestaurantDependencies: already registered, skipping');
-    return;
-  }
+  // All restaurant repositories and stores have been removed
+  // Restaurant functionality now uses direct Hive database access
+  // No dependencies to register
   // ignore: avoid_print
-  print('_registerRestaurantDependencies: registering dependencies');
-
-  // ==================== REPOSITORIES ====================
-  locator.registerLazySingleton<ItemRepository>(() => ItemRepository());
-  locator.registerLazySingleton<restaurant.CategoryRepository>(() => restaurant.CategoryRepository());
-  locator.registerLazySingleton<CartRepository>(() => CartRepository());
-  locator.registerLazySingleton<OrderRepository>(() => OrderRepository());
-  locator.registerLazySingleton<TableRepository>(() => TableRepository());
-  locator.registerLazySingleton<StaffRepository>(() => StaffRepository());
-  locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
-  locator.registerLazySingleton<ExpenseRepository>(() => ExpenseRepository());
-  locator.registerLazySingleton<PastOrderRepository>(() => PastOrderRepository());
-  locator.registerLazySingleton<EodRepository>(() => EodRepository());
-  locator.registerLazySingleton<restaurant.VariantRepository>(() => restaurant.VariantRepository());
-  locator.registerLazySingleton<ChoiceRepository>(() => ChoiceRepository());
-  locator.registerLazySingleton<ExtraRepository>(() => ExtraRepository());
-
-  // ==================== STORES ====================
-  locator.registerLazySingleton<ItemStore>(() => ItemStore());
-  locator.registerLazySingleton<restaurant.CategoryStore>(() => restaurant.CategoryStore());
-  locator.registerLazySingleton<restaurant.CartStorer>(() => restaurant.CartStorer());
-  locator.registerLazySingleton<OrderStore>(() => OrderStore());
-  locator.registerLazySingleton<TableStore>(() => TableStore());
-  locator.registerLazySingleton<StaffStore>(() => StaffStore());
-  locator.registerLazySingleton<TaxStore>(() => TaxStore());
-  locator.registerLazySingleton<ExpenseStore>(() => ExpenseStore());
-  locator.registerLazySingleton<PastOrderStore>(() => PastOrderStore());
-  locator.registerLazySingleton<EodStore>(() => EodStore());
-  locator.registerLazySingleton<VariantStore>(() => VariantStore());
-  locator.registerLazySingleton<ChoiceStore>(() => ChoiceStore());
-  locator.registerLazySingleton<ExtraStore>(() => ExtraStore());
+  print('_registerRestaurantDependencies: using direct Hive access, no dependencies to register');
 }
 
 /// Register business dependencies dynamically (called during setup wizard)
@@ -276,33 +233,19 @@ AttributeRepository get attributeRepository => locator<AttributeRepository>();
 
 // ==================== RESTAURANT CONVENIENCE GETTERS ====================
 
-/// Restaurant Stores
-ItemStore get itemStore => locator<ItemStore>();
-restaurant.CategoryStore get categoryStore => locator<restaurant.CategoryStore>();
-restaurant.CartStorer get restaurantCartStore => locator<restaurant.CartStorer>();
-restaurant.CartStorer get cartStorer => locator<restaurant.CartStorer>();  // Alias for backward compatibility
-OrderStore get orderStore => locator<OrderStore>();
-TableStore get tableStore => locator<TableStore>();
-StaffStore get staffStore => locator<StaffStore>();
-TaxStore get taxStore => locator<TaxStore>();
-ExpenseStore get expenseStore => locator<ExpenseStore>();
-PastOrderStore get pastOrderStore => locator<PastOrderStore>();
-EodStore get eodStore => locator<EodStore>();
-VariantStore get variantStore => locator<VariantStore>();
-ChoiceStore get choiceStore => locator<ChoiceStore>();
-ExtraStore get extraStore => locator<ExtraStore>();
-
-/// Restaurant Repositories
-ItemRepository get itemRepository => locator<ItemRepository>();
-restaurant.CategoryRepository get restaurantCategoryRepository => locator<restaurant.CategoryRepository>();
-CartRepository get cartRepository => locator<CartRepository>();
-OrderRepository get orderRepository => locator<OrderRepository>();
-TableRepository get tableRepository => locator<TableRepository>();
-StaffRepository get staffRepository => locator<StaffRepository>();
-TaxRepository get taxRepository => locator<TaxRepository>();
-ExpenseRepository get expenseRepository => locator<ExpenseRepository>();
-PastOrderRepository get pastOrderRepository => locator<PastOrderRepository>();
-EodRepository get eodRepository => locator<EodRepository>();
-restaurant.VariantRepository get restaurantVariantRepository => locator<restaurant.VariantRepository>();
-ChoiceRepository get choiceRepository => locator<ChoiceRepository>();
-ExtraRepository get extraRepository => locator<ExtraRepository>();
+// All restaurant stores and repositories have been removed
+// Restaurant functionality now uses direct Hive database access via:
+// - HiveBoxes.getAllCategories(), HiveBoxes.addCategory(), etc.
+// - itemsBoxes.getAllItems(), itemsBoxes.addItem(), itemsBoxes.updateItem(), etc.
+// - HiveChoice.getAllChoice(), HiveChoice.addChoice(), etc.
+// - HiveExtra.getAllExtra(), HiveExtra.addExtra(), etc.
+// - HiveVariante.getAllVariante(), HiveVariante.addVariante(), etc.
+// - HiveCart for cart operations
+// - HiveTable for table management
+// - HiveOrder for order management
+// - HivePastOrder for past orders
+// - HiveStaff for staff management
+// - HiveEOD for end of day operations
+// - HiveExpenseCategory for expense categories
+// - HiveTax for tax management
+// - HiveTestBill for test bills

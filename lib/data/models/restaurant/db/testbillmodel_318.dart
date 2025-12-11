@@ -44,7 +44,7 @@ class TestBillModel extends HiveObject {
   }
 }
 
-@HiveType(typeId: 24)
+@HiveType(typeId: HiveTypeIds.restaurantTestBillItem)
 class TestBillItem extends HiveObject {
   @HiveField(0)
   String itemName;

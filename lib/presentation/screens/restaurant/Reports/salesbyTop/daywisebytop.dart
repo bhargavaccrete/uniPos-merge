@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart' show HivePastOrder;
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 class DayWisebyTop extends StatefulWidget {
@@ -44,15 +45,15 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
 
     try {
       // Get all past orders
-      final allOrders = pastOrderStore.pastOrders.toList();
+      final allOrders = await HivePastOrder.getAllPastOrderModel();
 
       // Filter orders for selected date only
       final selectedDateOrders = allOrders.where((order) {
         if (order.orderAt == null) return false;
         final orderDate = order.orderAt!;
         return orderDate.year == _fromDate!.year &&
-               orderDate.month == _fromDate!.month &&
-               orderDate.day == _fromDate!.day;
+            orderDate.month == _fromDate!.month &&
+            orderDate.day == _fromDate!.day;
       }).toList();
 
       // Calculate item sales
@@ -193,105 +194,105 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                   ),
                 )
               else if (_topSellingItems.isNotEmpty)
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                      headingRowHeight: 50,
-                      columnSpacing: 2,
-                      headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
-                      border: TableBorder.all(color: Colors.white),
-                      columns: [
-                        DataColumn(
-                            columnWidth: FixedColumnWidth(width * 0.2),
-                            label: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(50),
-                                    bottomLeft: Radius.circular(50),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                        headingRowHeight: 50,
+                        columnSpacing: 2,
+                        headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
+                        border: TableBorder.all(color: Colors.white),
+                        columns: [
+                          DataColumn(
+                              columnWidth: FixedColumnWidth(width * 0.2),
+                              label: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(50),
+                                      bottomLeft: Radius.circular(50),
+                                    ),
                                   ),
-                                ),
-                                child: Text(
-                                  'Date',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                ))),
-                        DataColumn(
-                            headingRowAlignment: MainAxisAlignment.center,
-                            columnWidth: FixedColumnWidth(width * 0.3),
-                            label: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(10),
-                                    bottomLeft: Radius.circular(10),
-                                  ),
-                                ),
-                                child: Text(
-                                  "Item Name",
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center,
-                                ))),
-                        DataColumn(
-                            headingRowAlignment: MainAxisAlignment.center,
-                            columnWidth: FixedColumnWidth(width * 0.2),
-                            label: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(10),
-                                    bottomLeft: Radius.circular(10),
-                                  ),
-                                ),
-                                child: Text('Quantity',
+                                  child: Text(
+                                    'Date',
                                     textScaler: TextScaler.linear(1),
                                     style: GoogleFonts.poppins(fontSize: 14),
-                                    textAlign: TextAlign.center))),
-                        DataColumn(
-                            headingRowAlignment: MainAxisAlignment.center,
-                            columnWidth: FixedColumnWidth(width * 0.25),
-                            label: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(10),
-                                    bottomLeft: Radius.circular(10),
+                                  ))),
+                          DataColumn(
+                              headingRowAlignment: MainAxisAlignment.center,
+                              columnWidth: FixedColumnWidth(width * 0.3),
+                              label: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(10),
+                                      bottomLeft: Radius.circular(10),
+                                    ),
                                   ),
-                                ),
-                                child: Text('Total (Rs)',
+                                  child: Text(
+                                    "Item Name",
                                     textScaler: TextScaler.linear(1),
                                     style: GoogleFonts.poppins(fontSize: 14),
-                                    textAlign: TextAlign.center))),
-                      ],
-                      rows: _topSellingItems.map((item) {
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              Center(
-                                  child: Text(displayDate, style: GoogleFonts.poppins(fontSize: 12))),
-                            ),
-                            DataCell(
-                              Center(
-                                  child: Text(item['itemName'],
-                                      style: GoogleFonts.poppins(fontSize: 12))),
-                            ),
-                            DataCell(
-                              Center(
-                                  child: Text('${item['quantity']}',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 12, fontWeight: FontWeight.w600))),
-                            ),
-                            DataCell(
-                              Center(
-                                  child: Text('Rs. ${item['totalAmount'].toStringAsFixed(2)}',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 12, fontWeight: FontWeight.w600))),
-                            ),
-                          ],
-                        );
-                      }).toList()),
-                )
+                                    textAlign: TextAlign.center,
+                                  ))),
+                          DataColumn(
+                              headingRowAlignment: MainAxisAlignment.center,
+                              columnWidth: FixedColumnWidth(width * 0.2),
+                              label: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(10),
+                                      bottomLeft: Radius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text('Quantity',
+                                      textScaler: TextScaler.linear(1),
+                                      style: GoogleFonts.poppins(fontSize: 14),
+                                      textAlign: TextAlign.center))),
+                          DataColumn(
+                              headingRowAlignment: MainAxisAlignment.center,
+                              columnWidth: FixedColumnWidth(width * 0.25),
+                              label: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(10),
+                                      bottomLeft: Radius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text('Total (Rs)',
+                                      textScaler: TextScaler.linear(1),
+                                      style: GoogleFonts.poppins(fontSize: 14),
+                                      textAlign: TextAlign.center))),
+                        ],
+                        rows: _topSellingItems.map((item) {
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                Center(
+                                    child: Text(displayDate, style: GoogleFonts.poppins(fontSize: 12))),
+                              ),
+                              DataCell(
+                                Center(
+                                    child: Text(item['itemName'],
+                                        style: GoogleFonts.poppins(fontSize: 12))),
+                              ),
+                              DataCell(
+                                Center(
+                                    child: Text('${item['quantity']}',
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 12, fontWeight: FontWeight.w600))),
+                              ),
+                              DataCell(
+                                Center(
+                                    child: Text('Rs. ${item['totalAmount'].toStringAsFixed(2)}',
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 12, fontWeight: FontWeight.w600))),
+                              ),
+                            ],
+                          );
+                        }).toList()),
+                  )
             ],
           ),
         ),

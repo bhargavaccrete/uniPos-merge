@@ -13,20 +13,20 @@ class Online_Completed extends StatefulWidget {
 }
 
 class _Online_CompletedState extends State<Online_Completed> {
-DateTime? _datepicker;
+  DateTime? _datepicker;
   Future<void> _pickDate(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
-    context: context,
-initialDate: DateTime.now(),
-firstDate: DateTime(2000), 
-lastDate: DateTime(2100));
-    
+        context: context,
+        initialDate: DateTime.now(),
+        firstDate: DateTime(2000),
+        lastDate: DateTime(2100));
+
     if(pickedDate!= null){
       setState(() {
         _datepicker = pickedDate;
       });
     }
-}
+  }
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 1;
@@ -98,8 +98,8 @@ lastDate: DateTime(2100));
                       child: Container(
                         padding: EdgeInsets.all(2),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(color: Colors.grey)
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(color: Colors.grey)
                         ),
                         child: Row(
                           children: [

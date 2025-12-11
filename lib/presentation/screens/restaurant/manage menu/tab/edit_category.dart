@@ -5,11 +5,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
 
 class EditCategory extends StatefulWidget {
-final Category category;
+  final Category category;
   const EditCategory({super.key, required this.category,});
 
   @override
@@ -48,7 +49,7 @@ class _EditCategoryState extends State<EditCategory> {
                       height:MediaQuery.of(context).size.height * 0.2 ,
 
                       decoration: BoxDecoration(
-                          // color: Colors.green,
+                        // color: Colors.green,
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(4)),
                       child: Column(
@@ -104,21 +105,21 @@ class _EditCategoryState extends State<EditCategory> {
   void initState() {
     // TODO: implement initState
     super.initState();
-  nameController = TextEditingController(text: widget.category.name);
+    nameController = TextEditingController(text: widget.category.name);
     // _selectedImage = widget.category.imagePath.;
-  // saveChanges();
+    // saveChanges();
   }
 
   void saveChanges()async{
     final updateCategory = widget.category.copyWith(
-      name: nameController.text,
-      imagePath: _selectedImage != null ? _selectedImage!.path: null
+        name: nameController.text,
+        imagePath: _selectedImage != null ? _selectedImage!.path: null
     );
 
     // 🔍 AUDIT TRAIL: Track this category edit
     AuditTrailHelper.trackEdit(updateCategory, editedBy: 'Admin'); // TODO: Replace 'Admin' with actual logged-in user
 
-    await categoryStore.updateCategory(updateCategory);
+    await HiveBoxes.updateCategory(updateCategory);
     Navigator.pop(context, true);
 
   }
@@ -210,16 +211,16 @@ class _EditCategoryState extends State<EditCategory> {
                               ),
                               Text('600X400',textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(
-                                  fontSize: 12
+                                    fontSize: 12
 
                                 ),)
                             ],
                           )),
                       Text(
-                        'Upload Image (png , .jpg, .jpeg) upto 3mb',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(
-                          fontSize: 12))
+                          'Upload Image (png , .jpg, .jpeg) upto 3mb',
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(
+                              fontSize: 12))
                     ],
                   )),
 

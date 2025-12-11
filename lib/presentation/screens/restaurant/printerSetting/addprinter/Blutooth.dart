@@ -28,7 +28,7 @@ class Bluthooth extends StatelessWidget {
       floatingActionButton:FloatingActionButton(
         backgroundColor: primarycolor,
         onPressed: (){},
-      child: Icon(Icons.refresh,color: Colors.white,),
+        child: Icon(Icons.refresh,color: Colors.white,),
       ),
     );
   }

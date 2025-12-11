@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
@@ -31,7 +32,7 @@ class _ViewExpenseState extends State<ViewExpense> {
   }
 
   void _loadExpenses() async {
-    final expenses = expenseStore.expenses.toList();
+    final expenses = await HiveExpenceL.getAllItems();
     setState(() {
       allExpenses = expenses;
       filteredExpenses = expenses;
@@ -43,7 +44,7 @@ class _ViewExpenseState extends State<ViewExpense> {
       setState(() {
         filteredExpenses = allExpenses.where((expense) {
           return expense.dateandTime.isAfter(_fromDatee!.subtract(Duration(days: 1))) &&
-                 expense.dateandTime.isBefore(_toDate!.add(Duration(days: 1)));
+              expense.dateandTime.isBefore(_toDate!.add(Duration(days: 1)));
         }).toList();
       });
     } else {
@@ -56,7 +57,7 @@ class _ViewExpenseState extends State<ViewExpense> {
   String _getCategoryName(String? categoryId) {
     if (categoryId == null) return 'No Category';
     try {
-      final box = Hive.box<ExpenseCategory>('expenseCategories');
+      final box = Hive.box<ExpenseCategory>('expenseCategory');
       final category = box.get(categoryId);
       return category?.name ?? 'Unknown Category';
     } catch (e) {
@@ -196,7 +197,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     ),
                     SizedBox(height: 8),
                     ValueListenableBuilder(
-                      valueListenable: Hive.box<ExpenseCategory>('expenseCategories').listenable(),
+                      valueListenable: Hive.box<ExpenseCategory>('expenseCategory').listenable(),
                       builder: (context, Box<ExpenseCategory> box, _) {
                         final categories = box.values.where((cat) => cat.isEnabled).toList();
                         return Container(
@@ -288,7 +289,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                             bordercircular: 0,
                             height: 50,
                             onTap: () async {
-                              await expenseStore.deleteExpense(expense.id);
+                              await HiveExpenceL.deleteItem(expense.id);
                               Navigator.pop(context);
                               _loadExpenses();
                               NotificationService.instance.showSuccess('Expense deleted successfully');
@@ -317,7 +318,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                                   reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
                                   paymentType: selectedPaymentType,
                                 );
-                                await expenseStore.updateExpense(updatedExpense);
+                                await HiveExpenceL.updateItem(updatedExpense);
                                 Navigator.pop(context);
                                 _loadExpenses();
                                 NotificationService.instance.showSuccess('Expense updated successfully');
@@ -362,79 +363,79 @@ class _ViewExpenseState extends State<ViewExpense> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Start Date',textScaler: TextScaler.linear(1),
-            style: GoogleFonts.poppins(fontSize: 14),),
-                  // SizedBox(height:15),
-
-                  InkWell(
-                    onTap: (){
-                      _pickFromDate(context);
-                    },
-                    child: Expanded(
-                      child: Container(
-                        padding: EdgeInsets.all(5),
-                        width: width * 0.44,
-                        height: height * 0.05,
-                        decoration:BoxDecoration(
-                          border: Border.all(color:primarycolor)
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _fromDatee == null
-                                  ? ' DD/MM/YYYY'
-                                  : '${_fromDatee!.day}/${_fromDatee!.month}/${_fromDatee!.year}',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 14),
-                              textAlign: TextAlign.center,
-                            ),
-                            Icon(Icons.date_range)
-                          ],
-                        )
-                      ),
-                    ),
-                  )
-                ],
-              ),
                 Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('End Date',textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(fontSize: 14),),
-                  // SizedBox(height:15),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Start Date',textScaler: TextScaler.linear(1),
+                      style: GoogleFonts.poppins(fontSize: 14),),
+                    // SizedBox(height:15),
 
-                  InkWell(
-                    onTap: _fromDatee ==null ? null: ()=> _pickToDate(context),
-                    child: Expanded(
-                      child: Container(
-                        padding: EdgeInsets.all(5),
-                        width: width * 0.44,
-                        height: height * 0.05,
-                        decoration:BoxDecoration(
-                          border: Border.all(color:primarycolor)
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _toDate == null
-                                  ? ' DD/MM/YYYY'
-                                  : '${_toDate!.day}/${_toDate!.month}/${_toDate!.year}',textAlign: TextAlign.center,
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 14),
+                    InkWell(
+                      onTap: (){
+                        _pickFromDate(context);
+                      },
+                      child: Expanded(
+                        child: Container(
+                            padding: EdgeInsets.all(5),
+                            width: width * 0.44,
+                            height: height * 0.05,
+                            decoration:BoxDecoration(
+                                border: Border.all(color:primarycolor)
                             ),
-                            Icon(Icons.date_range)
-                          ],
-                        )
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _fromDatee == null
+                                      ? ' DD/MM/YYYY'
+                                      : '${_fromDatee!.day}/${_fromDatee!.month}/${_fromDatee!.year}',
+                                  textScaler: TextScaler.linear(1),
+                                  style: GoogleFonts.poppins(fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                                Icon(Icons.date_range)
+                              ],
+                            )
+                        ),
                       ),
-                    ),
-                  )
-                ],
-              )
+                    )
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('End Date',textScaler: TextScaler.linear(1),
+                      style: GoogleFonts.poppins(fontSize: 14),),
+                    // SizedBox(height:15),
+
+                    InkWell(
+                      onTap: _fromDatee ==null ? null: ()=> _pickToDate(context),
+                      child: Expanded(
+                        child: Container(
+                            padding: EdgeInsets.all(5),
+                            width: width * 0.44,
+                            height: height * 0.05,
+                            decoration:BoxDecoration(
+                                border: Border.all(color:primarycolor)
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _toDate == null
+                                      ? ' DD/MM/YYYY'
+                                      : '${_toDate!.day}/${_toDate!.month}/${_toDate!.year}',textAlign: TextAlign.center,
+                                  textScaler: TextScaler.linear(1),
+                                  style: GoogleFonts.poppins(fontSize: 14),
+                                ),
+                                Icon(Icons.date_range)
+                              ],
+                            )
+                        ),
+                      ),
+                    )
+                  ],
+                )
               ],
             ),
             SizedBox(height: 25),
@@ -480,93 +481,93 @@ class _ViewExpenseState extends State<ViewExpense> {
             Expanded(
               child: filteredExpenses.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      size: 80,
+                      color: Colors.grey,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'No expenses found',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : ListView.builder(
+                itemCount: filteredExpenses.length,
+                itemBuilder: (context, index) {
+                  final expense = filteredExpenses[index];
+                  return Card(
+                    margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: primarycolor,
+                        child: Icon(
+                          Icons.account_balance_wallet,
+                          color: Colors.white,
+                        ),
+                      ),
+                      title: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(
-                            Icons.receipt_long_outlined,
-                            size: 80,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
                           Text(
-                            'No expenses found',
+                            _getCategoryName(expense.categoryOfExpense),
                             style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              color: Colors.grey,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            '\u20b9${expense.amount.toStringAsFixed(2)}',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('dd MMM yyyy').format(expense.dateandTime),
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          if (expense.reason != null && expense.reason!.isNotEmpty)
+                            Text(
+                              expense.reason!,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          Text(
+                            expense.paymentType ?? 'Cash',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.blue,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: filteredExpenses.length,
-                      itemBuilder: (context, index) {
-                        final expense = filteredExpenses[index];
-                        return Card(
-                          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: primarycolor,
-                              child: Icon(
-                                Icons.account_balance_wallet,
-                                color: Colors.white,
-                              ),
-                            ),
-                            title: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _getCategoryName(expense.categoryOfExpense),
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                Text(
-                                  '\u20b9${expense.amount.toStringAsFixed(2)}',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  DateFormat('dd MMM yyyy').format(expense.dateandTime),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                if (expense.reason != null && expense.reason!.isNotEmpty)
-                                  Text(
-                                    expense.reason!,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                Text(
-                                  expense.paymentType ?? 'Cash',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            onTap: () => _showEditExpenseBottomSheet(expense),
-                          ),
-                        );
-                      },
+                      onTap: () => _showEditExpenseBottomSheet(expense),
                     ),
+                  );
+                },
+              ),
             )
           ],
         ),
@@ -574,3 +575,4 @@ class _ViewExpenseState extends State<ViewExpense> {
     );
   }
 }
+

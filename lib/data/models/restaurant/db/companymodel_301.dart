@@ -49,24 +49,24 @@ class Company extends HiveObject{
   String pass;
 
   Company({
-   required this.comapanyName,
-  required this.ownerName,
-  required this.mobileNumber,
-  required this.mobilenumberaltr,
-  required this.email,
+    required this.comapanyName,
+    required this.ownerName,
+    required this.mobileNumber,
+    required this.mobilenumberaltr,
+    required this.email,
     required this.btype,
     required this.gst,
-  required this.fssai,
-  required this.country,
+    required this.fssai,
+    required this.country,
     required this.state,
-  required this.city,
+    required this.city,
     required this.pincode,
     this.imagePath,
-  required this.dateofreg,
+    required this.dateofreg,
     required this.pass,
     required this.address
 
-});
+  });
 
   /// Convert to Map
   Map<String, dynamic> toMap() {

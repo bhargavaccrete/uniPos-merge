@@ -18,33 +18,33 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
   // The local 'switchValues' map is no longer needed here.
 //  / ✅ PASTE THE ENTIRE FUNCTION HERE
   Widget _buildRoundOffDropdown() {
-  return Padding(
-  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-  child: ValueListenableBuilder<String>(
-    valueListenable: AppSettings.roundOffNotifier,
-      builder: (contex , currentValue,child){
-      return  DropdownButtonFormField<String>(
-          value: currentValue,
-          decoration: const InputDecoration(
-            labelText: 'Round Off To Nearest',
-            border: OutlineInputBorder(),
-          ),
-          items: ['0.50', '1.00', '5.00', '10.00']
-              .map((value) =>
-              DropdownMenuItem(
-                value: value,
-                child: Text('$value'),
-              ))
-              .toList(),
-          onChanged: (newValue) {
-          if(newValue != null){
-            AppSettings.updateRoundOffValue(newValue);
-          }
-            // 💡 Remember to save this value permanently if needed
-          },
-        );
-      }),
-  );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: ValueListenableBuilder<String>(
+          valueListenable: AppSettings.roundOffNotifier,
+          builder: (contex , currentValue,child){
+            return  DropdownButtonFormField<String>(
+              value: currentValue,
+              decoration: const InputDecoration(
+                labelText: 'Round Off To Nearest',
+                border: OutlineInputBorder(),
+              ),
+              items: ['0.50', '1.00', '5.00', '10.00']
+                  .map((value) =>
+                  DropdownMenuItem(
+                    value: value,
+                    child: Text('$value'),
+                  ))
+                  .toList(),
+              onChanged: (newValue) {
+                if(newValue != null){
+                  AppSettings.updateRoundOffValue(newValue);
+                }
+                // 💡 Remember to save this value permanently if needed
+              },
+            );
+          }),
+    );
   }
   @override
   Widget build(BuildContext context) {
@@ -56,11 +56,11 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
       appBar: AppBar(
         backgroundColor: primarycolor,
         automaticallyImplyLeading: false,
-       leading: InkWell(
-           onTap: (){
-             Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
-           },
-           child: Icon(Icons.arrow_back)),
+        leading: InkWell(
+            onTap: (){
+              Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
+            },
+            child: Icon(Icons.arrow_back)),
         title:  Text('Setting & Customization',style: GoogleFonts.poppins(color: Colors.white,fontSize:  16, fontWeight: FontWeight.w600),),
       ),
       // body: ListenableBuilder(
@@ -124,9 +124,9 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
                         child: Text(
                           groupTitle,
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: primarycolor
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: primarycolor
                           ),
                         ),
                       ),

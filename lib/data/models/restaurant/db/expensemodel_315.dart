@@ -38,22 +38,22 @@ class ExpenseCategory extends HiveObject {
   }
 
 
- factory ExpenseCategory.fromMap(Map<String, dynamic>map){
+  factory ExpenseCategory.fromMap(Map<String, dynamic>map){
     return ExpenseCategory(
-        id: map['id'],
-        name: map['name'],
-        isEnabled: map['isEnabled'],
+      id: map['id'],
+      name: map['name'],
+      isEnabled: map['isEnabled'],
 
     );
- }
+  }
 
- Map<String, dynamic> toMap(){
+  Map<String, dynamic> toMap(){
     return{
       'id':id,
       'name':name,
       'isEnabled': isEnabled,
     };
- }
+  }
 
 
 }

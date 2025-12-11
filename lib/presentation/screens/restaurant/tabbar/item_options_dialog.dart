@@ -15,8 +15,6 @@ import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../../data/models/restaurant/db/toppingmodel_304.dart';
 import '../../../../data/models/restaurant/db/variantmodel_305.dart';
 
-
-// Helper class for variants
 class DisplayVariant {
   final String id;
   final String name;
@@ -57,14 +55,14 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   void initState() {
     super.initState();
     _prepareVariants();
-     _prepareChoices();
-     _prepareExtra();
+    _prepareChoices();
+    _prepareExtra();
     _recalculateTotal();
   }
 
   void _prepareVariants() {
     if (widget.item.variant == null || widget.item.variant!.isEmpty) return;
-    final variantBox = Hive.box<VariantModel>('variants');
+    final variantBox = Hive.box<VariantModel>('variante');
     // ... (This logic is the same as before)
     for (ItemVariante itemVariant in widget.item.variant!) {
       final variantDetails = variantBox.values.firstWhere((v) => v.id == itemVariant.variantId, orElse: () => VariantModel(id: '', name: 'Unknown'));
@@ -79,7 +77,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   void _prepareChoices() {
     if (widget.item.choiceIds == null || widget.item.choiceIds!.isEmpty) return;
-    final choiceBox = Hive.box<ChoicesModel>('choices'); // Use your choice group box name
+    final choiceBox = Hive.box<ChoicesModel>('choice'); // Use your choice group box name
     for (String choiceId in widget.item.choiceIds!) {
       final choiceGroup = choiceBox.values.firstWhere((c) => c.id == choiceId, orElse: () => ChoicesModel(id: '', name: 'Unknown'));
       if (choiceGroup.name != 'Unknown') {
@@ -90,7 +88,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   void _prepareExtra(){
     if(widget.item.extraId == null || widget.item.extraId!.isEmpty) return ;
-    final ExtraBox = Hive.box<Extramodel>('extras');
+    final ExtraBox = Hive.box<Extramodel>('extra');
     for(String extraId in widget.item.extraId!){
       final extraGroup = ExtraBox.values.firstWhere((e)=> e.Id == extraId, orElse:  ()=> Extramodel(Id: '', Ename: 'Unknown'));
       if(extraGroup.Ename != 'Unknown'){
@@ -238,8 +236,8 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     print("DEBUG in Dialog: Received category name: '${widget.categoryName}'");
 
     final cartItem = CartItem(
-      productId: widget.item.id,
-      isStockManaged: widget.item.trackInventory,
+        productId: widget.item.id,
+        isStockManaged: widget.item.trackInventory,
         id: const Uuid().v4(),
         // 1. The title is now clean.
         title: finalTitle,
@@ -252,34 +250,34 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         variantPrice: _selectedVariant?.price,
         // 3. The choices are stored *only* in this list, not in the title.
         choiceNames: _selectedChoices.map((c) => c.name).toList(),
-      taxRate: widget.item.taxRate,
-      extras: _selectedExtra.map((e) {
-        // Find the category this extra belongs to
-        String categoryName = '';
-        String categoryId = '';
-        for (var extraGroup in _displayExtra) {
-          if (extraGroup.topping!.contains(e)) {
-            categoryName = extraGroup.Ename;
-            categoryId = extraGroup.Id;
-            break;
+        taxRate: widget.item.taxRate,
+        extras: _selectedExtra.map((e) {
+          // Find the category this extra belongs to
+          String categoryName = '';
+          String categoryId = '';
+          for (var extraGroup in _displayExtra) {
+            if (extraGroup.topping!.contains(e)) {
+              categoryName = extraGroup.Ename;
+              categoryId = extraGroup.Id;
+              break;
+            }
           }
-        }
-        
-        final displayName = categoryName.isNotEmpty ? '$categoryName - ${e.name}' : e.name;
-        final finalPrice = _selectedVariant != null && e.isContainSize == true && e.variantPrices != null 
-            ? e.getPriceForVariant(_selectedVariant!.id) 
-            : e.price;
-        
-        print('Extra Debug: Category="$categoryName", Name="${e.name}", DisplayName="$displayName"');
-        
-        return {
-          'name': e.name,
-          'displayName': displayName,
-          'price': finalPrice,
-          'categoryName': categoryName,
-          'categoryId': categoryId,
-        };
-      }).toList()
+
+          final displayName = categoryName.isNotEmpty ? '$categoryName - ${e.name}' : e.name;
+          final finalPrice = _selectedVariant != null && e.isContainSize == true && e.variantPrices != null
+              ? e.getPriceForVariant(_selectedVariant!.id)
+              : e.price;
+
+          print('Extra Debug: Category="$categoryName", Name="${e.name}", DisplayName="$displayName"');
+
+          return {
+            'name': e.name,
+            'displayName': displayName,
+            'price': finalPrice,
+            'categoryName': categoryName,
+            'categoryId': categoryId,
+          };
+        }).toList()
     );
 
     print(cartItem);
@@ -405,144 +403,144 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   Widget _buildExtraSection(){
     return Column(
-     crossAxisAlignment:  CrossAxisAlignment.start,
-      children: _displayExtra.map((extraGroup){
-        // Get min/max constraints for this extra category
-        final constraints = widget.item.extraConstraints?[extraGroup.Id];
-        final minRequired = constraints?['min'] ?? 0;
-        final maxAllowed = constraints?['max'] ?? 0;
-        final currentCount = _getExtraCategoryCount(extraGroup.Id);
+        crossAxisAlignment:  CrossAxisAlignment.start,
+        children: _displayExtra.map((extraGroup){
+          // Get min/max constraints for this extra category
+          final constraints = widget.item.extraConstraints?[extraGroup.Id];
+          final minRequired = constraints?['min'] ?? 0;
+          final maxAllowed = constraints?['max'] ?? 0;
+          final currentCount = _getExtraCategoryCount(extraGroup.Id);
 
-        // First, filter the toppings for this extra group
-        final filteredToppings = extraGroup.topping!.where((topping) {
-          // Filter toppings based on size availability
-          if (topping.isContainSize == true) {
-            // If topping is size-dependent, only show it if:
-            // 1. A variant is selected AND
-            // 2. The topping has a price for that variant AND
-            // 3. The price is greater than 0
-            if (_selectedVariant != null && topping.variantPrices != null) {
-              if (topping.variantPrices!.containsKey(_selectedVariant!.id)) {
-                final price = topping.variantPrices![_selectedVariant!.id] ?? 0.0;
-                // Only show if price is greater than 0
-                return price > 0;
+          // First, filter the toppings for this extra group
+          final filteredToppings = extraGroup.topping!.where((topping) {
+            // Filter toppings based on size availability
+            if (topping.isContainSize == true) {
+              // If topping is size-dependent, only show it if:
+              // 1. A variant is selected AND
+              // 2. The topping has a price for that variant AND
+              // 3. The price is greater than 0
+              if (_selectedVariant != null && topping.variantPrices != null) {
+                if (topping.variantPrices!.containsKey(_selectedVariant!.id)) {
+                  final price = topping.variantPrices![_selectedVariant!.id] ?? 0.0;
+                  // Only show if price is greater than 0
+                  return price > 0;
+                }
+                return false;
               }
+              // Don't show size-dependent toppings when no variant is selected
               return false;
             }
-            // Don't show size-dependent toppings when no variant is selected
-            return false;
+            // If topping is not size-dependent, always show it (unless you want to filter by base price)
+            return true;
+          }).toList();
+
+          // Only show this extra group if there are toppings to display
+          if (filteredToppings.isEmpty) {
+            return const SizedBox.shrink(); // Return empty widget
           }
-          // If topping is not size-dependent, always show it (unless you want to filter by base price)
-          return true;
-        }).toList();
 
-        // Only show this extra group if there are toppings to display
-        if (filteredToppings.isEmpty) {
-          return const SizedBox.shrink(); // Return empty widget
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Row(
-                children: [
-                  Text(extraGroup.Ename, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-                  if (minRequired > 0 || maxAllowed > 0) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
-                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (maxAllowed > 0 && currentCount >= maxAllowed)
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Padding(
-                padding: const EdgeInsets.only(left: 16.0, bottom: 8.0),
-                child: Text(
-                  'Maximum selection reached',
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange[700], fontWeight: FontWeight.w500),
-                ),
-              ),
-            ...filteredToppings.map((topping){
-              // Calculate the display price based on selected variant
-              double displayPrice = topping.price;
-              if (_selectedVariant != null && topping.isContainSize == true && topping.variantPrices != null) {
-                displayPrice = topping.getPriceForVariant(_selectedVariant!.id);
-              }
-
-              final currentQuantity = _extraQuantities[topping.name] ?? 0;
-              final canIncrement = maxAllowed == 0 || currentCount < maxAllowed;
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Row(
                   children: [
-                    // Topping name and price
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(topping.name, style: GoogleFonts.poppins(fontSize: 14)),
-                          Text('Rs. ${displayPrice.toStringAsFixed(2)}',
-                               style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
-                        ],
+                    Text(extraGroup.Ename, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                    if (minRequired > 0 || maxAllowed > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
+                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
                       ),
-                    ),
-
-                    // Quantity controls
-                    Row(
-                      children: [
-                        // Minus button
-                        IconButton(
-                          icon: Icon(Icons.remove_circle_outline, color: currentQuantity > 0 ? primarycolor : Colors.grey[400]),
-                          onPressed: currentQuantity > 0 ? () {
-                            setState(() {
-                              _extraQuantities[topping.name] = currentQuantity - 1;
-                              _recalculateTotal();
-                            });
-                          } : null,
-                          padding: EdgeInsets.zero,
-                          constraints: BoxConstraints(),
-                        ),
-
-                        // Quantity display
-                        Container(
-                          width: 40,
-                          alignment: Alignment.center,
-                          child: Text(
-                            currentQuantity.toString(),
-                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-
-                        // Plus button
-                        IconButton(
-                          icon: Icon(Icons.add_circle_outline, color: canIncrement ? primarycolor : Colors.grey[400]),
-                          onPressed: canIncrement ? () {
-                            setState(() {
-                              _extraQuantities[topping.name] = currentQuantity + 1;
-                              _recalculateTotal();
-                            });
-                          } : null,
-                          padding: EdgeInsets.zero,
-                          constraints: BoxConstraints(),
-                        ),
-                      ],
-                    ),
+                    ],
                   ],
                 ),
-              );
-            }).toList(),
-            const Divider()
+              ),
+              if (maxAllowed > 0 && currentCount >= maxAllowed)
+                Padding(
+                  padding: const EdgeInsets.only(left: 16.0, bottom: 8.0),
+                  child: Text(
+                    'Maximum selection reached',
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange[700], fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ...filteredToppings.map((topping){
+                // Calculate the display price based on selected variant
+                double displayPrice = topping.price;
+                if (_selectedVariant != null && topping.isContainSize == true && topping.variantPrices != null) {
+                  displayPrice = topping.getPriceForVariant(_selectedVariant!.id);
+                }
 
-          ],
-        );
+                final currentQuantity = _extraQuantities[topping.name] ?? 0;
+                final canIncrement = maxAllowed == 0 || currentCount < maxAllowed;
 
-      }).toList()
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: Row(
+                    children: [
+                      // Topping name and price
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(topping.name, style: GoogleFonts.poppins(fontSize: 14)),
+                            Text('Rs. ${displayPrice.toStringAsFixed(2)}',
+                                style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+                          ],
+                        ),
+                      ),
+
+                      // Quantity controls
+                      Row(
+                        children: [
+                          // Minus button
+                          IconButton(
+                            icon: Icon(Icons.remove_circle_outline, color: currentQuantity > 0 ? primarycolor : Colors.grey[400]),
+                            onPressed: currentQuantity > 0 ? () {
+                              setState(() {
+                                _extraQuantities[topping.name] = currentQuantity - 1;
+                                _recalculateTotal();
+                              });
+                            } : null,
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(),
+                          ),
+
+                          // Quantity display
+                          Container(
+                            width: 40,
+                            alignment: Alignment.center,
+                            child: Text(
+                              currentQuantity.toString(),
+                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+
+                          // Plus button
+                          IconButton(
+                            icon: Icon(Icons.add_circle_outline, color: canIncrement ? primarycolor : Colors.grey[400]),
+                            onPressed: canIncrement ? () {
+                              setState(() {
+                                _extraQuantities[topping.name] = currentQuantity + 1;
+                                _recalculateTotal();
+                              });
+                            } : null,
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              const Divider()
+
+            ],
+          );
+
+        }).toList()
     );
 
 

@@ -41,7 +41,7 @@ class _MonthWiseItemState extends State<MonthWiseItem> {
                 width: width * 0.6,
                 // height: height *0.07,
                 child: CommonTextForm(
-controller: SearchController(),
+                    controller: SearchController(),
                     hintText: "Search Item",
                     HintColor: Colors.grey,
                     icon: Icon(Icons.search,color: primarycolor,size: 30,),

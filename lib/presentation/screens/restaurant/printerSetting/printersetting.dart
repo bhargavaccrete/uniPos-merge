@@ -32,7 +32,7 @@ class _PrintersettingState extends State<Printersetting> {
             Container(
               padding: EdgeInsets.all(5),
               decoration:
-                  BoxDecoration(border: Border.all(color: primarycolor)),
+              BoxDecoration(border: Border.all(color: primarycolor)),
               width: width,
               height: height * 0.35,
               child: Row(
@@ -69,7 +69,7 @@ class _PrintersettingState extends State<Printersetting> {
             Container(
               padding: EdgeInsets.all(5),
               decoration:
-                  BoxDecoration(border: Border.all(color: primarycolor)),
+              BoxDecoration(border: Border.all(color: primarycolor)),
               width: width,
               height: height * 0.35,
               child: Row(

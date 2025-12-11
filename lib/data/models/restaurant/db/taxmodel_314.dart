@@ -9,7 +9,7 @@ part 'taxmodel_314.g.dart';
 class Tax extends HiveObject{
 
   @HiveField(0)
-    String id;
+  String id;
 
   @HiveField(1)
   String taxname;
@@ -21,20 +21,20 @@ class Tax extends HiveObject{
   Tax({
     required this.id,
     required this.taxname,
-     this.taxperecentage
-});
+    this.taxperecentage
+  });
 
 
-Tax copyWith({
+  Tax copyWith({
     String? id,
     String? taxname,
     double? taxperecentage
-}){
-  return Tax(
-      id: id ?? this.id,
-      taxname: taxname ?? this.taxname,
-      taxperecentage: taxperecentage ?? this.taxperecentage);
-}
+  }){
+    return Tax(
+        id: id ?? this.id,
+        taxname: taxname ?? this.taxname,
+        taxperecentage: taxperecentage ?? this.taxperecentage);
+  }
 
   // Convert to Map for export
   Map<String, dynamic> toMap() {

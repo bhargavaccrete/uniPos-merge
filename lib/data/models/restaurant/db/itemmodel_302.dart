@@ -167,21 +167,21 @@ class Items extends HiveObject {
     Map<String, Map<String, int>>? extraConstraints,
   }) {
     return Items(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        price: price ?? this.price,
-        categoryOfItem: categoryOfItem ?? this.categoryOfItem,
-        imagePath: imagePath ?? this.imagePath,
-        // CHANGED from imagePath
-        description: description ?? this.description,
-        isVeg: isVeg ?? this.isVeg,
-        unit: unit ?? this.unit,
-        isSoldByWeight: isSoldByWeight ?? this.isSoldByWeight,
-        variant: variant ?? this.variant,
-        choiceIds: choiceIds ?? this.choiceIds,
-        extraId: extraId ?? this.extraId,
-        isEnabled: isEnabled ?? this.isEnabled,
-        taxRate: taxRate ?? this.taxRate,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      price: price ?? this.price,
+      categoryOfItem: categoryOfItem ?? this.categoryOfItem,
+      imagePath: imagePath ?? this.imagePath,
+      // CHANGED from imagePath
+      description: description ?? this.description,
+      isVeg: isVeg ?? this.isVeg,
+      unit: unit ?? this.unit,
+      isSoldByWeight: isSoldByWeight ?? this.isSoldByWeight,
+      variant: variant ?? this.variant,
+      choiceIds: choiceIds ?? this.choiceIds,
+      extraId: extraId ?? this.extraId,
+      isEnabled: isEnabled ?? this.isEnabled,
+      taxRate: taxRate ?? this.taxRate,
       trackInventory: trackInventory ?? this.trackInventory, // RENAMED
       stockQuantity: stockQuantity ?? this.stockQuantity,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock ?? this.allowOrderWhenOutOfStock,
@@ -288,15 +288,15 @@ class Items extends HiveObject {
       editedBy: map['editedBy'],
       editCount: map['editCount'] ?? 0,
       extraConstraints: map['extraConstraints'] != null
-        ? Map<String, Map<String, int>>.from(
-            (map['extraConstraints'] as Map).map(
+          ? Map<String, Map<String, int>>.from(
+        (map['extraConstraints'] as Map).map(
               (key, value) => MapEntry(
-                key.toString(),
-                Map<String, int>.from(value as Map),
-              ),
-            ),
-          )
-        : null,
+            key.toString(),
+            Map<String, int>.from(value as Map),
+          ),
+        ),
+      )
+          : null,
     );
   }
 }

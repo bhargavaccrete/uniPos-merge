@@ -95,85 +95,85 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
           ),
           FittedBox(
               child: Container(
-            width: widget * 1,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
-            child: DataTable(
-                headingRowColor: WidgetStateProperty.all(Colors.blue),
-                columns: [
-                  DataColumn(
-                    label: Text(
-                      "Sr No",
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "Method\nName",
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "Active\nDeactive",
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      "Edit",
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-                rows: [
-                  DataRow(cells: [
-                    DataCell(Text("1")),
-                    DataCell(Text("Cash")),
-                    DataCell(ToggleSwitch(
-                      initialValue: false,
-                      showBorder: false,
-                    )),
-                    DataCell(IconButton(
-                        onPressed: () {
-                          showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return Showdialog(
-                                  content: 'update the payment details here',
-                                  title: 'update Payment Method',
-                                  ButtonText: 'Update',
-                                );
-                              });
-                        },
-                        icon: Icon(Icons.edit)))
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text("2")),
-                    DataCell(Text("Card")),
-                    DataCell(ToggleSwitch(
-                      initialValue: false,
-                      showBorder: false,
-                    )),
-                    DataCell(IconButton(
-                        onPressed: () {
-                          showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return Showdialog(
-                                  content: 'update the payment details here',
-                                  title: 'update Payment Method',
-                                  ButtonText: 'Update',
-                                );
-                              });
-                        },
-                        icon: Icon(Icons.edit)))
-                  ])
-                ]),
-          )),
+                width: widget * 1,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
+                child: DataTable(
+                    headingRowColor: WidgetStateProperty.all(Colors.blue),
+                    columns: [
+                      DataColumn(
+                        label: Text(
+                          "Sr No",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          "Method\nName",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          "Active\nDeactive",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          "Edit",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                    rows: [
+                      DataRow(cells: [
+                        DataCell(Text("1")),
+                        DataCell(Text("Cash")),
+                        DataCell(ToggleSwitch(
+                          initialValue: false,
+                          showBorder: false,
+                        )),
+                        DataCell(IconButton(
+                            onPressed: () {
+                              showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return Showdialog(
+                                      content: 'update the payment details here',
+                                      title: 'update Payment Method',
+                                      ButtonText: 'Update',
+                                    );
+                                  });
+                            },
+                            icon: Icon(Icons.edit)))
+                      ]),
+                      DataRow(cells: [
+                        DataCell(Text("2")),
+                        DataCell(Text("Card")),
+                        DataCell(ToggleSwitch(
+                          initialValue: false,
+                          showBorder: false,
+                        )),
+                        DataCell(IconButton(
+                            onPressed: () {
+                              showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return Showdialog(
+                                      content: 'update the payment details here',
+                                      title: 'update Payment Method',
+                                      ButtonText: 'Update',
+                                    );
+                                  });
+                            },
+                            icon: Icon(Icons.edit)))
+                      ])
+                    ]),
+              )),
         ]));
   }
 }

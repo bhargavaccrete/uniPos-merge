@@ -63,7 +63,7 @@ class CartItem extends HiveObject {
     required this.title,
     required this.imagePath,
     required this.price,
-     required this.productId,
+    required this.productId,
     this.isStockManaged,
 
     this.quantity = 1,

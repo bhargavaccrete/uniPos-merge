@@ -88,14 +88,14 @@ class _AllTabState extends State<AllTab> {
                   gesture: Icon(Icons.search,color: Colors.grey,),
                   BorderColor: Colors.grey,
                   obsecureText: false,
-                controller: searchController,
+                  controller: searchController,
                 ),
               ),
 
               // ✅ This builder automatically listens for any changes in your Hive boxes
               ValueListenableBuilder(
                 // Listens to the 'categories' box
-                valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
+                valueListenable: Hive.box<Category>('categories').listenable(),
                 builder: (context, categoryBox, _) {
                   return ValueListenableBuilder(
                     // Listens to the 'items' box
@@ -103,165 +103,165 @@ class _AllTabState extends State<AllTab> {
                     builder: (context, itemBox, _) {
                       return ValueListenableBuilder(
                         // Listens to the 'variants' box
-                        valueListenable: Hive.box<VariantModel>('variants').listenable(),
+                        valueListenable: Hive.box<VariantModel>('variante').listenable(),
                         builder: (context, variantBox, _) {
-                      final allCategories = categoryBox.values.toList();
+                          final allCategories = categoryBox.values.toList();
 
-                      final filtercat = query.isEmpty
-                      ?allCategories
-                          :allCategories.where((cat){
+                          final filtercat = query.isEmpty
+                              ?allCategories
+                              :allCategories.where((cat){
                             final name = cat.name.toLowerCase();
                             final queryLower = query.toLowerCase();
                             return name.contains(queryLower);
-                      }).toList();
+                          }).toList();
 
 
-                      final allItems = itemBox.values.toList();
+                          final allItems = itemBox.values.toList();
 
-                      // This logic now runs automatically whenever data changes
-                      final Map<String, List<Items>> categoryItemsMap = {};
-                      for (var category in allCategories) {
-                        categoryItemsMap[category.id] = allItems
-                            .where((item) => item.categoryOfItem == category.id)
-                            .toList();
-                      }
+                          // This logic now runs automatically whenever data changes
+                          final Map<String, List<Items>> categoryItemsMap = {};
+                          for (var category in allCategories) {
+                            categoryItemsMap[category.id] = allItems
+                                .where((item) => item.categoryOfItem == category.id)
+                                .toList();
+                          }
 
-                      // --- Build UI with the always-fresh data ---
-                      if (allCategories.isEmpty) {
-                        return Container(
-                          height: height * 0.65,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Lottie.asset(notfoundanimation, height: height * 0.3),
-                              Text('No Categories Found!', style: GoogleFonts.poppins(fontSize: 16)),
-                            ],
-                          ),
-                        );
-                      }
-
-                      return Container(
-                        // color: Colors.red,
-                        height: height * 0.6, // Consider making this more flexible with Expanded
-                        child: ListView.builder(
-                          itemCount: filtercat.length,
-                          itemBuilder: (context, index) {
-                            final cat = filtercat[index];
-                            final items = categoryItemsMap[cat.id] ?? [];
-
-                            return ExpansionTile(
-                              title: Text(
-                                cat.name,
-                                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+                          // --- Build UI with the always-fresh data ---
+                          if (allCategories.isEmpty) {
+                            return Container(
+                              height: height * 0.65,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Lottie.asset(notfoundanimation, height: height * 0.3),
+                                  Text('No Categories Found!', style: GoogleFonts.poppins(fontSize: 16)),
+                                ],
                               ),
-                              children:
-                              items.isEmpty
-                                  ? [
-                                const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Text("No items in this category"),
-                                )
-                              ]
-                                  :
-                              items.map((item) {
-                                return Container(
-                                  padding: EdgeInsets.all(5),
-                                  width: width * 0.9,
-
-                                  margin: EdgeInsets.all(5),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.black)
-                                  ),
-                                  // color: Colors.red,
-                                  child: Column(
-                                    crossAxisAlignment:CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(item.name),
-                                          Row(
-                                            children: [
-                                              Text("₹${item.price ?? "N/A"}"),
-                                              Transform.scale(
-                                                  scale: 0.8,
-                                                  child:Switch(
-
-                                                    // thumb when ON
-                                                      activeColor: Colors.white,
-                                                      // track when ON
-                                                      activeTrackColor: primarycolor,
-                                                      // thumb when OFF
-                                                      inactiveThumbColor: Colors.white70,
-                                                      // track when OFF
-                                                      inactiveTrackColor: Colors.grey.shade400,
-                                                      value: item.isEnabled,
-                                                      onChanged: (bool value)async{
-                                                        item.isEnabled = value;
-                                                        await item.save();
-
-                                                      })),
-                                            ],
-                                          )
-                                        ],
-                                      ),
-
-                                      Divider(),
-                                      if (item.variant != null && item.variant!.isNotEmpty)
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              "Variations:",
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.grey[600]
-                                              ),
-                                            ),
-                                            SizedBox(height: 4),
-                                            ...item.variant!.map((variant) {
-                                              final variantData = variantBox.values.firstWhere(
-                                                (v) => v.id == variant.variantId,
-                                                orElse: () => VariantModel(id: variant.variantId, name: 'Unknown')
-                                              );
-                                              return Padding(
-                                                padding: EdgeInsets.only(left: 8, bottom: 2),
-                                                child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      "• ${variantData.name}",
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize: 11,
-                                                        color: Colors.grey[700]
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      "₹${variant.price}",
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w500,
-                                                        color: primarycolor
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            }).toList(),
-                                          ],
-                                        ),
-                                    ],
-
-
-
-                                  )
-                                );
-                              }).toList(),
                             );
-                          },
-                        ),
-                      );
+                          }
+
+                          return Container(
+                            // color: Colors.red,
+                            height: height * 0.6, // Consider making this more flexible with Expanded
+                            child: ListView.builder(
+                              itemCount: filtercat.length,
+                              itemBuilder: (context, index) {
+                                final cat = filtercat[index];
+                                final items = categoryItemsMap[cat.id] ?? [];
+
+                                return ExpansionTile(
+                                  title: Text(
+                                    cat.name,
+                                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+                                  ),
+                                  children:
+                                  items.isEmpty
+                                      ? [
+                                    const Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Text("No items in this category"),
+                                    )
+                                  ]
+                                      :
+                                  items.map((item) {
+                                    return Container(
+                                        padding: EdgeInsets.all(5),
+                                        width: width * 0.9,
+
+                                        margin: EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                            border: Border.all(color: Colors.black)
+                                        ),
+                                        // color: Colors.red,
+                                        child: Column(
+                                          crossAxisAlignment:CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(item.name),
+                                                Row(
+                                                  children: [
+                                                    Text("₹${item.price ?? "N/A"}"),
+                                                    Transform.scale(
+                                                        scale: 0.8,
+                                                        child:Switch(
+
+                                                          // thumb when ON
+                                                            activeColor: Colors.white,
+                                                            // track when ON
+                                                            activeTrackColor: primarycolor,
+                                                            // thumb when OFF
+                                                            inactiveThumbColor: Colors.white70,
+                                                            // track when OFF
+                                                            inactiveTrackColor: Colors.grey.shade400,
+                                                            value: item.isEnabled,
+                                                            onChanged: (bool value)async{
+                                                              item.isEnabled = value;
+                                                              await item.save();
+
+                                                            })),
+                                                  ],
+                                                )
+                                              ],
+                                            ),
+
+                                            Divider(),
+                                            if (item.variant != null && item.variant!.isNotEmpty)
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    "Variations:",
+                                                    style: GoogleFonts.poppins(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: Colors.grey[600]
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 4),
+                                                  ...item.variant!.map((variant) {
+                                                    final variantData = variantBox.values.firstWhere(
+                                                            (v) => v.id == variant.variantId,
+                                                        orElse: () => VariantModel(id: variant.variantId, name: 'Unknown')
+                                                    );
+                                                    return Padding(
+                                                      padding: EdgeInsets.only(left: 8, bottom: 2),
+                                                      child: Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            "• ${variantData.name}",
+                                                            style: GoogleFonts.poppins(
+                                                                fontSize: 11,
+                                                                color: Colors.grey[700]
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            "₹${variant.price}",
+                                                            style: GoogleFonts.poppins(
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.w500,
+                                                                color: primarycolor
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  }).toList(),
+                                                ],
+                                              ),
+                                          ],
+
+
+
+                                        )
+                                    );
+                                  }).toList(),
+                                );
+                              },
+                            ),
+                          );
                         },
                       );
                     },

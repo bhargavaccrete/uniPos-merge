@@ -114,7 +114,7 @@ class _ThisWeekbyComparisonState extends State<ThisWeekbyComparison> {
                           columnWidth:FixedColumnWidth(width *0.35),
 
                           label: Container(
-                            alignment: Alignment.center,
+                              alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
                                 borderRadius: BorderRadius.only(
@@ -133,7 +133,7 @@ class _ThisWeekbyComparisonState extends State<ThisWeekbyComparison> {
                         cells: [
                           DataCell(
                             Center(child: Text('Farm fresh',textScaler: TextScaler.linear(1),
-                style: GoogleFonts.poppins(fontSize: 14),)),
+                              style: GoogleFonts.poppins(fontSize: 14),)),
                           ),
                           DataCell(
                             Center(child: Text('2',textScaler: TextScaler.linear(1),

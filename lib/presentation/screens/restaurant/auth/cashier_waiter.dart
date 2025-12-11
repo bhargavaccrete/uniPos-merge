@@ -18,39 +18,39 @@ class _CashierWaiterState extends State<CashierWaiter> {
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
       backgroundColor: screenBGColor,
-     
+
       body: SingleChildScrollView(
-       
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
-          
+
           children: [
-             Container(
-              padding: EdgeInsets.all(10), 
-              alignment: Alignment.center,
-              height: height * 0.20,
-              width:width * 0.5,
-              child: Image.asset(logo)),
-              Padding(
-                padding: const EdgeInsets.all(30),
-                child: Text("Select Cashier | Waiter",style: TextStyle(fontSize: 20),),
-              ),
-              Container(
-                width: width,
-                height: height*0.5,
-               child: RawScrollbar(
-                thumbColor: primarycolor,
-                thickness: 5,
-                
-                
-                child: 
-               ListView.builder(itemCount: 10,
-                itemBuilder: (context, index) {
-                return MultipleListViewWithNavigation(displayTitle: 'cashier', onTap: (){
-                  Navigator.push(context,MaterialPageRoute(builder: (context)=> AdminLogin()));
-                });
-               })), 
-               ),
+            Container(
+                padding: EdgeInsets.all(10),
+                alignment: Alignment.center,
+                height: height * 0.20,
+                width:width * 0.5,
+                child: Image.asset(logo)),
+            Padding(
+              padding: const EdgeInsets.all(30),
+              child: Text("Select Cashier | Waiter",style: TextStyle(fontSize: 20),),
+            ),
+            Container(
+              width: width,
+              height: height*0.5,
+              child: RawScrollbar(
+                  thumbColor: primarycolor,
+                  thickness: 5,
+
+
+                  child:
+                  ListView.builder(itemCount: 10,
+                      itemBuilder: (context, index) {
+                        return MultipleListViewWithNavigation(displayTitle: 'cashier', onTap: (){
+                          Navigator.push(context,MaterialPageRoute(builder: (context)=> AdminLogin()));
+                        });
+                      })),
+            ),
 
             Padding(
               padding: const EdgeInsets.all(50),

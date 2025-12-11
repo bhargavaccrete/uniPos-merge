@@ -16,7 +16,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// String formatted = await CurrencyHelper.formatAmount(100.50);
 /// // Output: "$100.50"
 /// ```
-
 class CurrencyHelper {
   static const String _currencyKey = 'selected_currency';
 
@@ -73,10 +72,10 @@ class CurrencyHelper {
   /// - formatAmount(100.5) => "$100.50"
   /// - formatAmount(100, showSymbol: false) => "100.00"
   static Future<String> formatAmount(
-    num amount, {
-    bool showSymbol = true,
-    int decimalPlaces = 2,
-  }) async {
+      num amount, {
+        bool showSymbol = true,
+        int decimalPlaces = 2,
+      }) async {
     final symbol = showSymbol ? await getCurrencySymbol() : '';
     final formatted = amount.toStringAsFixed(decimalPlaces);
     return showSymbol ? '$symbol$formatted' : formatted;
@@ -85,10 +84,10 @@ class CurrencyHelper {
   /// Format amount synchronously with a given symbol
   /// Use this when you already have the symbol to avoid async calls in UI
   static String formatAmountWithSymbol(
-    num amount,
-    String symbol, {
-    int decimalPlaces = 2,
-  }) {
+      num amount,
+      String symbol, {
+        int decimalPlaces = 2,
+      }) {
     final formatted = amount.toStringAsFixed(decimalPlaces);
     return '$symbol$formatted';
   }

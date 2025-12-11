@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/domain/services/restaurant/data_clear_service.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
@@ -11,6 +12,9 @@ import 'package:unipos/domain/services/restaurant/eod_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+
+import '../../../../data/models/restaurant/db/database/hive_cart.dart';
+import '../../../../data/models/restaurant/db/database/hive_pastorder.dart';
 
 class EndDayDrawer extends StatefulWidget {
   const EndDayDrawer({super.key});
@@ -43,7 +47,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
     try {
       // Check if there are any past orders (transactions) to display
-      final pastOrders = pastOrderStore.pastOrders.toList();
+      final pastOrders = await HivePastOrder.getAllPastOrderModel();
 
       // If there are no past orders, show empty state
       if (pastOrders.isEmpty) {
@@ -113,7 +117,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
 
     // Check if there are any active orders remaining
-    final activeOrders = orderStore.orders.toList();
+    final activeOrders = await HiveOrders.getAllOrder();
     if (activeOrders.isNotEmpty) {
       // Show warning dialog asking user to clear active orders
       final shouldProceed = await _showActiveOrdersWarning(activeOrders.length);
@@ -172,7 +176,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => AdminWelcome()),
-          (route) => false, // Remove all previous routes
+              (route) => false, // Remove all previous routes
         );
       }
     } catch (e) {
@@ -254,19 +258,19 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
   Future<void> _clearAllData() async {
     // Import the data clear service
-    final pastOrders = pastOrderStore.pastOrders.toList();
+    final pastOrders = await HivePastOrder.getAllPastOrderModel();
     for (final order in pastOrders) {
-      await pastOrderStore.deleteOrder(order.id);
+      await HivePastOrder.deleteOrder(order.id);
     }
 
     // Clear active orders
-    final activeOrders = orderStore.orders.toList();
+    final activeOrders = await HiveOrders.getAllOrder();
     for (final order in activeOrders) {
-      await orderStore.deleteOrder(order.id);
+      await HiveOrders.deleteOrder(order.id);
     }
 
     // Clear cart
-    await cartStore.clearCart();
+    await HiveCart.clearCart();
   }
 
   Future<void> _markDayCompleted() async {
@@ -365,7 +369,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     Text(
                       'Admin',
                       style:
-                          GoogleFonts.poppins(fontSize: 10, color: Colors.grey),
+                      GoogleFonts.poppins(fontSize: 10, color: Colors.grey),
                     )
                   ],
                 )
@@ -378,7 +382,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         child: Container(
           padding: EdgeInsets.all(15),
           child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(
               'End of Day Settlement',
               style: GoogleFonts.poppins(
@@ -390,7 +394,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
               width: width,
               height: height * 0.07,
               decoration:
-                  BoxDecoration(border: Border.all(color: primarycolor)),
+              BoxDecoration(border: Border.all(color: primarycolor)),
               child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -469,7 +473,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     child: ExpansionTile(
                       tilePadding: EdgeInsets.symmetric(horizontal: 15),
                       childrenPadding:
-                          EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       title: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -662,15 +666,15 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                       Text('${payment.paymentType} Payment',
                           textScaler: TextScaler.linear(1),
                           style:
-                              GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                          GoogleFonts.poppins(fontWeight: FontWeight.w500)),
                       Text('#${payment.transactionCount}',
                           textScaler: TextScaler.linear(1),
                           style:
-                              GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                          GoogleFonts.poppins(fontWeight: FontWeight.w500)),
                       Text('Rs.${payment.totalAmount.toStringAsFixed(2)}',
                           textScaler: TextScaler.linear(1),
                           style:
-                              GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                          GoogleFonts.poppins(fontWeight: FontWeight.w500)),
                     ],
                   ),
                 );
@@ -908,21 +912,21 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                           : () => _completeEndOfDay(),
                       child: _isGenerating
                           ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                           : Text(
-                              'End of The Day',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 18,
-                                  color: Colors.white),
-                            ))
+                        'End of The Day',
+                        textScaler: TextScaler.linear(1),
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 18,
+                            color: Colors.white),
+                      ))
                 ],
               ),
             )

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 
 import '../../../../../core/di/service_locator.dart';
-
 enum TimePeriod { Today, Month, Year, Custom }
 
 class ExpenseReport extends StatefulWidget {
@@ -119,7 +119,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
 
     try {
       // First, load all expense categories to map IDs to names
-      final categories = expenseStore.categories.toList();
+      final categories = await HiveExpenseCat.getAllECategory();
       final categoryMap = <String, String>{};
       for (var category in categories) {
         categoryMap[category.id] = category.name;
@@ -145,7 +145,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
     setState(() => _isLoading = true);
 
     try {
-      final allExpenses = expenseStore.expenses.toList();
+      final allExpenses = await HiveExpenceL.getAllItems();
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 
@@ -164,7 +164,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
           break;
 
         case TimePeriod.Month:
-          // Group by month - for now show current month, can be enhanced
+        // Group by month - for now show current month, can be enhanced
           filtered = allExpenses.where((expense) {
             return expense.dateandTime.year == now.year &&
                 expense.dateandTime.month == now.month;
@@ -172,7 +172,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
           break;
 
         case TimePeriod.Year:
-          // Group by year - for now show current year
+        // Group by year - for now show current year
           filtered = allExpenses.where((expense) {
             return expense.dateandTime.year == now.year;
           }).toList();

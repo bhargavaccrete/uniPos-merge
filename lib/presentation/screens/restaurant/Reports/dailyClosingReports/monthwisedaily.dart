@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 
 import '../../../../widget/componets/restaurant/componets/Button.dart';
@@ -55,7 +56,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
       final year = dropdownvalue2;
 
       // Get all EOD reports
-      final allReports = eodStore.reports.toList();
+      final allReports = await HiveEOD.getAllEODReports();
 
       // Filter reports for selected month and year
       final monthReports = allReports.where((report) {
@@ -118,190 +119,190 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 20),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 20),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Select Month',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 5),
-                              Container(
-                                width: width * 0.4,
-                                height: height * 0.05,
-                                padding: EdgeInsets.all(5),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: primarycolor),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton(
-                                    value: dropDownValue1,
-                                    isExpanded: true,
-                                    items: monthitem.map((String items) {
-                                      return DropdownMenuItem(
-                                        value: items,
-                                        child: Text(
-                                          items,
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 14),
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (String? newValue) {
-                                      setState(() {
-                                        dropDownValue1 = newValue!;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              )
-                            ],
+                        Text(
+                          'Select Month',
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Select Year',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 5),
-                              Container(
-                                width: width * 0.4,
-                                height: height * 0.05,
-                                padding: EdgeInsets.all(5),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: primarycolor),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton(
-                                    value: dropdownvalue2,
-                                    isExpanded: true,
-                                    items: yearitem.map((int items) {
-                                      return DropdownMenuItem(
-                                        value: items,
-                                        child: Text(
-                                          items.toString(),
-                                          textScaler: TextScaler.linear(1),
-                                          style: GoogleFonts.poppins(fontSize: 14),
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (int? newValue) {
-                                      setState(() {
-                                        dropdownvalue2 = newValue!;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              )
-                            ],
+                        SizedBox(height: 5),
+                        Container(
+                          width: width * 0.4,
+                          height: height * 0.05,
+                          padding: EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: primarycolor),
                           ),
-                        ),
-                        SizedBox(height: 20, width: 20),
-                        InkWell(
-                          onTap: _loadMonthData,
-                          child: Container(
-                            padding: EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: primarycolor,
-                              borderRadius: BorderRadius.circular(50),
-                            ),
-                            child: Icon(
-                              Icons.search,
-                              size: 25,
-                              color: Colors.white,
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton(
+                              value: dropDownValue1,
+                              isExpanded: true,
+                              items: monthitem.map((String items) {
+                                return DropdownMenuItem(
+                                  value: items,
+                                  child: Text(
+                                    items,
+                                    textScaler: TextScaler.linear(1),
+                                    style: GoogleFonts.poppins(fontSize: 14),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  dropDownValue1 = newValue!;
+                                });
+                              },
                             ),
                           ),
                         )
                       ],
                     ),
-                    SizedBox(height: 20),
-                    CommonButton(
-                      width: width * 0.6,
-                      height: height * 0.06,
-                      bordercircular: 5,
-                      onTap: () {},
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.note_add_outlined, color: Colors.white),
-                          SizedBox(width: 8),
-                          Text(
-                            'Export To Excel',
-                            textScaler: TextScaler.linear(1),
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          )
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 25),
-                    if (_reports.isNotEmpty) ...[
-                      Text(
-                        'Total Sales: Rs. ${_totalSales.toStringAsFixed(1)}',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Text(
-                        'Reports Found: ${_reports.length} day(s)',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      _buildOrderTable(width),
-                      SizedBox(height: 30),
-                      _buildPaymentTable(width),
-                      SizedBox(height: 30),
-                      _buildExpenseSection(width),
-                    ] else ...[
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Text(
-                            'No Data Available for Selected Month',
-                            textScaler: TextScaler.linear(1),
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Select Year',
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
+                        SizedBox(height: 5),
+                        Container(
+                          width: width * 0.4,
+                          height: height * 0.05,
+                          padding: EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: primarycolor),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton(
+                              value: dropdownvalue2,
+                              isExpanded: true,
+                              items: yearitem.map((int items) {
+                                return DropdownMenuItem(
+                                  value: items,
+                                  child: Text(
+                                    items.toString(),
+                                    textScaler: TextScaler.linear(1),
+                                    style: GoogleFonts.poppins(fontSize: 14),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (int? newValue) {
+                                setState(() {
+                                  dropdownvalue2 = newValue!;
+                                });
+                              },
+                            ),
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 20, width: 20),
+                  InkWell(
+                    onTap: _loadMonthData,
+                    child: Container(
+                      padding: EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: primarycolor,
+                        borderRadius: BorderRadius.circular(50),
                       ),
-                    ],
+                      child: Icon(
+                        Icons.search,
+                        size: 25,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                ],
+              ),
+              SizedBox(height: 20),
+              CommonButton(
+                width: width * 0.6,
+                height: height * 0.06,
+                bordercircular: 5,
+                onTap: () {},
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.note_add_outlined, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      'Export To Excel',
+                      textScaler: TextScaler.linear(1),
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    )
                   ],
                 ),
               ),
-            ),
+              SizedBox(height: 25),
+              if (_reports.isNotEmpty) ...[
+                Text(
+                  'Total Sales: Rs. ${_totalSales.toStringAsFixed(1)}',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Reports Found: ${_reports.length} day(s)',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                SizedBox(height: 20),
+                _buildOrderTable(width),
+                SizedBox(height: 30),
+                _buildPaymentTable(width),
+                SizedBox(height: 30),
+                _buildExpenseSection(width),
+              ] else ...[
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text(
+                      'No Data Available for Selected Month',
+                      textScaler: TextScaler.linear(1),
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 

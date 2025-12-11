@@ -19,7 +19,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Customer List Report',
+            'Customer List Report',
             textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
         ),
@@ -81,7 +81,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                 headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
 
                 decoration: BoxDecoration(
-                    // color: Colors.grey.shade300,
+                  // color: Colors.grey.shade300,
                     shape: BoxShape.rectangle,
                     borderRadius: BorderRadius.circular(20)),
                 border: TableBorder.all(
@@ -92,60 +92,60 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                       headingRowAlignment: MainAxisAlignment.center,
 
                       label: Container(
-                    decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(10),
-                            bottomLeft: Radius.circular(10))),
-                    alignment: Alignment.center,
-                    width: width * 0.15,
-                    // height: height * 0.05,
-                    child: Text("Sr No",
-                        textAlign: TextAlign.center,
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontSize: 14),),
-                  )),
+                        decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10))),
+                        alignment: Alignment.center,
+                        width: width * 0.15,
+                        // height: height * 0.05,
+                        child: Text("Sr No",
+                          textAlign: TextAlign.center,
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(fontSize: 14),),
+                      )),
                   DataColumn(
                       label: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                    ),
-                    alignment: Alignment.center,
-                    width: width * 0.3,
-                    // height: height * 0.05,
-                    child: Text("Customber\n  Name",
-                        textAlign: TextAlign.center,
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontSize: 14),),
-                  )),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                        ),
+                        alignment: Alignment.center,
+                        width: width * 0.3,
+                        // height: height * 0.05,
+                        child: Text("Customber\n  Name",
+                          textAlign: TextAlign.center,
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(fontSize: 14),),
+                      )),
                   DataColumn(
                       label: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                    ),
-                    alignment: Alignment.center,
-                    width: width * 0.2,
-                    // height: height * 0.05,
-                    child: Text("Mobile",
-                        textAlign: TextAlign.center,
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontSize: 14),),
-                  )),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                        ),
+                        alignment: Alignment.center,
+                        width: width * 0.2,
+                        // height: height * 0.05,
+                        child: Text("Mobile",
+                          textAlign: TextAlign.center,
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(fontSize: 14),),
+                      )),
                   DataColumn(
                       label: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(10),
-                          bottomRight: Radius.circular(10)),
-                      color: Colors.grey.shade300,
-                    ),
-                    alignment: Alignment.center,
-                    width: width * 0.3,
-                    // height: height * 0.05,
-                    child: Text("Revenue",
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontSize: 14),),
-                  )),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.only(
+                              topRight: Radius.circular(10),
+                              bottomRight: Radius.circular(10)),
+                          color: Colors.grey.shade300,
+                        ),
+                        alignment: Alignment.center,
+                        width: width * 0.3,
+                        // height: height * 0.05,
+                        child: Text("Revenue",
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(fontSize: 14),),
+                      )),
                 ],
                 rows: [
                   DataRow(cells: [
@@ -153,23 +153,23 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                     DataCell(Center(child: Text("Guest"))),
                     DataCell(Center(
                         child: Text(
-                      "-",
-                      textAlign: TextAlign.center,
-                    ))),
+                          "-",
+                          textAlign: TextAlign.center,
+                        ))),
                     DataCell(Center(
                         child: Text(
-                      "559",
-                      textAlign: TextAlign.center,
-                    ))),
+                          "559",
+                          textAlign: TextAlign.center,
+                        ))),
                   ]),
                   DataRow(cells: [
                     DataCell(Center(child: Text("2"))),
                     DataCell(Center(child: Text("Guest"))),
                     DataCell(Center(
                         child: Text(
-                      "-",
-                      textAlign: TextAlign.center,
-                    ))),
+                          "-",
+                          textAlign: TextAlign.center,
+                        ))),
                     DataCell(Center(
                         child: Text(
                           "559",

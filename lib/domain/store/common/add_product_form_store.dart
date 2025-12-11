@@ -16,7 +16,9 @@ import '../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 
 // Stores
 import '../retail/product_store.dart';
-import '../restaurant/item_store.dart';
+
+// Restaurant Hive Database
+import '../../../data/models/restaurant/db/database/hive_db.dart';
 
 part 'add_product_form_store.g.dart';
 
@@ -565,7 +567,6 @@ abstract class _AddProductFormStore with Store {
   }
 
   Future<void> _submitRestaurantItem() async {
-    final itemStore = locator<ItemStore>();
     final itemId = _uuid.v4();
 
     // Create item variants if has portion sizes
@@ -613,7 +614,7 @@ abstract class _AddProductFormStore with Store {
       createdTime: DateTime.now(),
     );
 
-    await itemStore.addItem(item);
+    await itemsBoxes.addItem(item);
   }
 
   // ==================== RESET ====================

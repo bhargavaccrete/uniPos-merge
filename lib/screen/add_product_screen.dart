@@ -1,29 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/adapters.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
+import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
 
 import '../core/config/app_config.dart';
 import '../core/di/service_locator.dart';
+import '../data/models/restaurant/db/database/hive_tax.dart';
+import '../data/models/restaurant/db/taxmodel_314.dart';
 import '../data/models/retail/hive_model/attribute_model_219.dart';
 import '../data/models/retail/hive_model/attribute_value_model_220.dart';
 import '../data/models/retail/hive_model/variante_model_201.dart';
 import '../data/repositories/tax_details_repository.dart';
 import '../domain/store/common/add_product_form_store.dart';
-import '../domain/store/restaurant/category_store.dart';
 import '../domain/store/retail/product_store.dart';
 import '../domain/store/retail/attribute_store.dart';
-import '../domain/store/restaurant/item_store.dart';
-import '../domain/store/restaurant/category_store.dart' as restaurant;
-import '../domain/store/restaurant/choice_store.dart';
-import '../domain/store/restaurant/extra_store.dart';
-import '../util/color.dart';
 import '../util/responsive.dart';
 import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
+import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
+import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback? onNext;
@@ -307,10 +317,11 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   Future<bool> _updateRestaurantItem() async {
     try {
-      final itemStore = locator<ItemStore>();
+      // Get all items from Hive
+      final allItems = await itemsBoxes.getAllItems();
 
       // Get the existing item to preserve fields not in the form
-      final existingItem = itemStore.items.firstWhere(
+      final existingItem = allItems.firstWhere(
         (item) => item.id == _editingRestaurantItemId,
       );
 
@@ -334,7 +345,7 @@ class _AddProductScreenState extends State<AddProductScreen>
       );
 
       // Update item in database
-      await itemStore.updateItem(updatedItem);
+      await itemsBoxes.updateItem(updatedItem);
 
       return true;
     } catch (e) {
@@ -745,6 +756,7 @@ class _AddProductScreenState extends State<AddProductScreen>
             ),
             const SizedBox(width: 8),
             ChoiceChip(
+
               label: const Text('Non-Veg'),
               selected: _formStore.isVeg == 'non-veg',
               onSelected: (_) => _formStore.setIsVeg('non-veg'),
@@ -785,27 +797,65 @@ class _AddProductScreenState extends State<AddProductScreen>
         },
       );
     } else {
-      final categoryStore = locator<restaurant.CategoryStore>();
-      return Observer(
-        builder: (_) {
-          // Ensure the selected value is valid or null
-          final categoryIds = categoryStore.categories.map((c) => c.id).toList();
+      // Restaurant mode - use FutureBuilder with category selector
+      return FutureBuilder<Box<Category>>(
+        future: HiveBoxes.getCategory(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Category*',
+                prefixIcon: const Icon(Icons.category, color: AppColors.primary),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                suffixIcon: const CircularProgressIndicator(),
+              ),
+              child: const Text('Loading...'),
+            );
+          }
+
+          final categoryBox = snapshot.data!;
+          final categories = categoryBox.values.toList();
+          final categoryIds = categories.map((c) => c.id).toList();
+
+          // Ensure selected value is valid
           final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
               ? _formStore.selectedCategoryId
               : null;
 
-          return DropdownButtonFormField<String>(
-            value: selectedValue,
-            decoration: InputDecoration(
-              labelText: 'Category*',
-              prefixIcon: const Icon(Icons.category, color: AppColors.primary),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          return InkWell(
+            onTap: () async {
+              // Show category selector bottom sheet
+              final result = await CategorySelectorSheet.show(
+                context,
+                selectedCategoryId: selectedValue,
+                onAddCategory: () async {
+                  Navigator.pop(context);
+                  await AddCategoryDialog.show(context);
+                },
+              );
+
+              if (result != null) {
+                setState(() {
+                  _formStore.setSelectedCategoryId(result.id);
+                });
+              }
+            },
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Category*',
+                prefixIcon: const Icon(Icons.category, color: AppColors.primary),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                suffixIcon: const Icon(Icons.arrow_drop_down),
+              ),
+              child: Text(
+                selectedValue != null && categories.isNotEmpty
+                    ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
+                    : 'Select or Add Category',
+                style: TextStyle(
+                  color: selectedValue != null ? Colors.black : Colors.grey[600],
+                ),
+              ),
             ),
-            items: categoryStore.categories.map((category) {
-              return DropdownMenuItem(value: category.id, child: Text(category.name));
-            }).toList(),
-            onChanged: (value) => _formStore.setSelectedCategoryId(value),
-            hint: const Text('Select category'),
           );
         },
       );
@@ -813,23 +863,16 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildGstDropdown() {
-    // Fetch tax rates from saved tax details
+    // Fetch tax rates from saved tax details (for retail)
     final taxDetailsRepo = locator<TaxDetailsRepository>();
     final savedTax = taxDetailsRepo.get();
-
-    print('_buildGstDropdown: savedTax = $savedTax');
-    print('_buildGstDropdown: savedTax?.taxRates = ${savedTax?.taxRates}');
 
     // Get tax rates from saved details, or use default if none saved
     List<String> gstRates = [];
     if (savedTax != null && savedTax.taxRates != null && savedTax.taxRates!.isNotEmpty) {
-      // Use saved tax rates from setup
-      print('_buildGstDropdown: Using saved tax rates');
       gstRates = savedTax.taxRates!.map((tax) => tax.rate.toString()).toList();
-      print('_buildGstDropdown: gstRates = $gstRates');
     } else {
       // Fallback to common GST rates if no tax rates were added during setup
-      print('_buildGstDropdown: Using fallback default rates');
       gstRates = ['0', '5', '12', '18', '28'];
     }
 
@@ -857,6 +900,55 @@ class _AddProductScreenState extends State<AddProductScreen>
     );
   }
 
+  Widget _buildRestaurantTaxDropdown() {
+    // Use FutureBuilder to avoid box type conflicts
+    return FutureBuilder<Box<Tax>>(
+      future: TaxBox.getTaxBox(),
+      builder: (context, snapshot) {
+        List<Map<String, String>> taxRates = [
+          {'id': '', 'name': 'No Tax', 'rate': '0'},
+        ];
+
+        if (snapshot.hasData) {
+          final taxes = snapshot.data!.values.toList();
+          taxRates.addAll(
+            taxes.map((tax) => {
+              'id': tax.id,
+              'name': tax.taxname,
+              'rate': tax.taxperecentage.toString(),
+            }),
+          );
+        }
+
+        // Find current selected value
+        final currentValue = _taxRateController.text.isEmpty ? null : _taxRateController.text;
+
+        return DropdownButtonFormField<String>(
+          value: currentValue,
+          decoration: InputDecoration(
+            labelText: 'Tax Rate',
+            prefixIcon: const Icon(Icons.receipt_outlined, color: AppColors.primary),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          items: taxRates.map<DropdownMenuItem<String>>((tax) {
+            return DropdownMenuItem<String>(
+              value: tax['rate']!,
+              child: Text('${tax['name']} (${tax['rate']}%)'),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _taxRateController.text = value ?? '';
+            });
+          },
+          hint: const Text('Select tax rate'),
+        );
+      },
+    );
+  }
+
   // ==================== SECTION 2: PRICING ====================
 
   Widget _buildPricingSection(bool isMobile) {
@@ -865,28 +957,18 @@ class _AddProductScreenState extends State<AddProductScreen>
       children: [
         _buildSubSectionTitle('Pricing & Tax'),
 
-        // GST/Tax Rate Dropdown for Retail, TextField for Restaurant
+        // GST/Tax Rate Dropdown for both Retail and Restaurant
         if (isMobile)
           AppConfig.isRetail
               ? _buildGstDropdown()
-              : _buildTextField(
-            controller: _taxRateController,
-            label: 'Tax Rate (%)',
-            icon: Icons.percent,
-            keyboardType: TextInputType.number,
-          )
+              : _buildRestaurantTaxDropdown()
         else
           Row(
             children: [
               Expanded(
                 child: AppConfig.isRetail
                     ? _buildGstDropdown()
-                    : _buildTextField(
-                  controller: _taxRateController,
-                  label: 'Tax Rate (%)',
-                  icon: Icons.percent,
-                  keyboardType: TextInputType.number,
-                ),
+                    : _buildRestaurantTaxDropdown(),
               ),
               const SizedBox(width: 16),
               const Expanded(child: SizedBox.shrink()),
@@ -1746,20 +1828,20 @@ class _AddProductScreenState extends State<AddProductScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSubSectionTitle('Portion Sizes'),
+        _buildSubSectionTitle('Variants'),
 
-        // Has Sizes Toggle
+        // Has Variants Toggle
         Observer(
           builder: (_) => SwitchListTile(
-            title: const Text('Has Multiple Sizes'),
-            subtitle: const Text('Enable if item has different portion sizes (S, M, L)'),
+            title: const Text('Has Multiple Variants'),
+            subtitle: const Text('Enable if item has different sizes (Small, Medium, Large)'),
             value: _formStore.hasPortionSizes,
             onChanged: (v) => _formStore.setHasPortionSizes(v),
             activeColor: AppColors.primary,
           ),
         ),
 
-        // Portion Sizes List
+        // Variants List
         Observer(
           builder: (_) {
             if (!_formStore.hasPortionSizes) {
@@ -1778,7 +1860,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 OutlinedButton.icon(
                   onPressed: () => _formStore.addPortionSize(),
                   icon: const Icon(Icons.add),
-                  label: const Text('Add Size'),
+                  label: const Text('Add Variant'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                   ),
@@ -1803,7 +1885,7 @@ class _AddProductScreenState extends State<AddProductScreen>
               child: TextFormField(
                 initialValue: size.name,
                 decoration: InputDecoration(
-                  labelText: 'Size Name',
+                  labelText: 'Variant Name',
                   hintText: 'e.g., Small, Medium, Large',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   isDense: true,
@@ -1877,135 +1959,141 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildChoiceGroupsSelector() {
-    final choiceStore = locator<ChoiceStore>();
+    return FutureBuilder<List<ChoicesModel>>(
+      future: HiveChoice.getAllChoice(),
+      builder: (context, snapshot) {
+        final choices = snapshot.data ?? [];
 
-    return Observer(
-      builder: (_) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Choice Groups (Free Selections)',
-            style: TextStyle(fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          if (choiceStore.choices.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'No choice groups available. Create them in settings.',
-                style: TextStyle(color: Colors.grey),
-              ),
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: choiceStore.choices.map((choice) {
-                final isSelected = _formStore.selectedChoiceIds.contains(choice.id);
-                return FilterChip(
-                  label: Text(choice.name),
-                  selected: isSelected,
-                  onSelected: (_) => _formStore.toggleChoiceGroup(choice.id),
-                  selectedColor: AppColors.primary.withOpacity(0.2),
-                  avatar: isSelected
-                      ? const Icon(Icons.check_circle, size: 18, color: AppColors.primary)
-                      : const Icon(Icons.radio_button_unchecked, size: 18),
-                );
-              }).toList(),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Choice Groups (Free Selections)',
+              style: TextStyle(fontWeight: FontWeight.w500),
             ),
-        ],
-      ),
+            const SizedBox(height: 8),
+            if (choices.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'No choice groups available. Create them in settings.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: choices.map((choice) {
+                  final isSelected = _formStore.selectedChoiceIds.contains(choice.id);
+                  return FilterChip(
+                    label: Text(choice.name),
+                    selected: isSelected,
+                    onSelected: (_) => _formStore.toggleChoiceGroup(choice.id),
+                    selectedColor: AppColors.primary.withOpacity(0.2),
+                    avatar: isSelected
+                        ? const Icon(Icons.check_circle, size: 18, color: AppColors.primary)
+                        : const Icon(Icons.radio_button_unchecked, size: 18),
+                  );
+                }).toList(),
+              ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildExtraGroupsSelector() {
-    final extraStore = locator<ExtraStore>();
+    return FutureBuilder<List<Extramodel>>(
+      future: HiveExtra.getAllExtra(),
+      builder: (context, snapshot) {
+        final extras = snapshot.data ?? [];
 
-    return Observer(
-      builder: (_) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Extra Groups (Paid Add-ons)',
-            style: TextStyle(fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          if (extraStore.extras.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'No extra groups available. Create them in settings.',
-                style: TextStyle(color: Colors.grey),
-              ),
-            )
-          else
-            Column(
-              children: extraStore.extras.map((extra) {
-                final isSelected = _formStore.selectedExtraIds.contains(extra.Id);
-                final constraint = _formStore.extraConstraints[extra.Id];
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: CheckboxListTile(
-                    title: Text(extra.Ename),
-                    subtitle: isSelected && constraint != null
-                        ? Row(
-                      children: [
-                        const Text('Min: '),
-                        SizedBox(
-                          width: 50,
-                          child: TextFormField(
-                            initialValue: constraint.min.toString(),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (v) => _formStore.setExtraConstraint(
-                              extra.Id,
-                              int.tryParse(v) ?? 0,
-                              constraint.max,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Text('Max: '),
-                        SizedBox(
-                          width: 50,
-                          child: TextFormField(
-                            initialValue: constraint.max.toString(),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (v) => _formStore.setExtraConstraint(
-                              extra.Id,
-                              constraint.min,
-                              int.tryParse(v) ?? 5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                        : Text('${extra.topping?.length ?? 0} toppings'),
-                    value: isSelected,
-                    onChanged: (_) => _formStore.toggleExtraGroup(extra.Id),
-                    activeColor: AppColors.primary,
-                  ),
-                );
-              }).toList(),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Extra Groups (Paid Add-ons)',
+              style: TextStyle(fontWeight: FontWeight.w500),
             ),
-        ],
-      ),
+            const SizedBox(height: 8),
+            if (extras.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'No extra groups available. Create them in settings.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
+            else
+              Column(
+                children: extras.map((extra) {
+                  final isSelected = _formStore.selectedExtraIds.contains(extra.Id);
+                  final constraint = _formStore.extraConstraints[extra.Id];
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: CheckboxListTile(
+                      title: Text(extra.Ename),
+                      subtitle: isSelected && constraint != null
+                          ? Row(
+                        children: [
+                          const Text('Min: '),
+                          SizedBox(
+                            width: 50,
+                            child: TextFormField(
+                              initialValue: constraint.min.toString(),
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              ),
+                              keyboardType: TextInputType.number,
+                              onChanged: (v) => _formStore.setExtraConstraint(
+                                extra.Id,
+                                int.tryParse(v) ?? 0,
+                                constraint.max,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          const Text('Max: '),
+                          SizedBox(
+                            width: 50,
+                            child: TextFormField(
+                              initialValue: constraint.max.toString(),
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              ),
+                              keyboardType: TextInputType.number,
+                              onChanged: (v) => _formStore.setExtraConstraint(
+                                extra.Id,
+                                constraint.min,
+                                int.tryParse(v) ?? 5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                          : Text('${extra.topping?.length ?? 0} toppings'),
+                      value: isSelected,
+                      onChanged: (_) => _formStore.toggleExtraGroup(extra.Id),
+                      activeColor: AppColors.primary,
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -2109,13 +2197,15 @@ class _AddProductScreenState extends State<AddProductScreen>
                   ),
                 ],
 
-                SwitchListTile(
-                  title: const Text('Allow Order When Out of Stock'),
-                  subtitle: const Text('Customers can still order when stock is 0'),
-                  value: _formStore.allowOrderWhenOutOfStock,
-                  onChanged: (v) => _formStore.setAllowOrderWhenOutOfStock(v),
-                  activeColor: AppColors.warning,
-                ),
+                // Only show "Allow Order When Out of Stock" if tracking inventory
+                if (_formStore.trackInventory)
+                  SwitchListTile(
+                    title: const Text('Allow Order When Out of Stock'),
+                    subtitle: const Text('Customers can still order when stock is 0'),
+                    value: _formStore.allowOrderWhenOutOfStock,
+                    onChanged: (v) => _formStore.setAllowOrderWhenOutOfStock(v),
+                    activeColor: AppColors.warning,
+                  ),
 
                 SwitchListTile(
                   title: const Text('Sold by Weight'),
@@ -2508,19 +2598,32 @@ class _AddProductScreenState extends State<AddProductScreen>
                         ),
                       );
 
-                      // Refresh stores
-                      try {
-                        final itemStore = locator<ItemStore>();
-                        final categoryStore = locator<CategoryStore>();
-                        final choiceStore = locator<ChoiceStore>();
-                        final extraStore = locator<ExtraStore>();
+                      // Data is already saved to Hive by the import service
+                      // Force a complete rebuild by popping all dialogs and refreshing
+                      if (mounted) {
+                        // Add a small delay to ensure all Hive listeners are triggered
+                        await Future.delayed(const Duration(milliseconds: 200));
+                        setState(() {});
 
-                        await itemStore.loadItems();
-                        await categoryStore.loadCategories();
-                        await choiceStore.loadChoices();
-                        await extraStore.loadExtras();
-                      } catch (e) {
-                        print('Error refreshing stores: $e');
+                        // Notify user to navigate to manage menu
+                        if (result.success && result.itemsImported > 0) {
+                          Future.delayed(const Duration(milliseconds: 500), () {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('✅ Import successful! Go to "Manage Menu" to view all imported items.'),
+                                  duration: const Duration(seconds: 5),
+                                  backgroundColor: Colors.green,
+                                  action: SnackBarAction(
+                                    label: 'Got it',
+                                    textColor: Colors.white,
+                                    onPressed: () {},
+                                  ),
+                                ),
+                              );
+                            }
+                          });
+                        }
                       }
                     } catch (e) {
                       if (!mounted) return;
@@ -2784,8 +2887,6 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildRestaurantItemList() {
-    final itemStore = locator<ItemStore>();
-
     return Container(
       padding: const EdgeInsets.all(20),
       child: Container(
@@ -2802,70 +2903,92 @@ class _AddProductScreenState extends State<AddProductScreen>
         ),
         child: Column(
           children: [
-            Observer(
-              builder: (_) => _buildListHeader(itemStore.items.length, 'Items'),
+            FutureBuilder<List<Items>>(
+              future: itemsBoxes.getAllItems(),
+              builder: (context, snapshot) {
+                final items = snapshot.data ?? [];
+                return _buildListHeader(items.length, 'Items');
+              },
             ),
             Expanded(
-              child: Observer(
-                builder: (_) => itemStore.items.isEmpty
-                    ? _buildEmptyState('items')
-                    : ListView.separated(
-                  padding: const EdgeInsets.all(20),
-                  itemCount: itemStore.items.length,
-                  separatorBuilder: (_, __) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final item = itemStore.items[index];
-                    return ListTile(
-                      leading: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: item.isVeg == 'veg'
-                              ? AppColors.success.withOpacity(0.1)
-                              : AppColors.danger.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+              child: FutureBuilder<List<Items>>(
+                future: itemsBoxes.getAllItems(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final items = snapshot.data!;
+
+                  if (items.isEmpty) {
+                    return _buildEmptyState('items');
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return ListTile(
+                        leading: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: item.isVeg == 'veg'
+                                ? AppColors.success.withOpacity(0.1)
+                                : AppColors.danger.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: item.imagePath != null
+                              ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(item.imagePath!),
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                              : Icon(
+                            Icons.restaurant,
+                            color: item.isVeg == 'veg' ? AppColors.success : AppColors.danger,
+                          ),
                         ),
-                        child: item.imagePath != null
-                            ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(
-                            File(item.imagePath!),
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                            : Icon(
-                          Icons.restaurant,
-                          color: item.isVeg == 'veg' ? AppColors.success : AppColors.danger,
+                        title: Text(
+                          item.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                      ),
-                      title: Text(
-                        item.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(
-                        '₹${item.price ?? "Multiple sizes"} • ${item.isEnabled ? "Active" : "Disabled"}',
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Switch(
-                            value: item.isEnabled,
-                            onChanged: (_) => itemStore.toggleItemEnabled(item.id),
-                            activeColor: AppColors.success,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit, size: 20),
-                            onPressed: () => _editRestaurantItem(item),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
-                            onPressed: () => itemStore.deleteItem(item.id),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                        subtitle: Text(
+                          '₹${item.price ?? "Multiple sizes"} • ${item.isEnabled ? "Active" : "Disabled"}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Switch(
+                              value: item.isEnabled,
+                              onChanged: (_) async {
+                                final updatedItem = item.copyWith(isEnabled: !item.isEnabled);
+                                await itemsBoxes.updateItem(updatedItem);
+                                setState(() {});
+                              },
+                              activeColor: AppColors.success,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 20),
+                              onPressed: () => _editRestaurantItem(item),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
+                              onPressed: () async {
+                                await itemsBoxes.deleteItem(item.id);
+                                setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ],

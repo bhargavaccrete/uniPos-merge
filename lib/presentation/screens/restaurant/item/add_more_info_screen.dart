@@ -6,10 +6,11 @@ import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'variant_selection_screen.dart';
 import 'choice_selection_screen.dart';
 import 'extra_selection_screen.dart';
+import 'tax_selection_screen.dart';
 
 class AddMoreInfoScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
-  
+
   const AddMoreInfoScreen({super.key, this.initialData});
 
   @override
@@ -18,12 +19,14 @@ class AddMoreInfoScreen extends StatefulWidget {
 
 class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
   Map<String, dynamic> itemData = {};
-  
+
   // Selected data
   List<Map<String, dynamic>> selectedVariants = [];
   List<String> selectedChoiceIds = [];
   List<String> selectedExtraIds = [];
-  
+  String? selectedTaxId;
+  double? selectedTaxRate;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +37,8 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
       selectedVariants = List<Map<String, dynamic>>.from(itemData['variants'] ?? []);
       selectedChoiceIds = List<String>.from(itemData['choiceIds'] ?? []);
       selectedExtraIds = List<String>.from(itemData['extraIds'] ?? []);
+      selectedTaxId = itemData['taxId'];
+      selectedTaxRate = itemData['taxRate'];
     }
   }
 
@@ -69,7 +74,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
               ),
             ),
             SizedBox(height: 30),
-            
+
             // Add Variants Option
             _buildOptionCard(
               icon: Icons.straighten_outlined,
@@ -92,9 +97,9 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                 }
               },
             ),
-            
+
             SizedBox(height: 20),
-            
+
             // Add Choices Option
             _buildOptionCard(
               icon: Icons.checklist_outlined,
@@ -117,9 +122,9 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                 }
               },
             ),
-            
+
             SizedBox(height: 20),
-            
+
             // Add Extras Option
             _buildOptionCard(
               icon: Icons.add_circle_outline,
@@ -142,9 +147,38 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                 }
               },
             ),
-            
+
+            SizedBox(height: 20),
+
+            // Add Tax Option
+            _buildTaxCard(
+              icon: Icons.receipt_outlined,
+              title: 'Select Tax',
+              description: selectedTaxRate != null
+                  ? 'Tax: ${(selectedTaxRate! * 100).toStringAsFixed(2)}%'
+                  : 'Add tax rate for this item',
+              hasSelection: selectedTaxRate != null,
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TaxSelectionScreen(
+                      selectedTaxId: selectedTaxId,
+                      currentTaxRate: selectedTaxRate,
+                    ),
+                  ),
+                );
+                if (result != null) {
+                  setState(() {
+                    selectedTaxId = result['taxId'];
+                    selectedTaxRate = result['taxRate'];
+                  });
+                }
+              },
+            ),
+
             Spacer(),
-            
+
             // Bottom Buttons
             Row(
               children: [
@@ -155,6 +189,8 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                       'variants': selectedVariants,
                       'choiceIds': selectedChoiceIds,
                       'extraIds': selectedExtraIds,
+                      'taxId': selectedTaxId,
+                      'taxRate': selectedTaxRate,
                     }),
                     bgcolor: Colors.white,
                     bordercolor: primarycolor,
@@ -177,6 +213,8 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                       'variants': selectedVariants,
                       'choiceIds': selectedChoiceIds,
                       'extraIds': selectedExtraIds,
+                      'taxId': selectedTaxId,
+                      'taxRate': selectedTaxRate,
                       'shouldSave': true,
                     }),
                     bordercircular: 10,
@@ -193,6 +231,74 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
               ],
             ),
             SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaxCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required bool hasSelection,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: hasSelection ? primarycolor : Colors.grey[300]!,
+            width: hasSelection ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          color: hasSelection ? primarycolor.withValues(alpha: 0.05) : Colors.grey[50],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: primarycolor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: primarycolor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    description,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey[400],
+            ),
           ],
         ),
       ),

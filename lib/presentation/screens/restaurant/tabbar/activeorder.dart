@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
@@ -50,7 +53,7 @@ class _ActiveorderState extends State<Activeorder> {
 
     // Only delete if the user confirmed
     if (shouldDelete == true) {
-      await orderStore.deleteOrder(orderId);
+      await HiveOrders.deleteOrder(orderId);
       // setState(() {
       //   // Refresh the FutureBuilder by getting the updated list of orders
       //   // _ordersFuture = HiveOrders.getAllOrder();
@@ -96,40 +99,40 @@ class _ActiveorderState extends State<Activeorder> {
           content: Text('What is the status of this order?'),
           actions: <Widget>[
             // Button 1: Ready to Pickup
-       Column(
-         crossAxisAlignment: CrossAxisAlignment.center,
-         mainAxisAlignment: MainAxisAlignment.center,
-         children: [
-           order.status == 'Ready'
-             ? SizedBox()
-          : CommonButton(
-             bgcolor: Colors.white,
-             width: 300,
-             height: 50,
-             child: Text(istakeaway?'Ready to Pickup':'Ready to Served',style:GoogleFonts.poppins(color: Colors.black)),
-             onTap: () {
-               Navigator.of(context).pop(); // Close the dialog
-               _updateOrderStatus(order, 'Ready');
-             },
-           ),
-           SizedBox(height: 10,),
-           // Button 2: Picked Up
-           CommonButton(
-             bgcolor: Colors.white,
-             width: 300,
-             height: 50,
-             child: Text(istakeaway?'Picked Up':'Served',style:GoogleFonts.poppins(color: Colors.black)),
-             onTap: () {
-               Navigator.of(context).pop(); // Close the dialog
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                order.status == 'Ready'
+                    ? SizedBox()
+                    : CommonButton(
+                  bgcolor: Colors.white,
+                  width: 300,
+                  height: 50,
+                  child: Text(istakeaway?'Ready to Pickup':'Ready to Served',style:GoogleFonts.poppins(color: Colors.black)),
+                  onTap: () {
+                    Navigator.of(context).pop(); // Close the dialog
+                    _updateOrderStatus(order, 'Ready');
+                  },
+                ),
+                SizedBox(height: 10,),
+                // Button 2: Picked Up
+                CommonButton(
+                  bgcolor: Colors.white,
+                  width: 300,
+                  height: 50,
+                  child: Text(istakeaway?'Picked Up':'Served',style:GoogleFonts.poppins(color: Colors.black)),
+                  onTap: () {
+                    Navigator.of(context).pop(); // Close the dialog
 
-               if(order.paymentStatus == 'Paid'){
-                 _moveOrderToPast(order);
-               }
-               _updateOrderStatus(order, 'Ready');
-             },
-           ),
-         ],
-       )
+                    if(order.paymentStatus == 'Paid'){
+                      _moveOrderToPast(order);
+                    }
+                    _updateOrderStatus(order, 'Ready');
+                  },
+                ),
+              ],
+            )
           ],
         );
       },
@@ -141,7 +144,7 @@ class _ActiveorderState extends State<Activeorder> {
     // Create an updated version of the order
     final updatedOrder = order.copyWith(status: newStatus);
     // Save the change to the Hive database
-    await orderStore.updateOrder(updatedOrder);
+    await HiveOrders.updateOrder(updatedOrder);
     // Refresh the screen to show the new color
     // _refreshOrders();
     print("Order ${order.kotNumber} status updated to $newStatus.");
@@ -170,9 +173,9 @@ class _ActiveorderState extends State<Activeorder> {
     );
 
     // Add to past orders and delete from active orders
-    await pastOrderStore.addOrder(pastOrder);
-    await orderStore.deleteOrder(order.id);
-    await tableStore.updateTableStatus(order.tableNo!, 'Available');
+    await HivePastOrder.addOrder(pastOrder);
+    await HiveOrders.deleteOrder(order.id);
+    await HiveTables.updateTableStatus(order.tableNo!, 'Available');
 
     // Refresh the screen to remove the card
     // _refreshOrders();
@@ -218,80 +221,80 @@ class _ActiveorderState extends State<Activeorder> {
 
             // FIX: This Expanded now has a fixed space to fill
             Expanded(
-              child:  ValueListenableBuilder(
-                valueListenable: Hive.box<OrderModel>('orderBox').listenable(),
-                builder: (context, orders ,_){
+                child:  ValueListenableBuilder(
+                  valueListenable: Hive.box<OrderModel>('orderBox').listenable(),
+                  builder: (context, orders ,_){
 
-                  final allOrders = orders.values.toList();
+                    final allOrders = orders.values.toList();
 
-                  allOrders.sort((a,b)=> b.timeStamp.compareTo(a.timeStamp));
+                    allOrders.sort((a,b)=> b.timeStamp.compareTo(a.timeStamp));
 
 
-                  if(allOrders.isEmpty){
-                    return Center(
-                      child: Text(
-                        'No Active Orders',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 28,
-                          color: Colors.grey.shade800,
+                    if(allOrders.isEmpty){
+                      return Center(
+                        child: Text(
+                          'No Active Orders',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 28,
+                            color: Colors.grey.shade800,
+                          ),
                         ),
-                      ),
-                    );
-                  }
-
-                  final filterOrderList = dropDownValue == 'All'
-                      ? allOrders
-                      : allOrders.where((order)=> order.orderType == dropDownValue)
-                      .toList();
-
-                  if(filterOrderList.isEmpty){
-                    return Center(child: Text('No Order of Type "$dropDownValue" found.'));
-                  }
-
-                  return ListView.builder(
-                    itemCount: filterOrderList.length,
-                    itemBuilder: (context, index) {
-                      final order = filterOrderList[index];
-                      return OrderCard(
-                        color: _getColorForStatus(order.status),
-
-                        order: order,
-                        onDelete: _deleteOrder,
-                        ontapcooking: () async {
-                          if (order.status == 'Cooking' || order.status == 'Ready') {
-                            _showStatusUpdateDialog(order,order.orderType == 'Take Away'? true : false);
-                          }
-                        },
-
-                        ontap: () async { // Make the function async
-                          // If status is 'Cooking', show the update dialog
-
-                          // If not paid, navigate to the cart to complete payment
-                          if (order.isPaid != true) {
-                            print('Card with Kot ${order.kotNumber}');
-
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CartScreen(
-                                  existingOrder: order,
-                                  selectedTableNo: order.tableNo,
-                                ),
-                              ),
-                            );
-                            // _refreshOrders();
-                          }
-                          // Handle other statuses if needed
-                          else {
-                            print("Order is in status: ${order.status}");
-                          }
-                        },
                       );
-                    },
-                  );
-                },
-              )
+                    }
+
+                    final filterOrderList = dropDownValue == 'All'
+                        ? allOrders
+                        : allOrders.where((order)=> order.orderType == dropDownValue)
+                        .toList();
+
+                    if(filterOrderList.isEmpty){
+                      return Center(child: Text('No Order of Type "$dropDownValue" found.'));
+                    }
+
+                    return ListView.builder(
+                      itemCount: filterOrderList.length,
+                      itemBuilder: (context, index) {
+                        final order = filterOrderList[index];
+                        return OrderCard(
+                          color: _getColorForStatus(order.status),
+
+                          order: order,
+                          onDelete: _deleteOrder,
+                          ontapcooking: () async {
+                            if (order.status == 'Cooking' || order.status == 'Ready') {
+                              _showStatusUpdateDialog(order,order.orderType == 'Take Away'? true : false);
+                            }
+                          },
+
+                          ontap: () async { // Make the function async
+                            // If status is 'Cooking', show the update dialog
+
+                            // If not paid, navigate to the cart to complete payment
+                            if (order.isPaid != true) {
+                              print('Card with Kot ${order.kotNumber}');
+
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CartScreen(
+                                    existingOrder: order,
+                                    selectedTableNo: order.tableNo,
+                                  ),
+                                ),
+                              );
+                              // _refreshOrders();
+                            }
+                            // Handle other statuses if needed
+                            else {
+                              print("Order is in status: ${order.status}");
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                )
 
 
 
@@ -302,8 +305,6 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 }
-
-
 
 
 // Future Builder

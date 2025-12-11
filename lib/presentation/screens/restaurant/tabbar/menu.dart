@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
 
@@ -86,7 +87,7 @@ class _MenuScreenState extends State<MenuScreen> {
     // --- 1. Find the category name for the tapped item ---
     String? categoryName;
     try {
-      final categoryBox = Hive.box<Category>('restaurant_categories');
+      final categoryBox = Hive.box<Category>('categories');
       final category = categoryBox.values.firstWhere((cat) => cat.id == item.categoryOfItem);
       categoryName = category.name;
     } catch (e) {
@@ -149,7 +150,7 @@ class _MenuScreenState extends State<MenuScreen> {
   /// This is the single, final function to add a prepared CartItem to the database.
   Future<void> _addItemToCart(CartItem cartItem) async {
     try {
-      final result = await cartStorer.addToCart(cartItem);
+      final result = await HiveCart.addToCart(cartItem);
 
       if (result['success'] == true) {
         await loadCartItems();
@@ -159,8 +160,8 @@ class _MenuScreenState extends State<MenuScreen> {
         });
 
         if (mounted) {
-        // TopSnack.show(context,
-        //     content:  Text('${cartItem.title} added toO cart'),);
+          // TopSnack.show(context,
+          //     content:  Text('${cartItem.title} added toO cart'),);
 
 
           // Show success notification
@@ -196,7 +197,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Future<void> loadCartItems() async {
     try {
-      final items = cartStorer.cartItems.toList();
+      final items = await HiveCart.getAllCartItems();
       setState(() {
         cartItemsList = items;
         totalPrice = items.fold(0.0, (sum, item) => sum + item.totalPrice);
@@ -300,8 +301,6 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
 
-
-
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
@@ -311,146 +310,146 @@ class _MenuScreenState extends State<MenuScreen> {
           child: Container(
             child: Column(
               // mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AppSettings.useGridViewCategory
-                            ? SizedBox()
-                            : Container(
-                                width: width * 0.3,
-                                height: height,
-                                color: Colors.blue.shade50,
-                                // color: Colors.blue,
-                                child: Column(
-                                  children: [
-                                    Container(
-                                      alignment: Alignment.center,
-                                      width: width * 0.3,
-                                      height: height * 0.04,
-                                      decoration: BoxDecoration(color: primarycolor, borderRadius: BorderRadius.circular(12)),
-                                      child: Text(
-                                        'Categories',
-                                        textScaler: TextScaler.linear(1),
-                                        style: GoogleFonts.poppins(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w600),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      height: 20,
-                                    ),
-
-                                    ValueListenableBuilder(valueListenable:Hive.box<Category>('restaurant_categories').listenable(),
-                                        builder: (context , categorys , _)
-                                        {
-                                          final  allcat = categorys.values.toList();
-
-
-                                          if(allcat.isEmpty){
-                                            return Container(
-                                              padding: EdgeInsets.all(5),
-                                              child: Text(
-                                                'No Category Found',
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            );
-                                          }
-                                          return Container(
-                                            // color: Colors.red,
-                                            height: height * 0.5,
-                                            width: 100,
-                                            child: Column(
-                                              children: [
-                                                if (AppSettings.allItemsCategory)
-                                                  InkWell(
-                                                    onTap: () {
-                                                      setState(() {
-                                                        activeCategory = null;
-                                                        // loadhive();
-                                                      });
-                                                    },
-                                                    child: Container(
-                                                      alignment: Alignment.center,
-                                                      width: width * 0.25,
-                                                      height: height * 0.03,
-                                                      decoration: BoxDecoration(
-                                                          color: Colors.teal[100],
-                                                          borderRadius: BorderRadius.circular(2),
-                                                          border: Border.all(
-                                                            color: primarycolor,
-                                                          )),
-                                                      child: Text(
-                                                        'All Items',
-                                                        textScaler: TextScaler.linear(1),
-                                                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                Expanded(
-                                                  // flex: 1,
-                                                  child: ListView.builder(
-                                                      itemCount: allcat.length,
-                                                      itemBuilder: (context, index) {
-                                                        var category = allcat[index];
-                                                        final isSelected = category.name == activeCategory;
-                                                        return Padding(
-                                                          padding: const EdgeInsets.all(8.0),
-                                                          child: InkWell(
-                                                            // onTap: (){
-                                                            //   setState(() {
-                                                            //     activeCategory = isSelected ? null : category.name;
-                                                            //   });
-                                                            //   loadhive();
-                                                            // },
-
-                                                            onTap: () {
-                                                              setState(() {
-                                                                if (isSelected) {
-                                                                  activeCategory = null;
-                                                                } else {
-                                                                  activeCategory = isSelected? null : category.id;
-                                                                }
-                                                              }
-                                                              );
-
-                                                              // loadhive();
-                                                            },
-                                                            child: Container(
-                                                              alignment: Alignment.center,
-                                                              width: width * 0.25,
-                                                              height: height * 0.04,
-                                                              decoration: BoxDecoration(
-                                                                  color: primarycolor,
-                                                                  borderRadius: BorderRadius.circular(2),
-                                                                  border: Border.all(
-                                                                    color: primarycolor,
-                                                                  )),
-                                                              child: Text(
-                                                                category.name,
-                                                                overflow: TextOverflow.ellipsis,
-                                                                textScaler: TextScaler.linear(1),
-                                                                style: GoogleFonts.poppins(
-                                                                    fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        })
-                                  ],
+                children: [
+                  Stack(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppSettings.useGridViewCategory
+                              ? SizedBox()
+                              : Container(
+                            width: width * 0.3,
+                            height: height,
+                            color: Colors.blue.shade50,
+                            // color: Colors.blue,
+                            child: Column(
+                              children: [
+                                Container(
+                                  alignment: Alignment.center,
+                                  width: width * 0.3,
+                                  height: height * 0.04,
+                                  decoration: BoxDecoration(color: primarycolor, borderRadius: BorderRadius.circular(12)),
+                                  child: Text(
+                                    'Categories',
+                                    textScaler: TextScaler.linear(1),
+                                    style: GoogleFonts.poppins(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                              ),
+                                SizedBox(
+                                  height: 20,
+                                ),
 
-                        // Online Order Column
-                        Expanded(
-                          child: Column(
-                            children: [
+                                ValueListenableBuilder(valueListenable:Hive.box<Category>('categories').listenable(),
+                                    builder: (context , categorys , _)
+                                    {
+                                      final  allcat = categorys.values.toList();
+
+
+                                      if(allcat.isEmpty){
+                                        return Container(
+                                          padding: EdgeInsets.all(5),
+                                          child: Text(
+                                            'No Category Found',
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        );
+                                      }
+                                      return Container(
+                                        // color: Colors.red,
+                                        height: height * 0.5,
+                                        width: 100,
+                                        child: Column(
+                                          children: [
+                                            if (AppSettings.allItemsCategory)
+                                              InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    activeCategory = null;
+                                                    // loadhive();
+                                                  });
+                                                },
+                                                child: Container(
+                                                  alignment: Alignment.center,
+                                                  width: width * 0.25,
+                                                  height: height * 0.03,
+                                                  decoration: BoxDecoration(
+                                                      color: Colors.teal[100],
+                                                      borderRadius: BorderRadius.circular(2),
+                                                      border: Border.all(
+                                                        color: primarycolor,
+                                                      )),
+                                                  child: Text(
+                                                    'All Items',
+                                                    textScaler: TextScaler.linear(1),
+                                                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
+                                                  ),
+                                                ),
+                                              ),
+                                            Expanded(
+                                              // flex: 1,
+                                              child: ListView.builder(
+                                                  itemCount: allcat.length,
+                                                  itemBuilder: (context, index) {
+                                                    var category = allcat[index];
+                                                    final isSelected = category.name == activeCategory;
+                                                    return Padding(
+                                                      padding: const EdgeInsets.all(8.0),
+                                                      child: InkWell(
+                                                        // onTap: (){
+                                                        //   setState(() {
+                                                        //     activeCategory = isSelected ? null : category.name;
+                                                        //   });
+                                                        //   loadhive();
+                                                        // },
+
+                                                        onTap: () {
+                                                          setState(() {
+                                                            if (isSelected) {
+                                                              activeCategory = null;
+                                                            } else {
+                                                              activeCategory = isSelected? null : category.id;
+                                                            }
+                                                          }
+                                                          );
+
+                                                          // loadhive();
+                                                        },
+                                                        child: Container(
+                                                          alignment: Alignment.center,
+                                                          width: width * 0.25,
+                                                          height: height * 0.04,
+                                                          decoration: BoxDecoration(
+                                                              color: primarycolor,
+                                                              borderRadius: BorderRadius.circular(2),
+                                                              border: Border.all(
+                                                                color: primarycolor,
+                                                              )),
+                                                          child: Text(
+                                                            category.name,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            textScaler: TextScaler.linear(1),
+                                                            style: GoogleFonts.poppins(
+                                                                fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    })
+                              ],
+                            ),
+                          ),
+
+                          // Online Order Column
+                          Expanded(
+                            child: Column(
+                              children: [
                                 Container(
                                   // color: Colors.red,
                                   child: CommonButton(
@@ -522,36 +521,36 @@ class _MenuScreenState extends State<MenuScreen> {
                                 // category if gridview
                                 if (AppSettings.useGridViewCategory)
                                   Container(
-                                    width: width * 0.9,
-                                    height: height * 0.06,
-                                    color: Colors.blue.shade50,
-                                    // color: Colors.blue,
-                                    child:
+                                      width: width * 0.9,
+                                      height: height * 0.06,
+                                      color: Colors.blue.shade50,
+                                      // color: Colors.blue,
+                                      child:
 
-                                        ValueListenableBuilder(valueListenable: Hive.box<Category>('restaurant_categories').listenable(),
-                                            builder: (context , categorys , _){
-
-
+                                      ValueListenableBuilder(valueListenable: Hive.box<Category>('categories').listenable(),
+                                          builder: (context , categorys , _){
 
 
 
-                                          final allCat = categorys.values.toList();
+
+
+                                            final allCat = categorys.values.toList();
 
 
 
-                                          print('Active Category: $activeCategory');
-                                          print('Filtered Items Count: ${itemsList.length}');
-                                          if(allCat.isEmpty){
-                                            return Container(
-                                              padding: EdgeInsets.all(5),
-                                              child: Text(
-                                                'No Category Found',
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            );
+                                            print('Active Category: $activeCategory');
+                                            print('Filtered Items Count: ${itemsList.length}');
+                                            if(allCat.isEmpty){
+                                              return Container(
+                                                padding: EdgeInsets.all(5),
+                                                child: Text(
+                                                  'No Category Found',
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              );
 
-                                          }
-                                          return ListView.builder(
+                                            }
+                                            return ListView.builder(
                                                 physics: BouncingScrollPhysics(),
                                                 scrollDirection: Axis.horizontal,
                                                 itemCount: allCat.length,
@@ -597,7 +596,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                                   );
                                                 });
 
-                                            })
+                                          })
                                   ),
 
 
@@ -606,101 +605,101 @@ class _MenuScreenState extends State<MenuScreen> {
                                   height: height,
                                   child:
                                   ValueListenableBuilder(
-                                    valueListenable: AppSettings.settingsNotifier,
-                                    builder: (context, value, _){
-                                      double aspectRatio =
-                                      AppSettings.useGridViewCategory ?
-                                      // Grid view category - shorter cards
-                                      (AppSettings.fixItemCard ?
+                                      valueListenable: AppSettings.settingsNotifier,
+                                      builder: (context, value, _){
+                                        double aspectRatio =
+                                        AppSettings.useGridViewCategory ?
+                                        // Grid view category - shorter cards
+                                        (AppSettings.fixItemCard ?
                                         (AppSettings.showItemImage ? 1.4 : 2.5)
-                                        :
+                                            :
                                         (AppSettings.showItemImage ? 1.0 : 2.0))
-                                      :
-                                      // Side category - normal cards
-                                      (AppSettings.fixItemCard ?
+                                            :
+                                        // Side category - normal cards
+                                        (AppSettings.fixItemCard ?
                                         (AppSettings.showItemImage ? 1.2 : 2.2)
-                                        :
+                                            :
                                         (AppSettings.showItemImage ? 0.65 : 1.8));
 
-                                    return ValueListenableBuilder(valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-                                        builder:(context, item, _){
-                                      final items = item.values.toList();
+                                        return ValueListenableBuilder(valueListenable: Hive.box<Items>('itemBoxs').listenable(),
+                                            builder:(context, item, _){
+                                              final items = item.values.toList();
 
-                                      final visibleItems = items.where((item)=> item.isEnabled).toList();
-
-
-                                      final filteredItems = (activeCategory != null && activeCategory!.isNotEmpty)
-                                      ? visibleItems.where((item)=> item.categoryOfItem == activeCategory).toList()
-                                      : visibleItems;
+                                              final visibleItems = items.where((item)=> item.isEnabled).toList();
 
 
-                                      final filterdsearch = query.isEmpty
-                                      ? filteredItems
-                                      : filteredItems.where((item){
-                                        final name = item.name.toLowerCase();
-                                        final querylower = query.toLowerCase();
-                                        return name.contains(querylower);
-                                      }).toList();
+                                              final filteredItems = (activeCategory != null && activeCategory!.isNotEmpty)
+                                                  ? visibleItems.where((item)=> item.categoryOfItem == activeCategory).toList()
+                                                  : visibleItems;
 
 
-                                      print('Active Category: $activeCategory');
-                                      print('Filtered Items Count: ${itemsList.length}');
+                                              final filterdsearch = query.isEmpty
+                                                  ? filteredItems
+                                                  : filteredItems.where((item){
+                                                final name = item.name.toLowerCase();
+                                                final querylower = query.toLowerCase();
+                                                return name.contains(querylower);
+                                              }).toList();
 
 
-                                      if(filteredItems.isEmpty){
-                                        return Container(
-                                          // alignment: Alignment.center,
-                                          width: width * 0.5,
-                                          height: height * 0.01,
-                                          padding: EdgeInsets.all(20),
-                                          // color: Colors.red,
-                                          child: Center(child: Text('No Items')
-                                          ),);
-                                      }
-                                      return    GridView.builder(
-                                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                            crossAxisCount: 2,
-                                            // Two items per row
-                                            crossAxisSpacing: 20,
-                                            // Space between columns
-                                            mainAxisSpacing: 10,
-                                            // Space between rows
-                                            childAspectRatio: aspectRatio, // Adjust item size
-                                          ),
-                                          itemCount: filterdsearch.length,
-                                          itemBuilder: (context, index) {
-                                            final item = filterdsearch[index];
-                                            // final categoryOfItem = items[index].categoryOfItem;
-                                            return Card(
-                                              child:
-                                              // ontap item
-                                              InkWell(
-                                                // onTap: () => addToCart(item),
-                                                onTap: () => _handleItemTap(item),
-                                                child: Container(
+                                              print('Active Category: $activeCategory');
+                                              print('Filtered Items Count: ${itemsList.length}');
+
+
+                                              if(filteredItems.isEmpty){
+                                                return Container(
+                                                  // alignment: Alignment.center,
+                                                  width: width * 0.5,
+                                                  height: height * 0.01,
+                                                  padding: EdgeInsets.all(20),
                                                   // color: Colors.red,
-                                                  width: width * 0.3,
-                                                  height: AppSettings.showItemImage ? height * 0.1 : height * 0.1,
-                                                  child: Column(
-                                                    children: [
+                                                  child: Center(child: Text('No Items')
+                                                  ),);
+                                              }
+                                              return    GridView.builder(
+                                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 2,
+                                                    // Two items per row
+                                                    crossAxisSpacing: 20,
+                                                    // Space between columns
+                                                    mainAxisSpacing: 10,
+                                                    // Space between rows
+                                                    childAspectRatio: aspectRatio, // Adjust item size
+                                                  ),
+                                                  itemCount: filterdsearch.length,
+                                                  itemBuilder: (context, index) {
+                                                    final item = filterdsearch[index];
+                                                    // final categoryOfItem = items[index].categoryOfItem;
+                                                    return Card(
+                                                      child:
+                                                      // ontap item
+                                                      InkWell(
+                                                        // onTap: () => addToCart(item),
+                                                        onTap: () => _handleItemTap(item),
+                                                        child: Container(
+                                                          // color: Colors.red,
+                                                          width: width * 0.3,
+                                                          height: AppSettings.showItemImage ? height * 0.1 : height * 0.1,
+                                                          child: Column(
+                                                            children: [
 
 
-                                                      AppSettings.showItemImage
-                                                          ? (item.imagePath != null && item.imagePath!.isNotEmpty
-                                                          ? (File(item.imagePath!).existsSync()
-                                                          ? Image.file(
-                                                        File(item.imagePath!),
-                                                        fit: BoxFit.cover,
-                                                        width: 80,
-                                                        height: 80,
-                                                      )
-                                                          : Icon(Icons.broken_image, size: 80, color: Colors.grey))
-                                                          : Icon(Icons.image, size: 80, color: Colors.grey))
-                                                          : SizedBox(),
+                                                              AppSettings.showItemImage
+                                                                  ? (item.imagePath != null && item.imagePath!.isNotEmpty
+                                                                  ? (File(item.imagePath!).existsSync()
+                                                                  ? Image.file(
+                                                                File(item.imagePath!),
+                                                                fit: BoxFit.cover,
+                                                                width: 80,
+                                                                height: 80,
+                                                              )
+                                                                  : Icon(Icons.broken_image, size: 80, color: Colors.grey))
+                                                                  : Icon(Icons.image, size: 80, color: Colors.grey))
+                                                                  : SizedBox(),
 
 
 
-                                                      /*AppSettings.showItemImage
+                                                              /*AppSettings.showItemImage
                                                           ? (item.imagePath != null && item.imagePath!.isNotEmpty
 
                                                           ?Image.memory(
@@ -715,71 +714,71 @@ class _MenuScreenState extends State<MenuScreen> {
                                                         size: 80,
                                                       )))
                                                           : SizedBox(),*/
-                                                      SizedBox(height: 5,),
-                                                      Center(
-                                                        child: Text(
-                                                          item.name,
-                                                          textAlign: TextAlign.center,
-                                                          style: GoogleFonts.poppins(fontSize: 12,color: Colors.indigo.shade900, fontWeight: FontWeight.w600),
-                                                        ),
-                                                      ),
-                                                      SizedBox(
-                                                        height: 5,
-                                                      ),
-                                                      AppSettings.showItemPrice
-                                                          ? Text(
-                                                              item.price != null
-                                                                ? "Price: ₹${item.price!.toStringAsFixed(2)}"
-                                                                : (item.variant != null && item.variant!.isNotEmpty)
-                                                                  ? "Price: ₹${item.variant!.first.price.toStringAsFixed(2)}+"
-                                                                  : "Price: N/A",
-                                                              textAlign: TextAlign.center,
-                                                              style: GoogleFonts.poppins(color: Colors.indigo.shade900, fontWeight: FontWeight.w600))
-                                                          : SizedBox(),
-
-                                                      // Stock quantity display
-                                                      if (item.trackInventory) ...[
-                                                        SizedBox(height: 3),
-                                                        Container(
-                                                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            color: _getStockColor(item, true),
-                                                            borderRadius: BorderRadius.circular(8),
-                                                            border: Border.all(
-                                                              color: _getStockBorderColor(item),
-                                                              width: 1,
-                                                            ),
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              Icon(
-                                                                _getStockIcon(item),
-                                                                size: 12,
-                                                                color: _getStockColor(item, false),
-                                                              ),
-                                                              SizedBox(width: 3),
-                                                              Text(
-                                                                _formatStockDisplay(item),
-                                                                style: GoogleFonts.poppins(
-                                                                  fontSize: 9,
-                                                                  color: _getStockColor(item, false),
-                                                                  fontWeight: FontWeight.w600,
+                                                              SizedBox(height: 5,),
+                                                              Center(
+                                                                child: Text(
+                                                                  item.name,
+                                                                  textAlign: TextAlign.center,
+                                                                  style: GoogleFonts.poppins(fontSize: 12,color: Colors.indigo.shade900, fontWeight: FontWeight.w600),
                                                                 ),
                                                               ),
+                                                              SizedBox(
+                                                                height: 5,
+                                                              ),
+                                                              AppSettings.showItemPrice
+                                                                  ? Text(
+                                                                  item.price != null
+                                                                      ? "Price: ₹${item.price!.toStringAsFixed(2)}"
+                                                                      : (item.variant != null && item.variant!.isNotEmpty)
+                                                                      ? "Price: ₹${item.variant!.first.price.toStringAsFixed(2)}+"
+                                                                      : "Price: N/A",
+                                                                  textAlign: TextAlign.center,
+                                                                  style: GoogleFonts.poppins(color: Colors.indigo.shade900, fontWeight: FontWeight.w600))
+                                                                  : SizedBox(),
+
+                                                              // Stock quantity display
+                                                              if (item.trackInventory) ...[
+                                                                SizedBox(height: 3),
+                                                                Container(
+                                                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                  decoration: BoxDecoration(
+                                                                    color: _getStockColor(item, true),
+                                                                    borderRadius: BorderRadius.circular(8),
+                                                                    border: Border.all(
+                                                                      color: _getStockBorderColor(item),
+                                                                      width: 1,
+                                                                    ),
+                                                                  ),
+                                                                  child: Row(
+                                                                    mainAxisSize: MainAxisSize.min,
+                                                                    children: [
+                                                                      Icon(
+                                                                        _getStockIcon(item),
+                                                                        size: 12,
+                                                                        color: _getStockColor(item, false),
+                                                                      ),
+                                                                      SizedBox(width: 3),
+                                                                      Text(
+                                                                        _formatStockDisplay(item),
+                                                                        style: GoogleFonts.poppins(
+                                                                          fontSize: 9,
+                                                                          color: _getStockColor(item, false),
+                                                                          fontWeight: FontWeight.w600,
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ],
                                                           ),
                                                         ),
-                                                      ],
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          });
-                                        });
+                                                      ),
+                                                    );
+                                                  });
+                                            });
 
-                                    }
+                                      }
                                   ),
                                 )
                               ],
@@ -788,94 +787,94 @@ class _MenuScreenState extends State<MenuScreen> {
 
                         ],
                       ),
-                    if (isCartShow)
+                      if (isCartShow)
                       // isCartShow?
-                      Positioned(
-                          top: height * 0.65,
-                          width: width * 0.8,
-                          left: width * 0.1,
-                          // right: 20,
-                          child: Container(
-                              width: width,
-                              padding: EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: primarycolor,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Total price: $totalPrice',
-                                    textScaler: TextScaler.linear(1),
-                                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                                  ),
-                                  SizedBox(
-                                    width: 5,
-                                  ),
-                                  CommonButton(
-                                      bordercircular: 25,
-                                      bgcolor: Colors.white,
-                                      width: width * 0.3,
-                                      height: height * 0.05,
-                                      onTap: () async {
-                                        if (widget.isForAddingItem == true) {
-                                          // For an existing order, we just go back. No other logic is needed.
-                                          Navigator.pop(context);
-                                        } else {
-                                          // For a new order, we navigate to the cart and then refresh when we return.
-                                          final appBox = Hive.box('app_state');
-                                          await Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                  builder: (context) => CartScreen(selectedTableNo: widget.tableIdForNewOrder,)));
-                                          appBox.delete('selected_table_for_new_order');
-                                          await loadCartItems();
-                                        }
-                                      },
-                                      //     () async {
-                                      //   final appBox = Hive.box('app_state');
-                                      //   // final selectedTable = appBox.get('selected_table_for_new_order');
-                                      //
-                                      //
-                                      //   widget.isForAddingItem ==true?
-                                      //       Navigator.pop(context):
-                                      //   await Navigator.push(
-                                      //       context,
-                                      //       MaterialPageRoute(
-                                      //           builder: (context) => CartScreen(
-                                      //
-                                      //             // isActiveCart: true,
-                                      //               // cartItems: cartItems,
-                                      //               // selectedTableNo: selectedTable,
-                                      //               )));
-                                      //   appBox.delete('selected_table_for_new_order');
-                                      //   // await loadCartItems();
-                                      //
-                                      //   await loadCartItems();
-                                      // },
-                                      child: Container(
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              'View Cart',
-                                              style: GoogleFonts.poppins(fontSize: 14),
-                                              textScaler: TextScaler.linear(1),
-                                            ),
-                                            Icon(
-                                              Icons.arrow_forward_ios,
-                                              size: 20,
-                                            )
-                                          ],
-                                        ),
-                                      ))
-                                ],
-                              )))
-                    // : SizedBox()
-                  ],
-                ),
-    ]
+                        Positioned(
+                            top: height * 0.65,
+                            width: width * 0.8,
+                            left: width * 0.1,
+                            // right: 20,
+                            child: Container(
+                                width: width,
+                                padding: EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: primarycolor,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Total price: $totalPrice',
+                                      textScaler: TextScaler.linear(1),
+                                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                                    ),
+                                    SizedBox(
+                                      width: 5,
+                                    ),
+                                    CommonButton(
+                                        bordercircular: 25,
+                                        bgcolor: Colors.white,
+                                        width: width * 0.3,
+                                        height: height * 0.05,
+                                        onTap: () async {
+                                          if (widget.isForAddingItem == true) {
+                                            // For an existing order, we just go back. No other logic is needed.
+                                            Navigator.pop(context);
+                                          } else {
+                                            // For a new order, we navigate to the cart and then refresh when we return.
+                                            final appBox = Hive.box('app_state');
+                                            await Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                    builder: (context) => CartScreen(selectedTableNo: widget.tableIdForNewOrder,)));
+                                            appBox.delete('selected_table_for_new_order');
+                                            await loadCartItems();
+                                          }
+                                        },
+                                        //     () async {
+                                        //   final appBox = Hive.box('app_state');
+                                        //   // final selectedTable = appBox.get('selected_table_for_new_order');
+                                        //
+                                        //
+                                        //   widget.isForAddingItem ==true?
+                                        //       Navigator.pop(context):
+                                        //   await Navigator.push(
+                                        //       context,
+                                        //       MaterialPageRoute(
+                                        //           builder: (context) => CartScreen(
+                                        //
+                                        //             // isActiveCart: true,
+                                        //               // cartItems: cartItems,
+                                        //               // selectedTableNo: selectedTable,
+                                        //               )));
+                                        //   appBox.delete('selected_table_for_new_order');
+                                        //   // await loadCartItems();
+                                        //
+                                        //   await loadCartItems();
+                                        // },
+                                        child: Container(
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                'View Cart',
+                                                style: GoogleFonts.poppins(fontSize: 14),
+                                                textScaler: TextScaler.linear(1),
+                                              ),
+                                              Icon(
+                                                Icons.arrow_forward_ios,
+                                                size: 20,
+                                              )
+                                            ],
+                                          ),
+                                        ))
+                                  ],
+                                )))
+                      // : SizedBox()
+                    ],
+                  ),
+                ]
             ),
           ),
         ),

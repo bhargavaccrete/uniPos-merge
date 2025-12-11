@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 
 import '../../../../widget/componets/restaurant/componets/Button.dart';
@@ -53,7 +54,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
     });
 
     try {
-      final reports = eodStore.reports.toList();
+      final reports = await HiveEOD.getAllEODReports();
       setState(() {
         _allReports = reports;
         _filteredReports = reports;
@@ -80,8 +81,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
       setState(() {
         _filteredReports = _allReports.where((report) {
           return report.date.year == _dateTime!.year &&
-                 report.date.month == _dateTime!.month &&
-                 report.date.day == _dateTime!.day;
+              report.date.month == _dateTime!.month &&
+              report.date.day == _dateTime!.day;
         }).toList();
       });
     }
@@ -112,50 +113,50 @@ class _PosenddayreportState extends State<Posenddayreport> {
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-            // Text(
-            //   'End Day Report',
-            //   style: GoogleFonts.poppins(
-            //       fontWeight: FontWeight.w500, fontSize: 16),
-            // ),
-            // SizedBox(
-            //   height: 25,
-            // ),
-            Text(
-              'Select User:',
-              textScaler: TextScaler.linear(1),
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-            ),
-            SizedBox(
-              height: 10,
-            ),
-            // dropdownbutton
-            Container(
-              width: width * 0.5,
-              height: height *0.06,
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(5)),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton(
-                    // dropdownColor: primarycolor,
-                    value: dropvalue,
-                    items: userlist.map((String items) {
-                      return DropdownMenuItem(
-                          value: items,
-                          child: Text(
-                            items,textAlign: TextAlign.center,
-                            textScaler: TextScaler.linear(1),
-                            style: GoogleFonts.poppins(fontSize: 14),
-                          ));
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        dropvalue = newValue!;
-                      });
-                    }),
-              ),
-            ),
+                // Text(
+                //   'End Day Report',
+                //   style: GoogleFonts.poppins(
+                //       fontWeight: FontWeight.w500, fontSize: 16),
+                // ),
+                // SizedBox(
+                //   height: 25,
+                // ),
+                Text(
+                  'Select User:',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                ),
+                SizedBox(
+                  height: 10,
+                ),
+                // dropdownbutton
+                Container(
+                  width: width * 0.5,
+                  height: height *0.06,
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(5)),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton(
+                      // dropdownColor: primarycolor,
+                        value: dropvalue,
+                        items: userlist.map((String items) {
+                          return DropdownMenuItem(
+                              value: items,
+                              child: Text(
+                                items,textAlign: TextAlign.center,
+                                textScaler: TextScaler.linear(1),
+                                style: GoogleFonts.poppins(fontSize: 14),
+                              ));
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            dropvalue = newValue!;
+                          });
+                        }),
+                  ),
+                ),
 
                 SizedBox(height: 25,),
 
@@ -169,8 +170,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
                         width: width * 0.4,
                         padding: EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          border: Border.all(color: primarycolor),
-                          borderRadius: BorderRadius.circular(5)
+                            border: Border.all(color: primarycolor),
+                            borderRadius: BorderRadius.circular(5)
                         ),
                         child:Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -178,8 +179,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
                             Text(_dateTime ==null?
                             'DD/MM/YYYY'
                                 : '${_dateTime!.day}/${_dateTime!.month}/${_dateTime!.year}',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14),
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),
                             ),
                             Icon(Icons.date_range,color: primarycolor,)
                           ],
@@ -257,45 +258,45 @@ class _PosenddayreportState extends State<Posenddayreport> {
                 SizedBox(height: 20,),
                 _isLoading
                     ? Center(
-                        child: CircularProgressIndicator(
-                          color: primarycolor,
-                        ),
-                      )
+                  child: CircularProgressIndicator(
+                    color: primarycolor,
+                  ),
+                )
                     : _filteredReports.isEmpty
-                        ? Center(
-                            child: Container(
-                              padding: EdgeInsets.all(20),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    size: 50,
-                                    color: Colors.grey,
-                                  ),
-                                  SizedBox(height: 10),
-                                  Text(
-                                    _dateTime != null
-                                        ? 'No End Day Report found for selected date'
-                                        : 'No End Day Reports found',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  SizedBox(height: 10),
-                                  Text(
-                                    'Complete End Day process to see reports here',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : SingleChildScrollView(
+                    ? Center(
+                  child: Container(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 50,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          _dateTime != null
+                              ? 'No End Day Report found for selected date'
+                              : 'No End Day Reports found',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'Complete End Day process to see reports here',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                    : SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                       headingRowHeight: 50,
@@ -427,82 +428,82 @@ class _PosenddayreportState extends State<Posenddayreport> {
 
                       ],
                       rows: _isLoading
-                        ? []
-                        : _filteredReports.map((report) {
-                            final dateFormatter = DateFormat('dd/MM/yyyy');
-                            final timeFormatter = DateFormat('HH:mm');
+                          ? []
+                          : _filteredReports.map((report) {
+                        final dateFormatter = DateFormat('dd/MM/yyyy');
+                        final timeFormatter = DateFormat('HH:mm');
 
-                            // Calculate payment summaries
-                            double cashAmount = 0.0;
-                            double cardAmount = 0.0;
-                            double onlineAmount = 0.0;
+                        // Calculate payment summaries
+                        double cashAmount = 0.0;
+                        double cardAmount = 0.0;
+                        double onlineAmount = 0.0;
 
-                            for (var payment in report.paymentSummaries) {
-                              if (payment.paymentType.toLowerCase() == 'cash') {
-                                cashAmount = payment.totalAmount;
-                              } else if (payment.paymentType.toLowerCase() == 'card') {
-                                cardAmount = payment.totalAmount;
-                              } else if (payment.paymentType.toLowerCase() == 'online' ||
-                                        payment.paymentType.toLowerCase() == 'upi') {
-                                onlineAmount = payment.totalAmount;
-                              }
-                            }
+                        for (var payment in report.paymentSummaries) {
+                          if (payment.paymentType.toLowerCase() == 'cash') {
+                            cashAmount = payment.totalAmount;
+                          } else if (payment.paymentType.toLowerCase() == 'card') {
+                            cardAmount = payment.totalAmount;
+                          } else if (payment.paymentType.toLowerCase() == 'online' ||
+                              payment.paymentType.toLowerCase() == 'upi') {
+                            onlineAmount = payment.totalAmount;
+                          }
+                        }
 
-                            return DataRow(
-                              cells: [
-                                DataCell(
-                                  Center(child: Text(
-                                    '${dateFormatter.format(report.date)} ${timeFormatter.format(report.date)}',
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                                DataCell(
-                                  Center(child: Text(
-                                    '${dateFormatter.format(report.date)} ${timeFormatter.format(report.date.add(Duration(hours: 8)))}',
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                                DataCell(
-                                  Center(child: Text(
-                                    report.openingBalance.toStringAsFixed(2),
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                                DataCell(
-                                  Center(child: Text(
-                                    report.closingBalance.toStringAsFixed(2),
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                                DataCell(
-                                  Center(child: Text(
-                                    report.cashReconciliation.actualCash.toStringAsFixed(2),
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                                DataCell(
-                                  Center(child: Text(
-                                    cashAmount.toStringAsFixed(2),
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                                DataCell(
-                                  Center(child: Text(
-                                    cardAmount.toStringAsFixed(2),
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                                DataCell(
-                                  Center(child: Text(
-                                    onlineAmount.toStringAsFixed(2),
-                                    style: GoogleFonts.poppins(fontSize: 12),
-                                  )),
-                                ),
-                              ],
-                            );
-                          }).toList()),
+                        return DataRow(
+                          cells: [
+                            DataCell(
+                              Center(child: Text(
+                                '${dateFormatter.format(report.date)} ${timeFormatter.format(report.date)}',
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                            DataCell(
+                              Center(child: Text(
+                                '${dateFormatter.format(report.date)} ${timeFormatter.format(report.date.add(Duration(hours: 8)))}',
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                            DataCell(
+                              Center(child: Text(
+                                report.openingBalance.toStringAsFixed(2),
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                            DataCell(
+                              Center(child: Text(
+                                report.closingBalance.toStringAsFixed(2),
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                            DataCell(
+                              Center(child: Text(
+                                report.cashReconciliation.actualCash.toStringAsFixed(2),
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                            DataCell(
+                              Center(child: Text(
+                                cashAmount.toStringAsFixed(2),
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                            DataCell(
+                              Center(child: Text(
+                                cardAmount.toStringAsFixed(2),
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                            DataCell(
+                              Center(child: Text(
+                                onlineAmount.toStringAsFixed(2),
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              )),
+                            ),
+                          ],
+                        );
+                      }).toList()),
                 )
-          ]),
+              ]),
         ),
       ),
     );

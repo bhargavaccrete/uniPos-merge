@@ -137,38 +137,38 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
 
                     rows: [
                       DataRow(
-                  cells: [
-                    DataCell(
-                      Center(child: Text('Total Orders',textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14),)),
-                    ),
-                    DataCell(
-                      Center(child: Text('3',textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14),)),
-                    ),
-                    DataCell(
-                      Center(child: Text('2',textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14),)),
-                    ),
-                  ],
-                ),
+                        cells: [
+                          DataCell(
+                            Center(child: Text('Total Orders',textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),)),
+                          ),
+                          DataCell(
+                            Center(child: Text('3',textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),)),
+                          ),
+                          DataCell(
+                            Center(child: Text('2',textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),)),
+                          ),
+                        ],
+                      ),
                       DataRow(
-                  cells: [
-                    DataCell(
+                        cells: [
+                          DataCell(
 
-                      Text('Total Amount',textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14),),
-                    ),
-                    DataCell(
-                      Center(child: Text('559.00',textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14),)),
-                    ),
-                    DataCell(
-                      Center(child: Text('1205.00',textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14),)),
-                    ),
-                  ],
-                ),
+                            Text('Total Amount',textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),),
+                          ),
+                          DataCell(
+                            Center(child: Text('559.00',textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),)),
+                          ),
+                          DataCell(
+                            Center(child: Text('1205.00',textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(fontSize: 14),)),
+                          ),
+                        ],
+                      ),
                     ]),
               )
             ],

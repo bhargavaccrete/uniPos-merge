@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
 
 import '../../../../../constants/restaurant/color.dart';
@@ -13,7 +16,6 @@ import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
-
 
 class CartItemStatus {
   final CartItem item;
@@ -41,24 +43,24 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen>
     with SingleTickerProviderStateMixin {
 
-bool _isIntalizedLoad = true;
+  bool _isIntalizedLoad = true;
 
-List<CartItem> _activeList = [];
-List<CartItem> _newlyAddedList = [];
+  List<CartItem> _activeList = [];
+  List<CartItem> _newlyAddedList = [];
 
 
-List<CartItemStatus>
-get _combinedList =>[
-  ..._activeList.map((item)=>CartItemStatus(item, true)),
-  ..._newlyAddedList.map((item)=> CartItemStatus(item,false))
-];
+  List<CartItemStatus>
+  get _combinedList =>[
+    ..._activeList.map((item)=>CartItemStatus(item, true)),
+    ..._newlyAddedList.map((item)=> CartItemStatus(item,false))
+  ];
 
   List<CartItem> cartItems = [];
   String selectedFilter = "Take Away";
   bool isExistingOrder = false;
   String? tableNo;
 
-String? _selectedTableNoForUI; // Add a state variable
+  String? _selectedTableNoForUI; // Add a state variable
 
   @override
   void initState() {
@@ -66,18 +68,18 @@ String? _selectedTableNoForUI; // Add a state variable
     _selectedTableNoForUI = widget.selectedTableNo;
     _initializeCart();
   }
-void _navigateAndAddMoreItems() async {
-  // Navigate to the menu to add more items
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => Startorder(isForAddingItem: true), // Assuming MenuScreen exists
-    ),
-  );
+  void _navigateAndAddMoreItems() async {
+    // Navigate to the menu to add more items
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Startorder(isForAddingItem: true), // Assuming MenuScreen exists
+      ),
+    );
 
-  // When the user returns, re-initialize the cart to show the new items
-  _initializeCart();
-}
+    // When the user returns, re-initialize the cart to show the new items
+    _initializeCart();
+  }
   /// ------------------- CART INITIALIZATION ------------------- ///
   Future<void> _initializeCart() async {
     // Add these lines for debugging
@@ -88,7 +90,7 @@ void _navigateAndAddMoreItems() async {
     // Priority 1: If widget has existing order
     if (widget.existingOrder != null) {
       if(_isIntalizedLoad){
-        await cartStore.clearCart();
+        await HiveCart.clearCart();
         _isIntalizedLoad =false;
       }
 
@@ -111,10 +113,10 @@ void _navigateAndAddMoreItems() async {
       final String? persistedTableId = appBox.get('existing_order_table');
       if (persistedTableId != null) {
         final existingOrder =
-        orderStore.getActiveOrderByTableId(persistedTableId);
+        await HiveOrders.getActiveOrderByTableId(persistedTableId);
         if (existingOrder != null && mounted) {
           setState(() {
-        _activeList = existingOrder.items;
+            _activeList = existingOrder.items;
             isExistingOrder = true;
             selectedFilter = 'Dine In';
             tableNo = existingOrder.tableNo;
@@ -125,7 +127,7 @@ void _navigateAndAddMoreItems() async {
     }
 
     // Priority 3: Fresh cart
-    final newCartItems = cartStorer.cartItems.toList();
+    final newCartItems = await HiveCart.getAllCartItems();
     if (mounted) {
       setState(() {
         _newlyAddedList = newCartItems;
@@ -139,7 +141,7 @@ void _navigateAndAddMoreItems() async {
   /// ------------------- CART HELPERS ------------------- ///
   Future<void> loadCartItems() async {
     try {
-      final items = cartStorer.cartItems.toList();
+      final items = await HiveCart.getAllCartItems();
       if (mounted) setState(() => _newlyAddedList = items);
     } catch (e) {
       debugPrint('Error loading cart: $e');
@@ -149,7 +151,7 @@ void _navigateAndAddMoreItems() async {
 
   Future<void> clearCart() async {
     try {
-      await cartStore.clearCart();
+      await HiveCart.clearCart();
       await loadCartItems();
       _showSnackBar('Cart cleared');
     } catch (e) {
@@ -190,7 +192,7 @@ void _navigateAndAddMoreItems() async {
       isdelivery: isDelivery,
       cartItems: _combinedList,
       onAddtoCart: (item) async {
-        final result = await cartStorer.addToCart(item);
+        final result = await HiveCart.addToCart(item);
         if (result['success'] == true) {
           await loadCartItems();
         } else {
@@ -216,40 +218,40 @@ void _navigateAndAddMoreItems() async {
         // Check stock availability before increasing quantity
         final itemBox = await Hive.openBox<Items>('itemBoxs');
         Items? inventoryItem;
-        
+
         try {
           inventoryItem = itemBox.values.firstWhere(
-            (invItem) => invItem.id == item.id,
+                (invItem) => invItem.id == item.id,
           );
         } catch (e) {
           // Try to find by name if not found by ID
           try {
             inventoryItem = itemBox.values.firstWhere(
-              (invItem) => invItem.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
+                  (invItem) => invItem.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
             );
           } catch (e2) {
             // Item not found, allow increase (no inventory tracking)
-            await cartStorer.updateQuantity(item.id, item.quantity + 1);
+            await HiveCart.updateQuantity(item.id, item.quantity + 1);
             await loadCartItems();
             return;
           }
         }
-        
+
         // Check if inventory tracking is enabled and stock is available
         if (inventoryItem != null && inventoryItem.trackInventory) {
           if (!inventoryItem.allowOrderWhenOutOfStock) {
             // Check stock availability
             final requestedQuantity = item.quantity + 1;
-            
+
             if (item.variantName != null && inventoryItem.variant != null) {
               // Check variant stock
               try {
-                final variantBox = Hive.box<VariantModel>('variants');
+                final variantBox = Hive.box<VariantModel>('variante');
                 final variant = inventoryItem.variant!.firstWhere(
-                  (v) => variantBox.get(v.variantId)?.name == item.variantName,
+                      (v) => variantBox.get(v.variantId)?.name == item.variantName,
                 );
                 final availableStock = variant.stockQuantity ?? 0;
-                
+
                 if (availableStock < requestedQuantity) {
                   // Show error message
                   NotificationService.instance.showInfo(
@@ -292,16 +294,16 @@ void _navigateAndAddMoreItems() async {
             }
           }
         }
-        
+
         // If all checks pass, update quantity
-        await cartStorer.updateQuantity(item.id, item.quantity + 1);
+        await HiveCart.updateQuantity(item.id, item.quantity + 1);
         await loadCartItems();
       },
       onDecreseQty: (item) async {
         if (item.quantity > 1) {
-          await cartStorer.updateQuantity(item.id, item.quantity - 1);
+          await HiveCart.updateQuantity(item.id, item.quantity - 1);
         } else {
-          await cartStorer.removeFromCart(item.id);
+          await HiveCart.removeFromCart(item.id);
         }
         await loadCartItems();
       },
@@ -374,223 +376,223 @@ void _navigateAndAddMoreItems() async {
       body: _combinedList.isEmpty
           ? _buildEmptyCart()
           : Stack(
-            children:[
+          children:[
 
 
 
-              Column(
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Filterbutton(
-                    title: 'Take Away',
-                    selectedFilter: selectedFilter,
-                    onpressed: () =>
-                        setState(() => selectedFilter = "Take Away"),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(2.0),
-                    child: Filterbutton(
-                      title: 'Dine In',
-                      selectedFilter: selectedFilter,
-                      onpressed: () async {
+                      Filterbutton(
+                        title: 'Take Away',
+                        selectedFilter: selectedFilter,
+                        onpressed: () =>
+                            setState(() => selectedFilter = "Take Away"),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(2.0),
+                        child: Filterbutton(
+                          title: 'Dine In',
+                          selectedFilter: selectedFilter,
+                          onpressed: () async {
 
 
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const TableScreen(isfromcart: true,)),
-                        );
-                        if (result is String) {
-                          setState(() {
-                            selectedFilter = "Dine In";
-                            _selectedTableNoForUI = result;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  Filterbutton(
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const TableScreen(isfromcart: true,)),
+                            );
+                            if (result is String) {
+                              setState(() {
+                                selectedFilter = "Dine In";
+                                _selectedTableNoForUI = result;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      Filterbutton(
 
-                    title: 'Delivery',
-                    selectedFilter: selectedFilter,
-                    onpressed: () =>
-                        setState(() => selectedFilter = "Delivery"),
+                        title: 'Delivery',
+                        selectedFilter: selectedFilter,
+                        onpressed: () =>
+                            setState(() => selectedFilter = "Delivery"),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            // Display KOT numbers and table info for existing orders (Compact Version)
-            if (isExistingOrder && widget.existingOrder != null)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  border: Border.all(color: Colors.blue.shade200),
-                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // KOT Numbers Section (Left Side)
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Icon(Icons.receipt_long, color: Colors.blue.shade700, size: 16),
+                // Display KOT numbers and table info for existing orders (Compact Version)
+                if (isExistingOrder && widget.existingOrder != null)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      border: Border.all(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // KOT Numbers Section (Left Side)
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(Icons.receipt_long, color: Colors.blue.shade700, size: 16),
+                              SizedBox(width: 6),
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 4,
+                                  runSpacing: 4,
+                                  children: (widget.existingOrder!.kotNumbers ??
+                                      (widget.existingOrder!.kotNumber != null ? [widget.existingOrder!.kotNumber!] : []))
+                                      .map((kotNum) {
+                                    return Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade700,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '#$kotNum',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Table Info Section (Right Side) - Only for Dine In
+                        if (widget.existingOrder!.orderType == 'Dine In' && widget.existingOrder!.tableNo != null && widget.existingOrder!.tableNo!.isNotEmpty) ...[
+                          Container(
+                            height: 30,
+                            width: 1,
+                            color: Colors.blue.shade300,
+                            margin: EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          Icon(Icons.table_restaurant, color: Colors.blue.shade700, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            tableNo ?? widget.existingOrder!.tableNo!,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
                           SizedBox(width: 6),
-                          Expanded(
-                            child: Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: (widget.existingOrder!.kotNumbers ??
-                                (widget.existingOrder!.kotNumber != null ? [widget.existingOrder!.kotNumber!] : []))
-                                .map((kotNum) {
-                                return Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade700,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '#$kotNum',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                          // Change Table Button
+                          InkWell(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const TableScreen(isfromcart: true),
+                                ),
+                              );
+                              if (result is String && result != widget.existingOrder!.tableNo) {
+                                try {
+                                  final oldTableNo = widget.existingOrder!.tableNo;
+
+                                  print('=== TABLE CHANGE DEBUG ===');
+                                  print('Old table: $oldTableNo');
+                                  print('New table: $result');
+                                  print('Order ID: ${widget.existingOrder!.id}');
+
+                                  final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
+                                  await HiveOrders.updateOrder(updatedOrder);
+                                  print('✅ Order updated in database');
+
+                                  if (oldTableNo != null && oldTableNo.isNotEmpty) {
+                                    await HiveTables.updateTableStatus(oldTableNo, 'Available');
+                                    print('✅ Old table ($oldTableNo) set to Available');
+                                  }
+
+                                  await HiveTables.updateTableStatus(
+                                    result,
+                                    'Cooking',
+                                    total: updatedOrder.totalPrice,
+                                    orderId: updatedOrder.id,
+                                    orderTime: updatedOrder.timeStamp,
+                                  );
+                                  print('✅ New table ($result) set to Cooking');
+
+                                  setState(() {
+                                    _selectedTableNoForUI = result;
+                                    tableNo = result;
+                                  });
+
+                                  print('=== TABLE CHANGE COMPLETE ===');
+
+                                  NotificationService.instance.showInfo(
+                                    'Table changed from $oldTableNo to $result',
+                                  );
+                                } catch (e, stackTrace) {
+                                  print('❌ Error changing table: $e');
+                                  print('Stack trace: $stackTrace');
+                                  NotificationService.instance.showInfo(
+                                    'Failed to change table. Please try again.',
+                                  );
+                                }
+                              }
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade700,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Icon(Icons.swap_horiz, size: 14, color: Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          // Merge Table Button
+                          InkWell(
+                            onTap: () => _showMergeTableDialog(),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade700,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Icon(Icons.merge_type, size: 14, color: Colors.white),
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
-
-                    // Table Info Section (Right Side) - Only for Dine In
-                    if (widget.existingOrder!.orderType == 'Dine In' && widget.existingOrder!.tableNo != null && widget.existingOrder!.tableNo!.isNotEmpty) ...[
-                      Container(
-                        height: 30,
-                        width: 1,
-                        color: Colors.blue.shade300,
-                        margin: EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      Icon(Icons.table_restaurant, color: Colors.blue.shade700, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        tableNo ?? widget.existingOrder!.tableNo!,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
-                        ),
-                      ),
-                      SizedBox(width: 6),
-                      // Change Table Button
-                      InkWell(
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const TableScreen(isfromcart: true),
-                            ),
-                          );
-                          if (result is String && result != widget.existingOrder!.tableNo) {
-                            try {
-                              final oldTableNo = widget.existingOrder!.tableNo;
-
-                              print('=== TABLE CHANGE DEBUG ===');
-                              print('Old table: $oldTableNo');
-                              print('New table: $result');
-                              print('Order ID: ${widget.existingOrder!.id}');
-
-                              final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
-                              await orderStore.updateOrder(updatedOrder);
-                              print('✅ Order updated in database');
-
-                              if (oldTableNo != null && oldTableNo.isNotEmpty) {
-                                await tableStore.updateTableStatus(oldTableNo, 'Available');
-                                print('✅ Old table ($oldTableNo) set to Available');
-                              }
-
-                              await tableStore.updateTableStatus(
-                                result,
-                                'Cooking',
-                                total: updatedOrder.totalPrice,
-                                orderId: updatedOrder.id,
-                                orderTime: updatedOrder.timeStamp,
-                              );
-                              print('✅ New table ($result) set to Cooking');
-
-                              setState(() {
-                                _selectedTableNoForUI = result;
-                                tableNo = result;
-                              });
-
-                              print('=== TABLE CHANGE COMPLETE ===');
-
-                              NotificationService.instance.showInfo(
-                                'Table changed from $oldTableNo to $result',
-                              );
-                            } catch (e, stackTrace) {
-                              print('❌ Error changing table: $e');
-                              print('Stack trace: $stackTrace');
-                              NotificationService.instance.showInfo(
-                                'Failed to change table. Please try again.',
-                              );
-                            }
-                          }
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade700,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Icon(Icons.swap_horiz, size: 14, color: Colors.white),
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      // Merge Table Button
-                      InkWell(
-                        onTap: () => _showMergeTableDialog(),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade700,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Icon(Icons.merge_type, size: 14, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            Expanded(child: _getBody()),
-                    ],
                   ),
+                Expanded(child: _getBody()),
+              ],
+            ),
 
-              // Show Add button only when there are active items but no new items added
-              if (_activeList.isNotEmpty && _newlyAddedList.isEmpty)
-                Positioned(
-                  bottom: 150,
-                  right: 130,
-                  child:   FloatingActionButton.extended(
-                    backgroundColor: primarycolor,
+            // Show Add button only when there are active items but no new items added
+            if (_activeList.isNotEmpty && _newlyAddedList.isEmpty)
+              Positioned(
+                bottom: 150,
+                right: 130,
+                child:   FloatingActionButton.extended(
+                  backgroundColor: primarycolor,
 
-                    onPressed: _navigateAndAddMoreItems,
-                    icon: const Icon(Icons.add,color: Colors.white,), // The icon to display.
-                    label:  Text('Add',style: GoogleFonts.poppins(color: Colors.white)),     // The text label to display.
-                  ),),
-            ]
+                  onPressed: _navigateAndAddMoreItems,
+                  icon: const Icon(Icons.add,color: Colors.white,), // The icon to display.
+                  label:  Text('Add',style: GoogleFonts.poppins(color: Colors.white)),     // The text label to display.
+                ),),
+          ]
 
 
-          ),
+      ),
     );
   }
 
@@ -616,19 +618,19 @@ void _navigateAndAddMoreItems() async {
     if (widget.existingOrder == null) return;
 
     // Get all active orders with their table numbers
-    final allOrders = orderStore.orders.toList();
+    final allOrders = await HiveOrders.getAllOrder();
     final activeOrders = allOrders.where((order) =>
-      (order.status == 'Cooking' || order.status == 'Processing') &&
-      (order.isPaid == null || order.isPaid == false) && // Exclude paid orders
-      (order.paymentStatus == null || order.paymentStatus != 'Paid') // Double-check payment status
+    (order.status == 'Cooking' || order.status == 'Processing') &&
+        (order.isPaid == null || order.isPaid == false) && // Exclude paid orders
+        (order.paymentStatus == null || order.paymentStatus != 'Paid') // Double-check payment status
     ).toList();
 
     // Filter out the current table
     final otherTables = activeOrders.where((order) =>
-      order.tableNo != widget.existingOrder!.tableNo &&
-      order.orderType == 'Dine In' &&
-      order.tableNo != null &&
-      order.tableNo!.isNotEmpty
+    order.tableNo != widget.existingOrder!.tableNo &&
+        order.orderType == 'Dine In' &&
+        order.tableNo != null &&
+        order.tableNo!.isNotEmpty
     ).toList();
 
     if (otherTables.isEmpty) {
@@ -834,7 +836,7 @@ void _navigateAndAddMoreItems() async {
       final combinedBoundaries = [
         ...widget.existingOrder!.kotBoundaries,
         ...sourceOrder.kotBoundaries.map((boundary) =>
-          boundary + widget.existingOrder!.items.length
+        boundary + widget.existingOrder!.items.length
         ),
       ];
 
@@ -851,16 +853,16 @@ void _navigateAndAddMoreItems() async {
       );
 
       // 6. Update the main order in database
-      await orderStore.updateOrder(mergedOrder);
+      await HiveOrders.updateOrder(mergedOrder);
       print('✅ Merged order updated in database');
 
       // 7. Delete the source order
-      await orderStore.deleteOrder(sourceOrder.id);
+      await HiveOrders.deleteOrder(sourceOrder.id);
       print('✅ Source order deleted');
 
       // 8. Update table statuses
       // Target table keeps cooking status with updated total
-      await tableStore.updateTableStatus(
+      await HiveTables.updateTableStatus(
         widget.existingOrder!.tableNo!,
         'Cooking',
         total: newTotal,
@@ -869,7 +871,7 @@ void _navigateAndAddMoreItems() async {
       );
 
       // Source table becomes available
-      await tableStore.updateTableStatus(sourceOrder.tableNo!, 'Available');
+      await HiveTables.updateTableStatus(sourceOrder.tableNo!, 'Available');
       print('✅ Table statuses updated');
 
       // 9. Update local state

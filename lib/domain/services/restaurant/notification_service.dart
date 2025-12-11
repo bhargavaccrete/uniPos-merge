@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/constants/restaurant/color.dart';
-
 enum NotificationType {
   success,
   error,
@@ -52,14 +51,14 @@ class NotificationService {
 
   // Method to add a new notification
   void show(
-    String message, {
-    Color? color,
-    NotificationType type = NotificationType.info,
-    IconData? icon,
-    Duration duration = const Duration(seconds: 3),
-    VoidCallback? onTap,
-    bool dismissible = true,
-  }) {
+      String message, {
+        Color? color,
+        NotificationType type = NotificationType.info,
+        IconData? icon,
+        Duration duration = const Duration(seconds: 3),
+        VoidCallback? onTap,
+        bool dismissible = true,
+      }) {
     // Determine color based on type if not provided
     color ??= _getColorForType(type);
     icon ??= _getIconForType(type);
@@ -138,7 +137,7 @@ class NotificationService {
       // Animate the removal from the list
       listKey.currentState?.removeItem(
         index,
-        (context, animation) => buildNotificationItem(removedItem, animation),
+            (context, animation) => buildNotificationItem(removedItem, animation),
         duration: const Duration(milliseconds: 300),
       );
       print('🔥 Animation triggered for removal');
@@ -159,7 +158,7 @@ class NotificationService {
       final removedItem = _notifications.removeAt(i);
       listKey.currentState?.removeItem(
         i,
-        (context, animation) => buildNotificationItem(removedItem, animation),
+            (context, animation) => buildNotificationItem(removedItem, animation),
         duration: const Duration(milliseconds: 200),
       );
     }

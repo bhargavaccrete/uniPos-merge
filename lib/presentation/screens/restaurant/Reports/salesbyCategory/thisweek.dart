@@ -28,7 +28,7 @@ class _ThisWeekCategoryState extends State<ThisWeekCategory> {
               Container(
                 width: width * 0.6,
                 child: CommonTextForm(
-                  controller: SearchCategory,
+                    controller: SearchCategory,
                     hintText: "Search Category",
                     HintColor: Colors.grey,
                     icon: Icon(
@@ -74,13 +74,13 @@ class _ThisWeekCategoryState extends State<ThisWeekCategory> {
                     columnSpacing: 2,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
                     border: TableBorder.all(
-                        // borderRadius: BorderRadius.circular(5),
+                      // borderRadius: BorderRadius.circular(5),
                         color: Colors.white),
                     decoration: BoxDecoration(
-                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                        // color: Colors.green,
+                      // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
+                      // color: Colors.green,
 
-                        ),
+                    ),
                     columns: [
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,

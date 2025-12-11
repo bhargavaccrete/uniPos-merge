@@ -96,7 +96,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         title: const Text('Clear All Data?'),
         content: const Text(
           'This will permanently delete ALL test data from all Hive boxes. '
-          'This action cannot be undone.\n\nAre you sure?',
+              'This action cannot be undone.\n\nAre you sure?',
         ),
         actions: [
           TextButton(
@@ -152,42 +152,42 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       ),
       body: _isGenerating || _isClearing
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 20),
-                  Text(
-                    _isGenerating
-                        ? 'Generating data...\nThis may take a while for large datasets'
-                        : 'Clearing all data...',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildInfoCard(),
-                  const SizedBox(height: 20),
-                  _buildInputSection(),
-                  const SizedBox(height: 20),
-                  _buildImageOptionsCard(),
-                  const SizedBox(height: 20),
-                  _buildActionButtons(),
-                  const SizedBox(height: 20),
-                  if (_lastGenerationResults != null) _buildResultsCard(),
-                  if (_lastGenerationResults != null) const SizedBox(height: 20),
-                  _buildStatsCard(),
-                  const SizedBox(height: 20),
-                  _buildFileSizesCard(),
-                ],
-              ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 20),
+            Text(
+              _isGenerating
+                  ? 'Generating data...\nThis may take a while for large datasets'
+                  : 'Clearing all data...',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
             ),
+          ],
+        ),
+      )
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildInfoCard(),
+            const SizedBox(height: 20),
+            _buildInputSection(),
+            const SizedBox(height: 20),
+            _buildImageOptionsCard(),
+            const SizedBox(height: 20),
+            _buildActionButtons(),
+            const SizedBox(height: 20),
+            if (_lastGenerationResults != null) _buildResultsCard(),
+            if (_lastGenerationResults != null) const SizedBox(height: 20),
+            _buildStatsCard(),
+            const SizedBox(height: 20),
+            _buildFileSizesCard(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -462,10 +462,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             const SizedBox(height: 12),
             const Text(
               '• Generate test data for all Hive boxes\n'
-              '• Configure the amount of data for each box\n'
-              '• Monitor insertion speed and file sizes\n'
-              '• Test performance with large datasets (50,000+ records)\n'
-              '• Verify data integrity and query performance',
+                  '• Configure the amount of data for each box\n'
+                  '• Monitor insertion speed and file sizes\n'
+                  '• Test performance with large datasets (50,000+ records)\n'
+                  '• Verify data integrity and query performance',
               style: TextStyle(fontSize: 14, height: 1.5),
             ),
           ],
@@ -506,11 +506,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   }
 
   Widget _buildInputField(
-    String label,
-    TextEditingController controller,
-    IconData icon, {
-    bool highlight = false,
-  }) {
+      String label,
+      TextEditingController controller,
+      IconData icon, {
+        bool highlight = false,
+      }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
@@ -606,11 +606,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       '• 400x400px high-quality images\n'
-                      '• 15 vibrant color variations\n'
-                      '• Gradient backgrounds\n'
-                      '• Decorative shapes and borders\n'
-                      '• Tests app performance with image data\n'
-                      '• Tests import/export with larger file sizes',
+                          '• 15 vibrant color variations\n'
+                          '• Gradient backgrounds\n'
+                          '• Decorative shapes and borders\n'
+                          '• Tests app performance with image data\n'
+                          '• Tests import/export with larger file sizes',
                       style: TextStyle(fontSize: 13, height: 1.4),
                     ),
                   ],

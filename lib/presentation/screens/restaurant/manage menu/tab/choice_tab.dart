@@ -7,6 +7,7 @@ import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
@@ -66,10 +67,10 @@ class _ChoiceTabState extends State<ChoiceTab> {
         name: trimmedName,
         choiceOption: option,
       );
-      await choiceStore.updateChoice(updateChoice);
+      await HiveChoice.updateChoice(updateChoice);
     } else {
       final newchoice = ChoicesModel(id: Uuid().v4(), name: trimmedName, choiceOption: option);
-      await choiceStore.addChoice(newchoice);
+      await HiveChoice.addChoice(newchoice);
     }
     ChoiceController.clear();
     OptionController.clear();
@@ -81,7 +82,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
 
   // delete
   Future<void> _delete(ChoicesModel choice) async {
-    await choiceStore.deleteChoice(choice.id);
+    await HiveChoice.deleteChoice(choice);
     Navigator.pop(context);
 
   }
@@ -108,7 +109,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
           child: Column(
             children: [
               ValueListenableBuilder(
-                  valueListenable: Hive.box<ChoicesModel>('choices').listenable(),
+                  valueListenable: Hive.box<ChoicesModel>('choice').listenable(),
                   builder: (context, choicebox, _) {
                     final allchoice = choicebox.values.toList();
 

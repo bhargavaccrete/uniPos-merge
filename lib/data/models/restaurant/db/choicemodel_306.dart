@@ -13,7 +13,7 @@ class ChoicesModel extends HiveObject{
   final String name;
 
   @HiveField(2)
-   List<ChoiceOption> choiceOption;
+  List<ChoiceOption> choiceOption;
 
   // --- AUDIT TRAIL FIELDS ---
   @HiveField(3)
@@ -31,7 +31,7 @@ class ChoicesModel extends HiveObject{
   ChoicesModel({
     required this.id,
     required this.name,
-     this.choiceOption= const [],
+    this.choiceOption= const [],
     this.createdTime,
     this.lastEditedTime,
     this.editedBy,
@@ -48,13 +48,13 @@ class ChoicesModel extends HiveObject{
     int? editCount,
   }){
     return ChoicesModel(
-        id: id?? this.id,
-        name: name?? this.name,
-       choiceOption:  choiceOption?? this.choiceOption,
-        createdTime: createdTime ?? this.createdTime,
-        lastEditedTime: lastEditedTime ?? this.lastEditedTime,
-        editedBy: editedBy ?? this.editedBy,
-        editCount: editCount ?? this.editCount,
+      id: id?? this.id,
+      name: name?? this.name,
+      choiceOption:  choiceOption?? this.choiceOption,
+      createdTime: createdTime ?? this.createdTime,
+      lastEditedTime: lastEditedTime ?? this.lastEditedTime,
+      editedBy: editedBy ?? this.editedBy,
+      editCount: editCount ?? this.editCount,
     );
   }
 
@@ -89,5 +89,3 @@ class ChoicesModel extends HiveObject{
     );
   }
 }
-
-// option

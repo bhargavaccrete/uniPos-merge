@@ -34,7 +34,7 @@ class Expense extends HiveObject{
     this.categoryOfExpense,
     this.reason,
     this.paymentType
-});
+  });
 
 
   Expense copyWith({
@@ -44,14 +44,14 @@ class Expense extends HiveObject{
     String? categoryOfExpense,
     String ? reason,
     String ? paymentType
-}){
+  }){
     return Expense(
         id: id ?? this.id,
         dateandTime: dateandTime  ?? this.dateandTime,
         amount: amount ?? this.amount,
-    categoryOfExpense: categoryOfExpense ?? this.categoryOfExpense,
-      paymentType: paymentType ?? this.paymentType,
-      reason: reason ?? this.reason
+        categoryOfExpense: categoryOfExpense ?? this.categoryOfExpense,
+        paymentType: paymentType ?? this.paymentType,
+        reason: reason ?? this.reason
     );
   }
 
@@ -73,9 +73,9 @@ class Expense extends HiveObject{
             ? DateTime.parse(map['dateandTime'])
             : map['dateandTime'],
         amount: (map['amount'] ?? 0).toDouble(),
-    categoryOfExpense: map['categoryOfExpense'],
-      reason: map['reason'],
-      paymentType: map['paymentType']
+        categoryOfExpense: map['categoryOfExpense'],
+        reason: map['reason'],
+        paymentType: map['paymentType']
     );
   }
 

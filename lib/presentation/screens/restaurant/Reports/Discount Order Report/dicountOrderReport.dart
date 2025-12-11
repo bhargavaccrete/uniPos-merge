@@ -23,7 +23,7 @@ class _DiscountOrderReportState extends State<DiscountOrderReport> {
     switch(selectedFilter){
       case "Today":
         return TodayByDiscount();
-        case "This Week":
+      case "This Week":
         return WeekByDiscount();
       case "Month Wise":
         return MonthbyDiscount();

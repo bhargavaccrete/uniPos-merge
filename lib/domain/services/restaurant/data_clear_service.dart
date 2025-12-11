@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../data/models/restaurant/db/database/hive_cart.dart';
+import '../../../data/models/restaurant/db/database/hive_order.dart';
+import '../../../data/models/restaurant/db/database/hive_pastorder.dart';
 
 class DataClearService {
 
@@ -12,9 +15,9 @@ class DataClearService {
       // Past orders will remain in the database for reporting purposes
 
       // Clear all active orders - using correct class name HiveOrders
-      final activeOrders = orderStore.orders.toList();
+      final activeOrders = await HiveOrders.getAllOrder();
       for (final order in activeOrders) {
-        await orderStore.deleteOrder(order.id);
+        await HiveOrders.deleteOrder(order.id);
       }
       debugPrint('Cleared ${activeOrders.length} active orders');
 
@@ -22,7 +25,7 @@ class DataClearService {
       // Expenses will remain in the database for historical reporting
 
       // Clear cart if needed
-      await cartStore.clearCart();
+      await HiveCart.clearCart();
       debugPrint('Cart cleared');
 
       // Using debugPrint instead of print for production
@@ -36,9 +39,9 @@ class DataClearService {
   /// Clears only completed orders (past orders)
   static Future<void> clearCompletedOrders() async {
     try {
-      final pastOrders = pastOrderStore.pastOrders.toList();
+      final pastOrders = await HivePastOrder.getAllPastOrderModel();
       for (final order in pastOrders) {
-        await pastOrderStore.deleteOrder(order.id);
+        await HivePastOrder.deleteOrder(order.id);
       }
       debugPrint('Completed orders cleared successfully');
     } catch (e) {
@@ -50,8 +53,8 @@ class DataClearService {
   /// Get count of orders to be cleared
   static Future<Map<String, int>> getDataCountsToBeCleared() async {
     try {
-      final pastOrders = pastOrderStore.pastOrders.toList();
-      final activeOrders = orderStore.orders.toList();
+      final pastOrders = await HivePastOrder.getAllPastOrderModel();
+      final activeOrders = await HiveOrders.getAllOrder();
 
       return {
         'pastOrders': pastOrders.length,

@@ -43,7 +43,7 @@ class _TodaybytradingState extends State<Todaybytrading> {
               Container(
                 width: width * 0.6,
                 child: CommonTextForm(
-controller: SearchCategory,
+                    controller: SearchCategory,
                     hintText: "Search Category",
                     HintColor: Colors.grey,
                     icon: Icon(Icons.search,color: primarycolor,size: 30,),
@@ -63,7 +63,7 @@ controller: SearchCategory,
                       Text('Export TO Excel',
                         textScaler: TextScaler.linear(1),
                         style: GoogleFonts.poppins(
-                          color: Colors.white, fontWeight: FontWeight.w500),)
+                            color: Colors.white, fontWeight: FontWeight.w500),)
                     ],)),
 
               SizedBox(height: 25,),

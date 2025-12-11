@@ -9,6 +9,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
@@ -91,7 +95,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _descController = TextEditingController(text: widget.items.description ?? '');
     selectedCategoryId = widget.items.categoryOfItem ?? '';
     selectedIMGCategory = widget.items.isVeg ?? 'Veg';
-    
+
     // ✅ ADDED: Initialize selling method based on existing item
     _sellingMethod = widget.items.isSoldByWeight == true ? SellingMethod.byWeight : SellingMethod.byUnit;
     _selectedUnit = widget.items.unit ?? 'kg';
@@ -107,19 +111,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
 // In _EdititemScreenState
 
   Future<EditScreenData> _loadInitialData() async {
-    // Load data from stores and boxes
+    // ✅ FIX: Use your helper classes to get the correct boxes
     final results = await Future.wait([
       Hive.openBox<Category>('categories'),
+      HiveVariante.getVariante(), // <-- Use your helper
+      HiveChoice.getchoice(),     // <-- Use your helper
+      HiveExtra.getextra(),
       Hive.openBox<Items>('items'),
     ]);
 
     final categoryBox = results[0] as Box<Category>;
-    final itemBox = results[1] as Box<Items>;
+    final variantBox = results[1] as Box<VariantModel>;
+    final choiceBox = results[2] as Box<ChoicesModel>;
+    final extraBox = results[3] as Box<Extramodel>;
+    final itemBox = results[4] as Box<Items>;
 
     final allCategories = categoryBox.values.toList();
-    final allVariants = variantStore.variants.toList();
-    final allChoices = choiceStore.choices.toList();
-    final allExtra = extraStore.extras.toList();
+    final allVariants = variantBox.values.toList();
+    final allChoices = choiceBox.values.toList();
+    final allExtra = extraBox.values.toList();
     final allItems = itemBox.values.toList();
 
     // The rest of the function remains the same, as it correctly
@@ -267,7 +277,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     // 🔍 AUDIT TRAIL: Track this edit
     AuditTrailHelper.trackEdit(updateItem, editedBy: 'Admin'); // TODO: Replace 'Admin' with actual logged-in user
 
-    await itemStore.updateItem(updateItem);
+    await itemsBoxes.updateItem(updateItem);
     Navigator.pop(context, true);
   }
 
@@ -313,7 +323,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
       child: Column(
         children: [
           CommonTextForm(
-            borderc: 5,
+              borderc: 5,
               LabelColor: Colors.grey,
               controller: _nameController,
               labelText: 'Item Name',
@@ -377,7 +387,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
 
 
-           SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -863,7 +873,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
     );
 
     if (confirmed == true) {
-      await Hive.box<Category>('restaurant_categories').delete(categoryId);
+      await Hive.box<Category>('categories').delete(categoryId);
       // Refresh the list inside the sheet
       setState(() {
         _currentCategories.removeWhere((cat) => cat.id == categoryId);
@@ -879,7 +889,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
 
     if (newCategoryName != null && newCategoryName.isNotEmpty) {
       final newCategory = Category(id: const Uuid().v4(), name: newCategoryName);
-      await Hive.box<Category>('restaurant_categories').put(newCategory.id, newCategory);
+      await Hive.box<Category>('categories').put(newCategory.id, newCategory);
       // Refresh the list inside this sheet to show the new category
       setState(() {
         _currentCategories.add(newCategory);
@@ -1023,9 +1033,6 @@ class _VegNonVegSheet extends StatelessWidget {
       ],
     );
   }}
-
-
-
 
 
 

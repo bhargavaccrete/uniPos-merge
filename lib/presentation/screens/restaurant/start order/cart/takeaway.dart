@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../../../../data/models/restaurant/db/database/hive_order.dart' show HiveOrders;
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
@@ -33,16 +37,16 @@ class Takeaway extends StatefulWidget {
 
   Takeaway(
       {super.key,
-      this.tableid,
-      this.existingModel,
-      required this.isexisting,
-      required this.isdelivery,
-      required this.cartItems,
-      required this.onAddtoCart,
-      required this.onIncreseQty,
-      required this.onDecreseQty,
-      required this.isDineIn,
-      this.selectedTableNo});
+        this.tableid,
+        this.existingModel,
+        required this.isexisting,
+        required this.isdelivery,
+        required this.cartItems,
+        required this.onAddtoCart,
+        required this.onIncreseQty,
+        required this.onDecreseQty,
+        required this.isDineIn,
+        this.selectedTableNo});
 
   @override
   State<Takeaway> createState() => _TakeawayState();
@@ -53,7 +57,7 @@ class _TakeawayState extends State<Takeaway> {
 
 
 
- /* double get totalPrice {
+  /* double get totalPrice {
 
     // This print statement tells us the function is running.
     print("--- Checking totalPrice ---");
@@ -141,7 +145,7 @@ class _TakeawayState extends State<Takeaway> {
           // Show ACTIVE items for this KOT
           if (activeKotItems.isNotEmpty) {
             kotSections.add(
-              _buildItemSection('KOT #$kotNum - ACTIVE', Colors.green, activeKotItems)
+                _buildItemSection('KOT #$kotNum - ACTIVE', Colors.green, activeKotItems)
             );
             kotSections.add(SizedBox(height: 16));
           }
@@ -149,7 +153,7 @@ class _TakeawayState extends State<Takeaway> {
           // Show NEW items for this KOT
           if (newKotItems.isNotEmpty) {
             kotSections.add(
-              _buildItemSection('KOT #$kotNum - NEW', Colors.blue, newKotItems)
+                _buildItemSection('KOT #$kotNum - NEW', Colors.blue, newKotItems)
             );
             kotSections.add(SizedBox(height: 16));
           }
@@ -164,7 +168,7 @@ class _TakeawayState extends State<Takeaway> {
       List<CartItemStatus> newItems = allItems.sublist(startIndex);
       if (newItems.isNotEmpty) {
         kotSections.add(
-          _buildItemSection('NEW ITEMS (Pending KOT)', Colors.orange, newItems)
+            _buildItemSection('NEW ITEMS (Pending KOT)', Colors.orange, newItems)
         );
       }
     }
@@ -409,30 +413,30 @@ class _TakeawayState extends State<Takeaway> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'extra : ${item.extras!.map((extra){
-                    // Debug: Print what data we have
-                    print('=== EXTRA DEBUG ===');
-                    print('Extra keys: ${extra.keys}');
-                    print('name: ${extra['name']}');
-                    print('displayName: ${extra['displayName']}');
-                    print('categoryName: ${extra['categoryName']}');
+                    'extra : ${item.extras!.map((extra){
+                      // Debug: Print what data we have
+                      print('=== EXTRA DEBUG ===');
+                      print('Extra keys: ${extra.keys}');
+                      print('name: ${extra['name']}');
+                      print('displayName: ${extra['displayName']}');
+                      print('categoryName: ${extra['categoryName']}');
 
-                    // Try multiple ways to get the display name
-                    String displayName;
-                    if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
-                      displayName = extra['displayName'];
-                    } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
-                      displayName = '${extra['categoryName']} - ${extra['name']}';
-                    } else {
-                      displayName = extra['name'];
-                    }
+                      // Try multiple ways to get the display name
+                      String displayName;
+                      if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
+                        displayName = extra['displayName'];
+                      } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
+                        displayName = '${extra['categoryName']} - ${extra['name']}';
+                      } else {
+                        displayName = extra['name'];
+                      }
 
-                    final double price = extra['price']?.toDouble() ?? 0.0;
-                    print('Final displayName: $displayName');
-                    print('===================');
+                      final double price = extra['price']?.toDouble() ?? 0.0;
+                      print('Final displayName: $displayName');
+                      print('===================');
 
-                    return '$displayName(Rs. ${price.toStringAsFixed(2)})';
-                  }).join(', ')}'
+                      return '$displayName(Rs. ${price.toStringAsFixed(2)})';
+                    }).join(', ')}'
                 ),
               ),
 
@@ -446,7 +450,7 @@ class _TakeawayState extends State<Takeaway> {
 
   Future<void> clearCart() async {
     try {
-      await cartStore.clearCart();
+      await HiveCart.clearCart();
       // await loadCartItems();
       if (mounted) {
         NotificationService.instance.showInfo(
@@ -539,7 +543,7 @@ class _TakeawayState extends State<Takeaway> {
   // NEW ORDER // This is the corrected and reliable version of your function
   Future<void> _placeOrder(CartCalculationService calculations) async {
     final plainItems = widget.cartItems.map((w) => w.item).toList();
-    
+
     // Check stock availability before placing order
     final bool stockAvailable = await InventoryService.checkStockAvailability(plainItems);
     if (!stockAvailable) {
@@ -558,8 +562,8 @@ class _TakeawayState extends State<Takeaway> {
       }
       return; // Stop order placement
     }
-    
-    final int newKotNumber = await orderStore.getNextKotNumber();
+
+    final int newKotNumber = await HiveOrders.getNextKotNumber();
 
     final neworder = OrderModel(
       id: Uuid().v4(),
@@ -572,7 +576,7 @@ class _TakeawayState extends State<Takeaway> {
       orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
       // kotNumber removed - using kotNumbers only
       tableNo: widget.selectedTableNo ?? '',
-        // widget.selectedTableNo.toString()
+      // widget.selectedTableNo.toString()
       remark: remarkController.text.trim(),
 
       // ✅ Use the service as the single source of truth for ALL financial data
@@ -589,9 +593,9 @@ class _TakeawayState extends State<Takeaway> {
       kotBoundaries: [plainItems.length], // First KOT boundary at item count
     );
 
-    await orderStore.addOrder(neworder);
+    await HiveOrders.addOrder(neworder);
     print("✅ New active order saved with Total: ${neworder.totalPrice}");
-    
+
     // Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
     print("✅ Stock deducted for order items");
@@ -600,7 +604,7 @@ class _TakeawayState extends State<Takeaway> {
     // print("")
     if (widget.isDineIn && widget.selectedTableNo != null) {
       // Also use the correct total here
-      await tableStore.updateTableStatus(
+      await HiveTables.updateTableStatus(
         widget.selectedTableNo!,
         'Running',
         total: neworder.totalPrice,
@@ -662,7 +666,7 @@ class _TakeawayState extends State<Takeaway> {
 
       if (hasNewItems) {
         // Generate a new KOT for the newly added items
-        newKotNumber = await orderStore.getNextKotNumber();
+        newKotNumber = await HiveOrders.getNextKotNumber();
         updatedKotNumbers.add(newKotNumber);
         updatedKotBoundaries.add(newItemCount); // Add boundary at new item count
 
@@ -689,11 +693,11 @@ class _TakeawayState extends State<Takeaway> {
         kotBoundaries: updatedKotBoundaries, // Update KOT boundaries
       );
 
-      await orderStore.updateOrder(updateOrder);
+      await HiveOrders.updateOrder(updateOrder);
 
       // Update the table's total price as well
       if (updateOrder.tableNo != null) {
-        await tableStore.updateTableStatus(updateOrder.tableNo!, 'Reserved', total: calculations.grandTotal);
+        await HiveTables.updateTableStatus(updateOrder.tableNo!, 'Reserved', total: calculations.grandTotal);
       }
 
       if (mounted) {
@@ -776,33 +780,33 @@ class _TakeawayState extends State<Takeaway> {
         Expanded(
           child: widget.cartItems.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'Your cart is empty',
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'Your cart is empty',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    color: Colors.grey,
                   ),
-                )
-              : Column(
-                  children: [
-                    Container(
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: primarycolor)),
-                        child: widget.isDineIn
-                            ? Text("Table no:${widget.selectedTableNo.toString()}")
-                            : Text(widget.isexisting ? 'Existing Order' : 'New Order')),
-                    Expanded(
-                      child: _buildGroupedCartItems(),
-                    ),
-                  ],
                 ),
+              ],
+            ),
+          )
+              : Column(
+            children: [
+              Container(
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: primarycolor)),
+                  child: widget.isDineIn
+                      ? Text("Table no:${widget.selectedTableNo.toString()}")
+                      : Text(widget.isexisting ? 'Existing Order' : 'New Order')),
+              Expanded(
+                child: _buildGroupedCartItems(),
+              ),
+            ],
+          ),
         ),
 
         // Total and Checkout
@@ -856,94 +860,94 @@ class _TakeawayState extends State<Takeaway> {
       children: [
         widget.isdelivery
             ? CommonButton(
-                bordercircular: 5,
-                width: width * 0.8,
-                height: height * 0.05,
-                onTap: ()=> _updateExistingOrder(calculations),
-                child: Center(
-                  child: Text(
-                    'Place Order',
-                    textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                  ),
-                ),
-              )
+          bordercircular: 5,
+          width: width * 0.8,
+          height: height * 0.05,
+          onTap: ()=> _updateExistingOrder(calculations),
+          child: Center(
+            child: Text(
+              'Place Order',
+              textScaler: TextScaler.linear(1),
+              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
+            ),
+          ),
+        )
             : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CommonButton(
-                    bordercircular: 5,
-                    width: width * 0.40,
-                    height: height * 0.06,
-                    onTap: () {
-                      // _completeOrder();
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => Customerdetails(
-                                    tableid: widget.tableid,
-                                    existingModel: widget.existingModel,
-                                    totalPrice: calculations.grandTotal,
-                                  )));
-                    },
-                    child: Center(
-                      child: Text(
-                        'Settlee \n (Rs. ${calculations.grandTotal.toStringAsFixed(2)})',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  widget.isdelivery
-                      ? SizedBox()
-                      : CommonButton(
-                          bordercircular: 5,
-                          width: width * 0.40,
-                          height: height * 0.05,
-                          onTap:()=>_updateExistingOrder(calculations),
-                          child: Center(
-                            child: Text(
-                              'place Order',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                            ),
-                          ),
-                        ),
-                ],
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            CommonButton(
+              bordercircular: 5,
+              width: width * 0.40,
+              height: height * 0.06,
+              onTap: () {
+                // _completeOrder();
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => Customerdetails(
+                          tableid: widget.tableid,
+                          existingModel: widget.existingModel,
+                          totalPrice: calculations.grandTotal,
+                        )));
+              },
+              child: Center(
+                child: Text(
+                  'Settlee \n (Rs. ${calculations.grandTotal.toStringAsFixed(2)})',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 12),
+                ),
               ),
+            ),
+            widget.isdelivery
+                ? SizedBox()
+                : CommonButton(
+              bordercircular: 5,
+              width: width * 0.40,
+              height: height * 0.05,
+              onTap:()=>_updateExistingOrder(calculations),
+              child: Center(
+                child: Text(
+                  'place Order',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
         SizedBox(
           height: 10,
         ),
         widget.isdelivery
             ? SizedBox()
             : ElevatedButton(
-                onPressed: widget.cartItems.isEmpty
-                    ? null
-                    : () {
-                        // Handle checkout
-                        // Handle print bill for existing order
-                  NotificationService.instance.showInfo(
-                    'Print Bill functionality to be implemented',
-                  );
+          onPressed: widget.cartItems.isEmpty
+              ? null
+              : () {
+            // Handle checkout
+            // Handle print bill for existing order
+            NotificationService.instance.showInfo(
+              'Print Bill functionality to be implemented',
+            );
 
-                  // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Print Bill functionality to be implemented')));
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primarycolor,
-                  minimumSize: Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'print Bill',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+            // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Print Bill functionality to be implemented')));
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primarycolor,
+            minimumSize: Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            'print Bill',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -957,220 +961,220 @@ class _TakeawayState extends State<Takeaway> {
         // new order placeorder button
         widget.isdelivery
             ? CommonButton(
-                bordercircular: 5,
-                width: width * 0.8,
-                height: height * 0.05,
-                onTap:() {
-                  // _completeOrder();
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
+          bordercircular: 5,
+          width: width * 0.8,
+          height: height * 0.05,
+          onTap:() {
+            // _completeOrder();
+            Navigator.push(
+                context,
+                MaterialPageRoute(
 
-                          builder: (context) => Customerdetails(
-                            tableid: widget.tableid,
-                            cartitems: plainItems,
-                            totalPrice:calculations.grandTotal ,
-                            orderType: 'Delivery',
-                            isSettle: true,
-                          )));
-                  // Handle checkout
-                },
-                child: Center(
-                  child: Text(
-                    'Place Orderr',
-                    textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                  ),
-                ),
-              )
+                    builder: (context) => Customerdetails(
+                      tableid: widget.tableid,
+                      cartitems: plainItems,
+                      totalPrice:calculations.grandTotal ,
+                      orderType: 'Delivery',
+                      isSettle: true,
+                    )));
+            // Handle checkout
+          },
+          child: Center(
+            child: Text(
+              'Place Orderr',
+              textScaler: TextScaler.linear(1),
+              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
+            ),
+          ),
+        )
             : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CommonButton(
-                    bordercircular: 5,
-                    width: width * 0.40,
-                    height: height * 0.05,
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return AlertDialog(
-                            title: Center(
-                              child: Text(
-                                'Place Order',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            content: SingleChildScrollView(
-                              child: Container(
-                                width: width,
-                                height: height * 0.6,
-                                child: Column(
-                                  children: [
-                                    Text('Customer Details',
-                                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500), textAlign: TextAlign.start),
-                                    const SizedBox(height: 10),
-                                    CommonTextForm(
-                                        hintText: 'Name',
-                                        controller: nameController,
-                                        BorderColor: primarycolor,
-                                        HintColor: primarycolor,
-                                        obsecureText: false),
-                                    const SizedBox(height: 10),
-                                    CommonTextForm(
-                                        hintText: 'Mobile No',
-                                        controller: mobileController,
-                                        BorderColor: primarycolor,
-                                        HintColor: primarycolor,
-                                        obsecureText: false),
-                                    const SizedBox(height: 25),
-                                    CommonTextForm(
-                                        hintText: 'Email ID (Optional)',
-                                        controller: emailController,
-                                        BorderColor: primarycolor,
-                                        HintColor: primarycolor,
-                                        obsecureText: false),
-                                    const SizedBox(height: 10),
-                                    CommonTextForm(
-                                        hintText: 'Remark',
-                                        controller: remarkController,
-                                        BorderColor: primarycolor,
-                                        HintColor: primarycolor,
-                                        obsecureText: false),
-                                    const SizedBox(height: 25),
-                                    const Divider(),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text('To Be Paid', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-                                        Text('Rs.${calculations.grandTotal.toStringAsFixed(2)}',
-                                            style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                    const Divider(),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-
-                                        // butttons for placing new order
-                                        Expanded(
-                                          child: CommonButton(
-                                            // width: width * 0.3,
-                                            height: height * 0.06,
-                                            bordercircular: 2,
-                                            onTap: ()=> _placeOrder(calculations),
-                                            child: Center(
-                                              child: Text('Print & Order',
-                                                  style: GoogleFonts.poppins(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 16,
-                                                  )),
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: 5,
-                                        ),
-
-                                        Expanded(
-                                          child: CommonButton(
-                                            // width: width * 0.3,
-                                            height: height * 0.06,
-                                            bordercircular: 2,
-                                            onTap: ()=> _placeOrder(calculations),
-                                            child: Center(
-                                              child: Text('Place Order',
-                                                  style: GoogleFonts.poppins(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 16,
-                                                  )),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    // SizedBox(height: 10,)
-                                  ],
-                                ),
-                              ),
-                            ),
-                            titlePadding: const EdgeInsets.all(20),
-                            alignment: Alignment.center,
-                            actions: [],
-                          );
-                        },
-                      );
-                    },
-                    child: Center(
-                      child: Text(
-                        'Place Orderr',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                      ),
-                    ),
-                  ),
-                  widget.isdelivery
-                      ? SizedBox()
-                      : CommonButton(
-                          bordercircular: 5,
-                          width: width * 0.40,
-                          height: height * 0.05,
-                          onTap: ()=> _qucikSettleNewOrder(calculations),
-                          child: Center(
-                            child: Text(
-                              'Quick Settlee',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                            ),
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            CommonButton(
+              bordercircular: 5,
+              width: width * 0.40,
+              height: height * 0.05,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: Center(
+                        child: Text(
+                          'Place Order',
+                          textScaler: TextScaler.linear(1),
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                ],
+                      ),
+                      content: SingleChildScrollView(
+                        child: Container(
+                          width: width,
+                          height: height * 0.6,
+                          child: Column(
+                            children: [
+                              Text('Customer Details',
+                                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500), textAlign: TextAlign.start),
+                              const SizedBox(height: 10),
+                              CommonTextForm(
+                                  hintText: 'Name',
+                                  controller: nameController,
+                                  BorderColor: primarycolor,
+                                  HintColor: primarycolor,
+                                  obsecureText: false),
+                              const SizedBox(height: 10),
+                              CommonTextForm(
+                                  hintText: 'Mobile No',
+                                  controller: mobileController,
+                                  BorderColor: primarycolor,
+                                  HintColor: primarycolor,
+                                  obsecureText: false),
+                              const SizedBox(height: 25),
+                              CommonTextForm(
+                                  hintText: 'Email ID (Optional)',
+                                  controller: emailController,
+                                  BorderColor: primarycolor,
+                                  HintColor: primarycolor,
+                                  obsecureText: false),
+                              const SizedBox(height: 10),
+                              CommonTextForm(
+                                  hintText: 'Remark',
+                                  controller: remarkController,
+                                  BorderColor: primarycolor,
+                                  HintColor: primarycolor,
+                                  obsecureText: false),
+                              const SizedBox(height: 25),
+                              const Divider(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('To Be Paid', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
+                                  Text('Rs.${calculations.grandTotal.toStringAsFixed(2)}',
+                                      style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              const Divider(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+
+                                  // butttons for placing new order
+                                  Expanded(
+                                    child: CommonButton(
+                                      // width: width * 0.3,
+                                      height: height * 0.06,
+                                      bordercircular: 2,
+                                      onTap: ()=> _placeOrder(calculations),
+                                      child: Center(
+                                        child: Text('Print & Order',
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 16,
+                                            )),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 5,
+                                  ),
+
+                                  Expanded(
+                                    child: CommonButton(
+                                      // width: width * 0.3,
+                                      height: height * 0.06,
+                                      bordercircular: 2,
+                                      onTap: ()=> _placeOrder(calculations),
+                                      child: Center(
+                                        child: Text('Place Order',
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 16,
+                                            )),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // SizedBox(height: 10,)
+                            ],
+                          ),
+                        ),
+                      ),
+                      titlePadding: const EdgeInsets.all(20),
+                      alignment: Alignment.center,
+                      actions: [],
+                    );
+                  },
+                );
+              },
+              child: Center(
+                child: Text(
+                  'Place Orderr',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
+                ),
               ),
+            ),
+            widget.isdelivery
+                ? SizedBox()
+                : CommonButton(
+              bordercircular: 5,
+              width: width * 0.40,
+              height: height * 0.05,
+              onTap: ()=> _qucikSettleNewOrder(calculations),
+              child: Center(
+                child: Text(
+                  'Quick Settlee',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
         SizedBox(
           height: 10,
         ),
         widget.isdelivery
             ? SizedBox()
             : ElevatedButton(
-                onPressed: widget.cartItems.isEmpty
-                    ? null
-                    : () {
-                  // _completeOrder();
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
+          onPressed: widget.cartItems.isEmpty
+              ? null
+              : () {
+            // _completeOrder();
+            Navigator.push(
+                context,
+                MaterialPageRoute(
 
-                          builder: (context) => Customerdetails(
-                            tableid: widget.tableid,
-                            cartitems: plainItems,
-                            totalPrice: calculations.grandTotal,
-                            orderType:  widget.isDineIn ? 'Dine In' : 'Take Away',
-                            isSettle: true,
-                          )));
-                        // Handle checkout
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primarycolor,
-                  minimumSize: Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Settle & Print Bill',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+                    builder: (context) => Customerdetails(
+                      tableid: widget.tableid,
+                      cartitems: plainItems,
+                      totalPrice: calculations.grandTotal,
+                      orderType:  widget.isDineIn ? 'Dine In' : 'Take Away',
+                      isSettle: true,
+                    )));
+            // Handle checkout
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primarycolor,
+            minimumSize: Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            'Settle & Print Bill',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1231,11 +1235,11 @@ class _TakeawayState extends State<Takeaway> {
       kotBoundaries: activeModel.kotBoundaries, // KOT boundaries for grouping items
     );
 
-    await pastOrderStore.addOrder(pastOrder);
+    await HivePastOrder.addOrder(pastOrder);
     print("✅ Order saved to past orders history.");
 
     // This is the critical missing step: delete the order from the ACTIVE list.
-    await orderStore.deleteOrder(activeModel.id);
+    await HiveOrders.deleteOrder(activeModel.id);
     print("🗑️ Active order has been deleted.");
   }
 
@@ -1287,7 +1291,7 @@ class _TakeawayState extends State<Takeaway> {
   Future<void> _qucikSettleNewOrder(CartCalculationService calculations) async {
     // Get the plain cart items
     final plainItems = widget.cartItems.map((w) => w.item).toList();
-    
+
     // Check stock availability before processing order
     final bool stockAvailable = await InventoryService.checkStockAvailability(plainItems);
     if (!stockAvailable) {
@@ -1309,7 +1313,7 @@ class _TakeawayState extends State<Takeaway> {
     }
 
     // No need for a temporary OrderModel. We create the final pastOrderModel directly.
-    final int quickSettleKotNumber = await orderStore.getNextKotNumber();
+    final int quickSettleKotNumber = await HiveOrders.getNextKotNumber();
     final pastOrder = pastOrderModel(
       id: Uuid().v4(), // Generate a unique ID for this transaction
       customerName: 'Quick Settle',
@@ -1332,14 +1336,14 @@ class _TakeawayState extends State<Takeaway> {
     );
 
     // 1. Add the completed order to history
-    await pastOrderStore.addOrder(pastOrder);
+    await HivePastOrder.addOrder(pastOrder);
 
     // 2. Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
     print("✅ Stock deducted for quick settle order");
 
     // 3. Clear the user's cart
-    await cartStore.clearCart();
+    await HiveCart.clearCart();
 
     // 4. Navigate and show success message
     if (mounted) {
@@ -1356,7 +1360,7 @@ class _TakeawayState extends State<Takeaway> {
   }
 
 
-  // Add this helper method inside your _TakeawayState class
+// Add this helper method inside your _TakeawayState class
 // Place this method inside your _CustomerdetailsState class
 //   Map<String, double> _calculateGst(List<CartItem> items) {
 //     double totalGstAmount = 0;

@@ -46,7 +46,7 @@ class StaffModel extends HiveObject{
     required this.pinNo,
     required this.createdAt,
     this.isActive = true,
-});
+  });
 
 
   StaffModel copyWith({
@@ -60,7 +60,7 @@ class StaffModel extends HiveObject{
     String? pinNo,
     DateTime? dateTime,
     bool? isActive,
-}){
+  }){
     return StaffModel(
         id: id ?? this.id,
         userName: userName ?? this.userName,
@@ -105,17 +105,17 @@ class StaffModel extends HiveObject{
       isActive: map['isActive'] ?? true,
     );
   }
-  // factory StaffModel.fromMap(Map<String, dynamic>map){
-  //   return StaffModel(
-  //       id: map['id'],
-  //       userName: map['userName'],
-  //       firstName: map['firstName'],
-  //       lastName: map['lastName'],
-  //       isCashier: map['isCashier'],
-  //       mobileNo: map['mobileNo'],
-  //       emailId: map['emailId'],
-  //       pinNo: map['pinNo']);
-  // }
+// factory StaffModel.fromMap(Map<String, dynamic>map){
+//   return StaffModel(
+//       id: map['id'],
+//       userName: map['userName'],
+//       firstName: map['firstName'],
+//       lastName: map['lastName'],
+//       isCashier: map['isCashier'],
+//       mobileNo: map['mobileNo'],
+//       emailId: map['emailId'],
+//       pinNo: map['pinNo']);
+// }
 
 
 

@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import '../../../../constants/restaurant/color.dart';
-
 class NeedhelpDrawer extends StatelessWidget {
   const NeedhelpDrawer({super.key});
 
@@ -20,104 +19,104 @@ class NeedhelpDrawer extends StatelessWidget {
             icon:Icon(Icons.arrow_back_ios_new,color: Colors.white,)),
         title:Text('Need Help?',                          textScaler: TextScaler.linear(1),
           style: GoogleFonts.poppins(color: Colors.white),),
-      centerTitle: true,
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              
-              Text('Contact Us',                          textScaler: TextScaler.linear(1),
-                style: GoogleFonts.poppins(fontSize: 20,fontWeight: FontWeight.w700),),
-              Container(
-                // margin: EdgeInsets.all(15),
-                height: heigth * 0.13,
-                padding: EdgeInsets.all(5),
-                child: Card(
-                  elevation: 5,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
+            padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
 
-                      Container(
-                        padding: EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(15)
-                          ),
-                          child: Icon(Icons.phone,color: Colors.white,size: 20,)),
+                Text('Contact Us',                          textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(fontSize: 20,fontWeight: FontWeight.w700),),
+                Container(
+                  // margin: EdgeInsets.all(15),
+                  height: heigth * 0.13,
+                  padding: EdgeInsets.all(5),
+                  child: Card(
+                    elevation: 5,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
 
-                      Text('+91 1234567890',                          textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14,color: Colors.black),),
+                          Container(
+                              padding: EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(15)
+                              ),
+                              child: Icon(Icons.phone,color: Colors.white,size: 20,)),
 
-                      Row(children: [
-                        Container(
-                          width: width * 0.15,
-                  height: heigth * 0.05,
-                            padding: EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                                color: Colors.green,
-                                borderRadius: BorderRadius.circular(5)
-                            ),
-                            child: Icon(Icons.phone,color: Colors.white,size: 30,)),
-                        SizedBox(width: 10,),
-                        Container(
-                          width: width * 0.15,
-                  height: heigth * 0.05,
-                            padding: EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                                color: Colors.green,
-                                borderRadius: BorderRadius.circular(5)
-                            ),
-                            child: Icon(Icons.telegram,color: Colors.white,size: 30,)),
+                          Text('+91 1234567890',                          textScaler: TextScaler.linear(1),
+                            style: GoogleFonts.poppins(fontSize: 14,color: Colors.black),),
 
-                      ],)
+                          Row(children: [
+                            Container(
+                                width: width * 0.15,
+                                height: heigth * 0.05,
+                                padding: EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(5)
+                                ),
+                                child: Icon(Icons.phone,color: Colors.white,size: 30,)),
+                            SizedBox(width: 10,),
+                            Container(
+                                width: width * 0.15,
+                                height: heigth * 0.05,
+                                padding: EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(5)
+                                ),
+                                child: Icon(Icons.telegram,color: Colors.white,size: 30,)),
 
-                    ],
-                  ),
-                ),
-              ),),
-              SizedBox(height: 25,),
-              Container(
-                // margin: EdgeInsets.all(15),
-                height: heigth * 0.13,
-                padding: EdgeInsets.all(5),
-                child: Card(
-                  elevation: 5,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
+                          ],)
 
-                      Container(
-                        padding: EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(15)
-                          ),
-                          child: Icon(Icons.message,color: Colors.white,size: 20,)),
+                        ],
+                      ),
+                    ),
+                  ),),
+                SizedBox(height: 25,),
+                Container(
+                  // margin: EdgeInsets.all(15),
+                  height: heigth * 0.13,
+                  padding: EdgeInsets.all(5),
+                  child: Card(
+                    elevation: 5,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
 
-                      Text('support@BillBerry.com',                          textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(fontSize: 14,color: Colors.black),),
+                          Container(
+                              padding: EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(15)
+                              ),
+                              child: Icon(Icons.message,color: Colors.white,size: 20,)),
 
-                CommonButton(
-                    height: heigth * 0.04,
-                    width:  width * 0.2,
-                    bordercircular: 0,
-                    onTap: (){}, child: Text('Write US',                          textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w500)))
+                          Text('support@BillBerry.com',                          textScaler: TextScaler.linear(1),
+                            style: GoogleFonts.poppins(fontSize: 14,color: Colors.black),),
 
-                    ],
-                  ),
-                ),
-              ),),
-            ],
-          )
+                          CommonButton(
+                              height: heigth * 0.04,
+                              width:  width * 0.2,
+                              bordercircular: 0,
+                              onTap: (){}, child: Text('Write US',                          textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w500)))
+
+                        ],
+                      ),
+                    ),
+                  ),),
+              ],
+            )
         ),
       ),
     );

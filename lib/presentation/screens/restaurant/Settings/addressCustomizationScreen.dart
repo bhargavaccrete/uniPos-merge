@@ -12,19 +12,19 @@ class _addressCustomizationScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        elevation: 1,
-        title: Text("Address Customization",style: TextStyle(fontSize: 20.0,fontWeight: FontWeight.bold)),
-        actions: [
-          Row(
-            children: [
+        appBar: AppBar(
+          elevation: 1,
+          title: Text("Address Customization",style: TextStyle(fontSize: 20.0,fontWeight: FontWeight.bold)),
+          actions: [
+            Row(
+              children: [
                 Icon(Icons.person),
                 Text("admin"),
-            ],
-          )
-        ],
-      ),
-    body: DraggableEditableList()
+              ],
+            )
+          ],
+        ),
+        body: DraggableEditableList()
     );
   }
 }

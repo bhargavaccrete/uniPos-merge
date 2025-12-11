@@ -41,7 +41,7 @@ class pastOrderModel extends HiveObject{
   @HiveField(9)
   final  double? subTotal;
 
- @HiveField(10)
+  @HiveField(10)
   final  double? Discount;
 
   @HiveField(11)
@@ -94,8 +94,8 @@ class pastOrderModel extends HiveObject{
     required this.kotNumbers, // REQUIRED
     required this.kotBoundaries, // REQUIRED
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
-       assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
-       assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
+        assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
+        assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
 
 
   pastOrderModel copyWith({
@@ -120,15 +120,15 @@ class pastOrderModel extends HiveObject{
     List<int>? kotNumbers,
     List<int>? kotBoundaries,
 
-}) {
+  }) {
     return pastOrderModel(
-        id: id ?? this.id,
-        customerName: customerName ?? this.customerName,
-        totalPrice: totalPrice ?? this.totalPrice,
-        items: items ?? this.items,
-        orderAt: orderAt ?? this.orderAt,
-        kotNumber: kotNumber ?? this.kotNumber,
-    orderType: orderType ?? this.orderType,
+      id: id ?? this.id,
+      customerName: customerName ?? this.customerName,
+      totalPrice: totalPrice ?? this.totalPrice,
+      items: items ?? this.items,
+      orderAt: orderAt ?? this.orderAt,
+      kotNumber: kotNumber ?? this.kotNumber,
+      orderType: orderType ?? this.orderType,
       paymentmode: paymentMode ?? this.paymentmode,
       remark:  remark ?? this.remark,
       subTotal: subTotal ?? this.subTotal,

@@ -23,10 +23,10 @@ class _SplashscreenState extends State<Splashscreen> {
     // TODO: implement initState
     super.initState();
     _navigateAfterSplash();
-   // Timer(
-   //   Duration(seconds: 3),
-   //     ()=> Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context)=> AuthSelectionScreen()))
-   // ) ;
+    // Timer(
+    //   Duration(seconds: 3),
+    //     ()=> Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context)=> AuthSelectionScreen()))
+    // ) ;
   }
 
   Future<void> _navigateAfterSplash ()async{
@@ -45,15 +45,15 @@ class _SplashscreenState extends State<Splashscreen> {
   }
   @override
   Widget build(BuildContext context) {
-   final width = MediaQuery.of(context).size.width * 1;
-   final height = MediaQuery.of(context).size.height * 1;
+    final width = MediaQuery.of(context).size.width * 1;
+    final height = MediaQuery.of(context).size.height * 1;
     return Center(
       child: Container(
         height: height * 0.5,
         width: width * 0.5,
         color:screenBGColor,
         child:Image.asset(logo,
-         ) ,
+        ) ,
         // child:Image.asset('assets/images/BillBerry1_processed.jpg') ,
       ),
     );

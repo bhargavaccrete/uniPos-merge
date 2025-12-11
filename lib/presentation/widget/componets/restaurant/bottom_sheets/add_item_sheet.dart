@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../../core/di/service_locator.dart';
+import '../../../../../data/models/restaurant/db/database/hive_db.dart';
 import '../../../../../util/restaurant/responsive_helper.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import '../componets/Button.dart';
@@ -108,7 +108,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
     }
 
     final item = _formState.toItem();
-    await itemStore.addItem(item);
+    await itemsBoxes.addItem(item);
 
     widget.onItemAdded?.call();
 

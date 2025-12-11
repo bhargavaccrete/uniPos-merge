@@ -25,7 +25,7 @@ class ExtraSelectionScreen extends StatefulWidget {
 class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   List<Extramodel> availableExtras = [];
   Set<String> selectedExtraIds = {};
-  
+
   @override
   void initState() {
     super.initState();
@@ -34,7 +34,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   }
 
   void _loadExtras() {
-    final extraBox = Hive.box<Extramodel>('extras');
+    final extraBox = Hive.box<Extramodel>('extra');
     setState(() {
       availableExtras = extraBox.values.toList();
     });
@@ -155,11 +155,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
             ),
           ),
           SizedBox(height: 20),
-          
+
           ...availableExtras.map<Widget>((extra) {
             final isSelected = selectedExtraIds.contains(extra.Id);
             final toppingCount = extra.topping?.length ?? 0;
-            
+
             return Container(
               margin: EdgeInsets.only(bottom: 15),
               decoration: BoxDecoration(
@@ -236,19 +236,19 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                           ..add(
                             extra.topping!.length > 3
                                 ? Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[300],
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '+${extra.topping!.length - 3}',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                  )
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '+${extra.topping!.length - 3}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            )
                                 : Container(),
                           ),
                       ),
@@ -547,7 +547,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       topping: toppings,
                     );
 
-                    final extraBox = Hive.box<Extramodel>('extras');
+                    final extraBox = Hive.box<Extramodel>('extra');
                     await extraBox.put(newExtra.Id, newExtra);
 
                     _loadExtras();

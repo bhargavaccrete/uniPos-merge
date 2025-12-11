@@ -10,6 +10,7 @@ import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 
+
 class ChoiceSelectionScreen extends StatefulWidget {
   final List<String> selectedChoiceIds;
 
@@ -25,7 +26,7 @@ class ChoiceSelectionScreen extends StatefulWidget {
 class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
   List<ChoicesModel> availableChoices = [];
   Set<String> selectedChoiceIds = {};
-  
+
   @override
   void initState() {
     super.initState();
@@ -34,7 +35,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
   }
 
   void _loadChoices() {
-    final choiceBox = Hive.box<ChoicesModel>('choices');
+    final choiceBox = Hive.box<ChoicesModel>('choice');
     setState(() {
       availableChoices = choiceBox.values.toList();
     });
@@ -155,10 +156,10 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
             ),
           ),
           SizedBox(height: 20),
-          
+
           ...availableChoices.map<Widget>((choice) {
             final isSelected = selectedChoiceIds.contains(choice.id);
-            
+
             return Container(
               margin: EdgeInsets.only(bottom: 15),
               decoration: BoxDecoration(
@@ -223,19 +224,19 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                         ..add(
                           choice.choiceOption.length > 3
                               ? Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '+${choice.choiceOption.length - 3}',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 11,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                )
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '+${choice.choiceOption.length - 3}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          )
                               : Container(),
                         ),
                     ),
@@ -424,9 +425,9 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     final options = optionControllers
                         .where((controller) => controller.text.trim().isNotEmpty)
                         .map((controller) => ChoiceOption(
-                              id: Uuid().v4(),
-                              name: controller.text.trim(),
-                            ))
+                      id: Uuid().v4(),
+                      name: controller.text.trim(),
+                    ))
                         .toList();
 
                     if (options.isEmpty) {
@@ -445,7 +446,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                       choiceOption: options,
                     );
 
-                    final choiceBox = Hive.box<ChoicesModel>('choices');
+                    final choiceBox = Hive.box<ChoicesModel>('choice');
                     await choiceBox.put(newChoice.id, newChoice);
 
                     _loadChoices();

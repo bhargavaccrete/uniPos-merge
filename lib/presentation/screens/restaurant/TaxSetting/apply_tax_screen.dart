@@ -130,7 +130,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
           ),
         ],
       ),
-          body: ValueListenableBuilder(
+      body: ValueListenableBuilder(
         valueListenable: itemBox.listenable(),
         builder: (context, Box<Items> box, _) {
           final items = box.values.toList();
@@ -168,103 +168,103 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
 
                     // ✅ UI UPDATED TO MATCH YOUR IMAGE
                     return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        child: CheckboxListTile(
-                          value: isSelected,
-                          onChanged: (bool? value) => _onItemChecked(value, item),
-                          activeColor: Colors.blue,
-                          controlAffinity: ListTileControlAffinity.leading,
+                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (bool? value) => _onItemChecked(value, item),
+                        activeColor: Colors.blue,
+                        controlAffinity: ListTileControlAffinity.leading,
 
-                          // --- Title Row ---
-                          title: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                item.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        // --- Title Row ---
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              item.name,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            ),
+
+
+                            Text(
+                              // Show appropriate price based on tax setting
+                              AppSettings.isTaxInclusive
+                                  ? item.taxRate != null
+                                  ? item.basePrice.toStringAsFixed(2)  // Show base price if tax applied
+                                  : item.price!.toStringAsFixed(2)     // Show original price if no tax
+                                  : item.price!.toStringAsFixed(2),        // Show base price for exclusive
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: item.taxRate != null ? Colors.green : Colors.black87,
                               ),
+                            ),
+                          ],
+                        ),
 
-
+                        // --- Subtitle with Tax Breakdown ---
+                        subtitle: item.taxRate != null
+                            ? Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Show tax percentage applied
                               Text(
-                                // Show appropriate price based on tax setting
-                                AppSettings.isTaxInclusive
-                                    ? item.taxRate != null
-                                        ? item.basePrice.toStringAsFixed(2)  // Show base price if tax applied
-                                        : item.price!.toStringAsFixed(2)     // Show original price if no tax
-                                    : item.price!.toStringAsFixed(2),        // Show base price for exclusive
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: item.taxRate != null ? Colors.green : Colors.black87,
+                                "Tax Applied: ${(item.taxRate! * 100).toStringAsFixed(2)}%",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                  color: Colors.blue,
                                 ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text("Tax Amount:"),
+                                  const Text("Net Amount on Item:"),
+                                ],
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    AppSettings.isTaxInclusive
+                                        ? "₹${item.taxAmount.toStringAsFixed(2)}"  // Show calculated tax from inclusive price
+                                        : "₹${(item.price! * item.taxRate!).toStringAsFixed(2)}", // Show tax on base price
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  Text(
+                                    AppSettings.isTaxInclusive
+                                        ? "₹${item.price!.toStringAsFixed(2)}"     // Show inclusive price as net amount
+                                        : "₹${(item.price! * (1 + item.taxRate!)).toStringAsFixed(2)}", // Show base + tax as net amount
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-
-                          // --- Subtitle with Tax Breakdown ---
-                          subtitle: item.taxRate != null
-                              ? Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Show tax percentage applied
-                                Text(
-                                  "Tax Applied: ${(item.taxRate! * 100).toStringAsFixed(2)}%",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    color: Colors.blue,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text("Tax Amount:"),
-                                    const Text("Net Amount on Item:"),
-                                  ],
-                                ),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      AppSettings.isTaxInclusive
-                                          ? "₹${item.taxAmount.toStringAsFixed(2)}"  // Show calculated tax from inclusive price
-                                          : "₹${(item.price! * item.taxRate!).toStringAsFixed(2)}", // Show tax on base price
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                    Text(
-                                      AppSettings.isTaxInclusive
-                                          ? "₹${item.price!.toStringAsFixed(2)}"     // Show inclusive price as net amount
-                                          : "₹${(item.price! * (1 + item.taxRate!)).toStringAsFixed(2)}", // Show base + tax as net amount
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                        )
+                            : const Padding(
+                          padding: EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            "No tax applied",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
                             ),
-                          )
-                              : const Padding(
-                                  padding: EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    "No tax applied",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ), // Show "No tax applied" if no tax
-                        ),
-                      );
+                          ),
+                        ), // Show "No tax applied" if no tax
+                      ),
+                    );
                   },
                 ),
               ),
@@ -275,8 +275,8 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     );
   }
 
-  // double totalgst(double itemprice , double gstrate){
-  //   return itemprice * gstrate / 100 ;
-  // }
+// double totalgst(double itemprice , double gstrate){
+//   return itemprice * gstrate / 100 ;
+// }
 
 }

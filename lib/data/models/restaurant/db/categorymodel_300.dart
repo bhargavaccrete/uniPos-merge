@@ -26,18 +26,18 @@ class Category{
   @HiveField(6)
   int editCount;
 
-Category({
-  required this.id,
-  required this.name,
-  this.imagePath,
-  this.createdTime,
-  this.lastEditedTime,
-  this.editedBy,
-  this.editCount = 0,
-});
+  Category({
+    required this.id,
+    required this.name,
+    this.imagePath,
+    this.createdTime,
+    this.lastEditedTime,
+    this.editedBy,
+    this.editCount = 0,
+  });
 
 
-Category copyWith({
+  Category copyWith({
     String? id,
     String? name,
     String? imagePath,
@@ -45,8 +45,8 @@ Category copyWith({
     DateTime? lastEditedTime,
     String? editedBy,
     int? editCount,
-}){
-  return Category(
+  }){
+    return Category(
       id: id?? this.id,
       name: name ?? this.name,
       imagePath: imagePath ?? this.imagePath,
@@ -54,8 +54,8 @@ Category copyWith({
       lastEditedTime: lastEditedTime ?? this.lastEditedTime,
       editedBy: editedBy ?? this.editedBy,
       editCount: editCount ?? this.editCount,
-  );
-}
+    );
+  }
   factory Category.fromMap(Map<String, dynamic> map) {
     return Category(
       id: map['id'],

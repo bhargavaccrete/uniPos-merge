@@ -63,7 +63,7 @@ class AuthSelectionScreen extends StatelessWidget {
                               fontSize: 25,
                               color: Colors.white)
 
-                          ))),
+                      ))),
               SizedBox(height: 10),
               // Signup Button
               CommonButton(
@@ -71,18 +71,18 @@ class AuthSelectionScreen extends StatelessWidget {
 
 
                   onTap: () {
-                     // Navigator.push(context,MaterialPageRoute(builder: (context)=>Signup()));
-                     Navigator.push(context,MaterialPageRoute(builder: (context)=>Companyregister()));
+                    // Navigator.push(context,MaterialPageRoute(builder: (context)=>Signup()));
+                    Navigator.push(context,MaterialPageRoute(builder: (context)=>Companyregister()));
 
                   },
                   child: Center(
                       child: Text(
-                    'Sign Up',
-                    style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w400,
-                        fontSize: 25,
-                        color: Colors.white),
-                  ))),
+                        'Sign Up',
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 25,
+                            color: Colors.white),
+                      ))),
               SizedBox(height: 10),
 
               // Watch Demo Button
@@ -93,12 +93,12 @@ class AuthSelectionScreen extends StatelessWidget {
                   bgcolor: Colors.white,
                   child: Center(
                       child: Text(
-                    'Watch Demo',
-                    style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w400,
-                        fontSize: 25,
-                        color: primarycolor),
-                  ))),
+                        'Watch Demo',
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 25,
+                            color: primarycolor),
+                      ))),
             ],
           ),
         ),

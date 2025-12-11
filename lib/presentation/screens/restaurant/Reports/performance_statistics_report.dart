@@ -64,28 +64,28 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
       body: _isLoadingStats
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildHeaderCard(totalRecords),
-                  const SizedBox(height: 16),
-                  _buildDataSummaryCard(totalOrders),
-                  const SizedBox(height: 16),
-                  _buildInventoryCard(),
-                  const SizedBox(height: 16),
-                  _buildOperationsCard(),
-                  const SizedBox(height: 16),
-                  _buildPerformanceInsightsCard(totalRecords),
-                  const SizedBox(height: 16),
-                  _buildStorageCard(),
-                  if ((_stats['pastOrders'] ?? 0) > 0) ...[
-                    const SizedBox(height: 16),
-                    _buildTestResultsCard(),
-                  ],
-                ],
-              ),
-            ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildHeaderCard(totalRecords),
+            const SizedBox(height: 16),
+            _buildDataSummaryCard(totalOrders),
+            const SizedBox(height: 16),
+            _buildInventoryCard(),
+            const SizedBox(height: 16),
+            _buildOperationsCard(),
+            const SizedBox(height: 16),
+            _buildPerformanceInsightsCard(totalRecords),
+            const SizedBox(height: 16),
+            _buildStorageCard(),
+            if ((_stats['pastOrders'] ?? 0) > 0) ...[
+              const SizedBox(height: 16),
+              _buildTestResultsCard(),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

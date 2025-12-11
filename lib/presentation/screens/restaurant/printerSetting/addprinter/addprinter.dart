@@ -4,7 +4,6 @@ import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/Blutooth.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/usb.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/wifi.dart';
-
 class AddPrinter extends StatefulWidget {
   const AddPrinter({super.key});
 
@@ -14,7 +13,7 @@ class AddPrinter extends StatefulWidget {
 
 class _AddPrinterState extends State<AddPrinter> with SingleTickerProviderStateMixin{
   late TabController tabController;
-  
+
   @override
   void initState() {
     // TODO: implement initState
@@ -32,43 +31,43 @@ class _AddPrinterState extends State<AddPrinter> with SingleTickerProviderStateM
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
       appBar: AppBar(
-      title: Text('Printer Setting',style:GoogleFonts.poppins()),
+        title: Text('Printer Setting',style:GoogleFonts.poppins()),
         leading: BackButton(),
         centerTitle: true,
-      bottom: PreferredSize(preferredSize: Size.fromHeight(40),
+        bottom: PreferredSize(preferredSize: Size.fromHeight(40),
 
-          child: Container(
+            child: Container(
 
-            width: width * 0.7,
-            child: TabBar(
-              controller: tabController,
-                dividerColor: Colors.transparent,
-                unselectedLabelColor: Colors.grey.shade400,
-                indicatorColor: Colors.red,
-                indicator:  UnderlineTabIndicator(
-                  borderSide: BorderSide(width: 3.0 ,color: primarycolor)
-                ),
-                tabs:[
-                  Tab(
-                    text: "WIFI/LAN",
+              width: width * 0.7,
+              child: TabBar(
+                  controller: tabController,
+                  dividerColor: Colors.transparent,
+                  unselectedLabelColor: Colors.grey.shade400,
+                  indicatorColor: Colors.red,
+                  indicator:  UnderlineTabIndicator(
+                      borderSide: BorderSide(width: 3.0 ,color: primarycolor)
                   ),
-                  Tab(
-                    text: "Blutooth",
-                  ),
-                  Tab(
-                    text: "USB",
-                  )
-                ] ),
-          )),
+                  tabs:[
+                    Tab(
+                      text: "WIFI/LAN",
+                    ),
+                    Tab(
+                      text: "Blutooth",
+                    ),
+                    Tab(
+                      text: "USB",
+                    )
+                  ] ),
+            )),
       ),
       body: TabBarView(
-controller: tabController,
+          controller: tabController,
           children: [
             WifiLan(),
             Bluthooth(),
             Usb()
           ]),
-      
+
     );
   }
 }

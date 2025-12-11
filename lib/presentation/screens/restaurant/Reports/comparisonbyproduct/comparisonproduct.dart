@@ -94,9 +94,9 @@ class _ComparisonByProductState extends State<ComparisonByProduct> {
         },
         style: ElevatedButton.styleFrom(
             backgroundColor:
-                selectedFilter == title ? primarycolor : Colors.white,
+            selectedFilter == title ? primarycolor : Colors.white,
             foregroundColor:
-                selectedFilter == title ? Colors.white : primarycolor,
+            selectedFilter == title ? Colors.white : primarycolor,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
                 side: BorderSide(color: primarycolor))),

@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../../../data/models/restaurant/db/database/hive_db.dart';
+import '../../../../data/models/restaurant/db/database/hive_pastorder.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import 'partial_refund_dialog.dart';
@@ -57,9 +59,9 @@ class _OrderdetailsState extends State<Orderdetails> {
         automaticallyImplyLeading: false,
         leading:
         IconButton(onPressed: (){
-            Navigator.pop(context);
+          Navigator.pop(context);
 
-          }, icon: Icon(Icons.arrow_back,color: Colors.white,)),
+        }, icon: Icon(Icons.arrow_back,color: Colors.white,)),
 
         backgroundColor: primarycolor,
         title: Text('Order Details', style: GoogleFonts.poppins(color: Colors.white)),
@@ -294,123 +296,123 @@ class _OrderdetailsState extends State<Orderdetails> {
                       final remainingQty = originalQty - refundedQty;
                       final bool itemIsFullyRefunded = refundedQty > 0 && refundedQty >= originalQty;
 
-                // Calculate line total with proper discount and tax handling
-                final basePrice = it.price; // Original price
-                final itemDiscount = it.discount ?? 0.0; // Item-level discount
-                final priceAfterItemDiscount = it.finalItemPrice; // price - item.discount
+                      // Calculate line total with proper discount and tax handling
+                      final basePrice = it.price; // Original price
+                      final itemDiscount = it.discount ?? 0.0; // Item-level discount
+                      final priceAfterItemDiscount = it.finalItemPrice; // price - item.discount
 
-                double finalPricePerItem;
+                      double finalPricePerItem;
 
-                // Check if discount is on items (item.discount > 0) or on bill (order.Discount > 0)
-                if (itemDiscount > 0) {
-                  // Discount is applied to individual items
-                  // Tax is calculated on discounted price
-                  final taxAmount = priceAfterItemDiscount * (it.taxRate ?? 0.0);
-                  finalPricePerItem = priceAfterItemDiscount + taxAmount;
-                } else {
-                  // Discount is on total bill - distribute proportionally
-                  // Calculate total value of ALL items for proportional discount
-                  double totalItemsValue = 0.0;
-                  for (var orderItem in items) {
-                    totalItemsValue += orderItem.finalItemPrice * (orderItem.quantity ?? 0);
-                  }
+                      // Check if discount is on items (item.discount > 0) or on bill (order.Discount > 0)
+                      if (itemDiscount > 0) {
+                        // Discount is applied to individual items
+                        // Tax is calculated on discounted price
+                        final taxAmount = priceAfterItemDiscount * (it.taxRate ?? 0.0);
+                        finalPricePerItem = priceAfterItemDiscount + taxAmount;
+                      } else {
+                        // Discount is on total bill - distribute proportionally
+                        // Calculate total value of ALL items for proportional discount
+                        double totalItemsValue = 0.0;
+                        for (var orderItem in items) {
+                          totalItemsValue += orderItem.finalItemPrice * (orderItem.quantity ?? 0);
+                        }
 
-                  // Calculate this item's proportional share of order discount
-                  double itemDiscountShare = 0.0;
-                  final orderDiscount = currentOrder.Discount ?? 0.0;
-                  if (totalItemsValue > 0 && orderDiscount > 0) {
-                    final itemProportion = priceAfterItemDiscount / totalItemsValue;
-                    itemDiscountShare = orderDiscount * itemProportion;
-                  }
+                        // Calculate this item's proportional share of order discount
+                        double itemDiscountShare = 0.0;
+                        final orderDiscount = currentOrder.Discount ?? 0.0;
+                        if (totalItemsValue > 0 && orderDiscount > 0) {
+                          final itemProportion = priceAfterItemDiscount / totalItemsValue;
+                          itemDiscountShare = orderDiscount * itemProportion;
+                        }
 
-                  // Apply order discount and tax
-                  final priceAfterOrderDiscount = priceAfterItemDiscount - itemDiscountShare;
-                  final taxAmount = priceAfterOrderDiscount * (it.taxRate ?? 0.0);
-                  finalPricePerItem = priceAfterOrderDiscount + taxAmount;
-                }
+                        // Apply order discount and tax
+                        final priceAfterOrderDiscount = priceAfterItemDiscount - itemDiscountShare;
+                        final taxAmount = priceAfterOrderDiscount * (it.taxRate ?? 0.0);
+                        finalPricePerItem = priceAfterOrderDiscount + taxAmount;
+                      }
 
-                final lineTotal = finalPricePerItem * remainingQty;
+                      final lineTotal = finalPricePerItem * remainingQty;
 
-                return Card(
-                  elevation: 0,
-                  color: itemIsFullyRefunded ? Colors.grey.shade200 : Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: Text(
-                                '$remainingQty',
-                                style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 7,
-                              child: Column(
+                      return Card(
+                        elevation: 0,
+                        color: itemIsFullyRefunded ? Colors.grey.shade200 : Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(it.title?.toString() ?? '—',
-                                      style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
-                                  // This is where _metaChip was missing
-                                  if (it.variantName != null) _metaChip(it.variantName!),
-                                  // Display tax information
-                                  if (it.taxRate != null && it.taxRate! > 0)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4.0),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.receipt, size: 12, color: Colors.grey.shade600),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'Tax: ${(it.taxRate! * 100).toStringAsFixed(0)}% (₹${(priceAfterItemDiscount * it.taxRate!).toStringAsFixed(2)})',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 11,
-                                              color: Colors.grey.shade600,
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      '$remainingQty',
+                                      style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 7,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(it.title?.toString() ?? '—',
+                                            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+                                        // This is where _metaChip was missing
+                                        if (it.variantName != null) _metaChip(it.variantName!),
+                                        // Display tax information
+                                        if (it.taxRate != null && it.taxRate! > 0)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4.0),
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.receipt, size: 12, color: Colors.grey.shade600),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'Tax: ${(it.taxRate! * 100).toStringAsFixed(0)}% (₹${(priceAfterItemDiscount * it.taxRate!).toStringAsFixed(2)})',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 11,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 3,
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        _money(lineTotal),
+                                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700),
                                       ),
                                     ),
+                                  ),
                                 ],
                               ),
-                            ),
-                            Expanded(
-                              flex: 3,
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                  _money(lineTotal),
-                                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700),
+                              if (refundedQty > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0, left: 8.0),
+                                  child: Text(
+                                    'Refunded: $refundedQty of $originalQty',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: itemIsFullyRefunded ? Colors.red.shade700 : Colors.orange.shade800,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (refundedQty > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0, left: 8.0),
-                            child: Text(
-                              'Refunded: $refundedQty of $originalQty',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: itemIsFullyRefunded ? Colors.red.shade700 : Colors.orange.shade800,
-                              ),
-                            ),
+                            ],
                           ),
-                      ],
-                    ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
-          ),
+                ),
               );
             });
 
@@ -578,9 +580,9 @@ class _OrderdetailsState extends State<Orderdetails> {
 
       result.itemsToRefund.forEach((itemToRefund, quantityToRefund) {
         final index = updatedItems.indexWhere((item) =>
-          item.id == itemToRefund.id &&
-          item.productId == itemToRefund.productId &&
-          item.variantName == itemToRefund.variantName);
+        item.id == itemToRefund.id &&
+            item.productId == itemToRefund.productId &&
+            item.variantName == itemToRefund.variantName);
         if (index != -1) {
           final currentItem = updatedItems[index];
           final newRefundedQuantity = (currentItem.refundedQuantity ?? 0) + quantityToRefund;
@@ -604,7 +606,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         refundedAt: DateTime.now(),
       );
 
-      await pastOrderStore.updateOrder(updatedOrder);
+      await HivePastOrder.updateOrder(updatedOrder);
 
       // Process stock restoration for items marked for restocking
       await _restoreItemStock(result.itemsToRestock);
@@ -625,7 +627,8 @@ class _OrderdetailsState extends State<Orderdetails> {
         if (cartItem.productId.isEmpty || restockQuantity <= 0) continue;
 
         // Get the current item from the database
-        final existingItem = itemStore.getItemById(cartItem.productId);
+        final itemBox = await itemsBoxes.getItemBox();
+        final existingItem = itemBox.get(cartItem.productId);
 
         if (existingItem != null && existingItem.trackInventory) {
           // Update the stock quantity
@@ -634,7 +637,7 @@ class _OrderdetailsState extends State<Orderdetails> {
           );
 
           // Save the updated item back to the database
-          await itemStore.updateItem(updatedItem);
+          await itemsBoxes.updateItem(updatedItem);
 
           print('Stock restored: $restockQuantity units added to ${existingItem.name}. New stock: ${updatedItem.stockQuantity}');
         }
@@ -659,7 +662,7 @@ class _OrderdetailsState extends State<Orderdetails> {
     );
     if (confirm != true) return;
 
-    await pastOrderStore.deleteOrder(widget.Order!.id);
+    await HivePastOrder.deleteOrder(widget.Order!.id);
     NotificationService.instance.showSuccess('Order deleted successfully');
     if (mounted) Navigator.pop(context);
   }

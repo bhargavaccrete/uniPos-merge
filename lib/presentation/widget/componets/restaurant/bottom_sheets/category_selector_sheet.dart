@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../constants/restaurant/color.dart';
-import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../../../data/models/restaurant/db/database/hive_db.dart';
 import '../componets/Button.dart';
 
 /// Result from category selection
@@ -69,9 +69,12 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   }
 
   Future<void> _loadData() async {
+    final categories = await HiveBoxes.getAllCategories();
+    final items = await itemsBoxes.getAllItems();
+
     setState(() {
-      _categories = categoryStore.categories.toList();
-      _items = itemStore.items.toList();
+      _categories = categories;
+      _items = items;
       _isLoading = false;
     });
   }
@@ -102,7 +105,7 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
     );
 
     if (confirm == true) {
-      await categoryStore.deleteCategory(category.id);
+      await HiveBoxes.deleteCategory(category.id);
       _loadData();
     }
   }
