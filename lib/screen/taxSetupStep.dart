@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
+import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
+import 'package:unipos/models/tax_details.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../util/color.dart';
+import '../core/config/app_config.dart';
 
 /// Tax Setup Step
 /// UI Only - uses Observer to listen to store changes
@@ -25,14 +31,16 @@ class TaxSetupStep extends StatefulWidget {
 class _TaxSetupStepState extends State<TaxSetupStep> {
   final _taxNameController = TextEditingController();
   final _taxRateController = TextEditingController();
+  final _uuid = const Uuid();
 
   List<TaxItem> _taxes = [];
 
   @override
   void initState() {
     super.initState();
-    // Load existing tax data from store
+    // Load existing tax data from store and database
     _loadFromStore();
+    _loadFromDatabase();
   }
 
   void _loadFromStore() {
@@ -41,6 +49,84 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
       _taxes = [
         TaxItem(widget.store.taxName, widget.store.taxRate, true),
       ];
+    }
+  }
+
+  Future<void> _loadFromDatabase() async {
+    try {
+      // Only load from restaurant tax database if in restaurant mode
+      if (AppConfig.isRestaurant) {
+        final existingTaxes = await TaxBox.getAllTax();
+        if (existingTaxes.isNotEmpty && _taxes.isEmpty) {
+          setState(() {
+            _taxes = existingTaxes.map((tax) {
+              return TaxItem(tax.taxname, tax.taxperecentage ?? 0, false);
+            }).toList();
+            if (_taxes.isNotEmpty) {
+              _taxes[0] = TaxItem(_taxes[0].name, _taxes[0].rate, true);
+            }
+          });
+          _syncToStore();
+        }
+      }
+    } catch (e) {
+      print('Error loading taxes from database: $e');
+    }
+  }
+
+  /// Save all taxes to restaurant Hive database (restaurant mode only)
+  Future<void> _saveTaxesToDatabase() async {
+    // Only save to restaurant tax database if in restaurant mode
+    if (!AppConfig.isRestaurant) {
+      print('ℹ️ Skipping restaurant tax save (not in restaurant mode)');
+      return;
+    }
+
+    try {
+      print('💾 Saving ${_taxes.length} taxes to restaurant database...');
+
+      // Get existing taxes from database
+      final existingTaxes = await TaxBox.getAllTax();
+
+      // Create a map of existing taxes by name for quick lookup
+      final existingTaxMap = <String, Tax>{};
+      for (final tax in existingTaxes) {
+        existingTaxMap[tax.taxname.toLowerCase()] = tax;
+      }
+
+      // Save or update each tax
+      for (final taxItem in _taxes) {
+        final existingTax = existingTaxMap[taxItem.name.toLowerCase()];
+
+        if (existingTax != null) {
+          // Update existing tax
+          existingTax.taxperecentage = taxItem.rate;
+          await TaxBox.updateTax(existingTax);
+          print('🔄 Updated tax: ${existingTax.taxname} (${existingTax.taxperecentage}%)');
+        } else {
+          // Create new tax
+          final tax = Tax(
+            id: _uuid.v4(), // Generate unique ID
+            taxname: taxItem.name,
+            taxperecentage: taxItem.rate,
+          );
+          await TaxBox.addTax(tax);
+          print('✅ Created tax: ${tax.taxname} (${tax.taxperecentage}%)');
+        }
+      }
+
+      print('✅ All taxes saved to restaurant database');
+    } catch (e) {
+      print('❌ Error saving taxes to database: $e');
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save taxes: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -378,8 +464,12 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                   builder: (_) => ElevatedButton(
                     onPressed: widget.store.isLoading
                         ? null
-                        : () {
+                        : () async {
+                            // Save to configuration store
                             widget.store.saveTaxDetails();
+                            // Save to restaurant database
+                            await _saveTaxesToDatabase();
+                            // Continue to next step
                             widget.onNext();
                           },
                     style: ElevatedButton.styleFrom(

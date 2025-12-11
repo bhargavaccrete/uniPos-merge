@@ -3,9 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
-import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/drawer.dart';
-import '../Desktop/online_Order_desktop/online.dart';
 import '../tabbar/menu.dart';
 import '../tabbar/order.dart';
 import '../tabbar/table.dart';
@@ -206,7 +204,83 @@ class _StartorderState extends State<Startorder>
     print(widget.newOrderForTableId ?? 'no table id ');
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
-    return LayoutBuilder(
+    return Scaffold(
+      appBar: AppBar(
+        leading: Builder(
+          builder: (context) {
+            return IconButton(
+              icon: Icon(Icons.menu, size: 28),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              padding: EdgeInsets.zero,        // remove unwanted padding
+              constraints: BoxConstraints(),   // remove default constraints
+              alignment: Alignment.center,     // force icon to stay centered
+            );
+          },
+        ),
+
+        title: Text(
+          'orange',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.person),
+                    Text(
+                      'Admin',
+                      style: GoogleFonts.poppins(fontSize: 12),
+                      textScaler: TextScaler.linear(1),
+                    )
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(50),
+          child: Container(
+            width: double.infinity,
+            child: TabBar(
+              isScrollable: false,
+              // indicatorSize: TabBarIndicatorSize.values(),
+              controller: tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.grey,
+              dividerColor: Colors.transparent,
+
+              indicatorColor: Primarysecond,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                  color: primarycolor, borderRadius: BorderRadius.circular(2)),
+
+              tabs: const [
+                Tab(
+                  text: 'Menu',
+                ),
+                Tab(
+                  text: 'Order',
+                ),
+                Tab(
+                  text: 'Tables',
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
+      drawer: Drawerr(),
+      body: TabBarView(
+        controller: tabController,
+        children: [ MenuScreen(tableIdForNewOrder:_tableIdForCurrentSession,isForAddingItem: widget.isForAddingItem ?? false,), Order(), const TableScreen()],
+      ),
+    );
+
+   /*   LayoutBuilder(
       builder: (context , constraints){
         if(constraints.maxWidth <700){
           return Scaffold(
@@ -495,6 +569,6 @@ class _StartorderState extends State<Startorder>
         }
       },
 
-    );
+    );*/
   }
 }

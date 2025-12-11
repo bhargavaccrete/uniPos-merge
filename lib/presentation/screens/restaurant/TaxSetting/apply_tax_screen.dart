@@ -187,11 +187,13 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
 
                             Text(
                               // Show appropriate price based on tax setting
-                              AppSettings.isTaxInclusive
-                                  ? item.taxRate != null
-                                  ? item.basePrice.toStringAsFixed(2)  // Show base price if tax applied
-                                  : item.price!.toStringAsFixed(2)     // Show original price if no tax
-                                  : item.price!.toStringAsFixed(2),        // Show base price for exclusive
+                              item.price == null
+                                  ? '₹0.00'
+                                  : AppSettings.isTaxInclusive
+                                      ? item.taxRate != null
+                                          ? item.basePrice.toStringAsFixed(2)  // Show base price if tax applied
+                                          : item.price!.toStringAsFixed(2)     // Show original price if no tax
+                                      : item.price!.toStringAsFixed(2),        // Show base price for exclusive
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -210,7 +212,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                             children: [
                               // Show tax percentage applied
                               Text(
-                                "Tax Applied: ${(item.taxRate! * 100).toStringAsFixed(2)}%",
+                                "Tax Applied: ${item.taxRate! > 1 ? item.taxRate!.toStringAsFixed(2) : (item.taxRate! * 100).toStringAsFixed(2)}%",
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
@@ -229,18 +231,22 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    AppSettings.isTaxInclusive
-                                        ? "₹${item.taxAmount.toStringAsFixed(2)}"  // Show calculated tax from inclusive price
-                                        : "₹${(item.price! * item.taxRate!).toStringAsFixed(2)}", // Show tax on base price
+                                    item.price == null
+                                        ? "₹0.00"
+                                        : AppSettings.isTaxInclusive
+                                            ? "₹${item.taxAmount.toStringAsFixed(2)}"  // Show calculated tax from inclusive price
+                                            : "₹${(item.price! * item.taxRate!).toStringAsFixed(2)}", // Show tax on base price
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Colors.green,
                                     ),
                                   ),
                                   Text(
-                                    AppSettings.isTaxInclusive
-                                        ? "₹${item.price!.toStringAsFixed(2)}"     // Show inclusive price as net amount
-                                        : "₹${(item.price! * (1 + item.taxRate!)).toStringAsFixed(2)}", // Show base + tax as net amount
+                                    item.price == null
+                                        ? "₹0.00"
+                                        : AppSettings.isTaxInclusive
+                                            ? "₹${item.price!.toStringAsFixed(2)}"     // Show inclusive price as net amount
+                                            : "₹${(item.price! * (1 + item.taxRate!)).toStringAsFixed(2)}", // Show base + tax as net amount
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,

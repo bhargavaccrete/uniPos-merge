@@ -33,6 +33,7 @@ import 'package:unipos/data/models/retail/hive_model/credit_payment_model_218.da
 import 'package:unipos/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:unipos/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:unipos/data/models/retail/hive_model/product_attribute_model_221.dart';
+import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
 
 // Restaurant Models
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
@@ -263,6 +264,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailProductAttribute)) {
       Hive.registerAdapter(ProductAttributeModelAdapter());
     }
+    // RetailStaff - 172
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailStaff)) {
+      Hive.registerAdapter(RetailStaffModelAdapter());
+    }
   }
 
   /// Clean up old incorrectly-named attribute boxes
@@ -316,6 +321,7 @@ class HiveInit {
     await Hive.openBox<AttributeModel>('attributes');
     await Hive.openBox<AttributeValueModel>('attribute_values');
     await Hive.openBox<ProductAttributeModel>('product_attributes');
+    await Hive.openBox<RetailStaffModel>('retail_staff');
 
     print('✅ All retail boxes opened successfully');
   }

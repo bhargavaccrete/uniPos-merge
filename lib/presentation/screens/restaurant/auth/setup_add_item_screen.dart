@@ -14,6 +14,9 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Textfo
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/category_management_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen.dart';
+import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
+import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
@@ -65,8 +68,32 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   List<String> _selectedChoiceIds = [];
   List<String> _selectedExtraIds = [];
 
+  // Tax selection
+  List<Tax> _availableTaxes = [];
+  List<String> _selectedTaxIds = [];
+  bool _didLoadDependencies = false; // Guard to prevent excessive reloading
+
   // Items added counter
   int _itemsAdded = 0;
+  int _totalItemsInDatabase = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItemCount();
+    _loadTaxes();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload taxes when screen becomes visible again (e.g., after returning from Tax Setup)
+    // This ensures taxes added in previous steps are displayed
+    if (_didLoadDependencies) {
+      _loadTaxes();
+    }
+    _didLoadDependencies = true;
+  }
 
   @override
   void dispose() {
@@ -75,6 +102,32 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     _descriptionController.dispose();
     _stockController.dispose();
     super.dispose();
+  }
+
+  // ============ LOAD ITEM COUNT ============
+
+  Future<void> _loadItemCount() async {
+    try {
+      final itemBox = await itemsBoxes.getItemBox();
+      setState(() {
+        _totalItemsInDatabase = itemBox.length;
+      });
+    } catch (e) {
+      // Ignore errors during count
+    }
+  }
+
+  // ============ LOAD TAXES ============
+
+  Future<void> _loadTaxes() async {
+    try {
+      final taxes = await TaxBox.getAllTax();
+      setState(() {
+        _availableTaxes = taxes;
+      });
+    } catch (e) {
+      print('Error loading taxes: $e');
+    }
   }
 
   // ============ IMAGE UPLOAD ============
@@ -248,6 +301,61 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     }
   }
 
+  // ============ CALCULATE TAX RATE ============
+
+  /// Calculate total tax rate from selected tax IDs
+  Future<double> _calculateTotalTaxRate() async {
+    if (_selectedTaxIds.isEmpty) return 0.0;
+
+    try {
+      double totalRate = 0.0;
+
+      // Load all selected taxes and sum their rates
+      for (final taxId in _selectedTaxIds) {
+        final taxBox = await TaxBox.getTaxBox();
+        final tax = taxBox.get(taxId);
+        if (tax != null && tax.taxperecentage != null) {
+          totalRate += tax.taxperecentage!;
+        }
+      }
+
+      print('📊 Calculated total tax rate: $totalRate% from ${_selectedTaxIds.length} taxes');
+      return totalRate / 100; // Convert percentage to decimal (5% -> 0.05)
+    } catch (e) {
+      print('❌ Error calculating tax rate: $e');
+      return 0.0;
+    }
+  }
+
+  /// Calculate total tax percentage (synchronous version for UI)
+  double _calculateTotalTaxPercentage() {
+    if (_selectedTaxIds.isEmpty) return 0.0;
+
+    double totalRate = 0.0;
+    for (final taxId in _selectedTaxIds) {
+      final tax = _availableTaxes.firstWhere(
+        (t) => t.id == taxId,
+        orElse: () => Tax(id: '', taxname: '', taxperecentage: 0),
+      );
+      if (tax.taxperecentage != null) {
+        totalRate += tax.taxperecentage!;
+      }
+    }
+    return totalRate;
+  }
+
+  /// Calculate price with tax
+  double _calculatePriceWithTax() {
+    final priceText = _priceController.text.trim();
+    if (priceText.isEmpty) return 0.0;
+
+    final basePrice = double.tryParse(priceText) ?? 0.0;
+    final taxPercentage = _calculateTotalTaxPercentage();
+    final taxAmount = basePrice * (taxPercentage / 100);
+
+    return basePrice + taxAmount;
+  }
+
   // ============ SAVE ITEM ============
 
   Future<void> _saveItem() async {
@@ -273,6 +381,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         _savedImagePath = await _saveImageToLocalStorage(_selectedImage!);
       }
 
+      // Calculate tax rate from selected taxes
+      final taxRate = await _calculateTotalTaxRate();
+
       // Create item
       final item = Items(
         id: _uuid.v4(),
@@ -291,6 +402,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
         choiceIds: _selectedChoiceIds,
         extraId: _selectedExtraIds,
+        taxIds: _selectedTaxIds.isNotEmpty ? _selectedTaxIds : null,
+        taxRate: taxRate > 0 ? taxRate : null, // Apply calculated tax rate
         isEnabled: true,
         createdTime: DateTime.now(),
         editCount: 0,
@@ -320,9 +433,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       // Reset form
       _resetForm();
 
-      // Increment counter
+      // Increment counters
       setState(() {
         _itemsAdded++;
+        _totalItemsInDatabase++;
       });
     } catch (e) {
       // Close loading
@@ -360,6 +474,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _selectedVariantIds = [];
       _selectedChoiceIds = [];
       _selectedExtraIds = [];
+      _selectedTaxIds = [];
     });
   }
 
@@ -396,9 +511,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          if (_itemsAdded > 0)
+          if (_totalItemsInDatabase > 0)
             Text(
-              '$_itemsAdded item${_itemsAdded > 1 ? 's' : ''} added',
+              '$_totalItemsInDatabase item${_totalItemsInDatabase > 1 ? 's' : ''} in database',
               style: GoogleFonts.poppins(
                 color: Colors.green,
                 fontSize: 12,
@@ -408,15 +523,20 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         ],
       ),
       actions: [
-        if (_itemsAdded > 0 && widget.onNext != null)
-          TextButton.icon(
-            onPressed: widget.onNext,
-            icon: const Icon(Icons.check, size: 18),
-            label: Text(
-              'Continue',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-          ),
+        IconButton(
+          icon: Icon(Icons.upload_file, color: primarycolor),
+          tooltip: 'Bulk Import',
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const BulkImportTestScreenV3(),
+              ),
+            );
+            // Reload item count after bulk import
+            await _loadItemCount();
+          },
+        ),
       ],
     );
   }
@@ -429,6 +549,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildBulkImportCard(),
+            const SizedBox(height: 20),
             _buildSectionHeader('Basic Information', Icons.info_outline),
             const SizedBox(height: 15),
             _buildBasicInfoSection(),
@@ -444,6 +566,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
             const SizedBox(height: 15),
             _buildInventorySection(),
+            const SizedBox(height: 25),
+            _buildSectionHeader('Tax Selection', Icons.receipt_long),
+            const SizedBox(height: 15),
+            _buildTaxSection(),
             const SizedBox(height: 25),
             _buildSectionHeader('Additional Options', Icons.extension),
             const SizedBox(height: 15),
@@ -469,6 +595,128 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildBulkImportCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            primarycolor.withOpacity(0.1),
+            Colors.blue.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: primarycolor.withOpacity(0.3),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primarycolor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.table_chart,
+                  size: 32,
+                  color: primarycolor,
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bulk Import Items',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Upload multiple items at once using Excel',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const BulkImportTestScreenV3(),
+                      ),
+                    );
+                    // Reload item count after bulk import
+                    await _loadItemCount();
+                  },
+                  icon: const Icon(Icons.upload_file, size: 18),
+                  label: Text(
+                    'Start Bulk Import',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primarycolor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Download template, add items, and import back',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: Colors.blue[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -915,6 +1163,219 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     );
   }
 
+  Widget _buildTaxSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_availableTaxes.isEmpty) ...[
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No taxes available',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Add taxes in Setup Wizard Tax Settings first',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Text(
+              'Select applicable taxes for this item:',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 15),
+            ..._availableTaxes.map((tax) {
+              final isSelected = _selectedTaxIds.contains(tax.id);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? primarycolor.withOpacity(0.1) : Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected ? primarycolor : Colors.grey[300]!,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: CheckboxListTile(
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedTaxIds.add(tax.id);
+                      } else {
+                        _selectedTaxIds.remove(tax.id);
+                      }
+                    });
+                  },
+                  title: Text(
+                    tax.taxname,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${tax.taxperecentage?.toStringAsFixed(2) ?? '0.00'}%',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  activeColor: primarycolor,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                ),
+              );
+            }).toList(),
+            if (_selectedTaxIds.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_selectedTaxIds.length} tax${_selectedTaxIds.length > 1 ? 'es' : ''} selected',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Price Preview with Tax
+              if (_priceController.text.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue[200]!, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.receipt, color: Colors.blue[700], size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Price Preview',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Base Price:',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          Text(
+                            '₹${_priceController.text}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Tax (${_calculateTotalTaxPercentage().toStringAsFixed(2)}%):',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          Text(
+                            '+₹${((double.tryParse(_priceController.text) ?? 0) * _calculateTotalTaxPercentage() / 100).toStringAsFixed(2)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 12, thickness: 1),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Final Price:',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            '₹${_calculatePriceWithTax().toStringAsFixed(2)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: primarycolor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildAdditionalOptionsSection() {
     final hasSelections = _selectedVariantIds.isNotEmpty ||
         _selectedChoiceIds.isNotEmpty ||
@@ -1023,21 +1484,24 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               ),
             ),
           ),
-          if (_itemsAdded > 0 && widget.onNext != null) ...[
+          if (widget.onNext != null) ...[
             const SizedBox(width: 15),
             CommonButton(
               onTap: widget.onNext!,
-              bgcolor: Colors.green,
+              bgcolor: _totalItemsInDatabase > 0 ? Colors.green : Colors.grey[600]!,
               bordercircular: 10,
               height: ResponsiveHelper.responsiveHeight(context, 0.06),
-              width: 120,
+              width: 130,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.check, color: Colors.white),
+                  Icon(
+                    _totalItemsInDatabase > 0 ? Icons.arrow_forward : Icons.skip_next,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 5),
                   Text(
-                    'Done',
+                    _totalItemsInDatabase > 0 ? 'Continue' : 'Skip',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,

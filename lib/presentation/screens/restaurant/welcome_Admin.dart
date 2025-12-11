@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/reports.dart';
-
-
-
-
 import '../../../constants/restaurant/color.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
-import '../../../util/restaurant/images.dart';
 import '../../../util/restaurant/responsive_helper.dart';
 import '../../widget/componets/restaurant/componets/Button.dart';
 import '../../widget/componets/restaurant/componets/listmenu.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
-import 'Desktop/componets/ListMenuD.dart';
-import 'Desktop/online_Order_desktop/online.dart';
+
 import 'Expense/Expense.dart';
 import 'ManageStaff/manageStaff.dart';
 import 'Settings/settingsScreen.dart';
@@ -54,9 +48,320 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   Widget build(BuildContext context) {
     // final height = MediaQuery.of(context).size.height * 1;
     // final width = MediaQuery.of(context).size.width * 1;
-    return LayoutBuilder(builder: (context , constraints){
+    return  Scaffold(
+      backgroundColor: screenBGColor,
+      appBar: AppBar(
+          backgroundColor: screenBGColor,
+          automaticallyImplyLeading: false,
+          // toolbarHeight: 50,
+          // backgroundColor: Colors.red,
+          title: Container(
+            // color: Colors.red,
+              alignment: Alignment.centerLeft,
+              height: ResponsiveHelper.responsiveHeight(context, 0.3),
+
+              // width: width ,
+              // color: Colors.purple,
+              child: Image.asset(
+                // 'assets/images/BillBerry3_processed.jpg',
+                'assets/images/bblogo.png',
+                width: 150,
+                fit: BoxFit.fill,
+              )),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  Icon(Icons.person),
+                  Text(
+                    'Admin',
+                    style: GoogleFonts.poppins(
+                      fontSize:
+                      ResponsiveHelper.responsiveTextSize(context, 14),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ]),
+      body: SingleChildScrollView(
+        child: Container(
+          // alignment: Alignment.center,
+          width: ResponsiveHelper.responsiveWidth(context, 1),
+// width: width,
+          // height: height * 0.1,
+          // color: Colors.red,
+          padding: ResponsiveHelper.responsiveSymmetricPadding(context,
+              horizontalPercent: 0.05, verticalPercent: 0.01),
+          // color: Colors.red,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.02),
+              ),
+              // welcom
+              FittedBox(
+                child: Text(
+                  'Welcome Admin',
+                  textScaler: TextScaler.linear(1.2),
+                  style: GoogleFonts.poppins(
+                      fontSize:
+                      ResponsiveHelper.responsiveTextSize(context, 20),
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.02),
+              ),
+              Text(
+                'Orange',
+                style: GoogleFonts.poppins(fontSize: 18),
+              ),
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.02),
+              ),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+
+
+                            Navigator.push(context,MaterialPageRoute(builder: (context)=> Startorder()));
+                            //
+                            // ResponsiveHelper.isDesktop(context)?
+                            // Navigator.push(
+                            //     context,
+                            //     MaterialPageRoute(
+                            //         builder: (context) => StartorderD()))
+                            //     :
+                            // Navigator.push(
+                            //     context,
+                            //     MaterialPageRoute(
+                            //         builder: (context) => Startorder()));
+                          },
+                          title: 'Start',
+                          icons: (Icons.shopping_cart_sharp))),
+                  SizedBox(
+                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
+                  ),
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => Managemenu()));
+                          },
+                          title: 'Manage Menu',
+                          icons: (Icons.manage_accounts)
+                      ))
+                ],
+              ),
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.01),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => manageStaff()));
+                          },
+                          title: 'Manage Staff',
+                          icons: (Icons.manage_accounts_sharp))),
+                  SizedBox(
+                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
+                  ),
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => ManageInventory()));
+                          },
+                          title: 'Invatory',
+                          icons: (Icons.inventory)
+                      )
+                  )
+                ],
+              ),
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.01),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => ReportsScreen()));
+                          },
+                          title: 'Reports',
+                          icons: (Icons.auto_graph_outlined)
+                      )),
+                  SizedBox(
+                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
+                  ),
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => taxSetting(),
+                                ));
+                          },
+                          title: 'Tax Setting',
+                          icons: (Icons.settings)
+                      ))
+                ],
+              ),
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.01),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => Settingsscreen()));
+                          },
+                          title: 'Setting',
+                          icons: (Icons.settings))),
+                  SizedBox(
+                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
+                  ),
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => ExpenseScreen()));
+                          },
+                          title: 'Expense',
+                          icons: (Icons.wallet)))
+                ],
+              ),
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.01),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                      child: Listmenu(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => CompanyListScreen()));
+                          },
+                          title: 'Language',
+                          icons: (Icons.language))),
+                  SizedBox(
+                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
+                  ),
+                  Expanded(
+                      child: Listmenu(
+                        onTap: () {
+                          showDialog(
+                              context: context,
+                              builder: (BuildContext context) => AlertDialog(
+                                title: Text(
+                                  'Are you sure you want to logout?',
+                                  style: TextStyle(
+                                    fontSize:
+                                    ResponsiveHelper.responsiveTextSize(
+                                        context, 15),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                actions: <Widget>[
+                                  Row(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      CommonButton(
+                                        bordercolor: Colors.red,
+                                        bordercircular: 2,
+                                        width: ResponsiveHelper.responsiveWidth(
+                                            context, 0.2),
+                                        height:
+                                        ResponsiveHelper.responsiveHeight(
+                                            context, 0.05),
+                                        bgcolor: Colors.red,
+                                        onTap: () {
+                                          Navigator.of(context).pop();
+                                        },
+                                        child: Text("Cancle"),
+                                      ),
+                                      SizedBox(
+                                        width: 10,
+                                      ),
+                                      CommonButton(
+                                        bordercircular: 2,
+                                        width: ResponsiveHelper.responsiveWidth(
+                                            context, 0.2),
+                                        height:
+                                        ResponsiveHelper.responsiveHeight(
+                                            context, 0.05),
+                                        bgcolor: primarycolor,
+                                        onTap: () {
+                                          Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      AdminLogin()));
+                                        },
+                                        child: Text(
+                                          "Yes",
+                                          style: GoogleFonts.poppins(
+                                            fontSize: ResponsiveHelper
+                                                .responsiveTextSize(
+                                                context, 12),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ));
+                        },
+                        title: 'Logout',
+                        icons: (Icons.logout),
+                        color: Colors.red,
+                      ))
+                ],
+              ),
+              SizedBox(
+                height: ResponsiveHelper.responsiveHeight(context, 0.01),
+              ),
+              // Listmenu(title: 'start', icon: Icon(Icons.shopping_cart_sharp), titleS: 'Manage Menu', iconS: Icon(Icons.manage_accounts),)
+            ],
+          ),
+        ),
+      ),
+    );
+    /*  LayoutBuilder(builder: (context , constraints){
       if(constraints.maxWidth <700 ){
-        return Scaffold(
+        return
+          Scaffold(
           backgroundColor: screenBGColor,
           appBar: AppBar(
               backgroundColor: screenBGColor,
@@ -480,6 +785,22 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     children: [
                       Expanded(
                         child: Listmenud(Title: "Start Order",
+                          onTap: () {
+
+
+                            Navigator.push(context,MaterialPageRoute(builder: (context)=> Startorder()));
+                            //
+                            // ResponsiveHelper.isDesktop(context)?
+                            // Navigator.push(
+                            //     context,
+                            //     MaterialPageRoute(
+                            //         builder: (context) => StartorderD()))
+                            //     :
+                            // Navigator.push(
+                            //     context,
+                            //     MaterialPageRoute(
+                            //         builder: (context) => Startorder()));
+                          },
                           // img:'assets/icons/ecommerce.png'),
                           icons: (Icons.shopping_cart_sharp),
                         ),
@@ -601,6 +922,6 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ),
         );
       }
-    });
+    });*/
   }
 }

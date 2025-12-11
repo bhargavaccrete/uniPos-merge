@@ -68,6 +68,7 @@ class HiveTypeIds {
   static const int retailAttribute = 169;
   static const int retailAttributeValue = 170;
   static const int retailProductAttribute = 171;
+  static const int retailStaff = 172;
 
   // ==================== HELPER METHODS ====================
 
@@ -110,6 +111,7 @@ class HiveTypeIds {
     retailAttribute,
     retailAttributeValue,
     retailProductAttribute,
+    retailStaff,
   ];
 
   /// Get all restaurant model IDs

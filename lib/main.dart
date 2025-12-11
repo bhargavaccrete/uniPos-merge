@@ -55,23 +55,23 @@ class UniPOSApp extends StatelessWidget {
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       title: 'UniPOS',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: AppColors.primary,
-        scaffoldBackgroundColor: AppColors.lightNeutral,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.primary,
-          elevation: 0,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-      ),
+      // theme: ThemeData(
+      //   primaryColor: AppColors.primary,
+      //   scaffoldBackgroundColor: AppColors.lightNeutral,
+      //   appBarTheme: const AppBarTheme(
+      //     backgroundColor: AppColors.primary,
+      //     elevation: 0,
+      //   ),
+      //   elevatedButtonTheme: ElevatedButtonThemeData(
+      //     style: ElevatedButton.styleFrom(
+      //       backgroundColor: AppColors.primary,
+      //       foregroundColor: Colors.white,
+      //       shape: RoundedRectangleBorder(
+      //         borderRadius: BorderRadius.circular(8),
+      //       ),
+      //     ),
+      //   ),
+      // ),
       // Define all your routes here
       routes: {
         '/': (context) => const SplashScreen(),

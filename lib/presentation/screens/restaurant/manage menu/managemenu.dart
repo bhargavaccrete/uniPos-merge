@@ -22,6 +22,7 @@ import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
+import '../import/bulk_import_test_screen_v3.dart';
 
 class Managemenu extends StatefulWidget {
   const Managemenu({super.key});
@@ -52,6 +53,18 @@ class _ManagemenuState extends State<Managemenu>
       appBar: AppBar(
         // automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Bulk Import',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BulkImportTestScreenV3(),
+                ),
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(

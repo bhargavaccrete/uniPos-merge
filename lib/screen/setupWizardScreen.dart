@@ -512,6 +512,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: StaffSetupStep(
+            store: _store,
             onNext: _nextStep,
             onPrevious: _previousStep,
           ),

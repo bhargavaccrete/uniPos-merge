@@ -78,6 +78,9 @@ class Items extends HiveObject {
   @HiveField(21)
   Map<String, Map<String, int>>? extraConstraints; // Map of extraId to {min, max}
 
+  @HiveField(22)
+  List<String>? taxIds; // List of tax IDs from tax database
+
   Items({
     required this.id,
     required this.name,
@@ -101,6 +104,7 @@ class Items extends HiveObject {
     this.editedBy,
     this.editCount = 0,
     this.extraConstraints,
+    this.taxIds,
   });
 
 // --- ADJUSTED HELPER LOGIC ---
@@ -165,6 +169,7 @@ class Items extends HiveObject {
     String? editedBy,
     int? editCount,
     Map<String, Map<String, int>>? extraConstraints,
+    List<String>? taxIds,
   }) {
     return Items(
       id: id ?? this.id,
@@ -190,6 +195,7 @@ class Items extends HiveObject {
       editedBy: editedBy ?? this.editedBy,
       editCount: editCount ?? this.editCount,
       extraConstraints: extraConstraints ?? this.extraConstraints,
+      taxIds: taxIds ?? this.taxIds,
     );
   }
 
@@ -218,6 +224,7 @@ class Items extends HiveObject {
       'editedBy': editedBy,
       'editCount': editCount,
       'extraConstraints': extraConstraints,
+      'taxIds': taxIds,
     };
   }
 
@@ -297,6 +304,7 @@ class Items extends HiveObject {
         ),
       )
           : null,
+      taxIds: (map['taxIds'] as List?)?.map((e) => e.toString()).toList(),
     );
   }
 }
