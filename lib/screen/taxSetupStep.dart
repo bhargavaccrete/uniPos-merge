@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../util/color.dart';
 import '../core/config/app_config.dart';
+import '../core/di/service_locator.dart';
 
 /// Tax Setup Step
 /// UI Only - uses Observer to listen to store changes
@@ -239,38 +240,41 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
 
-                // Tax Type Selection - uses Observer
-                Text(
-                  'Tax Type',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-                Observer(
-                  builder: (_) => Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<bool>(
-                          title: const Text('Exclusive'),
-                          value: false,
-                          groupValue: widget.store.taxInclusive,
-                          onChanged: (value) => widget.store.setTaxInclusive(value!),
-                          dense: true,
-                        ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<bool>(
-                          title: const Text('Inclusive'),
-                          value: true,
-                          groupValue: widget.store.taxInclusive,
-                          onChanged: (value) => widget.store.setTaxInclusive(value!),
-                          dense: true,
-                        ),
-                      ),
-                    ],
+                // Tax Type Selection - Only show for RETAIL mode
+                // Restaurant manages this in Settings screen, not setup wizard
+                if (AppConfig.isRetail) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tax Type',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Observer(
+                    builder: (_) => Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<bool>(
+                            title: const Text('Exclusive'),
+                            value: false,
+                            groupValue: widget.store.taxInclusive,
+                            onChanged: (value) => widget.store.setTaxInclusive(value!),
+                            dense: true,
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<bool>(
+                            title: const Text('Inclusive'),
+                            value: true,
+                            groupValue: widget.store.taxInclusive,
+                            onChanged: (value) => widget.store.setTaxInclusive(value!),
+                            dense: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -467,8 +471,28 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                         : () async {
                             // Save to configuration store
                             widget.store.saveTaxDetails();
+
+                            // ✅ CRITICAL FIX: Save tax inclusive/exclusive setting to GstService
+                            // This ensures the setting is persisted to SharedPreferences
+                            // and used during billing calculations
+                            if (AppConfig.isRetail) {
+                              await gstService.setTaxInclusiveMode(widget.store.taxInclusive);
+                              // Also save the default tax rate if one is selected
+                              if (_taxes.isNotEmpty) {
+                                final defaultTax = _taxes.firstWhere(
+                                  (t) => t.isDefault,
+                                  orElse: () => _taxes.first,
+                                );
+                                await gstService.setDefaultGstRate(defaultTax.rate);
+                              }
+                              print('✅ Tax settings saved to GstService:');
+                              print('   - Tax Inclusive: ${widget.store.taxInclusive}');
+                              print('   - Default Rate: ${_taxes.isNotEmpty ? _taxes.firstWhere((t) => t.isDefault, orElse: () => _taxes.first).rate : 0}%');
+                            }
+
                             // Save to restaurant database
                             await _saveTaxesToDatabase();
+
                             // Continue to next step
                             widget.onNext();
                           },
@@ -493,6 +517,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
                           ),
                   ),

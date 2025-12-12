@@ -121,6 +121,7 @@ class BusinessTypeStep extends StatelessWidget {
                     child: const Text(
                       'Continue',
                       style: TextStyle(
+                        color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),

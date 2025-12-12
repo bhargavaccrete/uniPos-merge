@@ -292,6 +292,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                           : const Text(
                               'Continue',
                               style: TextStyle(
+                                color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),

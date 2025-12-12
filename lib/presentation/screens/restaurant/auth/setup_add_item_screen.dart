@@ -68,9 +68,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   List<String> _selectedChoiceIds = [];
   List<String> _selectedExtraIds = [];
 
-  // Tax selection
+  // Tax selection - SINGLE TAX ONLY
   List<Tax> _availableTaxes = [];
-  List<String> _selectedTaxIds = [];
+  String? _selectedTaxId; // Changed from List to single nullable String
   bool _didLoadDependencies = false; // Guard to prevent excessive reloading
 
   // Items added counter
@@ -301,47 +301,39 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     }
   }
 
-  // ============ CALCULATE TAX RATE ============
+  // ============ CALCULATE TAX RATE - SINGLE TAX ONLY ============
 
-  /// Calculate total tax rate from selected tax IDs
+  /// Calculate tax rate from selected tax ID (SINGLE TAX)
   Future<double> _calculateTotalTaxRate() async {
-    if (_selectedTaxIds.isEmpty) return 0.0;
+    if (_selectedTaxId == null) return 0.0;
 
     try {
-      double totalRate = 0.0;
+      final taxBox = await TaxBox.getTaxBox();
+      final tax = taxBox.get(_selectedTaxId!);
 
-      // Load all selected taxes and sum their rates
-      for (final taxId in _selectedTaxIds) {
-        final taxBox = await TaxBox.getTaxBox();
-        final tax = taxBox.get(taxId);
-        if (tax != null && tax.taxperecentage != null) {
-          totalRate += tax.taxperecentage!;
-        }
+      if (tax != null && tax.taxperecentage != null) {
+        final taxRate = tax.taxperecentage!;
+        print('📊 Tax rate: $taxRate% (${tax.taxname})');
+        return taxRate / 100; // Convert percentage to decimal (5% -> 0.05)
       }
 
-      print('📊 Calculated total tax rate: $totalRate% from ${_selectedTaxIds.length} taxes');
-      return totalRate / 100; // Convert percentage to decimal (5% -> 0.05)
+      return 0.0;
     } catch (e) {
       print('❌ Error calculating tax rate: $e');
       return 0.0;
     }
   }
 
-  /// Calculate total tax percentage (synchronous version for UI)
+  /// Calculate tax percentage (synchronous version for UI) - SINGLE TAX
   double _calculateTotalTaxPercentage() {
-    if (_selectedTaxIds.isEmpty) return 0.0;
+    if (_selectedTaxId == null) return 0.0;
 
-    double totalRate = 0.0;
-    for (final taxId in _selectedTaxIds) {
-      final tax = _availableTaxes.firstWhere(
-        (t) => t.id == taxId,
-        orElse: () => Tax(id: '', taxname: '', taxperecentage: 0),
-      );
-      if (tax.taxperecentage != null) {
-        totalRate += tax.taxperecentage!;
-      }
-    }
-    return totalRate;
+    final tax = _availableTaxes.firstWhere(
+      (t) => t.id == _selectedTaxId,
+      orElse: () => Tax(id: '', taxname: '', taxperecentage: 0),
+    );
+
+    return tax.taxperecentage ?? 0.0;
   }
 
   /// Calculate price with tax
@@ -402,7 +394,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
         choiceIds: _selectedChoiceIds,
         extraId: _selectedExtraIds,
-        taxIds: _selectedTaxIds.isNotEmpty ? _selectedTaxIds : null,
+        taxIds: _selectedTaxId != null ? [_selectedTaxId!] : null, // Single tax ID as list
         taxRate: taxRate > 0 ? taxRate : null, // Apply calculated tax rate
         isEnabled: true,
         createdTime: DateTime.now(),
@@ -474,7 +466,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _selectedVariantIds = [];
       _selectedChoiceIds = [];
       _selectedExtraIds = [];
-      _selectedTaxIds = [];
+      _selectedTaxId = null; // Reset single tax selection
     });
   }
 
@@ -1201,7 +1193,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             ),
           ] else ...[
             Text(
-              'Select applicable taxes for this item:',
+              'Select ONE tax for this item:',
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: Colors.grey[700],
@@ -1210,7 +1202,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             ),
             const SizedBox(height: 15),
             ..._availableTaxes.map((tax) {
-              final isSelected = _selectedTaxIds.contains(tax.id);
+              final isSelected = _selectedTaxId == tax.id;
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
@@ -1221,15 +1213,12 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     width: isSelected ? 2 : 1,
                   ),
                 ),
-                child: CheckboxListTile(
-                  value: isSelected,
+                child: RadioListTile<String>(
+                  value: tax.id,
+                  groupValue: _selectedTaxId,
                   onChanged: (value) {
                     setState(() {
-                      if (value == true) {
-                        _selectedTaxIds.add(tax.id);
-                      } else {
-                        _selectedTaxIds.remove(tax.id);
-                      }
+                      _selectedTaxId = value;
                     });
                   },
                   title: Text(
@@ -1253,7 +1242,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 ),
               );
             }).toList(),
-            if (_selectedTaxIds.isNotEmpty) ...[
+            if (_selectedTaxId != null) ...[
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -1266,7 +1255,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     Icon(Icons.check_circle, color: Colors.green[700], size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      '${_selectedTaxIds.length} tax${_selectedTaxIds.length > 1 ? 'es' : ''} selected',
+                      'Tax selected: ${_availableTaxes.firstWhere((t) => t.id == _selectedTaxId).taxname}',
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         color: Colors.green[700],

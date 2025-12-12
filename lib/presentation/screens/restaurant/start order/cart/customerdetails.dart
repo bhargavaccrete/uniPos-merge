@@ -1,5 +1,6 @@
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
@@ -15,6 +16,7 @@ import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
+import '../../../../../stores/payment_method_store.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -451,34 +453,45 @@ class _CustomerdetailsState extends State<Customerdetails> {
               ExpansionTile(
                 title: Text('Payment Method'),
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Filterbutton(
-                          title: 'Cash',
-                          selectedFilter: SelectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              SelectedFilter = 'Cash';
-                            });
-                          }),
-                      Filterbutton(
-                          title: 'Card',
-                          selectedFilter: SelectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              SelectedFilter = 'Card';
-                            });
-                          }),
-                      Filterbutton(
-                          title: 'Upi',
-                          selectedFilter: SelectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              SelectedFilter = 'Upi';
-                            });
-                          }),
-                    ],
+                  // ✅ Dynamic payment methods - only shows enabled methods from setup wizard
+                  Observer(
+                    builder: (_) {
+                      final paymentStore = locator<PaymentMethodStore>();
+
+                      // Get only enabled payment methods
+                      final enabledMethods = paymentStore.paymentMethods
+                          .where((method) => method.isEnabled)
+                          .toList();
+
+                      // If no payment methods enabled, show fallback
+                      if (enabledMethods.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            'No payment methods enabled. Please enable payment methods in Settings.',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      }
+
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.spaceAround,
+                        children: enabledMethods.map((method) {
+                          return Filterbutton(
+                            title: method.name,
+                            selectedFilter: SelectedFilter,
+                            onpressed: () {
+                              setState(() {
+                                SelectedFilter = method.name;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      );
+                    },
                   ),
                 ],
               ),

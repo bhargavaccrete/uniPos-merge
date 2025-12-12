@@ -524,6 +524,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                           ? 'Get Started'
                           : 'Next',
                       style: const TextStyle(
+                        color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -533,6 +534,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                       _currentPage == _walkthroughItems.length - 1
                           ? Icons.check
                           : Icons.arrow_forward_ios,
+                      color: Colors.white,
                       size: 16,
                     ),
                   ],

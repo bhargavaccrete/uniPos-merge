@@ -1061,7 +1061,7 @@ class WelcomeStep extends StatelessWidget {
               ),
               child: const Text(
                 "Let's Start",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,color: Colors.white),
               ),
             ),
           ],
