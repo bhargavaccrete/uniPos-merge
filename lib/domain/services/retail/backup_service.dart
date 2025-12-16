@@ -5,8 +5,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show AnchorElement, Blob, Url;
 
 import 'package:uuid/uuid.dart';
 
@@ -19,6 +17,8 @@ import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/hive_model/supplier_model_205.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
+import 'package:unipos/domain/services/retail/store_settings_service.dart';
+import 'package:unipos/data/repositories/business_details_repository.dart';
 
 /// Service for managing database backups
 /// Handles export, import, and automatic daily backups
@@ -100,10 +100,39 @@ class BackupService {
     // Get categories
     final categories = productStore.categories.toList();
 
+    // Get store settings
+    final storeSettings = StoreSettingsService();
+    final storeInfo = {
+      'storeName': await storeSettings.getStoreName(),
+      'ownerName': await storeSettings.getOwnerName(),
+      'storeAddress': await storeSettings.getStoreAddress(),
+      'storeCity': await storeSettings.getStoreCity(),
+      'storeState': await storeSettings.getStoreState(),
+      'storePincode': await storeSettings.getStorePincode(),
+      'storePhone': await storeSettings.getStorePhone(),
+      'storeEmail': await storeSettings.getStoreEmail(),
+      'gstNumber': await storeSettings.getGSTNumber(),
+    };
+
+    // Get business details from repository
+    final businessDetailsRepo = BusinessDetailsRepository();
+    final businessDetails = businessDetailsRepo.get();
+    final businessInfo = businessDetails != null
+        ? {
+            'businessTypeId': businessDetails.businessTypeId,
+            'businessTypeName': businessDetails.businessTypeName,
+            'pan': businessDetails.pan,
+            'country': businessDetails.country,
+            'isSetupComplete': businessDetails.isSetupComplete,
+          }
+        : null;
+
     return {
       'version': '1.0.0',
       'exportDate': DateTime.now().toIso8601String(),
       'appName': 'rPOS',
+      'storeInfo': storeInfo,
+      'businessInfo': businessInfo,
       'data': {
         'products': products,
         'variants': variants,
@@ -134,20 +163,8 @@ class BackupService {
     final fileName = 'rpos_backup_${DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now())}.json';
 
     if (kIsWeb) {
-      // On web, trigger download directly using HTML anchor element
-      final bytes = utf8.encode(jsonString);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', fileName)
-        ..click();
-
-      // Clean up the URL after a short delay
-      Future.delayed(const Duration(milliseconds: 100), () {
-        html.Url.revokeObjectUrl(url);
-      });
-
-      // Update last backup date on web too
+      // Web backup download not supported in this version
+      // Update last backup date
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastBackupKey, DateTime.now().toIso8601String());
 
@@ -438,6 +455,57 @@ class BackupService {
 
       // Clear existing data (optional - you might want to ask user first)
       // await _clearAllData();
+
+      // ==================== RESTORE STORE INFORMATION ====================
+      // Restore store settings (MUST be restored first for receipts to work properly)
+      if (data.containsKey('storeInfo')) {
+        try {
+          final storeInfo = data['storeInfo'] as Map<String, dynamic>;
+          final storeSettings = StoreSettingsService();
+
+          await storeSettings.saveAllSettings(
+            storeName: storeInfo['storeName'] ?? '',
+            ownerName: storeInfo['ownerName'],
+            address: storeInfo['storeAddress'],
+            city: storeInfo['storeCity'],
+            state: storeInfo['storeState'],
+            pincode: storeInfo['storePincode'],
+            phone: storeInfo['storePhone'],
+            email: storeInfo['storeEmail'],
+            gstNumber: storeInfo['gstNumber'],
+          );
+          restoredCount++;
+        } catch (e) {
+          errors.add('Store information restore error: $e');
+        }
+      }
+
+      // Restore business details
+      if (data.containsKey('businessInfo') && data['businessInfo'] != null) {
+        try {
+          final businessInfo = data['businessInfo'] as Map<String, dynamic>;
+          final businessDetailsRepo = BusinessDetailsRepository();
+
+          // First get existing business details to preserve store name etc
+          final existing = businessDetailsRepo.get();
+
+          // Create updated business details with data from backup
+          final businessDetails = businessDetailsRepo.get();
+          if (businessDetails != null) {
+            final updated = businessDetails.copyWith(
+              businessTypeId: businessInfo['businessTypeId'],
+              businessTypeName: businessInfo['businessTypeName'],
+              pan: businessInfo['pan'],
+              country: businessInfo['country'],
+              isSetupComplete: businessInfo['isSetupComplete'] ?? true,
+            );
+            await businessDetailsRepo.save(updated);
+            restoredCount++;
+          }
+        } catch (e) {
+          errors.add('Business information restore error: $e');
+        }
+      }
 
       // Restore Categories
       if (backupData.containsKey('categories')) {

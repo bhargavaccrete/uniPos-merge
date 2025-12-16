@@ -191,15 +191,47 @@ class RestaurantBulkImportServiceV3 {
         );
         return result != null ? 'Template downloaded successfully' : 'Download cancelled';
       } else if (Platform.isAndroid || Platform.isIOS) {
-        if (await Permission.storage.request().isGranted ||
-            await Permission.manageExternalStorage.request().isGranted) {
-          final directory = await getDownloadsDirectory();
-          if (directory == null) return 'Could not access downloads directory';
-          final path = '${directory.path}/$fileName';
-          await File(path).writeAsBytes(bytes);
-          return 'Template saved to $path';
+        // For Android 10+ (API 29+), use app's external storage directory (no permission needed)
+        // This directory is accessible and won't be deleted on app uninstall
+        try {
+          final directory = await getExternalStorageDirectory();
+          if (directory != null) {
+            // Navigate to public Downloads folder
+            // From: /storage/emulated/0/Android/data/com.app/files
+            // To: /storage/emulated/0/Download/
+            final pathParts = directory.path.split('/');
+            final publicPath = pathParts.sublist(0, 4).join('/'); // Get /storage/emulated/0
+
+            // Try to save in Downloads folder
+            final downloadsDir = Directory('$publicPath/Download');
+            if (await downloadsDir.exists()) {
+              final filePath = '${downloadsDir.path}/$fileName';
+              await File(filePath).writeAsBytes(bytes);
+              return 'Template saved to Downloads/$fileName';
+            }
+
+            // Fallback: save in Documents folder
+            final documentsDir = Directory('$publicPath/Documents');
+            try {
+              if (!await documentsDir.exists()) {
+                await documentsDir.create(recursive: true);
+              }
+              final filePath = '${documentsDir.path}/$fileName';
+              await File(filePath).writeAsBytes(bytes);
+              return 'Template saved to Documents/$fileName';
+            } catch (e) {
+              // If Documents fails, use app's directory
+            }
+          }
+
+          // Final fallback: use app's directory (always works, no permission needed)
+          final appDir = await getApplicationDocumentsDirectory();
+          final filePath = '${appDir.path}/$fileName';
+          await File(filePath).writeAsBytes(bytes);
+          return 'Template saved to: $filePath\nYou can find it in your file manager.';
+        } catch (e) {
+          return 'Error saving file: $e';
         }
-        return 'Permission denied';
       } else {
         final result = await FilePicker.platform.saveFile(
           dialogTitle: 'Save Template',
@@ -880,7 +912,7 @@ class RestaurantBulkImportServiceV3 {
           trackInventory: _parseBool(rowData['TrackInventory']?.toString() ?? '', false),
           stockQuantity: hasVariants ? 0 : _getDoubleFromValue(rowData['StockQuantity']),
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
-          taxRate: _getDoubleFromValue(rowData['TaxRate']),
+          taxRate: _normalizeTaxRate(_getDoubleFromValue(rowData['TaxRate'])),
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
           variant: [],
           choiceIds: choiceIds,
@@ -1014,6 +1046,16 @@ class RestaurantBulkImportServiceV3 {
     if (value == null) return 0.0;
     String val = value.toString().replaceAll(RegExp(r'[^0-9.]'), '');
     return double.tryParse(val) ?? 0.0;
+  }
+
+  /// Normalize tax rate to decimal format (0-1 range)
+  /// If value > 1, assumes it's a percentage and divides by 100
+  /// Examples: 5 -> 0.05, 18 -> 0.18, 0.05 -> 0.05
+  double _normalizeTaxRate(double value) {
+    if (value > 1) {
+      return value / 100; // Convert percentage to decimal
+    }
+    return value; // Already in decimal format
   }
 
   int? _getInt(List<dynamic> row, int index) {

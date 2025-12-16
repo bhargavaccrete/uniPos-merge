@@ -8,6 +8,7 @@ import 'package:unipos/data/repositories/tax_details_repository.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/init/hive_init.dart';
 import 'package:unipos/core/di/service_locator.dart' as sl;
+import 'package:unipos/domain/services/retail/store_settings_service.dart';
 
 part 'setup_wizard_store.g.dart';
 
@@ -435,6 +436,20 @@ abstract class _SetupWizardStore with Store {
         isSetupComplete: false,
       );
       await _businessDetailsRepo.save(details);
+
+      // Also save to StoreSettingsService for use in receipts
+      final storeSettings = StoreSettingsService();
+      await storeSettings.saveAllSettings(
+        storeName: storeName,
+        ownerName: ownerName.isNotEmpty ? ownerName : null,
+        address: address.isNotEmpty ? address : null,
+        city: city.isNotEmpty ? city : null,
+        state: state.isNotEmpty ? state : null,
+        pincode: pincode.isNotEmpty ? pincode : null,
+        phone: phone.isNotEmpty ? phone : null,
+        email: email.isNotEmpty ? email : null,
+        gstNumber: gstin.isNotEmpty ? gstin : null,
+      );
     } catch (e) {
       errorMessage = 'Failed to save business details: $e';
     } finally {
@@ -532,7 +547,21 @@ abstract class _SetupWizardStore with Store {
       );
       await _businessDetailsRepo.save(details);
 
-      // 7. Mark setup complete in AppConfig
+      // 7. Save to StoreSettingsService for use in receipts
+      final storeSettings = StoreSettingsService();
+      await storeSettings.saveAllSettings(
+        storeName: storeName,
+        ownerName: ownerName.isNotEmpty ? ownerName : null,
+        address: address.isNotEmpty ? address : null,
+        city: city.isNotEmpty ? city : null,
+        state: state.isNotEmpty ? state : null,
+        pincode: pincode.isNotEmpty ? pincode : null,
+        phone: phone.isNotEmpty ? phone : null,
+        email: email.isNotEmpty ? email : null,
+        gstNumber: gstin.isNotEmpty ? gstin : null,
+      );
+
+      // 8. Mark setup complete in AppConfig
       await AppConfig.setSetupComplete(true);
 
       isSetupComplete = true;

@@ -30,6 +30,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   final _productSkuController = TextEditingController();
   final _productBarcodeController = TextEditingController();
   final _productStockController = TextEditingController();
+  final _searchController = TextEditingController();
 
   // Selected values for hierarchy
   String? _selectedCategory;
@@ -41,6 +42,10 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   // Edit mode tracking
   bool _isEditMode = false;
   int? _editingIndex;
+
+  // Search mode tracking
+  bool _isSearching = false;
+  String _searchQuery = '';
 
   // Sample data structure
   final Map<String, List<String>> _categories = {
@@ -82,7 +87,24 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
     _productSkuController.dispose();
     _productBarcodeController.dispose();
     _productStockController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  // Get filtered products based on search query
+  List<Product> get _filteredProducts {
+    if (_searchQuery.isEmpty) {
+      return _products;
+    }
+
+    final query = _searchQuery.toLowerCase();
+    return _products.where((product) {
+      return product.name.toLowerCase().contains(query) ||
+             product.category.toLowerCase().contains(query) ||
+             (product.variation?.toLowerCase().contains(query) ?? false) ||
+             (product.sku?.toLowerCase().contains(query) ?? false) ||
+             (product.barcode?.toLowerCase().contains(query) ?? false);
+    }).toList();
   }
 
   Future<void> _uploadExcel() async {
@@ -1234,6 +1256,8 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
 
   Widget _buildProductListTab() {
     print('Building product list tab. Product count: ${_products.length}');
+    final filteredProducts = _filteredProducts;
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Container(
@@ -1250,56 +1274,106 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
         ),
         child: Column(
           children: [
+            // Header
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.05),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Text(
-                    'Product List',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkNeutral,
-                    ),
-                  ),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(20),
+                      Text(
+                        'Product List',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.darkNeutral,
                         ),
-                        child: Text(
-                          '${_products.length} items',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${filteredProducts.length}${_searchQuery.isNotEmpty ? '/${_products.length}' : ''} items',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      IconButton(
-                        icon: const Icon(Icons.filter_list),
-                        onPressed: () {},
-                        tooltip: 'Filter',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: () {},
-                        tooltip: 'Search',
+                          const SizedBox(width: 12),
+                          IconButton(
+                            icon: const Icon(Icons.filter_list),
+                            onPressed: () {},
+                            tooltip: 'Filter',
+                          ),
+                          IconButton(
+                            icon: Icon(_isSearching ? Icons.close : Icons.search),
+                            onPressed: () {
+                              setState(() {
+                                _isSearching = !_isSearching;
+                                if (!_isSearching) {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                }
+                              });
+                            },
+                            tooltip: _isSearching ? 'Close Search' : 'Search',
+                          ),
+                        ],
                       ),
                     ],
                   ),
+
+                  // Search Bar
+                  if (_isSearching)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Search by name, category, SKU, or barcode...',
+                          prefixIcon: Icon(Icons.search, color: AppColors.primary),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                      ),
+                    ),
                 ],
               ),
             ),
+
+            // Product List
             Expanded(
               child: _products.isEmpty
                   ? Center(
@@ -1342,94 +1416,126 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                   ],
                 ),
               )
-                  : ListView.separated(
-                padding: const EdgeInsets.all(20),
-                itemCount: _products.length,
-                separatorBuilder: (context, index) => const Divider(),
-                itemBuilder: (context, index) {
-                  final product = _products[index];
-                  return ListTile(
-                    onLongPress: () => _showProductOptions(index),
-                    leading: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.inventory,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    title: Text(
-                      product.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  : filteredProducts.isEmpty
+                      ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          '${product.category}${product.variation != null ? ' • ${product.variation}' : ''} • \$${product.price}',
+                        Icon(
+                          Icons.search_off,
+                          size: 80,
+                          color: Colors.grey[300],
                         ),
-                        if (product.variation != null || product.extras?.isNotEmpty == true)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Long press for more options',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.primary.withOpacity(0.7),
-                                fontStyle: FontStyle.italic,
+                        const SizedBox(height: 20),
+                        Text(
+                          'No products found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your search',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                      : ListView.separated(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: filteredProducts.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final product = filteredProducts[index];
+                      final productIndex = _products.indexOf(product);
+
+                      return ListTile(
+                        onLongPress: () => _showProductOptions(productIndex),
+                        leading: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.inventory,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        title: Text(
+                          product.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${product.category}${product.variation != null ? ' • ${product.variation}' : ''} • \$${product.price}',
+                            ),
+                            if (product.variation != null || product.extras?.isNotEmpty == true)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Long press for more options',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.primary.withOpacity(0.7),
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: product.stock > 0
+                                    ? AppColors.success.withOpacity(0.1)
+                                    : AppColors.danger.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Stock: ${product.stock}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: product.stock > 0
+                                      ? AppColors.success
+                                      : AppColors.danger,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: product.stock > 0
-                                ? AppColors.success.withOpacity(0.1)
-                                : AppColors.danger.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Stock: ${product.stock}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: product.stock > 0
-                                  ? AppColors.success
-                                  : AppColors.danger,
-                              fontWeight: FontWeight.w600,
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 20),
+                              onPressed: () {
+                                print('Edit button tapped for index: $productIndex');
+                                _showEditDialog(productIndex);
+                              },
+                              tooltip: 'Edit Product',
                             ),
-                          ),
+                            IconButton(
+                              icon: Icon(Icons.delete, size: 20, color: AppColors.danger),
+                              onPressed: () {
+                                print('Delete button tapped for index: $productIndex');
+                                _showDeleteConfirmation(productIndex);
+                              },
+                              tooltip: 'Delete Product',
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 20),
-                          onPressed: () {
-                            print('Edit button tapped for index: $index');
-                            _showEditDialog(index);
-                          },
-                          tooltip: 'Edit Product',
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete, size: 20, color: AppColors.danger),
-                          onPressed: () {
-                            print('Delete button tapped for index: $index');
-                            _showDeleteConfirmation(index);
-                          },
-                          tooltip: 'Delete Product',
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                      );
+                    },
+                  ),
             ),
           ],
         ),

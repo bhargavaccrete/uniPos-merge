@@ -5,6 +5,7 @@ import 'package:unipos/presentation/screens/retail/backup_screen.dart';
 import 'package:unipos/presentation/screens/retail/gst_settings_screen.dart';
 import 'package:unipos/presentation/screens/retail/gst_report_screen.dart';
 import 'package:unipos/presentation/screens/retail/attributes_screen.dart';
+import 'package:unipos/presentation/screens/retail/store_info_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -22,6 +23,34 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Store Information Section
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'BUSINESS INFORMATION',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6B6B6B),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          _buildSettingsCard(
+            context,
+            icon: Icons.store,
+            title: 'Store Information',
+            subtitle: 'Configure store name, address, and contact details',
+            iconColor: const Color(0xFF4CAF50),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StoreInfoSettingsScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
           // Data Management Section
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),

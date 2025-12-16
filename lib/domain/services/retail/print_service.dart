@@ -34,6 +34,8 @@ class PrintService {
     String? storePhone,
     String? storeEmail,
     String? gstNumber,
+    String? orderType,
+    String? tableNo,
   }) async {
     final receiptData = ReceiptData(
       sale: sale,
@@ -44,6 +46,8 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      orderType: orderType,
+      tableNo: tableNo,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -52,7 +56,7 @@ class PrintService {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Receipt_${sale.saleId.substring(0, 8)}',
+      name: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}',
       format: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
     );
   }
@@ -69,6 +73,8 @@ class PrintService {
     String? storePhone,
     String? storeEmail,
     String? gstNumber,
+    String? orderType,
+    String? tableNo,
   }) async {
     final receiptData = ReceiptData(
       sale: sale,
@@ -79,6 +85,8 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      orderType: orderType,
+      tableNo: tableNo,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -116,7 +124,7 @@ class PrintService {
             build: (format) async => pdf.save(),
             canChangePageFormat: false,
             canChangeOrientation: false,
-            pdfFileName: 'Receipt_${sale.saleId.substring(0, 8)}.pdf',
+            pdfFileName: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
             initialPageFormat: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
           ),
         ),
@@ -135,6 +143,8 @@ class PrintService {
     String? storePhone,
     String? storeEmail,
     String? gstNumber,
+    String? orderType,
+    String? tableNo,
   }) async {
     final receiptData = ReceiptData(
       sale: sale,
@@ -145,6 +155,8 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      orderType: orderType,
+      tableNo: tableNo,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -156,21 +168,22 @@ class PrintService {
     if (kIsWeb) {
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'Receipt_${sale.saleId.substring(0, 8)}.pdf',
+        filename: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
       );
       return;
     }
 
     // Save to temp file
     final tempDir = await getTemporaryDirectory();
-    final fileName = 'Receipt_${sale.saleId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final safeId = sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId;
+    final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${tempDir.path}/$fileName');
     await file.writeAsBytes(bytes);
 
     // Share the file
     await Share.shareXFiles(
       [XFile(file.path)],
-      text: 'Receipt #${sale.saleId.substring(0, 8).toUpperCase()}',
+      text: 'Receipt #${safeId.toUpperCase()}',
     );
   }
 
@@ -202,7 +215,8 @@ class PrintService {
         : await _receiptPdfService.generateInvoice(receiptData);
 
     final bytes = await pdf.save();
-    final fileName = 'Receipt_${sale.saleId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final safeId = sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId;
+    final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
     if (kIsWeb) {
       await Printing.sharePdf(bytes: bytes, filename: fileName);

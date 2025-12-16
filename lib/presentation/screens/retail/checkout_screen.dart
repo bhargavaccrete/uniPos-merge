@@ -4,6 +4,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:unipos/domain/services/retail/gst_service.dart';
+import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/presentation/screens/retail/customer_selection_screen.dart';
 import 'package:unipos/presentation/widget/retail/split_payment_widget.dart';
 
@@ -831,13 +832,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    printService.showPrintOptionsDialog(
-                      context: this.context,
-                      sale: sale,
-                      items: saleItems,
-                      customer: customer,
-                    );
+                  onPressed: () async {
+                    // Fetch store settings
+                    final storeSettings = StoreSettingsService();
+                    final storeName = await storeSettings.getStoreName();
+                    final storeAddress = await storeSettings.getFormattedAddress();
+                    final storePhone = await storeSettings.getStorePhone();
+                    final storeEmail = await storeSettings.getStoreEmail();
+                    final gstNumber = await storeSettings.getGSTNumber();
+
+                    if (mounted) {
+                      await printService.showPrintOptionsDialog(
+                        context: this.context,
+                        sale: sale,
+                        items: saleItems,
+                        customer: customer,
+                        storeName: storeName,
+                        storeAddress: storeAddress,
+                        storePhone: storePhone,
+                        storeEmail: storeEmail,
+                        gstNumber: gstNumber,
+                      );
+                      // Navigate back after printing
+                      if (mounted) {
+                        Navigator.of(context).pop(true);
+                      }
+                    }
                   },
                   icon: const Icon(Icons.print_outlined),
                   label: const Text('Print Receipt'),
@@ -853,7 +873,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Done Button
+              // Done Button (Skip printing)
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
@@ -862,7 +882,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: const Text(
-                    'Done',
+                    'Skip & Close',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1010,13 +1030,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     final saleItems = await saleItemRepository.getItemsBySaleId(sale.saleId);
+
+                    // Fetch store settings
+                    final storeSettings = StoreSettingsService();
+                    final storeName = await storeSettings.getStoreName();
+                    final storeAddress = await storeSettings.getFormattedAddress();
+                    final storePhone = await storeSettings.getStorePhone();
+                    final storeEmail = await storeSettings.getStoreEmail();
+                    final gstNumber = await storeSettings.getGSTNumber();
+
                     if (mounted) {
-                      printService.showPrintOptionsDialog(
+                      await printService.showPrintOptionsDialog(
                         context: this.context,
                         sale: sale,
                         items: saleItems,
                         customer: customer,
+                        storeName: storeName,
+                        storeAddress: storeAddress,
+                        storePhone: storePhone,
+                        storeEmail: storeEmail,
+                        gstNumber: gstNumber,
                       );
+                      // Navigate back after printing
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pop(); // Return to POS screen
+                      }
                     }
                   },
                   icon: const Icon(Icons.print_outlined),
@@ -1033,7 +1072,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Done Button
+              // Done Button (Skip printing)
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
@@ -1045,7 +1084,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: const Text(
-                    'Done',
+                    'Skip & Close',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,

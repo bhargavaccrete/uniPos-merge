@@ -21,7 +21,10 @@ import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../startorder.dart';
+import '../../util/restaurant_print_helper.dart';
+
 enum DiscountType { amount, percentage }
+
 class Customerdetails extends StatefulWidget {
   final OrderModel? existingModel;
   final String? tableid;
@@ -55,11 +58,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
   final _remarkController = TextEditingController();
   final _discountValueController = TextEditingController();
 
-  final  _houseController = TextEditingController();
-  final  _stateController = TextEditingController();
-  final  _cityController = TextEditingController();
-  final  _areaController = TextEditingController();
-  final  _postCodeController = TextEditingController();
+  final _houseController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _areaController = TextEditingController();
+  final _postCodeController = TextEditingController();
 
   FocusNode mobilenode = FocusNode();
   FocusNode namenode = FocusNode();
@@ -71,9 +74,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
   String SelectedFilter = 'Cash';
   bool servicechargeapply = false;
   bool discountApply = false;
-  String? SelectedRemark ='Old Customer';
-  final List<String> remarkList = ['Old Customer','Regular Customer','police','know (known person)','other'];
-
+  String? SelectedRemark = 'Old Customer';
+  final List<String> remarkList = [
+    'Old Customer',
+    'Regular Customer',
+    'police',
+    'know (known person)',
+    'other'
+  ];
 
   @override
   void initState() {
@@ -82,10 +90,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
     _amountpercentageContorller.addListener(() => setState(() {}));
     _serviceChargeController.addListener(() => setState(() {}));
 
-    _nameController = TextEditingController(text: widget.existingModel?.customerName ?? '') ;
-    _emailController = TextEditingController(text: widget.existingModel?.customerEmail ?? '') ;
-    _mobileController = TextEditingController(text: widget.existingModel?.customerNumber??  '') ;
-
+    _nameController = TextEditingController(
+        text: widget.existingModel?.customerName ?? '');
+    _emailController = TextEditingController(
+        text: widget.existingModel?.customerEmail ?? '');
+    _mobileController = TextEditingController(
+        text: widget.existingModel?.customerNumber ?? '');
   }
 
   @override
@@ -104,31 +114,19 @@ class _CustomerdetailsState extends State<Customerdetails> {
     super.dispose();
   }
 
-
-
-
-
-
-
   @override
   Widget build(BuildContext context) {
-
     // This build method is now much cleaner.
 
     // ✅ Step 1: Gather all inputs from the UI.
-    // final double discountInputValue = _selectedDiscountType == DiscountType.amount
-    //     ? _toDouble(_amountController)
-    //     : (_amountpercentageContorller.text.isNotEmpty
-    //     ? _toDouble(_amountpercentageContorller)
-    //     : DiscountPercentage);
-
     final double discountInputValue = discountApply
         ? (_selectedDiscountType == DiscountType.amount
-        ? _toDouble(_amountController)
-        : _toDouble(_amountpercentageContorller))
+            ? _toDouble(_amountController)
+            : _toDouble(_amountpercentageContorller))
         : 0.0;
 
-    final double serviceChargeValue  = servicechargeapply ? _toDouble(_serviceChargeController) : 0.0;
+    final double serviceChargeValue =
+        servicechargeapply ? _toDouble(_serviceChargeController) : 0.0;
     final bool isDelivery = widget.orderType == 'Delivery';
 
     // ✅ Step 2: Create the service to do all the math.
@@ -142,7 +140,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
     );
 
     // ✅ Step 3: Build the UI using the final, calculated values.
-    // print(DiscountPercentage);
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     return Scaffold(
@@ -155,7 +152,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
             children: [
-
               CommonTextForm(
                 controller: _nameController,
                 borderc: 5,
@@ -201,68 +197,86 @@ class _CustomerdetailsState extends State<Customerdetails> {
               SizedBox(height: 10),
 
               widget.orderType == 'Delivery'
-                  ?Column(children: [
-                Divider(),
-                Text('Address',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.w600),),
-                SizedBox(height: 5,),
-                CommonTextForm(
-                  obsecureText: false,
-                  controller: _houseController,
-                  borderc: 10,
-                  BorderColor: primarycolor,
-                  // HintColor: primarycolor,
-                  // hintText: 'Name',
-                  labelText: 'House NO',
-                  LabelColor: primarycolor,
-                ),
-                SizedBox(height: 10,),
-                CommonTextForm(
-                  obsecureText: false,
-                  controller: _stateController,
-                  borderc: 10,
-                  BorderColor: primarycolor,
-                  // HintColor: primarycolor,
-                  // hintText: 'Name',
-                  labelText: 'State',
-                  LabelColor: primarycolor,
-                ),
-                SizedBox(height: 10,),
-                CommonTextForm(
-                  obsecureText: false,
-                  borderc: 10,
-                  BorderColor: primarycolor,
-                  // HintColor: primarycolor,
-                  // hintText: 'Name',
-                  controller: _cityController,
-                  labelText: 'City',
-                  LabelColor: primarycolor,
-                ),
-                SizedBox(height: 10,),
-                CommonTextForm(
-                  obsecureText: false,
-                  borderc: 10,
-                  BorderColor: primarycolor,
-                  // HintColor: primarycolor,
-                  // hintText: 'Name',
-                  controller: _areaController,
-                  labelText: 'Area',
-                  LabelColor: primarycolor,
-                ),
-                SizedBox(height: 10,),
-                CommonTextForm(
-                  obsecureText: false,
-                  borderc: 10,
-                  BorderColor: primarycolor,
-                  // HintColor: primarycolor,
-                  // hintText: 'Name',
-                  controller: _postCodeController,
-                  labelText: 'Post Code',
-                  LabelColor: primarycolor,
-                ),
-                SizedBox(height: 10,),
-                Divider(),
-              ],):SizedBox(),
-
+                  ? Column(
+                      children: [
+                        Divider(),
+                        Text(
+                          'Address',
+                          style: GoogleFonts.poppins(
+                              fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        SizedBox(
+                          height: 5,
+                        ),
+                        CommonTextForm(
+                          obsecureText: false,
+                          controller: _houseController,
+                          borderc: 10,
+                          BorderColor: primarycolor,
+                          // HintColor: primarycolor,
+                          // hintText: 'Name',
+                          labelText: 'House NO',
+                          LabelColor: primarycolor,
+                        ),
+                        SizedBox(
+                          height: 10,
+                        ),
+                        CommonTextForm(
+                          obsecureText: false,
+                          controller: _stateController,
+                          borderc: 10,
+                          BorderColor: primarycolor,
+                          // HintColor: primarycolor,
+                          // hintText: 'Name',
+                          labelText: 'State',
+                          LabelColor: primarycolor,
+                        ),
+                        SizedBox(
+                          height: 10,
+                        ),
+                        CommonTextForm(
+                          obsecureText: false,
+                          borderc: 10,
+                          BorderColor: primarycolor,
+                          // HintColor: primarycolor,
+                          // hintText: 'Name',
+                          controller: _cityController,
+                          labelText: 'City',
+                          LabelColor: primarycolor,
+                        ),
+                        SizedBox(
+                          height: 10,
+                        ),
+                        CommonTextForm(
+                          obsecureText: false,
+                          borderc: 10,
+                          BorderColor: primarycolor,
+                          // HintColor: primarycolor,
+                          // hintText: 'Name',
+                          controller: _areaController,
+                          labelText: 'Area',
+                          LabelColor: primarycolor,
+                        ),
+                        SizedBox(
+                          height: 10,
+                        ),
+                        CommonTextForm(
+                          obsecureText: false,
+                          borderc: 10,
+                          BorderColor: primarycolor,
+                          // HintColor: primarycolor,
+                          // hintText: 'Name',
+                          controller: _postCodeController,
+                          labelText: 'Post Code',
+                          LabelColor: primarycolor,
+                        ),
+                        SizedBox(
+                          height: 10,
+                        ),
+                        Divider(),
+                      ],
+                    )
+                  : SizedBox(),
 
               Row(
                 children: [
@@ -272,7 +286,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           controller: _serviceChargeController,
                           borderc: 5,
                           BorderColor: Colors.grey,
-                          labelText: widget.orderType == 'Delivery'?'Delivery Charge':'Service Charges(%)',
+                          labelText: widget.orderType == 'Delivery'
+                              ? 'Delivery Charge'
+                              : 'Service Charges(%)',
                           LabelColor: Colors.grey,
                           obsecureText: false)),
                   SizedBox(width: 5),
@@ -280,25 +296,31 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     child: CommonButton(
                         bordercircular: 5,
                         height: height * 0.05,
-
-                        bgcolor: servicechargeapply ?Colors.red.shade300:primarycolor,
-                        bordercolor: servicechargeapply ?Colors.red.shade300:primarycolor,
+                        bgcolor: servicechargeapply
+                            ? Colors.red.shade300
+                            : primarycolor,
+                        bordercolor: servicechargeapply
+                            ? Colors.red.shade300
+                            : primarycolor,
                         onTap: () {
-                          servicechargeapply== false?
-                          setState(() {
-                            servicechargeapply = true;
-                          })
+                          servicechargeapply == false
+                              ? setState(() {
+                                  servicechargeapply = true;
+                                })
                               : setState(() {
-                            servicechargeapply = false;
-                            _serviceChargeController.clear();
-                          });
+                                  servicechargeapply = false;
+                                  _serviceChargeController.clear();
+                                });
                         },
-                        child: Text(servicechargeapply?'Cancel': 'Apply',style: TextStyle(color:servicechargeapply ?Colors.black : Colors.white))),
+                        child: Text(servicechargeapply ? 'Cancel' : 'Apply',
+                            style: TextStyle(
+                                color: servicechargeapply
+                                    ? Colors.black
+                                    : Colors.white)))
                   )
                 ],
               ),
               SizedBox(height: 10),
-
 
               ExpansionTile(
                 title: Text('Discount'),
@@ -307,24 +329,26 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     children: [
                       Expanded(
                         child: ListTile(
-                          title: Text('Amount', style: GoogleFonts.poppins(fontSize: 12)),
+                          title: Text('Amount',
+                              style: GoogleFonts.poppins(fontSize: 12)),
                           leading: Radio<DiscountType>(
                               value: DiscountType.amount,
                               groupValue: _selectedDiscountType,
                               onChanged: (value) => setState(() {
-                                _selectedDiscountType = value!;
-                              })),
+                                    _selectedDiscountType = value!;
+                                  })),
                         ),
                       ),
                       Expanded(
                         child: ListTile(
-                          title: Text('Percentage', style: GoogleFonts.poppins(fontSize: 12)),
+                          title: Text('Percentage',
+                              style: GoogleFonts.poppins(fontSize: 12)),
                           leading: Radio<DiscountType>(
                               value: DiscountType.percentage,
                               groupValue: _selectedDiscountType,
                               onChanged: (value) => setState(() {
-                                _selectedDiscountType = value!;
-                              })),
+                                    _selectedDiscountType = value!;
+                                  })),
                         ),
                       ),
                     ],
@@ -355,10 +379,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           Expanded(
                               flex: 2,
                               child: CommonTextForm(
-                                  controller: _selectedDiscountType==DiscountType.amount ? _amountController : _amountpercentageContorller,
+                                  controller:
+                                      _selectedDiscountType == DiscountType.amount
+                                          ? _amountController
+                                          : _amountpercentageContorller,
                                   borderc: 10,
                                   BorderColor: Colors.grey,
-                                  labelText: _selectedDiscountType==DiscountType.amount ?'Enter Amount' : "Enter Percentage",
+                                  labelText:
+                                      _selectedDiscountType == DiscountType.amount
+                                          ? 'Enter Amount'
+                                          : "Enter Percentage",
                                   LabelColor: Colors.grey,
                                   obsecureText: false)),
                           SizedBox(width: 5),
@@ -366,8 +396,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
                             child: CommonButton(
                               bordercircular: 5,
                               height: height * 0.05,
-                              bgcolor: discountApply ? Colors.red.shade300 : primarycolor,
-                              bordercolor: discountApply ? Colors.red.shade300 : primarycolor,
+                              bgcolor: discountApply
+                                  ? Colors.red.shade300
+                                  : primarycolor,
+                              bordercolor: discountApply
+                                  ? Colors.red.shade300
+                                  : primarycolor,
                               onTap: () {
                                 setState(() {
                                   if (discountApply) {
@@ -385,27 +419,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
                               child: Text(
                                 discountApply ? 'Cancel' : 'Apply',
                                 style: TextStyle(
-                                  color: discountApply ? Colors.black : Colors.white,
+                                  color: discountApply
+                                      ? Colors.black
+                                      : Colors.white,
                                 ),
                               ),
                             ),
                           ),
-
-                          // Expanded(
-                          //   child: CommonButton(
-                          //       bordercircular: 5,
-                          //       height: height * 0.06,
-                          //       bgcolor: discountApply? Colors.grey.shade300 : Colors.grey.shade500,
-                          //       bordercolor: Colors.black,
-                          //       onTap: _clear,
-                          //       child: Text(
-                          //         discountApply ? 'Cancel': 'Apply',
-                          //         style: TextStyle(
-                          //           color: discountApply ? Colors.black : Colors.white,
-                          //         ),
-                          //
-                          //       )),
-                          // )
                         ],
                       ),
 
@@ -414,28 +434,30 @@ class _CustomerdetailsState extends State<Customerdetails> {
                       if (discountApply && calculations.discountAmount > 0)
                         Container(
                           width: width,
-                          height:height * 0.07,
+                          height: height * 0.07,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey)
-                          ),
-                          child: DropdownButtonHideUnderline(child: DropdownButton(
-                              value: SelectedRemark,
-                              items:remarkList.map((String dropdownValue){
-                                return DropdownMenuItem(
-                                  child:Text(dropdownValue),
-                                  value: dropdownValue,
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue){
-                                setState(() {
-                                  SelectedRemark = newValue;
-                                });
-                              })),
+                              border: Border.all(color: Colors.grey)),
+                          child: DropdownButtonHideUnderline(
+                              child: DropdownButton(
+                                  value: SelectedRemark,
+                                  items: remarkList.map((String dropdownValue) {
+                                    return DropdownMenuItem(
+                                      child: Text(dropdownValue),
+                                      value: dropdownValue,
+                                    );
+                                  }).toList(),
+                                  onChanged: (String? newValue) {
+                                    setState(() {
+                                      SelectedRemark = newValue!;
+                                    });
+                                  })),
                         ),
                       SizedBox(height: 5),
 
-                      if(calculations.discountAmount != null && calculations.discountAmount! > 0 && SelectedRemark == 'other')
+                      if (calculations.discountAmount != null &&
+                          calculations.discountAmount! > 0 &&
+                          SelectedRemark == 'other')
                         CommonTextForm(
                           controller: _remarkController,
                           borderc: 5,
@@ -469,7 +491,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           padding: const EdgeInsets.all(16.0),
                           child: Text(
                             'No payment methods enabled. Please enable payment methods in Settings.',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 14),
                             textAlign: TextAlign.center,
                           ),
                         );
@@ -485,7 +508,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                             selectedFilter: SelectedFilter,
                             onpressed: () {
                               setState(() {
-                                SelectedFilter = method.name;
+                                SelectedFilter = method.name!;
                               });
                             },
                           );
@@ -497,10 +520,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
               ),
               SizedBox(height: 15),
               CommonButton(
-                child: Text('Procced ', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                child: Text('Procced ',
+                    style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
                 height: height * 0.06,
-                onTap: () =>
-                    _submitOrder(calculations),
+                onTap: () => _submitOrder(calculations),
               )
             ],
           ),
@@ -523,56 +549,42 @@ class _CustomerdetailsState extends State<Customerdetails> {
         padding: EdgeInsets.all(5),
         decoration: BoxDecoration(
             border: Border.all(width: 1, color: Colors.grey),
-            shape: BoxShape.rectangle
-        ),
+            shape: BoxShape.rectangle),
       ),
     );
   }
 
 // ✅ This widget is now simple and only displays data.
   Widget _buildBillSummary(CartCalculationService calcs) {
-    double subtotal= AppSettings.isTaxInclusive ? calcs.subtotal - calcs.totalGST : calcs.subtotal;
+    double subtotal = AppSettings.isTaxInclusive
+        ? calcs.subtotal - calcs.totalGST
+        : calcs.subtotal;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         children: [
           _buildSummaryRow('Sub Total:', '₹${subtotal.toStringAsFixed(2)}'),
           if (calcs.discountAmount > 0.009)
-            _buildSummaryRow('Total Discount:', '-₹${calcs.discountAmount.toStringAsFixed(2)}'),
+            _buildSummaryRow('Total Discount:',
+                '-₹${calcs.discountAmount.toStringAsFixed(2)}'),
           if (calcs.totalGST > 0.009)
-            (AppSettings.isTaxInclusive?
-            _buildSummaryRow('Total GST(Inclusive):', '₹${calcs.totalGST.toStringAsFixed(2)}')
-                :  _buildSummaryRow('Total GST:', '₹${calcs.totalGST.toStringAsFixed(2)}')
-            ),
+            (AppSettings.isTaxInclusive
+                ? _buildSummaryRow('Total GST(Inclusive):',
+                    '₹${calcs.totalGST.toStringAsFixed(2)}')
+                : _buildSummaryRow(
+                    'Total GST:', '₹${calcs.totalGST.toStringAsFixed(2)}')),
 
-
-
-
-
-          //
-          // (widget.orderType == 'Delivery')
-          //     ? (calcs.deliveryCharge > 0.009
-          //     ? _buildSummaryRow('Delivery:', '₹${calcs.deliveryCharge.toStringAsFixed(2)}')
-          //     : SizedBox())
-          //     : (calcs.serviceChargeAmount > 0.009
-          //     ? _buildSummaryRow('Service Charge:', '₹${calcs.serviceChargeAmount.toStringAsFixed(2)}')
-          //     : SizedBox()),
-          //
-
-
-
-
-
-          if(calcs.serviceChargeAmount > 0.009)
+          if (calcs.serviceChargeAmount > 0.009)
             _buildSummaryRow(
-                widget.orderType == 'Delivery' ? 'Delivery Charge:' : 'Service Charge:',
-                '₹${calcs.serviceChargeAmount.toStringAsFixed(2)}'
-            ),
-
-
+                widget.orderType == 'Delivery'
+                    ? 'Delivery Charge:'
+                    : 'Service Charge:',
+                '₹${calcs.serviceChargeAmount.toStringAsFixed(2)}'),
 
           Divider(thickness: 2, height: 20),
-          _buildSummaryRow('Grand Total:', '₹${calcs.grandTotal.toStringAsFixed(2)}', isBold: true),
+          _buildSummaryRow(
+              'Grand Total:', '₹${calcs.grandTotal.toStringAsFixed(2)}',
+              isBold: true),
         ],
       ),
     );
@@ -584,144 +596,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(label,
+              style: TextStyle(
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );
   }
-
-  // double? discountAmount;
-
-  /// NEW: Calculate totals with per-item GST and flexible discount application
-/*  Map<String, double> _calculateDetailedTotals() {
-    final items = widget.cartitems ?? widget.existingModel?.items ?? [];
-
-    double subTotal = 0;
-    double totalDiscount = 0;
-    double totalGST = 0;
-    double serviceCharge = 0;
-    double grandTotal = 0;
-
-    // Get discount values
-    double discountAmountValue = 0;
-    double discountPercentageValue = 0;
-
-    if (_selectedDiscountType == DiscountType.amount) {
-      discountAmountValue = _toDouble(_amountController);
-    } else {
-      if (_amountpercentageContorller.text.isNotEmpty) {
-        discountPercentageValue = _toDouble(_amountpercentageContorller);
-      } else {
-        discountPercentageValue = DiscountPercentage;
-      }
-    }
-
-    if (AppSettings.discountOnItems) {
-      // DISCOUNT ON ITEMS: Apply discount to each item, then calculate GST
-      for (CartItem item in items) {
-        double itemSubtotal = item.price * item.quantity;
-        subTotal += itemSubtotal;
-
-        // Apply discount to this item
-        double itemDiscount = 0;
-        if (_selectedDiscountType == DiscountType.amount) {
-          // Proportional distribution of fixed amount discount
-          double itemProportion = itemSubtotal / widget.totalPrice;
-          itemDiscount = discountAmountValue * itemProportion;
-        } else {
-          // Percentage discount
-          itemDiscount = itemSubtotal * (discountPercentageValue / 100);
-        }
-
-        totalDiscount += itemDiscount;
-        double itemAfterDiscount = itemSubtotal - itemDiscount;
-
-        // Calculate GST on discounted price
-        double itemTaxRate = (item.taxRate ?? 0) * 100; // Convert to percentage
-        double itemGST = 0;
-
-        if (itemTaxRate > 0) {
-          if (AppSettings.isTaxInclusive) {
-            // GST is already included in the discounted price
-            itemGST = itemAfterDiscount - (itemAfterDiscount / (1 + (itemTaxRate / 100)));
-          } else {
-            // GST needs to be added to the discounted price
-            itemGST = itemAfterDiscount * (itemTaxRate / 100);
-          }
-        }
-
-        totalGST += itemGST;
-      }
-    } else {
-      // DISCOUNT ON TOTAL: Calculate GST first, then apply discount to final amount
-      for (CartItem item in items) {
-        double itemSubtotal = item.price * item.quantity;
-        subTotal += itemSubtotal;
-
-        // Calculate GST on original price
-        double itemTaxRate = (item.taxRate ?? 0) * 100;
-        double itemGST = 0;
-
-        if (itemTaxRate > 0) {
-          if (AppSettings.isTaxInclusive) {
-            itemGST = itemSubtotal - (itemSubtotal / (1 + (itemTaxRate / 100)));
-          } else {
-            itemGST = itemSubtotal * (itemTaxRate / 100);
-          }
-        }
-
-        totalGST += itemGST;
-      }
-
-      // Apply discount to subtotal + GST
-      double totalBeforeDiscount = AppSettings.isTaxInclusive ? subTotal : subTotal + totalGST;
-
-      if (_selectedDiscountType == DiscountType.amount) {
-        totalDiscount = discountAmountValue;
-      } else {
-        totalDiscount = totalBeforeDiscount * (discountPercentageValue / 100);
-      }
-    }
-
-    // Calculate service charge
-    double totalBeforeService = AppSettings.isTaxInclusive
-        ? subTotal - totalDiscount
-        : subTotal + totalGST - totalDiscount;
-
-    if (servicechargeapply) {
-      double servicePercentage = _toDouble(_serviceChargeController);
-      serviceCharge = totalBeforeService * (servicePercentage / 100);
-    }
-
-    // Calculate grand total
-    if (AppSettings.isTaxInclusive) {
-      grandTotal = subTotal - totalDiscount + serviceCharge;
-    } else {
-      grandTotal = subTotal + totalGST - totalDiscount + serviceCharge;
-    }
-
-    // Update the global discount amount for other methods
-    discountAmount = totalDiscount;
-
-    return {
-      'subTotal': subTotal,
-      'totalDiscount': totalDiscount,
-      'totalGST': totalGST,
-      'serviceCharge': serviceCharge,
-      'grandTotal': grandTotal,
-    };
-  }*/
-
-  /// LEGACY: Keep for backward compatibility
-/*  Map<String, double> _calculateTotals(double totalPrice) {
-    final detailed = _calculateDetailedTotals();
-    return {
-      'discountAmount': detailed['totalDiscount']!,
-      'serviceCharge': detailed['serviceCharge']!,
-      'toBePaid': detailed['grandTotal']!,
-    };
-  }*/
 
   double _toDouble(TextEditingController c, {double fallback = 0}) {
     final s = c.text.trim();
@@ -732,19 +616,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   void _clear() {
     setState(() {
-
-      if(discountApply){
+      if (discountApply) {
         discountApply = false;
         _amountpercentageContorller.clear();
         _amountController.clear();
         DiscountPercentage = 0;
-      }else{
+      } else {
         discountApply = true;
       }
       // calculations.discountAmount = 0;
     });
   }
-
 
   Future<void> proceed(CartCalculationService calculations) async {
     print('============THis is PRocced Function=============');
@@ -762,13 +644,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
       customerEmail: _emailController.text.trim(),
       discount: calculations.discountAmount,
       // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
-      serviceCharge:  calculations.serviceChargeAmount,
+      serviceCharge: calculations.serviceChargeAmount,
       totalPrice: calculations.grandTotal,
       paymentMethod: SelectedFilter,
       completedAt: DateTime.now(),
       status: 'Cooking',
       tableNo: widget.tableid,
-
     );
     try {
       await completeOrder(completedOrder, calculations);
@@ -779,24 +660,18 @@ class _CustomerdetailsState extends State<Customerdetails> {
         'Order Completed Successfully!',
       );
 
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => Startorder()),
-            (Route<dynamic> route) => false,
-      );
+      // Show success dialog with print option
+      await _showOrderSuccessDialog(completedOrder, calculations);
     } catch (e) {
       // _showSnackBar('Failed to proceed with the order: $e', isError: true);
       NotificationService.instance.showError(
         'Failed to proceed with the order: $e',
       );
-
-
     }
   }
 
-
-  Future<void> completeOrder(OrderModel activeModel, CartCalculationService calculations) async {
+  Future<void> completeOrder(
+      OrderModel activeModel, CartCalculationService calculations) async {
     print('============this is complete order function=============');
 
     double preTaxSubtotal = AppSettings.isTaxInclusive
@@ -811,13 +686,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
       orderAt: activeModel.timeStamp,
       orderType: activeModel.orderType,
       paymentmode: SelectedFilter,
-      remark: SelectedRemark == 'other' ? _remarkController.text : SelectedRemark,
+      remark:
+          SelectedRemark == 'other' ? _remarkController.text : SelectedRemark,
       Discount: calculations.discountAmount,
       subTotal: preTaxSubtotal,
       gstRate: 0,
       gstAmount: calculations.totalGST,
       kotNumbers: activeModel.kotNumbers, // Always present in new orders
-      kotBoundaries: activeModel.kotBoundaries, // KOT boundaries for grouping items
+      kotBoundaries:
+          activeModel.kotBoundaries, // KOT boundaries for grouping items
     );
     await HivePastOrder.addOrder(pastOrder);
     await HiveOrders.deleteOrder(activeModel.id);
@@ -830,7 +707,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
     double preTaxSubtotal = AppSettings.isTaxInclusive
         ? calculations.subtotal - calculations.totalGST
         : calculations.subtotal;
-
 
     final int newKotNumber = await HiveOrders.getNextKotNumber();
     final String newId = Uuid().v4();
@@ -846,7 +722,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       timeStamp: DateTime.now(),
       orderType: widget.orderType ?? 'Take Away',
       tableNo: widget.tableid ?? '',
-      subTotal:preTaxSubtotal,
+      subTotal: preTaxSubtotal,
       discount: calculations.discountAmount,
       serviceCharge: calculations.serviceChargeAmount,
       gstRate: 0,
@@ -857,12 +733,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
       completedAt: null,
       paymentStatus: "Paid",
       isPaid: true,
-      remark:  calculations.discountAmount>  0.009 ? SelectedRemark : 'no Remark',
+      remark:
+          calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
       // Initialize KOT tracking fields - single source of truth
       kotNumbers: [newKotNumber],
       itemCountAtLastKot: orderItems.length,
       kotBoundaries: [orderItems.length], // First KOT boundary at item count
-
     );
     try {
       await HiveOrders.addOrder(newOrder);
@@ -880,36 +756,87 @@ class _CustomerdetailsState extends State<Customerdetails> {
       );
 
       await HiveCart.clearCart();
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => Startorder()),
-            (Route<dynamic> route) => false,
-      );
+
+      // Show success dialog with print option
+      await _showOrderSuccessDialog(newOrder, calculations);
     } catch (e) {
       // _showSnackBar('Failed to create new order: $e', isError: true);
       NotificationService.instance.showError(
         'Failed to create new order: $e',
       );
-
     }
+  }
+
+  // Success dialog with print option
+  Future<void> _showOrderSuccessDialog(
+      OrderModel order, CartCalculationService calculations) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Column(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 50),
+            const SizedBox(height: 10),
+            Text(
+              'Order Successful',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Order has been placed successfully.\nDo you want to print the receipt?',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              _navigateToHome(); // Go to home
+            },
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await RestaurantPrintHelper.printOrderReceipt(
+                context: context,
+                order: order,
+                calculations: calculations,
+              );
+              // We don't close the dialog automatically after print,
+              // allowing user to print again or close manually
+            },
+            icon: const Icon(Icons.print, size: 18),
+            label: const Text('Print Receipt'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primarycolor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToHome() {
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const Startorder()),
+      (Route<dynamic> route) => false,
+    );
   }
 
   Future<void> clearCart() async {
     try {
       await HiveCart.clearCart();
       if (mounted) {
-
         NotificationService.instance.showInfo(
           'Cart cleared',
         );
-
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(
-        //     content: Text('Cart cleared'),
-        //     duration: Duration(seconds: 2),
-        //   ),
-        // );
       }
     } catch (e) {
       print('Error clearing cart: $e');
@@ -917,26 +844,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
         NotificationService.instance.showInfo(
           '$Error clearing cart',
         );
-
-
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(
-        //     content: Text('Error clearing cart'),
-        //     backgroundColor: Colors.red,
-        //   ),
-        // );
       }
     }
   }
-
-  // void _showSnackBar(String message, {bool isError = false}) {
-  // rootScaffoldMessengerKey.currentState?.showSnackBar(
-  //     SnackBar(
-  //       backgroundColor: isError ? Colors.red : Colors.green,
-  //       content: Text(message),
-  //     ),
-  //   );
-  // }
 
   Future<void> _submitOrder(CartCalculationService calculations) async {
     if (widget.isSettle == true) {
@@ -945,8 +855,4 @@ class _CustomerdetailsState extends State<Customerdetails> {
       await proceed(calculations);
     }
   }
-
-
-
-
 }

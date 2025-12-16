@@ -81,6 +81,9 @@ Future<void> setupServiceLocator() async {
     () => PaymentMethodStore(locator<PaymentMethodRepository>()),
   );
 
+  // Register PrintService as a common dependency for both Retail and Restaurant
+  locator.registerLazySingleton<PrintService>(() => PrintService());
+
   // Register business-specific dependencies based on mode
   // If mode is not set yet (during setup), we'll register them later
   if (AppConfig.isBusinessModeSet) {
@@ -105,7 +108,6 @@ Future<void> _registerRetailDependencies() async {
   // Register Services (Singletons - lazy loaded)
   locator.registerLazySingleton<BackupService>(() => BackupService());
   locator.registerLazySingleton<ReportService>(() => ReportService());
-  locator.registerLazySingleton<PrintService>(() => PrintService());
   locator.registerLazySingleton<StockAlertService>(() => StockAlertService());
   locator.registerLazySingleton<GstService>(() => GstService());
 

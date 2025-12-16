@@ -724,13 +724,36 @@ class _TakeawayState extends State<Takeaway> {
   Widget build(BuildContext context) {
     final plainItems  = widget.cartItems.map((w)=> w.item).toList();
 
-    // ✅ 1. Create an instance of the service here.
+    // ✅ FIX: Use saved values from existing order to show correct total
+    final double discountValue;
+    final double serviceChargeValue;
+    final double deliveryChargeValue;
+
+    if (widget.isexisting && widget.existingModel != null) {
+      // Use the saved values from the existing order
+      discountValue = widget.existingModel!.discount ?? 0.0;
+      // For delivery orders, serviceCharge field stores the delivery charge
+      if (widget.isdelivery) {
+        serviceChargeValue = 0.0;
+        deliveryChargeValue = widget.existingModel!.serviceCharge ?? 0.0;
+      } else {
+        serviceChargeValue = widget.existingModel!.serviceCharge ?? 0.0;
+        deliveryChargeValue = 0.0;
+      }
+    } else {
+      // For new orders, use default values
+      discountValue = 0.0;
+      serviceChargeValue = 0.0;
+      deliveryChargeValue = 0.0;
+    }
+
+    // ✅ 1. Create an instance of the service here with correct values
     final calculations = CartCalculationService(
       items: plainItems,
-      discountType: DiscountType.amount, // Default type, value is 0
-      discountValue: 0.0,
-      serviceChargePercentage: 0.0,
-      deliveryCharge: 0.0,
+      discountType: DiscountType.amount,
+      discountValue: discountValue,
+      serviceChargePercentage: serviceChargeValue,
+      deliveryCharge: deliveryChargeValue,
       isDeliveryOrder: widget.isdelivery ?? false,
       // orderType: widget.isdelivery? 'Delivery' : 'Take Away'
     );

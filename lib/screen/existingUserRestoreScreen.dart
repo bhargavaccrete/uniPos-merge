@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
+import '../domain/services/retail/backup_service.dart';
 
 class ExistingUserRestoreScreen extends StatefulWidget {
   const ExistingUserRestoreScreen({Key? key}) : super(key: key);
@@ -119,22 +122,88 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   Future<void> _validateFile() async {
+    if (_selectedFilePath == null && !kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid file path'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    // Simulate file validation and metadata extraction
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final backupService = BackupService();
+      final backupFile = File(_selectedFilePath!);
 
-    setState(() {
-      _fileValidated = true;
-      _fileMetadata = {
-        'storeName': 'Demo Store',
-        'backupDate': '2024-01-15',
-        'dataSize': '2.5 MB',
-        'version': '1.0.0',
-        'recordCount': '1,234',
-      };
-      _isLoading = false;
-    });
+      // Validate the backup file
+      final validation = await backupService.validateBackupFile(backupFile);
+
+      if (validation['valid'] != true) {
+        setState(() {
+          _fileValidated = false;
+          _fileMetadata = null;
+          _isLoading = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Invalid backup file: ${validation['error']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get backup info
+      final info = await backupService.getBackupInfo(backupFile);
+      final stats = info['statistics'] as Map<String, dynamic>? ?? {};
+
+      setState(() {
+        _fileValidated = true;
+        _fileMetadata = {
+          'storeName': info['fileName'] ?? 'Unknown',
+          'backupDate': _formatDate(info['exportDate']),
+          'dataSize': _formatFileSize(info['fileSize'] ?? 0),
+          'version': info['version'] ?? 'Unknown',
+          'recordCount': '${stats['totalProducts'] ?? 0} products, ${stats['totalSales'] ?? 0} sales',
+        };
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _fileValidated = false;
+        _fileMetadata = null;
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error validating file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatDate(dynamic dateStr) {
+    if (dateStr == null || dateStr == 'Unknown') return 'Unknown';
+    try {
+      final date = DateTime.parse(dateStr.toString());
+      return DateFormat('MMM dd, yyyy').format(date);
+    } catch (e) {
+      return dateStr.toString();
+    }
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(2)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 
   void _nextStep() {
@@ -164,18 +233,50 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   Future<void> _restoreData() async {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState!.validate() && _selectedFilePath != null) {
       setState(() => _isLoading = true);
 
-      // Simulate restore process
-      await Future.delayed(const Duration(seconds: 3));
+      try {
+        final backupService = BackupService();
+        final backupFile = File(_selectedFilePath!);
 
-      // Show success dialog
-      _showSuccessDialog();
+        // Restore the backup
+        final result = await backupService.restoreFromBackup(backupFile);
+
+        setState(() => _isLoading = false);
+
+        if (result['success'] == true) {
+          // Show success dialog
+          _showSuccessDialog(
+            message: result['message'] ?? 'Data restored successfully',
+            errors: result['errors'] as List?,
+          );
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Restore failed: ${result['error']}'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to restore backup: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog({String? message, List<dynamic>? errors}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -183,6 +284,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           padding: const EdgeInsets.all(30),
+          constraints: const BoxConstraints(maxWidth: 500),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -207,20 +309,76 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   fontWeight: FontWeight.bold,
                   color: AppColors.darkNeutral,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
-                'Your store data has been restored',
+                message ?? 'Your store data has been restored',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,
               ),
+
+              if (errors != null && errors.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.warning, color: Colors.orange.shade700, size: 18),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Some items had issues:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...errors.take(3).map((error) => Padding(
+                        padding: const EdgeInsets.only(left: 26, top: 4),
+                        child: Text(
+                          '• $error',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      )),
+                      if (errors.length > 3)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 26, top: 4),
+                          child: Text(
+                            '...and ${errors.length - 3} more',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/dashboard');
+                  Navigator.pop(context);
+                  Navigator.pushReplacementNamed(context, '/retail-billing');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

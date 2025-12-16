@@ -161,10 +161,50 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             builder: (context) {
               final suppliers = supplierStore.suppliers;
               if (suppliers.isEmpty) {
-                return const Center(
+                return Center(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('No suppliers found. Please add a supplier first.'),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No suppliers found',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Add a supplier to create purchase orders',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B6B6B),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showAddSupplierDialog();
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Supplier'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4CAF50),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }
@@ -199,6 +239,139 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
+          ),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _showAddSupplierDialog();
+            },
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add New'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF4CAF50),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddSupplierDialog() {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final addressController = TextEditingController();
+    final gstController = TextEditingController();
+    final openingBalanceController = TextEditingController(text: '0');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Supplier'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name *',
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone',
+                  border: OutlineInputBorder(),
+                  prefixText: '+91 ',
+                ),
+                keyboardType: TextInputType.phone,
+                maxLength: 10,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: addressController,
+                decoration: const InputDecoration(
+                  labelText: 'Address',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: gstController,
+                decoration: const InputDecoration(
+                  labelText: 'GST Number',
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.characters,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: openingBalanceController,
+                decoration: const InputDecoration(
+                  labelText: 'Opening Balance',
+                  border: OutlineInputBorder(),
+                  prefixText: '₹ ',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Supplier name is required'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final openingBalance = double.tryParse(openingBalanceController.text) ?? 0;
+
+              final newSupplier = SupplierModel.create(
+                name: nameController.text.trim(),
+                phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+                address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
+                gstNumber: gstController.text.trim().isEmpty ? null : gstController.text.trim(),
+                openingBalance: openingBalance,
+                currentBalance: openingBalance,
+              );
+
+              await supplierStore.addSupplier(newSupplier);
+
+              if (mounted) {
+                // Auto-select the newly added supplier
+                setState(() {
+                  _selectedSupplier = newSupplier;
+                });
+
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Supplier "${newSupplier.name}" added and selected'),
+                    backgroundColor: const Color(0xFF4CAF50),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Add Supplier'),
           ),
         ],
       ),

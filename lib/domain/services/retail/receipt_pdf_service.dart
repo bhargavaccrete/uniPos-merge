@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
@@ -18,6 +19,10 @@ class ReceiptData {
   final String? storeEmail;
   final String? gstNumber;
 
+  // Restaurant-specific fields
+  final String? orderType; // e.g., "Dine In", "Takeaway", "Delivery"
+  final String? tableNo; // Table number for dine-in orders
+
   ReceiptData({
     required this.sale,
     required this.items,
@@ -27,13 +32,15 @@ class ReceiptData {
     this.storePhone,
     this.storeEmail,
     this.gstNumber,
+    this.orderType,
+    this.tableNo,
   });
 }
 
 /// Service for generating PDF receipts and invoices
 class ReceiptPdfService {
   /// Default store info - can be customized via settings
-  static const String defaultStoreName = 'RPOS Store';
+  static const String defaultStoreName = 'UniPos Store';
   static const String defaultStoreAddress = 'Your Store Address';
   static const String defaultStorePhone = '+91 1234567890';
 
@@ -110,7 +117,7 @@ class ReceiptPdfService {
           children: [
             pw.Text('Receipt #:', style: const pw.TextStyle(fontSize: 8)),
             pw.Text(
-              data.sale.saleId.substring(0, 8).toUpperCase(),
+              data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
               style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
             ),
           ],
@@ -320,7 +327,7 @@ class ReceiptPdfService {
                 ),
                 pw.SizedBox(height: 8),
                 pw.Text(
-                  '# ${data.sale.saleId.substring(0, 13).toUpperCase()}',
+                  '# ${data.sale.saleId.substring(0, min(13, data.sale.saleId.length)).toUpperCase()}',
                   style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                 ),
                 pw.SizedBox(height: 4),
@@ -334,6 +341,49 @@ class ReceiptPdfService {
         ),
 
         pw.SizedBox(height: 24),
+
+        // Restaurant Order Type Badge (if available)
+        if (data.orderType != null) ...[
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: pw.BoxDecoration(
+              color: _getOrderTypeColor(data.orderType!),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Row(
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                pw.Text(
+                  data.orderType!.toUpperCase(),
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white,
+                  ),
+                ),
+                if (data.tableNo != null) ...[
+                  pw.SizedBox(width: 12),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColor.fromInt(0x4DFFFFFF), // 30% opacity white
+                      borderRadius: pw.BorderRadius.circular(4),
+                    ),
+                    child: pw.Text(
+                      'Table: ${data.tableNo}',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 16),
+        ],
 
         // Bill To / Payment Info
         pw.Row(
@@ -371,7 +421,7 @@ class ReceiptPdfService {
                         pw.Text(data.customer!.address!, style: const pw.TextStyle(fontSize: 10)),
                     ] else ...[
                       pw.Text(
-                        'Walk-in Customer',
+                        data.orderType != null ? '${data.orderType} Customer' : 'Walk-in Customer',
                         style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                       ),
                     ],
@@ -392,7 +442,7 @@ class ReceiptPdfService {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      'PAYMENT DETAILS',
+                      'ORDER DETAILS',
                       style: pw.TextStyle(
                         fontSize: 10,
                         fontWeight: pw.FontWeight.bold,
@@ -403,6 +453,8 @@ class ReceiptPdfService {
                     _buildInvoiceInfoRow('Payment Method:', data.sale.paymentType.toUpperCase()),
                     _buildInvoiceInfoRow('Status:', 'PAID'),
                     _buildInvoiceInfoRow('Total Items:', '${data.sale.totalItems}'),
+                    if (data.tableNo != null)
+                      _buildInvoiceInfoRow('Table Number:', data.tableNo!),
                   ],
                 ),
               ),
@@ -1010,5 +1062,19 @@ class ReceiptPdfService {
         ],
       ),
     );
+  }
+
+  /// Get color for order type badge
+  PdfColor _getOrderTypeColor(String orderType) {
+    final type = orderType.toLowerCase();
+    if (type.contains('dine in')) {
+      return PdfColors.blue800; // Blue for Dine In
+    } else if (type.contains('takeaway') || type.contains('take away')) {
+      return PdfColors.green800; // Green for Takeaway
+    } else if (type.contains('delivery')) {
+      return PdfColors.orange800; // Orange for Delivery
+    } else {
+      return PdfColors.purple800; // Purple for other types
+    }
   }
 }

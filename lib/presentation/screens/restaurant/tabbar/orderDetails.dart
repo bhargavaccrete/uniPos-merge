@@ -8,7 +8,11 @@ import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/database/hive_db.dart';
 import '../../../../data/models/restaurant/db/database/hive_pastorder.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
+import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/cart_calculation_service.dart';
+import '../util/restaurant_print_helper.dart';
+import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
 
 class Orderdetails extends StatefulWidget {
@@ -82,9 +86,7 @@ class _OrderdetailsState extends State<Orderdetails> {
               child: _ActionBtn(
                 label: 'Print',
                 outlined: true,
-                onTap: () {
-                  // TODO: print flow
-                },
+                onTap: () => _printBill(context),
               ),
             ),
             const SizedBox(width: 12),
@@ -471,6 +473,52 @@ class _OrderdetailsState extends State<Orderdetails> {
   }
 
   // --- HELPER WIDGETS AND FUNCTIONS (ADD ALL OF THESE) ---
+
+  Future<void> _printBill(BuildContext context) async {
+    try {
+      // Convert pastOrderModel to OrderModel for printing
+      final orderForPrint = OrderModel(
+        id: currentOrder.id,
+        customerName: currentOrder.customerName ?? '',
+        customerNumber: '', // pastOrderModel doesn't store customer number
+        customerEmail: '', // pastOrderModel doesn't store customer email
+        items: currentOrder.items ?? [],
+        status: 'COMPLETED',
+        timeStamp: currentOrder.orderAt ?? DateTime.now(),
+        orderType: currentOrder.orderType ?? 'Take Away',
+        tableNo: null, // pastOrderModel doesn't have table info
+        totalPrice: currentOrder.totalPrice ?? 0,
+        discount: currentOrder.Discount,
+        serviceCharge: 0, // pastOrderModel doesn't store service charge separately
+        paymentMethod: currentOrder.paymentmode,
+        kotNumbers: currentOrder.kotNumbers,
+        itemCountAtLastKot: currentOrder.items?.length ?? 0,
+        kotBoundaries: currentOrder.kotBoundaries,
+      );
+
+      // Detect if it's a delivery order
+      final bool isDelivery = (currentOrder.orderType ?? '').toLowerCase().contains('delivery');
+
+      // Create calculations with saved values from the order
+      final calculations = CartCalculationService(
+        items: currentOrder.items ?? [],
+        discountType: DiscountType.amount,
+        discountValue: currentOrder.Discount ?? 0,
+        serviceChargePercentage: 0, // Not stored in pastOrderModel
+        deliveryCharge: 0, // Not stored in pastOrderModel
+        isDeliveryOrder: isDelivery,
+      );
+
+      // Print using RestaurantPrintHelper
+      await RestaurantPrintHelper.printOrderReceipt(
+        context: context,
+        order: orderForPrint,
+        calculations: calculations,
+      );
+    } catch (e) {
+      NotificationService.instance.showError('Failed to print: $e');
+    }
+  }
 
   Widget _headCell(String text, {int flex = 1, bool alignEnd = false}) {
     return Expanded(
