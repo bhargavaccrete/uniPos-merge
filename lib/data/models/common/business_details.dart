@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:hive/hive.dart';
 import 'package:unipos/core/constants/hive_type_ids.dart';
 
@@ -45,7 +47,7 @@ class BusinessDetails extends HiveObject {
   final String? pincode;
 
   @HiveField(13)
-  final String? logo;
+  final Uint8List? logo;
 
   @HiveField(14)
   final bool isSetupComplete;
@@ -91,7 +93,7 @@ class BusinessDetails extends HiveObject {
     String? state,
     String? country,
     String? pincode,
-    String? logo,
+    Uint8List? logo,
     bool? isSetupComplete,
   }) {
     return BusinessDetails(

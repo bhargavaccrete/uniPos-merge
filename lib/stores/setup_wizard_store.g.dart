@@ -462,6 +462,22 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     });
   }
 
+  late final _$logoByteAtom =
+      Atom(name: '_SetupWizardStore.logoByte', context: context);
+
+  @override
+  Uint8List? get logoByte {
+    _$logoByteAtom.reportRead();
+    return super.logoByte;
+  }
+
+  @override
+  set logoByte(Uint8List? value) {
+    _$logoByteAtom.reportWrite(value, super.logoByte, () {
+      super.logoByte = value;
+    });
+  }
+
   late final _$selectBusinessTypeAsyncAction =
       AsyncAction('_SetupWizardStore.selectBusinessType', context: context);
 
@@ -510,6 +526,14 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   @override
   Future<void> completeSetup() {
     return _$completeSetupAsyncAction.run(() => super.completeSetup());
+  }
+
+  late final _$pickLogoAsyncAction =
+      AsyncAction('_SetupWizardStore.pickLogo', context: context);
+
+  @override
+  Future<void> pickLogo() {
+    return _$pickLogoAsyncAction.run(() => super.pickLogo());
   }
 
   late final _$resetSetupAsyncAction =
@@ -573,6 +597,28 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
         name: '_SetupWizardStore.setOwnerName');
     try {
       return super.setOwnerName(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setLogo(Uint8List? bytes) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setLogo');
+    try {
+      return super.setLogo(bytes);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void deleteLogo() {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.deleteLogo');
+    try {
+      return super.deleteLogo();
     } finally {
       _$_SetupWizardStoreActionController.endAction(_$actionInfo);
     }
@@ -804,6 +850,7 @@ taxPlaceOfSupply: ${taxPlaceOfSupply},
 taxApplyOnDelivery: ${taxApplyOnDelivery},
 taxNotes: ${taxNotes},
 taxRates: ${taxRates},
+logoByte: ${logoByte},
 hasBusinessType: ${hasBusinessType},
 hasStoreDetails: ${hasStoreDetails},
 canProceedFromBusinessType: ${canProceedFromBusinessType},

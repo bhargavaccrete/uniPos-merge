@@ -109,7 +109,7 @@ class _SplashScreenState extends State<SplashScreen>
           Navigator.pushReplacementNamed(context, '/retail-billing');
         } else if (AppConfig.isRestaurant) {
           // Navigate to restaurant home (you can add this route later)
-          Navigator.pushReplacementNamed(context, '/retail-billing'); // Temporary
+          Navigator.pushReplacementNamed(context, '/restaurant-home'); // Temporary
         } else {
           // Setup complete but no business mode - navigate to walkthrough
           Navigator.pushReplacementNamed(context, '/walkthrough');

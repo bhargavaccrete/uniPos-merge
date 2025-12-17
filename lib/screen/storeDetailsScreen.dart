@@ -140,6 +140,129 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             ),
             const SizedBox(height: 20),
 
+            /*------------------Image Upload-------------*/
+
+            Card(
+              elevation: 5,
+              color: Colors.white,
+              child: Observer(
+                  builder:(_){
+                    bool hasImage = widget.store.logoByte != null;
+                    return InkWell(
+                      onTap: (){
+                        widget.store.pickLogo();
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          color: hasImage ? Colors.black : Colors.teal.shade100,
+                          image: hasImage?
+                              DecorationImage(
+                                image: MemoryImage(widget.store.logoByte!),
+                                fit: BoxFit.contain
+                              )
+                              :null
+                        ),
+                        child: Stack(
+                          children: [
+                            if(!hasImage)
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children:[
+                                    Icon(Icons.image,color: Colors.teal.shade700,size: 60,),
+                                    SizedBox(height: 10,),
+
+                                    Text('UPLOAD LOGO',style: TextStyle(fontSize:16,color: Colors.teal.shade900,
+                                    fontWeight:FontWeight.w600
+                                    ),)
+
+                                  ]
+                                ),
+                              ),
+
+
+                            if(hasImage)
+                              Positioned(
+
+                                  child: InkWell(
+                                onTap: (){
+                                  widget.store.deleteLogo();
+                                },
+                                    child: Container(
+                                      padding: EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color:Colors.white,width: 2),
+                                      ),
+                                      child: Icon(
+                                        Icons.delete,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+
+                              ))
+
+                          ],
+                        ),
+                      ),
+                    );
+                  } ),
+            ),
+
+
+   /*         Card(
+              elevation: 5,
+              child: InkWell(
+                onTap: (){
+                 widget.store.pickLogo();
+                },
+                child: Container(
+                  width: double.infinity,
+                  height: 200,
+                  // color: Colors.teal.shade100,
+                    child: Observer(
+                      builder: (_){
+                        if(widget.store.logoByte != null){
+                          return Container(
+
+                              child: Stack(
+                               children: [
+
+                                 Icon(Icons.delete,color: Colors.red,size: 100,),
+
+                                 Image.memory(widget.store.logoByte!)
+
+                               ],
+
+                              ));
+                        }else{
+                          return  Icon(Icons.image,color: Colors.white,size: 100,);
+                        }
+                      },
+                    ),
+
+
+
+
+
+                    *//*child:Column(
+                      mainAxisAlignment:MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.image,color: Colors.white,size: 100,),
+                      Text('UPLOAD LOGO',style: TextStyle(fontSize:20,color: Colors.white,fontWeight: FontWeight.w600),),
+                    ],
+                  )*//*
+                ),
+              ),
+            ),*/
+
+            const SizedBox(height: 20,),
+
+
             // Phone & Email Row
             Row(
               children: [

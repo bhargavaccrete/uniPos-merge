@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
 import 'package:unipos/util/responsive.dart';
 import 'package:unipos/util/color.dart';
 
@@ -509,6 +510,11 @@ class HomeScreen extends StatelessWidget {
         icon: Icons.settings,
         title: 'Settings',
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
+      ),    _buildMenuCard(
+        context,
+        icon: Icons.settings,
+        title: 'ex pos',
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
       ),
     ];
   }

@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
@@ -23,6 +24,9 @@ class ReceiptData {
   final String? orderType; // e.g., "Dine In", "Takeaway", "Delivery"
   final String? tableNo; // Table number for dine-in orders
 
+  // Store logo
+  final Uint8List? logoBytes; // Store logo image
+
   ReceiptData({
     required this.sale,
     required this.items,
@@ -34,6 +38,7 @@ class ReceiptData {
     this.gstNumber,
     this.orderType,
     this.tableNo,
+    this.logoBytes,
   });
 }
 
@@ -83,6 +88,19 @@ class ReceiptPdfService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
+        // Store Logo (Both retail and restaurant)
+        if (data.logoBytes != null) ...[
+          pw.Container(
+            width: 60,
+            height: 60,
+            child: pw.Image(
+              pw.MemoryImage(data.logoBytes!),
+              fit: pw.BoxFit.contain,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+        ],
+
         // Store Header
         pw.Text(
           storeName,
@@ -286,25 +304,47 @@ class ReceiptPdfService {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Store Info
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  storeName,
-                  style: pw.TextStyle(
-                    fontSize: 24,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.green800,
+            // Store Logo and Info
+            pw.Expanded(
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  // Logo (Both retail and restaurant)
+                  if (data.logoBytes != null) ...[
+                    pw.Container(
+                      width: 80,
+                      height: 80,
+                      child: pw.Image(
+                        pw.MemoryImage(data.logoBytes!),
+                        fit: pw.BoxFit.contain,
+                      ),
+                    ),
+                    pw.SizedBox(width: 16),
+                  ],
+                  // Store Info
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          storeName,
+                          style: pw.TextStyle(
+                            fontSize: 24,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.green800,
+                          ),
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text(storeAddress, style: const pw.TextStyle(fontSize: 10)),
+                        pw.Text('Phone: $storePhone', style: const pw.TextStyle(fontSize: 10)),
+                        pw.Text('Email: $storeEmail', style: const pw.TextStyle(fontSize: 10)),
+                        if (data.gstNumber != null)
+                          pw.Text('GST No: ${data.gstNumber}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
                   ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(storeAddress, style: const pw.TextStyle(fontSize: 10)),
-                pw.Text('Phone: $storePhone', style: const pw.TextStyle(fontSize: 10)),
-                pw.Text('Email: $storeEmail', style: const pw.TextStyle(fontSize: 10)),
-                if (data.gstNumber != null)
-                  pw.Text('GST No: ${data.gstNumber}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-              ],
+                ],
+              ),
             ),
             // Invoice Title
             pw.Column(

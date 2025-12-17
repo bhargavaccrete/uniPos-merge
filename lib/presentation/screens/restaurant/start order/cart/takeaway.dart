@@ -22,6 +22,7 @@ import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import 'customerdetails.dart';
+import '../../util/restaurant_print_helper.dart';
 
 class Takeaway extends StatefulWidget {
   bool isexisting = false;
@@ -944,16 +945,31 @@ class _TakeawayState extends State<Takeaway> {
         widget.isdelivery
             ? SizedBox()
             : ElevatedButton(
-          onPressed: widget.cartItems.isEmpty
+          onPressed: widget.cartItems.isEmpty || widget.existingModel == null
               ? null
-              : () {
-            // Handle checkout
+              : () async {
             // Handle print bill for existing order
-            NotificationService.instance.showInfo(
-              'Print Bill functionality to be implemented',
-            );
+            print('🖨️ Print Bill button pressed');
+            print('📦 Cart items count: ${widget.cartItems.length}');
+            print('📄 Existing model: ${widget.existingModel?.id}');
 
-            // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Print Bill functionality to be implemented')));
+            try {
+              final plainItems = widget.cartItems.map((w) => w.item).toList();
+              print('✅ Plain items count: ${plainItems.length}');
+
+              await RestaurantPrintHelper.printBillForActiveOrder(
+                context: context,
+                order: widget.existingModel!,
+                currentItems: plainItems,
+              );
+
+              print('✅ Print completed successfully');
+              NotificationService.instance.showSuccess('Bill printed successfully');
+            } catch (e, stackTrace) {
+              print('❌ Print error: $e');
+              print('Stack trace: $stackTrace');
+              NotificationService.instance.showError('Failed to print bill: $e');
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: primarycolor,
@@ -1136,7 +1152,7 @@ class _TakeawayState extends State<Takeaway> {
               },
               child: Center(
                 child: Text(
-                  'Place Orderr',
+                  'Place Order',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
                 ),

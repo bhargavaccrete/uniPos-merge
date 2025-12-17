@@ -5,8 +5,8 @@ import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/presentation/screens/retail/sale_return_screen.dart';
-
-import '../../../core/di/service_locator.dart';
+import 'package:unipos/domain/services/retail/print_service.dart';
+import 'package:unipos/domain/services/retail/store_settings_service.dart';
 class SaleDetailScreen extends StatefulWidget {
   final String saleId;
 
@@ -90,6 +90,43 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     }
   }
 
+  Future<void> _printBill() async {
+    if (_sale == null || _saleItems.isEmpty) return;
+
+    try {
+      // Get store details
+      final storeSettingsService = StoreSettingsService();
+      final storeName = await storeSettingsService.getStoreName();
+      final storeAddress = await storeSettingsService.getFormattedAddress();
+      final storePhone = await storeSettingsService.getStorePhone();
+      final storeEmail = await storeSettingsService.getStoreEmail();
+      final gstNumber = await storeSettingsService.getGSTNumber();
+
+      // Show print options dialog
+      final printService = PrintService();
+      await printService.showPrintOptionsDialog(
+        context: context,
+        sale: _sale!,
+        items: _saleItems,
+        customer: _customer,
+        storeName: storeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        storeEmail: storeEmail,
+        gstNumber: gstNumber,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error printing: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   String _getPaymentIcon(String paymentType) {
     switch (paymentType.toLowerCase()) {
       case 'cash':
@@ -140,12 +177,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.print_outlined),
-            onPressed: () {
-              // TODO: Implement print functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Print feature coming soon')),
-              );
-            },
+            onPressed: _isLoading || _sale == null ? null : _printBill,
           ),
         ],
       ),

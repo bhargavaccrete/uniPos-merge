@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/data/repositories/business_details_repository.dart';
 
 /// Service for managing store/business settings
 class StoreSettingsService {
@@ -11,6 +13,8 @@ class StoreSettingsService {
   static const String _keyStoreCity = 'store_city';
   static const String _keyStoreState = 'store_state';
   static const String _keyStorePincode = 'store_pincode';
+
+  final _businessDetailsRepo = BusinessDetailsRepository();
 
   /// Get store name
   Future<String?> getStoreName() async {
@@ -120,6 +124,55 @@ class StoreSettingsService {
     return prefs.setString(_keyStorePincode, pincode);
   }
 
+  /// Get store logo as Uint8List from Hive
+  Future<Uint8List?> getStoreLogo() async {
+    try {
+      final businessDetails = _businessDetailsRepo.get();
+      return businessDetails?.logo;
+    } catch (e) {
+      print('Error getting logo from Hive: $e');
+      return null;
+    }
+  }
+
+  /// Set store logo from Uint8List to Hive
+  Future<bool> setStoreLogo(Uint8List logoBytes) async {
+    try {
+      final currentDetails = _businessDetailsRepo.get();
+      if (currentDetails == null) {
+        print('Error: No business details found in Hive');
+        return false;
+      }
+
+      // Update only the logo field
+      final updatedDetails = currentDetails.copyWith(logo: logoBytes);
+      await _businessDetailsRepo.save(updatedDetails);
+      return true;
+    } catch (e) {
+      print('Error saving logo to Hive: $e');
+      return false;
+    }
+  }
+
+  /// Delete store logo from Hive
+  Future<bool> deleteStoreLogo() async {
+    try {
+      final currentDetails = _businessDetailsRepo.get();
+      if (currentDetails == null) {
+        print('Error: No business details found in Hive');
+        return false;
+      }
+
+      // Update with null logo
+      final updatedDetails = currentDetails.copyWith(logo: null);
+      await _businessDetailsRepo.save(updatedDetails);
+      return true;
+    } catch (e) {
+      print('Error deleting logo from Hive: $e');
+      return false;
+    }
+  }
+
   /// Get complete store address formatted for receipts
   Future<String> getFormattedAddress() async {
     final address = await getStoreAddress();
@@ -177,6 +230,7 @@ class StoreSettingsService {
       await prefs.remove(_keyStoreCity);
       await prefs.remove(_keyStoreState);
       await prefs.remove(_keyStorePincode);
+      // Note: Logo is stored in Hive via BusinessDetails, not SharedPreferences
       return true;
     } catch (e) {
       return false;

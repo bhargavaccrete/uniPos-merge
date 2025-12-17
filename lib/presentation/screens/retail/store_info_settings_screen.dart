@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/util/color.dart';
 
@@ -24,6 +26,10 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   final _emailController = TextEditingController();
   final _gstNumberController = TextEditingController();
 
+  // Logo
+  Uint8List? _logoBytes;
+  bool _logoChanged = false;
+
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -45,8 +51,45 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     _phoneController.text = await _storeSettingsService.getStorePhone() ?? '';
     _emailController.text = await _storeSettingsService.getStoreEmail() ?? '';
     _gstNumberController.text = await _storeSettingsService.getGSTNumber() ?? '';
+    _logoBytes = await _storeSettingsService.getStoreLogo();
 
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _pickLogo() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _logoBytes = bytes;
+          _logoChanged = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick logo: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteLogo() async {
+    setState(() {
+      _logoBytes = null;
+      _logoChanged = true;
+    });
   }
 
   Future<void> _saveSettings() async {
@@ -54,6 +97,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
 
     setState(() => _isSaving = true);
 
+    // Save text settings
     final success = await _storeSettingsService.saveAllSettings(
       storeName: _storeNameController.text,
       ownerName: _ownerNameController.text.isNotEmpty ? _ownerNameController.text : null,
@@ -66,17 +110,28 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
       gstNumber: _gstNumberController.text.isNotEmpty ? _gstNumberController.text : null,
     );
 
+    // Save logo if it was changed
+    bool logoSuccess = true;
+    if (_logoChanged) {
+      if (_logoBytes != null) {
+        logoSuccess = await _storeSettingsService.setStoreLogo(_logoBytes!);
+      } else {
+        logoSuccess = await _storeSettingsService.deleteStoreLogo();
+      }
+    }
+
     setState(() => _isSaving = false);
 
     if (mounted) {
+      final bool allSuccess = success && logoSuccess;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(success ? 'Store information saved successfully' : 'Failed to save settings'),
-          backgroundColor: success ? AppColors.success : AppColors.danger,
+          content: Text(allSuccess ? 'Store information saved successfully' : 'Failed to save some settings'),
+          backgroundColor: allSuccess ? AppColors.success : AppColors.danger,
         ),
       );
 
-      if (success) {
+      if (allSuccess) {
         Navigator.pop(context);
       }
     }
@@ -141,6 +196,20 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 24),
+
+                    // Logo Section
+                    _buildSectionHeader('Store Logo'),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Your logo will appear on receipts and invoices',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildLogoSection(),
                     const SizedBox(height: 24),
 
                     // Business Details Section
@@ -316,6 +385,79 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
       maxLength: maxLength,
       textCapitalization: textCapitalization,
       validator: validator,
+    );
+  }
+
+  Widget _buildLogoSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        children: [
+          // Logo Display
+          Container(
+            height: 150,
+            width: 150,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: _logoBytes != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      _logoBytes!,
+                      fit: BoxFit.contain,
+                    ),
+                  )
+                : Icon(
+                    Icons.image_outlined,
+                    size: 60,
+                    color: Colors.grey[400],
+                  ),
+          ),
+          const SizedBox(height: 16),
+
+          // Buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _pickLogo,
+                icon: Icon(_logoBytes != null ? Icons.edit : Icons.upload, size: 18),
+                label: Text(_logoBytes != null ? 'Change Logo' : 'Upload Logo'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              if (_logoBytes != null) ...[
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _deleteLogo,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Remove'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: BorderSide(color: AppColors.danger),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

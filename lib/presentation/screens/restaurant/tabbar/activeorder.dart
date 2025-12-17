@@ -87,7 +87,7 @@ class _ActiveorderState extends State<Activeorder> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
             children: [
-              Text('Update Status #${order.kotNumber}'),
+              Text('Update Status #${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id.substring(0, 8)}'),
 
               InkWell(
                   onTap: (){
@@ -147,7 +147,7 @@ class _ActiveorderState extends State<Activeorder> {
     await HiveOrders.updateOrder(updatedOrder);
     // Refresh the screen to show the new color
     // _refreshOrders();
-    print("Order ${order.kotNumber} status updated to $newStatus.");
+    print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} status updated to $newStatus.");
   }
 
 // ACTION 2: Moves the order to the past orders box
@@ -179,7 +179,7 @@ class _ActiveorderState extends State<Activeorder> {
 
     // Refresh the screen to remove the card
     // _refreshOrders();
-    print("Order ${order.kotNumber} moved to past orders.");
+    print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} moved to past orders.");
   }
 
 
@@ -272,7 +272,7 @@ class _ActiveorderState extends State<Activeorder> {
 
                             // If not paid, navigate to the cart to complete payment
                             if (order.isPaid != true) {
-                              print('Card with Kot ${order.kotNumber}');
+                              print('Card with Kot ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id}');
 
                               await Navigator.push(
                                 context,

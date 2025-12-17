@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobx/mobx.dart';
 import 'package:unipos/data/models/common/business_type.dart';
 import 'package:unipos/data/models/common/business_details.dart';
@@ -108,6 +110,10 @@ abstract class _SetupWizardStore with Store {
 
   @observable
   List<dynamic>? taxRates; // List to store TaxItem objects from UI
+
+  @observable
+  Uint8List? logoByte;
+
 
   // ==================== COMPUTED ====================
 
@@ -228,6 +234,21 @@ abstract class _SetupWizardStore with Store {
   @action
   void setOwnerName(String value) {
     ownerName = value;
+  }
+
+
+
+  @action
+  void setLogo(Uint8List? bytes){
+    logoByte = bytes;
+  }
+
+
+  // Inside setup_wizard_store.dart
+
+  @action
+  void deleteLogo() {
+    logoByte = null;
   }
 
   @action
@@ -370,6 +391,7 @@ abstract class _SetupWizardStore with Store {
         state = savedDetails.state ?? '';
         country = savedDetails.country ?? '';
         pincode = savedDetails.pincode ?? '';
+        logoByte = savedDetails.logo;
         // Use AppConfig as source of truth for setup complete status
         if (!AppConfig.isBusinessModeSet) {
           isSetupComplete = savedDetails.isSetupComplete;
@@ -434,6 +456,7 @@ abstract class _SetupWizardStore with Store {
         country: country,
         pincode: pincode,
         isSetupComplete: false,
+        logo: logoByte
       );
       await _businessDetailsRepo.save(details);
 
@@ -543,7 +566,9 @@ abstract class _SetupWizardStore with Store {
         state: state,
         country: country,
         pincode: pincode,
+        logo: logoByte,
         isSetupComplete: true,
+
       );
       await _businessDetailsRepo.save(details);
 
@@ -573,6 +598,26 @@ abstract class _SetupWizardStore with Store {
     }
   }
 
+
+  @action
+  Future<void>pickLogo()async{
+    try{
+      final ImagePicker picker = ImagePicker();
+
+      final XFile ? image = await picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 50
+      );
+      if(image != null){
+        final bytes = await image.readAsBytes();
+      setLogo(bytes);
+      }
+
+    }catch(e){
+      errorMessage = 'Failed to pick image $e';
+    }
+  }
+
   @action
   Future<void> resetSetup() async {
     isLoading = true;
@@ -596,6 +641,7 @@ abstract class _SetupWizardStore with Store {
       state = '';
       country = '';
       pincode = '';
+      logoByte = null;
       isSetupComplete = false;
 
       // Reset tax observables

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
@@ -7,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
+import 'package:unipos/domain/services/retail/store_settings_service.dart';
 
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
@@ -21,6 +23,17 @@ enum ReceiptFormat {
 /// Service for handling all print operations
 class PrintService {
   final ReceiptPdfService _receiptPdfService = ReceiptPdfService();
+  final StoreSettingsService _storeSettingsService = StoreSettingsService();
+
+  /// Load store logo for all bills (both retail and restaurant)
+  Future<Uint8List?> _loadStoreLogo() async {
+    try {
+      return await _storeSettingsService.getStoreLogo();
+    } catch (e) {
+      print('Error loading logo: $e');
+      return null;
+    }
+  }
 
   /// Print a sale receipt/invoice
   Future<void> printReceipt({
@@ -37,6 +50,9 @@ class PrintService {
     String? orderType,
     String? tableNo,
   }) async {
+    // Load logo for all bills
+    final logoBytes = await _loadStoreLogo();
+
     final receiptData = ReceiptData(
       sale: sale,
       items: items,
@@ -48,6 +64,7 @@ class PrintService {
       gstNumber: gstNumber,
       orderType: orderType,
       tableNo: tableNo,
+      logoBytes: logoBytes,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -76,6 +93,9 @@ class PrintService {
     String? orderType,
     String? tableNo,
   }) async {
+    // Load logo for all bills
+    final logoBytes = await _loadStoreLogo();
+
     final receiptData = ReceiptData(
       sale: sale,
       items: items,
@@ -87,6 +107,7 @@ class PrintService {
       gstNumber: gstNumber,
       orderType: orderType,
       tableNo: tableNo,
+      logoBytes: logoBytes,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -146,6 +167,9 @@ class PrintService {
     String? orderType,
     String? tableNo,
   }) async {
+    // Load logo for all bills
+    final logoBytes = await _loadStoreLogo();
+
     final receiptData = ReceiptData(
       sale: sale,
       items: items,
@@ -157,6 +181,7 @@ class PrintService {
       gstNumber: gstNumber,
       orderType: orderType,
       tableNo: tableNo,
+      logoBytes: logoBytes,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -199,6 +224,9 @@ class PrintService {
     String? storeEmail,
     String? gstNumber,
   }) async {
+    // Load logo for all bills
+    final logoBytes = await _loadStoreLogo();
+
     final receiptData = ReceiptData(
       sale: sale,
       items: items,
@@ -208,6 +236,7 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      logoBytes: logoBytes,
     );
 
     final pdf = format == ReceiptFormat.thermal

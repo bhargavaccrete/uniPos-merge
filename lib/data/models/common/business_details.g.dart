@@ -30,7 +30,7 @@ class BusinessDetailsAdapter extends TypeAdapter<BusinessDetails> {
       state: fields[10] as String?,
       country: fields[11] as String?,
       pincode: fields[12] as String?,
-      logo: fields[13] as String?,
+      logo: fields[13] as Uint8List?,
       isSetupComplete: fields[14] as bool,
       createdAt: fields[15] as DateTime?,
       updatedAt: fields[16] as DateTime?,

@@ -341,6 +341,12 @@ class _MenuScreenState extends State<MenuScreen> {
                                   height: 20,
                                 ),
 
+
+
+
+
+                                /*------------------------------------Categories-------------------------------------*/
+
                                 ValueListenableBuilder(valueListenable:Hive.box<Category>('categories').listenable(),
                                     builder: (context , categorys , _)
                                     {
@@ -446,10 +452,13 @@ class _MenuScreenState extends State<MenuScreen> {
                             ),
                           ),
 
-                          // Online Order Column
+                     /* -------------------------Online Order Column-----------------------*/
                           Expanded(
                             child: Column(
                               children: [
+
+               /*------------------------Online Order  Button----------------------*/
+                              /*
                                 Container(
                                   // color: Colors.red,
                                   child: CommonButton(
@@ -474,7 +483,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                       )),
                                 ),
 
-                                SizedBox(height: 15),
+                                SizedBox(height: 15),*/
 
                                 // Search text field
                                 Padding(
@@ -482,43 +491,50 @@ class _MenuScreenState extends State<MenuScreen> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Container(
-                                          width: width * 0.32,
-                                          height: height * 0.04,
-                                          // color: Colors.red,
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                                hintText: 'Code Here',
-                                                hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                border: OutlineInputBorder()),
-                                          )),
+                                      Expanded(
+                                        child: Container(
+                                            // width: width * 0.32,
+                                            height: height * 0.04,
+                                            // color: Colors.red,
+                                            child: TextField(
+                                              textAlign: TextAlign.center,
+                                              decoration: InputDecoration(
+
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                                  hintText: 'Code Here',
+                                                  hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+                                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
+                                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
+                                                  border: OutlineInputBorder()),
+                                            )),
+                                      ),
                                       SizedBox(
                                         width: 2,
                                       ),
-                                      Container(
-                                          width: width * 0.32,
-                                          height: height * 0.04,
+                                      Expanded(
+                                        child: Container(
+                                            // width: width * 0.32,
+                                            height: height * 0.04,
 
-                                          // color: Colors.red,
-                                          child: TextField(
-                                            controller: _searchController,
-                                            decoration: InputDecoration(
-                                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                                hintText: 'Items Here',
-                                                hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                border: OutlineInputBorder()),
-                                          )),
+                                            // color: Colors.red,
+                                            child: TextField(
+                                              textAlign: TextAlign.center,
+                                              controller: _searchController,
+                                              decoration: InputDecoration(
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                                  hintText: 'Items Here',
+                                                  hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+                                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
+                                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
+                                                  border: OutlineInputBorder()),
+                                            )),
+                                      ),
                                     ],
                                   ),
                                 ),
 
 
-                                // category if gridview
+                           /* -----------category if gridview---------------*/
                                 if (AppSettings.useGridViewCategory)
                                   Container(
                                       width: width * 0.9,
@@ -600,7 +616,10 @@ class _MenuScreenState extends State<MenuScreen> {
                                   ),
 
 
+                                /*----------item card -------------*/
+                                //change the aspect ration for card height
                                 Container(
+                                  // color: Colors.red,
                                   width: width,
                                   height: height,
                                   child:
@@ -619,7 +638,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                         (AppSettings.fixItemCard ?
                                         (AppSettings.showItemImage ? 1.2 : 2.2)
                                             :
-                                        (AppSettings.showItemImage ? 0.65 : 1.8));
+                                        (AppSettings.showItemImage ? 0.65 : 1.5));
 
                                         return ValueListenableBuilder(valueListenable: Hive.box<Items>('itemBoxs').listenable(),
                                             builder:(context, item, _){
@@ -781,10 +800,14 @@ class _MenuScreenState extends State<MenuScreen> {
                                       }
                                   ),
                                 )
+
+
+
+
+
                               ],
                             ),
                           ),
-
                         ],
                       ),
                       if (isCartShow)

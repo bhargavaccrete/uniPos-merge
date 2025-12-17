@@ -63,11 +63,15 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   void _prepareVariants() {
     if (widget.item.variant == null || widget.item.variant!.isEmpty) return;
     final variantBox = Hive.box<VariantModel>('variante');
-    // ... (This logic is the same as before)
+    
     for (ItemVariante itemVariant in widget.item.variant!) {
-      final variantDetails = variantBox.values.firstWhere((v) => v.id == itemVariant.variantId, orElse: () => VariantModel(id: '', name: 'Unknown'));
-      if (variantDetails.name != 'Unknown') {
+      // Use direct key lookup which is O(1) and safer
+      final variantDetails = variantBox.get(itemVariant.variantId);
+      
+      if (variantDetails != null) {
         _displayVariants.add(DisplayVariant(id: variantDetails.id, name: variantDetails.name, price: itemVariant.price));
+      } else {
+        print("Warning: Variant ID ${itemVariant.variantId} found in item but not in 'variante' box.");
       }
     }
     if (_displayVariants.isNotEmpty) {
@@ -79,9 +83,13 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     if (widget.item.choiceIds == null || widget.item.choiceIds!.isEmpty) return;
     final choiceBox = Hive.box<ChoicesModel>('choice'); // Use your choice group box name
     for (String choiceId in widget.item.choiceIds!) {
-      final choiceGroup = choiceBox.values.firstWhere((c) => c.id == choiceId, orElse: () => ChoicesModel(id: '', name: 'Unknown'));
-      if (choiceGroup.name != 'Unknown') {
+      // Use direct key lookup
+      final choiceGroup = choiceBox.get(choiceId);
+      
+      if (choiceGroup != null) {
         _displayChoiceGroups.add(choiceGroup);
+      } else {
+         print("Warning: Choice ID $choiceId found in item but not in 'choice' box.");
       }
     }
   }
@@ -90,8 +98,10 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     if(widget.item.extraId == null || widget.item.extraId!.isEmpty) return ;
     final ExtraBox = Hive.box<Extramodel>('extra');
     for(String extraId in widget.item.extraId!){
-      final extraGroup = ExtraBox.values.firstWhere((e)=> e.Id == extraId, orElse:  ()=> Extramodel(Id: '', Ename: 'Unknown'));
-      if(extraGroup.Ename != 'Unknown'){
+      // Use direct key lookup
+      final extraGroup = ExtraBox.get(extraId);
+      
+      if(extraGroup != null){
         _displayExtra.add(extraGroup);
         // Initialize quantities for all toppings in this category
         if (extraGroup.topping != null) {
@@ -99,6 +109,8 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             _extraQuantities[topping.name] = 0;
           }
         }
+      } else {
+         print("Warning: Extra ID $extraId found in item but not in 'extra' box.");
       }
     }
 
@@ -499,7 +511,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                             icon: Icon(Icons.remove_circle_outline, color: currentQuantity > 0 ? primarycolor : Colors.grey[400]),
                             onPressed: currentQuantity > 0 ? () {
                               setState(() {
-                                _extraQuantities[topping.name] = currentQuantity - 1;
+                                final newQuantity = currentQuantity - 1;
+                                _extraQuantities[topping.name] = newQuantity;
+                                if (newQuantity == 0) {
+                                  _selectedExtra.remove(topping);
+                                }
                                 _recalculateTotal();
                               });
                             } : null,
@@ -522,7 +538,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                             icon: Icon(Icons.add_circle_outline, color: canIncrement ? primarycolor : Colors.grey[400]),
                             onPressed: canIncrement ? () {
                               setState(() {
-                                _extraQuantities[topping.name] = currentQuantity + 1;
+                                final newQuantity = currentQuantity + 1;
+                                _extraQuantities[topping.name] = newQuantity;
+                                if (newQuantity == 1) {
+                                  _selectedExtra.add(topping);
+                                }
                                 _recalculateTotal();
                               });
                             } : null,

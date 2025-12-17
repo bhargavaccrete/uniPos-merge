@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:hive/hive.dart';
 import '../data/models/common/business_details.dart';
 
@@ -40,7 +41,7 @@ class BusinessDetailsBox {
     String? state,
     String? country,
     String? pincode,
-    String? logo,
+    Uint8List? logo,
     bool? isSetupComplete,
   }) async {
     final existing = getBusinessDetails();
