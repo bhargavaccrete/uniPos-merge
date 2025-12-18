@@ -33,13 +33,73 @@ class RestaurantPrintHelper {
       final saleItems = order.items.map((item) {
         // Calculate tax for this item if possible, otherwise distribute total tax
         final itemTaxRate = (item.taxRate ?? 0) * 100;
-        
+
+        // Format extras with quantities for display
+        String? extrasInfo;
+        if (item.extras != null && item.extras!.isNotEmpty) {
+          // Group extras by name and count them
+          Map<String, Map<String, dynamic>> groupedExtras = {};
+
+          for (var extra in item.extras!) {
+            final displayName = extra['displayName'] ?? extra['name'] ?? 'Unknown';
+            final price = extra['price']?.toDouble() ?? 0.0;
+            final quantity = extra['quantity']?.toInt() ?? 1;
+
+            String key = '$displayName-${price.toStringAsFixed(2)}';
+
+            if (groupedExtras.containsKey(key)) {
+              groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + quantity;
+            } else {
+              groupedExtras[key] = {
+                'displayName': displayName,
+                'price': price,
+                'quantity': quantity,
+              };
+            }
+          }
+
+          // Build display string
+          extrasInfo = groupedExtras.entries.map((entry) {
+            final data = entry.value;
+            final int qty = data['quantity'] as int;
+            final String name = data['displayName'] as String;
+            final double price = data['price'] as double;
+
+            if (qty > 1) {
+              return '${qty}x $name(₹${price.toStringAsFixed(2)})';
+            } else {
+              return '$name(₹${price.toStringAsFixed(2)})';
+            }
+          }).join(', ');
+
+          if (extrasInfo!.isNotEmpty) {
+            extrasInfo = 'Extras: $extrasInfo';
+          }
+        }
+
+        // Format choices for display
+        String? choicesInfo;
+        if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
+          choicesInfo = 'Add-ons: ${item.choiceNames!.join(', ')}';
+        }
+
+        // Combine extras and choices into weight field for display
+        String? additionalInfo;
+        if (extrasInfo != null && choicesInfo != null) {
+          additionalInfo = '$choicesInfo | $extrasInfo';
+        } else if (extrasInfo != null) {
+          additionalInfo = extrasInfo;
+        } else if (choicesInfo != null) {
+          additionalInfo = choicesInfo;
+        }
+
         return SaleItemModel.create(
           saleId: order.id,
           varianteId: item.id, // Use item.id as variant ID since CartItem doesn't have explicit variantId field
           productId: item.productId,
           productName: item.title,
           size: item.variantName, // Use size field for variant name
+          weight: additionalInfo, // Use weight field to store extras and choices info
           price: item.price,
           qty: item.quantity,
           discountAmount: 0, // Item level discount not typically stored in restaurant cart

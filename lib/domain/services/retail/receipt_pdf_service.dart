@@ -644,6 +644,7 @@ class ReceiptPdfService {
               ),
             ],
           ),
+          // Display size/variant
           if (item.size != null || item.color != null)
             pw.Padding(
               padding: const pw.EdgeInsets.only(left: 8),
@@ -653,6 +654,15 @@ class ReceiptPdfService {
                   if (item.color != null) 'Color: ${item.color}',
                 ].join(' | '),
                 style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+              ),
+            ),
+          // Display extras and add-ons (stored in weight field)
+          if (item.weight != null && item.weight!.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(left: 8, top: 2),
+              child: pw.Text(
+                item.weight!,
+                style: pw.TextStyle(fontSize: 6, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic),
               ),
             ),
         ],
@@ -784,6 +794,15 @@ class ReceiptPdfService {
                 if (item.color != null) 'Color: ${item.color}',
               ].join(' | '),
               style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+          // Display extras and add-ons
+          if (item.weight != null && item.weight!.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 2),
+              child: pw.Text(
+                item.weight!,
+                style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic),
+              ),
             ),
           if (item.barcode != null)
             pw.Text(

@@ -413,14 +413,21 @@ class _TakeawayState extends State<Takeaway> {
                   color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text(
-                    'extra : ${item.extras!.map((extra){
+                child: Builder(
+                  builder: (context) {
+                    // Group extras by name and count them
+                    Map<String, Map<String, dynamic>> groupedExtras = {};
+
+                    for (var extra in item.extras!) {
                       // Debug: Print what data we have
                       print('=== EXTRA DEBUG ===');
+                      print('Extra data: $extra');
                       print('Extra keys: ${extra.keys}');
                       print('name: ${extra['name']}');
                       print('displayName: ${extra['displayName']}');
                       print('categoryName: ${extra['categoryName']}');
+                      print('quantity: ${extra['quantity']}');
+                      print('===================');
 
                       // Try multiple ways to get the display name
                       String displayName;
@@ -429,15 +436,44 @@ class _TakeawayState extends State<Takeaway> {
                       } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
                         displayName = '${extra['categoryName']} - ${extra['name']}';
                       } else {
-                        displayName = extra['name'];
+                        displayName = extra['name'] ?? 'Unknown';
                       }
 
                       final double price = extra['price']?.toDouble() ?? 0.0;
-                      print('Final displayName: $displayName');
-                      print('===================');
+                      final int itemQuantity = extra['quantity']?.toInt() ?? 1;
 
-                      return '$displayName(Rs. ${price.toStringAsFixed(2)})';
-                    }).join(', ')}'
+                      // Create a unique key for grouping
+                      String key = '$displayName-${price.toStringAsFixed(2)}';
+
+                      if (groupedExtras.containsKey(key)) {
+                        // If extra already exists, increment quantity
+                        groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + itemQuantity;
+                      } else {
+                        // Add new extra
+                        groupedExtras[key] = {
+                          'displayName': displayName,
+                          'price': price,
+                          'quantity': itemQuantity,
+                        };
+                      }
+                    }
+
+                    // Build the display string
+                    String extrasText = groupedExtras.entries.map((entry) {
+                      final data = entry.value;
+                      final int qty = data['quantity'] as int;
+                      final String name = data['displayName'] as String;
+                      final double price = data['price'] as double;
+
+                      if (qty > 1) {
+                        return '${qty}x $name(Rs. ${price.toStringAsFixed(2)})';
+                      } else {
+                        return '$name(Rs. ${price.toStringAsFixed(2)})';
+                      }
+                    }).join(', ');
+
+                    return Text('extra : $extrasText');
+                  },
                 ),
               ),
 

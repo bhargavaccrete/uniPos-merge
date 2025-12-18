@@ -280,7 +280,10 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
               ? e.getPriceForVariant(_selectedVariant!.id)
               : e.price;
 
-          print('Extra Debug: Category="$categoryName", Name="${e.name}", DisplayName="$displayName"');
+          // Get the quantity for this extra
+          final quantity = _extraQuantities[e.name] ?? 1;
+
+          print('Extra Debug: Category="$categoryName", Name="${e.name}", DisplayName="$displayName", Quantity=$quantity');
 
           return {
             'name': e.name,
@@ -288,6 +291,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             'price': finalPrice,
             'categoryName': categoryName,
             'categoryId': categoryId,
+            'quantity': quantity,
           };
         }).toList()
     );

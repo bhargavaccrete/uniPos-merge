@@ -658,7 +658,7 @@ class _AddProductScreenState extends State<AddProductScreen>
               children: [
                 _buildTextField(
                   controller: _unitController,
-                  label: 'Unit (e.g., pcs, kg)',
+                  label: 'Unitt (e.g., pcs, kg)',
                   icon: Icons.straighten,
                 ),
                 const SizedBox(height: 16),

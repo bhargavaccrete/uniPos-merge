@@ -9,6 +9,7 @@ import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
@@ -64,7 +65,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   final _stockController = TextEditingController();
 
   // Variants, Choices, Extras (from Add More Info screen)
-  List<String> _selectedVariantIds = [];
+  List<ItemVariante> _selectedVariants = [];
   List<String> _selectedChoiceIds = [];
   List<String> _selectedExtraIds = [];
 
@@ -286,6 +287,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       MaterialPageRoute(
         builder: (context) => AddMoreInfoScreen(
           initialData: {
+            'variants': _selectedVariants.map((v) => v.toMap()).toList(),
             'choiceIds': _selectedChoiceIds,
             'extraIds': _selectedExtraIds,
           },
@@ -295,6 +297,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
     if (result != null) {
       setState(() {
+        if (result['variants'] != null) {
+          _selectedVariants = (result['variants'] as List)
+              .map((v) => ItemVariante.fromMap(v as Map<String, dynamic>))
+              .toList();
+        }
         _selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
         _selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
       });
@@ -392,6 +399,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             ? double.tryParse(_stockController.text.trim()) ?? 0.0
             : 0.0,
         allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
+        variant: _selectedVariants,
         choiceIds: _selectedChoiceIds,
         extraId: _selectedExtraIds,
         taxIds: _selectedTaxId != null ? [_selectedTaxId!] : null, // Single tax ID as list
@@ -463,7 +471,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _selectedUnit = null;
       _trackInventory = false;
       _allowOrderWhenOutOfStock = false;
-      _selectedVariantIds = [];
+      _selectedVariants = [];
       _selectedChoiceIds = [];
       _selectedExtraIds = [];
       _selectedTaxId = null; // Reset single tax selection
@@ -1366,7 +1374,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Widget _buildAdditionalOptionsSection() {
-    final hasSelections = _selectedVariantIds.isNotEmpty ||
+    final hasSelections = _selectedVariants.isNotEmpty ||
         _selectedChoiceIds.isNotEmpty ||
         _selectedExtraIds.isNotEmpty;
 
@@ -1417,7 +1425,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     const SizedBox(height: 4),
                     Text(
                       hasSelections
-                          ? 'Variants: ${_selectedVariantIds.length}, Choices: ${_selectedChoiceIds.length}, Extras: ${_selectedExtraIds.length}'
+                          ? 'Variants: ${_selectedVariants.length}, Choices: ${_selectedChoiceIds.length}, Extras: ${_selectedExtraIds.length}'
                           : 'Add variants, choices, and extras',
                       style: GoogleFonts.poppins(
                         fontSize: 12,

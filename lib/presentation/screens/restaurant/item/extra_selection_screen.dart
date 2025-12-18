@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
+import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -321,11 +322,19 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
 
   void _showAddExtraDialog() {
     final extraNameController = TextEditingController();
+    // Load variants for "Contains Size" feature
+    final variantBox = Hive.box<VariantModel>('variante');
+    final availableVariants = variantBox.values.toList();
+
+    // Data structure to hold topping inputs including variant prices
     final List<Map<String, dynamic>> toppingData = [
       {
         'nameController': TextEditingController(),
         'priceController': TextEditingController(),
         'isVeg': true,
+        'hasSize': false,
+        'variantPriceControllers': <String, TextEditingController>{}, // map variantId -> controller
+        'selectedVariants': <String>{}, // set of selected variant IDs
       }
     ];
 
@@ -370,6 +379,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                     ),
                     SizedBox(height: 10),
                     ...List.generate(toppingData.length, (index) {
+                      final data = toppingData[index];
+                      final bool hasSize = data['hasSize'];
+                      final Map<String, TextEditingController> variantControllers = data['variantPriceControllers'];
+                      final Set<String> selectedVariants = data['selectedVariants'];
+
                       return Container(
                         margin: EdgeInsets.only(bottom: 15),
                         padding: EdgeInsets.all(12),
@@ -395,8 +409,10 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                     icon: Icon(Icons.remove_circle, color: Colors.red, size: 20),
                                     onPressed: () {
                                       setDialogState(() {
-                                        toppingData[index]['nameController'].dispose();
-                                        toppingData[index]['priceController'].dispose();
+                                        data['nameController'].dispose();
+                                        data['priceController'].dispose();
+                                        // Dispose variant controllers
+                                        variantControllers.values.forEach((c) => c.dispose());
                                         toppingData.removeAt(index);
                                       });
                                     },
@@ -405,20 +421,13 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                             ),
                             SizedBox(height: 8),
                             CommonTextForm(
-                              controller: toppingData[index]['nameController'],
+                              controller: data['nameController'],
                               labelText: 'Topping Name',
                               obsecureText: false,
                               borderc: 8,
                             ),
                             SizedBox(height: 10),
-                            CommonTextForm(
-                              controller: toppingData[index]['priceController'],
-                              labelText: 'Price',
-                              obsecureText: false,
-                              borderc: 8,
-                              keyboardType: TextInputType.numberWithOptions(decimal: true),
-                            ),
-                            SizedBox(height: 10),
+                            // Veg/Non-Veg Selection
                             Row(
                               children: [
                                 Text(
@@ -431,10 +440,10 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                     children: [
                                       Radio<bool>(
                                         value: true,
-                                        groupValue: toppingData[index]['isVeg'],
+                                        groupValue: data['isVeg'],
                                         onChanged: (value) {
                                           setDialogState(() {
-                                            toppingData[index]['isVeg'] = value!;
+                                            data['isVeg'] = value!;
                                           });
                                         },
                                         activeColor: Colors.green,
@@ -445,10 +454,10 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                       SizedBox(width: 15),
                                       Radio<bool>(
                                         value: false,
-                                        groupValue: toppingData[index]['isVeg'],
+                                        groupValue: data['isVeg'],
                                         onChanged: (value) {
                                           setDialogState(() {
-                                            toppingData[index]['isVeg'] = value!;
+                                            data['isVeg'] = value!;
                                           });
                                         },
                                         activeColor: Colors.red,
@@ -461,6 +470,115 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                 ),
                               ],
                             ),
+                            SizedBox(height: 10),
+                            // Contains Size Checkbox
+                            if (availableVariants.isNotEmpty)
+                              Row(
+                                children: [
+                                  Checkbox(
+                                    value: hasSize,
+                                    onChanged: (value) {
+                                      setDialogState(() {
+                                        data['hasSize'] = value!;
+                                        if (value) {
+                                          // Initialize variant controllers if needed
+                                          if (selectedVariants.isEmpty) {
+                                             // Auto-select all or none? Let's leave empty and let user select
+                                          }
+                                        } else {
+                                          // Clear logic if unchecked? Keep data for now or clear?
+                                        }
+                                      });
+                                    },
+                                    activeColor: primarycolor,
+                                  ),
+                                  Text(
+                                    'Contains Size (Variant Pricing)',
+                                    style: GoogleFonts.poppins(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            
+                            // Price Input (Show if NO size or used as base price)
+                            if (!hasSize) ...[
+                               SizedBox(height: 10),
+                               CommonTextForm(
+                                controller: data['priceController'],
+                                labelText: 'Price',
+                                obsecureText: false,
+                                borderc: 8,
+                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ] else ...[
+                              // Variant Pricing Section
+                              Padding(
+                                padding: const EdgeInsets.only(left: 10, top: 5),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Select Variants & Set Prices:',
+                                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                    SizedBox(height: 5),
+                                    ...availableVariants.map((variant) {
+                                      final isSelected = selectedVariants.contains(variant.id);
+                                      // Ensure controller exists if selected
+                                      if (isSelected && !variantControllers.containsKey(variant.id)) {
+                                          variantControllers[variant.id] = TextEditingController();
+                                      }
+
+                                      return Row(
+                                        children: [
+                                          Checkbox(
+                                            value: isSelected,
+                                            onChanged: (val) {
+                                              setDialogState(() {
+                                                if (val == true) {
+                                                  selectedVariants.add(variant.id);
+                                                  if (!variantControllers.containsKey(variant.id)) {
+                                                    variantControllers[variant.id] = TextEditingController();
+                                                  }
+                                                } else {
+                                                  selectedVariants.remove(variant.id);
+                                                }
+                                              });
+                                            },
+                                            visualDensity: VisualDensity.compact,
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              variant.name,
+                                              style: GoogleFonts.poppins(fontSize: 12),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (isSelected)
+                                            Expanded(
+                                              flex: 3,
+                                              child: SizedBox(
+                                                height: 40,
+                                                child: TextField(
+                                                  controller: variantControllers[variant.id],
+                                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                                  decoration: InputDecoration(
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                                                    prefixText: '₹',
+                                                    hintText: '0',
+                                                  ),
+                                                  style: GoogleFonts.poppins(fontSize: 12),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );
@@ -473,6 +591,9 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                             'nameController': TextEditingController(),
                             'priceController': TextEditingController(),
                             'isVeg': true,
+                            'hasSize': false,
+                            'variantPriceControllers': <String, TextEditingController>{},
+                            'selectedVariants': <String>{},
                           });
                         });
                       },
@@ -491,6 +612,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                     for (var data in toppingData) {
                       data['nameController'].dispose();
                       data['priceController'].dispose();
+                      (data['variantPriceControllers'] as Map<String, TextEditingController>).values.forEach((c) => c.dispose());
                     }
                     extraNameController.dispose();
                     Navigator.pop(context);
@@ -516,18 +638,41 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                     final toppings = <Topping>[];
                     for (var data in toppingData) {
                       final name = data['nameController'].text.trim();
-                      final priceText = data['priceController'].text.trim();
+                      final bool hasSize = data['hasSize'];
+                      final Map<String, TextEditingController> variantControllers = data['variantPriceControllers'];
+                      final Set<String> selectedVariants = data['selectedVariants'];
+                      
+                      if (name.isEmpty) continue;
 
-                      if (name.isNotEmpty && priceText.isNotEmpty) {
-                        final price = double.tryParse(priceText);
-                        if (price != null && price >= 0) {
-                          toppings.add(Topping(
-                            name: name,
-                            isveg: data['isVeg'],
-                            price: price,
-                          ));
-                        }
+                      double basePrice = 0.0;
+                      Map<String, double>? variantPrices;
+
+                      if (hasSize) {
+                        variantPrices = {};
+                         if (selectedVariants.isEmpty) {
+                           // Skip if contains size but no variants selected? 
+                           // Or allow with 0 prices? Let's skip invalid ones or warn
+                           // For now, continuing
+                         }
+                         for (var variantId in selectedVariants) {
+                            final priceText = variantControllers[variantId]?.text.trim() ?? '0';
+                            final price = double.tryParse(priceText) ?? 0.0;
+                            variantPrices[variantId] = price;
+                            // Set base price to first variant's price as fallback
+                            if (basePrice == 0.0) basePrice = price;
+                         }
+                      } else {
+                        final priceText = data['priceController'].text.trim();
+                        basePrice = double.tryParse(priceText) ?? 0.0;
                       }
+
+                      toppings.add(Topping(
+                        name: name,
+                        isveg: data['isVeg'],
+                        price: basePrice,
+                        isContainSize: hasSize,
+                        variantPrices: variantPrices,
+                      ));
                     }
 
                     if (toppings.isEmpty) {
@@ -555,6 +700,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                     for (var data in toppingData) {
                       data['nameController'].dispose();
                       data['priceController'].dispose();
+                      (data['variantPriceControllers'] as Map<String, TextEditingController>).values.forEach((c) => c.dispose());
                     }
                     extraNameController.dispose();
                     Navigator.pop(context);
