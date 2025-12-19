@@ -454,7 +454,8 @@ class HomeScreen extends StatelessWidget {
         context,
         icon: Icons.point_of_sale,
         title: 'Billing',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PosScreen())),
+        // onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PosScreen())),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
       ),
       _buildMenuCard(
         context,
@@ -510,12 +511,14 @@ class HomeScreen extends StatelessWidget {
         icon: Icons.settings,
         title: 'Settings',
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
-      ),    _buildMenuCard(
-        context,
-        icon: Icons.settings,
-        title: 'ex pos',
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
       ),
+
+      // _buildMenuCard(
+      //   context,
+      //   icon: Icons.settings,
+      //   title: 'ex pos',
+      //   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
+      // ),
     ];
   }
 

@@ -19,32 +19,39 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
         centerTitle: true,
-        title: const Text("Bulk Import Products"),
-        backgroundColor: AppColors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Observer(
-          builder: (_) {
-            if (_store.isProcessing) {
-              return _buildProcessingView();
-            }
-            
-            if (_store.parsedRows.isNotEmpty) {
-              return _buildPreviewView();
-            }
-
-            return _buildUploadView();
-          },
+        title: const Text(
+          "Bulk Import Products",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
         ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A1A)),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Observer(
+        builder: (_) {
+          if (_store.isProcessing) {
+            return _buildProcessingView();
+          }
+
+          if (_store.parsedRows.isNotEmpty) {
+            return _buildPreviewView();
+          }
+
+          return _buildUploadView();
+        },
       ),
     );
   }
 
   Widget _buildUploadView() {
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -52,39 +59,43 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: AppColors.info.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: AppColors.info.withOpacity(0.3), width: 0.5),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Text(
+                    Icon(Icons.info_outline, color: AppColors.info, size: 22),
+                    const SizedBox(width: 12),
+                    const Text(
                       'File Format Requirements',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade900,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'Supported formats: Excel (.xlsx, .xls) or CSV (.csv)',
-                  style: TextStyle(color: Colors.blue.shade900, fontSize: 14),
+                  style: TextStyle(color: Color(0xFF6B6B6B), fontSize: 14),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Required columns (in order):',
-                  style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   '1. Handle (Product group ID)\n'
                   '2. Name (Product name - required)\n'
                   '3. Category\n'
@@ -95,15 +106,21 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                   '13. Stock\n'
                   '14. Barcode/SKU\n'
                   '15. Min Stock',
-                  style: TextStyle(color: Colors.blue.shade800, fontSize: 12),
+                  style: TextStyle(color: Color(0xFF6B6B6B), fontSize: 12),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 TextButton.icon(
                   onPressed: () {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text('CSV Template Example'),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        title: const Text(
+                          'CSV Template Example',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                         content: SingleChildScrollView(
                           child: SelectableText(
                             'Copy this and save as a .csv file:\n\n'
@@ -113,6 +130,7 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                             'tshirt,T-Shirt,Clothing,Cotton T-Shirt,Size,Small,Color,Red,,,5,15,20,TS-RED-S,5\n'
                             'tshirt,T-Shirt,Clothing,Cotton T-Shirt,Size,Medium,Color,Red,,,5,15,15,TS-RED-M,5\n'
                             'tshirt,T-Shirt,Clothing,Cotton T-Shirt,Size,Large,Color,Blue,,,6,16,10,TS-BLU-L,5',
+                            style: TextStyle(fontSize: 12),
                           ),
                         ),
                         actions: [
@@ -124,8 +142,11 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.content_copy),
-                  label: const Text('Show CSV Example'),
+                  icon: Icon(Icons.content_copy, size: 18, color: AppColors.info),
+                  label: Text(
+                    'Show CSV Example',
+                    style: TextStyle(color: AppColors.info),
+                  ),
                 ),
               ],
             ),
@@ -141,20 +162,34 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                 await _store.downloadTemplate();
                 if (_store.successMessage != null && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_store.successMessage!)),
+                    SnackBar(
+                      content: Text(_store.successMessage!),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                 }
                 if (_store.errorMessage != null && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(_store.errorMessage!),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.danger,
+                      behavior: SnackBarBehavior.floating,
                     ),
                   );
                 }
               },
-              icon: const Icon(Icons.file_download),
+              icon: const Icon(Icons.file_download, size: 20),
               label: const Text("Download Excel Template"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -165,56 +200,17 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
             icon: Icons.upload_file,
             action: ElevatedButton.icon(
               onPressed: _store.isLoading ? null : _store.pickAndParseFile,
-              icon: const Icon(Icons.folder_open),
+              icon: const Icon(Icons.folder_open, size: 20),
               label: const Text("Select File"),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
               ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Test button to add sample products
-          ElevatedButton.icon(
-            onPressed: () async {
-              try {
-                final productStore = locator<ProductStore>();
-
-                // Add test product directly
-                final testProduct = ProductModel(
-                  productId: 'test-${DateTime.now().millisecondsSinceEpoch}',
-                  productName: 'Test Product ${DateTime.now().millisecondsSinceEpoch}',
-                  category: 'Test Category',
-                  hasVariants: false,
-                  productType: 'simple',
-                  createdAt: DateTime.now().toIso8601String(),
-                  updateAt: DateTime.now().toIso8601String(),
-                );
-
-                await productStore.addProduct(testProduct);
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Test product added! Total: ${productStore.products.length}'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.bug_report),
-            label: const Text("Test: Add Sample Product"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
             ),
           ),
           if (_store.errorMessage != null)
@@ -223,18 +219,24 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: AppColors.danger.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red),
+                  border: Border.all(
+                    color: AppColors.danger.withOpacity(0.3),
+                    width: 0.5,
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red),
-                    const SizedBox(width: 8),
+                    Icon(Icons.error_outline, color: AppColors.danger, size: 22),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _store.errorMessage!,
-                        style: const TextStyle(color: Colors.red),
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -253,24 +255,58 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
     required IconData icon,
     required Widget action,
   }) {
-    return Card(
-      elevation: 2,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.primary.withOpacity(0.1),
-              child: Text(step, style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Center(
+                child: Text(
+                  step,
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               description,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
+              style: const TextStyle(
+                color: Color(0xFF6B6B6B),
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 20),
             action,
@@ -295,16 +331,28 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(12),
-          color: Colors.blue.shade50,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.info.withOpacity(0.1),
+            border: Border(
+              bottom: BorderSide(
+                color: AppColors.info.withOpacity(0.3),
+                width: 0.5,
+              ),
+            ),
+          ),
           child: Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.blue),
+              Icon(Icons.info_outline, color: AppColors.info, size: 22),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   "Previewing ${dataRows.length} products (${headers.length} columns). Please verify data before confirming.",
-                  style: const TextStyle(color: Colors.blue),
+                  style: const TextStyle(
+                    color: Color(0xFF1A1A1A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -318,10 +366,26 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
-                  columns: headers.map((h) => DataColumn(label: Text(h))).toList(),
-                  rows: dataRows.take(50).map((row) { // Show max 50 for preview
+                  columns: headers.map((h) => DataColumn(
+                    label: Text(
+                      h,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                  )).toList(),
+                  rows: dataRows.take(50).map((row) {
                     return DataRow(
-                      cells: row.map((cell) => DataCell(Text(cell.toString()))).toList(),
+                      cells: row.map((cell) => DataCell(
+                        Text(
+                          cell.toString(),
+                          style: const TextStyle(
+                            color: Color(0xFF6B6B6B),
+                            fontSize: 13,
+                          ),
+                        ),
+                      )).toList(),
                     );
                   }).toList(),
                 ),
@@ -329,25 +393,55 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: _store.clear,
-                child: const Text("Cancel"),
-              ),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _store.importData,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text("Confirm Import"),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.danger,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: _store.clear,
+                  child: const Text(
+                    "Cancel",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _store.importData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    "Confirm Import",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -355,36 +449,45 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
 
   Widget _buildProcessingView() {
     return Container(
-      color: Colors.white,
+      color: const Color(0xFFFAFAFA),
+      padding: const EdgeInsets.all(20),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(value: _store.progress),
+            CircularProgressIndicator(
+              value: _store.progress,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
             const SizedBox(height: 20),
             Text(
               "Importing... ${(_store.progress * 100).toStringAsFixed(0)}%",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A),
+              ),
             ),
             const SizedBox(height: 20),
             Container(
               height: 200,
               width: double.infinity,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ListView.builder(
                 itemCount: _store.logMessages.length,
                 itemBuilder: (context, index) {
                   final msg = _store.logMessages[index];
-                  final isError = msg.startsWith("Error");
+                  final isError = msg.startsWith("✗");
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     child: Text(
                       msg,
                       style: TextStyle(
-                        color: isError ? Colors.red : Colors.green,
+                        color: isError ? AppColors.danger : AppColors.success,
                         fontSize: 12,
                       ),
                     ),
@@ -396,20 +499,27 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
             // Show success message
             if (_store.progress >= 1.0 && _store.successMessage != null)
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppColors.success.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green),
+                  border: Border.all(
+                    color: AppColors.success.withOpacity(0.3),
+                    width: 0.5,
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle, color: Colors.green),
-                    const SizedBox(width: 8),
+                    Icon(Icons.check_circle, color: AppColors.success, size: 22),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _store.successMessage!,
-                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -441,7 +551,19 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                     Navigator.pop(context); // Go back
                   }
                 },
-                child: const Text("Done - Go Back to Product List"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  "Done - Go Back to Product List",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
           ],
         ),

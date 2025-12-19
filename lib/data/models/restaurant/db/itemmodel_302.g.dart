@@ -41,13 +41,13 @@ class ItemsAdapter extends TypeAdapter<Items> {
       extraConstraints: (fields[21] as Map?)?.map((dynamic k, dynamic v) =>
           MapEntry(k as String, (v as Map).cast<String, int>())),
       taxIds: (fields[22] as List?)?.cast<String>(),
-    );
+    )..taxId = fields[23] as String?;
   }
 
   @override
   void write(BinaryWriter writer, Items obj) {
     writer
-      ..writeByte(23)
+      ..writeByte(24)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -72,6 +72,8 @@ class ItemsAdapter extends TypeAdapter<Items> {
       ..write(obj.extraId)
       ..writeByte(11)
       ..write(obj.taxRate)
+      ..writeByte(23)
+      ..write(obj.taxId)
       ..writeByte(12)
       ..write(obj.isEnabled)
       ..writeByte(13)

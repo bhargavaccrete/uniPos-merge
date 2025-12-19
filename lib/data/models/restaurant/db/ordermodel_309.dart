@@ -197,4 +197,65 @@ class OrderModel extends HiveObject {
 
     return itemsByKot;
   }
+
+  // Serialization methods for backup/restore
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'customerName': customerName,
+      'customerNumber': customerNumber,
+      'customerEmail': customerEmail,
+      'items': items.map((item) => item.toMap()).toList(),
+      'status': status,
+      'timeStamp': timeStamp.toIso8601String(),
+      'orderType': orderType,
+      'tableNo': tableNo,
+      'totalPrice': totalPrice,
+      'kotNumber': kotNumber,
+      'discount': discount,
+      'serviceCharge': serviceCharge,
+      'paymentMethod': paymentMethod,
+      'completedAt': completedAt?.toIso8601String(),
+      'paymentStatus': paymentStatus,
+      'subTotal': subTotal,
+      'isPaid': isPaid,
+      'gstRate': gstRate,
+      'gstAmount': gstAmount,
+      'remark': remark,
+      'kotNumbers': kotNumbers,
+      'itemCountAtLastKot': itemCountAtLastKot,
+      'kotBoundaries': kotBoundaries,
+    };
+  }
+
+  static OrderModel fromMap(Map<String, dynamic> map) {
+    return OrderModel(
+      id: map['id'] as String,
+      customerName: map['customerName'] as String,
+      customerNumber: map['customerNumber'] as String,
+      customerEmail: map['customerEmail'] as String,
+      items: (map['items'] as List<dynamic>)
+          .map((item) => CartItem.fromMap(item as Map<String, dynamic>))
+          .toList(),
+      status: map['status'] as String,
+      timeStamp: DateTime.parse(map['timeStamp'] as String),
+      orderType: map['orderType'] as String,
+      tableNo: map['tableNo'] as String?,
+      totalPrice: (map['totalPrice'] as num).toDouble(),
+      kotNumber: map['kotNumber'] as int?,
+      discount: map['discount'] != null ? (map['discount'] as num).toDouble() : null,
+      serviceCharge: map['serviceCharge'] != null ? (map['serviceCharge'] as num).toDouble() : null,
+      paymentMethod: map['paymentMethod'] as String?,
+      completedAt: map['completedAt'] != null ? DateTime.parse(map['completedAt'] as String) : null,
+      paymentStatus: map['paymentStatus'] as String?,
+      subTotal: map['subTotal'] != null ? (map['subTotal'] as num).toDouble() : null,
+      isPaid: map['isPaid'] as bool?,
+      gstRate: map['gstRate'] != null ? (map['gstRate'] as num).toDouble() : null,
+      gstAmount: map['gstAmount'] != null ? (map['gstAmount'] as num).toDouble() : null,
+      remark: map['remark'] as String?,
+      kotNumbers: (map['kotNumbers'] as List<dynamic>).map((e) => e as int).toList(),
+      itemCountAtLastKot: map['itemCountAtLastKot'] as int,
+      kotBoundaries: (map['kotBoundaries'] as List<dynamic>).map((e) => e as int).toList(),
+    );
+  }
 }

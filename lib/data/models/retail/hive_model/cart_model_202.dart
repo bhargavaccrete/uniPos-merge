@@ -66,6 +66,9 @@ class CartItemModel extends HiveObject {
   @HiveField(19)
   final String? categoryName;    // For GST lookup
 
+  @HiveField(20)
+  final int? tabIndex;
+
   CartItemModel({
     required this.cartItemId,
     required this.variantId,
@@ -87,6 +90,7 @@ class CartItemModel extends HiveObject {
     this.hsnCode,
     this.discountAmount,
     this.categoryName,
+    this.tabIndex,
   });
 
   factory CartItemModel.create({
@@ -105,6 +109,7 @@ class CartItemModel extends HiveObject {
     double? discountAmount,
     String? categoryName,
     bool taxInclusive = false,
+    int ? tabIndex = 1,
   }) {
     final now = DateTime.now().toIso8601String();
     final rate = gstRate ?? 0;
@@ -154,6 +159,7 @@ class CartItemModel extends HiveObject {
       hsnCode: hsnCode,
       discountAmount: discount,
       categoryName: categoryName,
+      tabIndex: tabIndex,
     );
   }
 

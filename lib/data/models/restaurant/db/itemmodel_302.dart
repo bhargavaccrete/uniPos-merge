@@ -44,6 +44,8 @@ class Items extends HiveObject {
   @HiveField(11)
   double? taxRate;
 
+  @HiveField(23)
+  String? taxId; // Single tax ID from tax database
 
   @HiveField(12)
   bool isEnabled;

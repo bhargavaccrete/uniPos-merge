@@ -95,6 +95,21 @@ class _AddProductScreenState extends State<AddProductScreen>
   String? _editingProductId;
   String? _editingRestaurantItemId;
 
+  // Search & Filter state
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  // Retail Filters
+  Set<String> _selectedCategories = {};
+  String? _selectedProductType; // 'all', 'simple', 'variable'
+  Set<String> _selectedBrands = {};
+  String _retailSortBy = 'name_asc'; // 'name_asc', 'name_desc', 'recent'
+
+  // Restaurant Filters
+  String? _selectedVegFilter; // 'all', 'veg', 'non-veg'
+  String? _selectedStatusFilter; // 'all', 'active', 'disabled'
+  String _restaurantSortBy = 'name_asc'; // 'name_asc', 'name_desc', 'price_asc', 'price_desc'
+
   @override
   void initState() {
     super.initState();
@@ -133,6 +148,7 @@ class _AddProductScreenState extends State<AddProductScreen>
     _bulkCostPriceController.dispose();
     _bulkSellingPriceController.dispose();
     _bulkStockController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -290,7 +306,7 @@ class _AddProductScreenState extends State<AddProductScreen>
         final variants = await productStore.getVariantsForProduct(_editingProductId!);
         if (variants.isNotEmpty) {
           final defaultVariant = variants.firstWhere(
-            (v) => v.isDefault,
+                (v) => v.isDefault,
             orElse: () => variants.first,
           );
 
@@ -323,7 +339,7 @@ class _AddProductScreenState extends State<AddProductScreen>
 
       // Get the existing item to preserve fields not in the form
       final existingItem = allItems.firstWhere(
-        (item) => item.id == _editingRestaurantItemId,
+            (item) => item.id == _editingRestaurantItemId,
       );
 
       // Create updated item
@@ -2747,7 +2763,7 @@ class _AddProductScreenState extends State<AddProductScreen>
     } else if (!product.hasVariants && variants.isNotEmpty) {
       // Simple product: Load default variant data into form fields
       final defaultVariant = variants.firstWhere(
-        (v) => v.isDefault,
+            (v) => v.isDefault,
         orElse: () => variants.first,
       );
 
@@ -2845,58 +2861,66 @@ class _AddProductScreenState extends State<AddProductScreen>
         ),
         child: Column(
           children: [
-            _buildListHeader(productStore.products.length, 'Products'),
+            Observer(
+              builder: (_) {
+                final filteredProducts = _getFilteredRetailProducts(productStore);
+                return _buildListHeader(filteredProducts.length, 'Products');
+              },
+            ),
             Expanded(
               child: Observer(
-                builder: (_) => productStore.products.isEmpty
-                    ? _buildEmptyState('products')
-                    : ListView.separated(
-                  padding: const EdgeInsets.all(20),
-                  itemCount: productStore.products.length,
-                  separatorBuilder: (_, __) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final product = productStore.products[index];
-                    return ListTile(
-                      leading: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: product.imagePath != null
-                            ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(
-                            File(product.imagePath!),
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                            : const Icon(Icons.inventory, color: AppColors.primary),
-                      ),
-                      title: Text(
-                        product.productName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(
-                        '${product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, size: 20),
-                            onPressed: () => _editRetailProduct(product),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
-                            onPressed: () => productStore.deleteProduct(product.productId),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                builder: (_) {
+                  final filteredProducts = _getFilteredRetailProducts(productStore);
+                  return filteredProducts.isEmpty
+                      ? _buildEmptyState('products')
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: filteredProducts.length,
+                          separatorBuilder: (_, __) => const Divider(),
+                          itemBuilder: (context, index) {
+                            final product = filteredProducts[index];
+                            return ListTile(
+                              leading: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: product.imagePath != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.file(
+                                          File(product.imagePath!),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    : const Icon(Icons.inventory, color: AppColors.primary),
+                              ),
+                              title: Text(
+                                product.productName,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                '${product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 20),
+                                    onPressed: () => _editRetailProduct(product),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
+                                    onPressed: () => productStore.deleteProduct(product.productId),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                },
               ),
             ),
           ],
@@ -2926,7 +2950,8 @@ class _AddProductScreenState extends State<AddProductScreen>
               future: itemsBoxes.getAllItems(),
               builder: (context, snapshot) {
                 final items = snapshot.data ?? [];
-                return _buildListHeader(items.length, 'Items');
+                final filteredItems = _getFilteredRestaurantItems(items);
+                return _buildListHeader(filteredItems.length, 'Items');
               },
             ),
             Expanded(
@@ -2938,17 +2963,18 @@ class _AddProductScreenState extends State<AddProductScreen>
                   }
 
                   final items = snapshot.data!;
+                  final filteredItems = _getFilteredRestaurantItems(items);
 
-                  if (items.isEmpty) {
+                  if (filteredItems.isEmpty) {
                     return _buildEmptyState('items');
                   }
 
                   return ListView.separated(
                     padding: const EdgeInsets.all(20),
-                    itemCount: items.length,
+                    itemCount: filteredItems.length,
                     separatorBuilder: (_, __) => const Divider(),
                     itemBuilder: (context, index) {
-                      final item = items[index];
+                      final item = filteredItems[index];
                       return ListTile(
                         leading: Container(
                           width: 50,
@@ -3017,53 +3043,239 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildListHeader(int count, String type) {
+    final activeFilters = _getActiveFilterCount();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.05),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$type List',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppColors.darkNeutral,
-            ),
-          ),
+          // Header row with title and buttons
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
+              Text(
+                '$type List',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkNeutral,
                 ),
-                child: Text(
-                  '$count items',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$count items',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              IconButton(
-                icon: const Icon(Icons.filter_list),
-                onPressed: () {},
-                tooltip: 'Filter',
-              ),
-              IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () {},
-                tooltip: 'Search',
+                  const SizedBox(width: 12),
+                  // Filter button with badge
+                  Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.filter_list),
+                        onPressed: () async {
+                          if (AppConfig.isRetail) {
+                            await _showRetailFilterDialog();
+                          } else {
+                            // For restaurant, we need to get items first
+                            final items = await itemsBoxes.getAllItems();
+                            await _showRestaurantFilterDialog(items);
+                          }
+                        },
+                        tooltip: 'Filter',
+                      ),
+                      if (activeFilters > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: AppColors.danger,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              '$activeFilters',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
+
+          const SizedBox(height: 12),
+
+          // Search bar
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: AppConfig.isRetail
+                  ? 'Search by name, category, brand, SKU, or barcode...'
+                  : 'Search by name or category...',
+              prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        });
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+          ),
+
+          // Active filter badges
+          if (activeFilters > 0 || _searchQuery.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                // Search query badge
+                if (_searchQuery.isNotEmpty)
+                  Chip(
+                    label: Text('Search: "$_searchQuery"'),
+                    onDeleted: () {
+                      setState(() {
+                        _searchController.clear();
+                        _searchQuery = '';
+                      });
+                    },
+                    deleteIcon: const Icon(Icons.close, size: 18),
+                    backgroundColor: AppColors.info.withOpacity(0.2),
+                  ),
+
+                // Category filter badges
+                if (_selectedCategories.isNotEmpty)
+                  ..._selectedCategories.map((cat) => Chip(
+                    label: Text('Category: $cat'),
+                    onDeleted: () {
+                      setState(() {
+                        _selectedCategories.remove(cat);
+                      });
+                    },
+                    deleteIcon: const Icon(Icons.close, size: 18),
+                    backgroundColor: AppColors.primary.withOpacity(0.2),
+                  )),
+
+                // Retail-specific badges
+                if (AppConfig.isRetail) ...[
+                  if (_selectedProductType != null && _selectedProductType != 'all')
+                    Chip(
+                      label: Text('Type: ${_selectedProductType![0].toUpperCase()}${_selectedProductType!.substring(1)}'),
+                      onDeleted: () {
+                        setState(() {
+                          _selectedProductType = 'all';
+                        });
+                      },
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                      backgroundColor: AppColors.secondary.withOpacity(0.2),
+                    ),
+                  if (_selectedBrands.isNotEmpty)
+                    ..._selectedBrands.map((brand) => Chip(
+                      label: Text('Brand: $brand'),
+                      onDeleted: () {
+                        setState(() {
+                          _selectedBrands.remove(brand);
+                        });
+                      },
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                      backgroundColor: AppColors.success.withOpacity(0.2),
+                    )),
+                ],
+
+                // Restaurant-specific badges
+                if (AppConfig.isRestaurant) ...[
+                  if (_selectedVegFilter != null && _selectedVegFilter != 'all')
+                    Chip(
+                      label: Text(_selectedVegFilter == 'veg' ? 'Veg Only' : 'Non-Veg Only'),
+                      onDeleted: () {
+                        setState(() {
+                          _selectedVegFilter = 'all';
+                        });
+                      },
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                      backgroundColor: _selectedVegFilter == 'veg'
+                          ? AppColors.success.withOpacity(0.2)
+                          : AppColors.danger.withOpacity(0.2),
+                    ),
+                  if (_selectedStatusFilter != null && _selectedStatusFilter != 'all')
+                    Chip(
+                      label: Text('Status: ${_selectedStatusFilter![0].toUpperCase()}${_selectedStatusFilter!.substring(1)}'),
+                      onDeleted: () {
+                        setState(() {
+                          _selectedStatusFilter = 'all';
+                        });
+                      },
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                      backgroundColor: _selectedStatusFilter == 'active'
+                          ? AppColors.success.withOpacity(0.2)
+                          : Colors.orange.withOpacity(0.2),
+                    ),
+                ],
+
+                // Clear all filters button
+                if (activeFilters > 0 || _searchQuery.isNotEmpty)
+                  ActionChip(
+                    label: const Text('Clear All', style: TextStyle(color: AppColors.danger)),
+                    onPressed: _clearAllFilters,
+                    backgroundColor: AppColors.danger.withOpacity(0.1),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -3492,6 +3704,513 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     generate(0, {});
     return result;
+  }
+
+  // ==================== SEARCH & FILTER METHODS ====================
+
+  List<ProductModel> _getFilteredRetailProducts(ProductStore productStore) {
+    var filtered = productStore.products.toList();
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((product) {
+        final searchLower = _searchQuery.toLowerCase();
+        return product.productName.toLowerCase().contains(searchLower) ||
+            (product.category?.toLowerCase().contains(searchLower) ?? false) ||
+            (product.brandName?.toLowerCase().contains(searchLower) ?? false);
+      }).toList();
+    }
+
+    // Apply category filter
+    if (_selectedCategories.isNotEmpty) {
+      filtered = filtered.where((product) =>
+          product.category != null && _selectedCategories.contains(product.category)).toList();
+    }
+
+    // Apply product type filter
+    if (_selectedProductType != null && _selectedProductType != 'all') {
+      filtered = filtered.where((product) {
+        if (_selectedProductType == 'simple') return !product.hasVariants;
+        if (_selectedProductType == 'variable') return product.hasVariants;
+        return true;
+      }).toList();
+    }
+
+    // Apply brand filter
+    if (_selectedBrands.isNotEmpty) {
+      filtered = filtered.where((product) =>
+          product.brandName != null && _selectedBrands.contains(product.brandName!)).toList();
+    }
+
+    // Apply sorting
+    if (_retailSortBy == 'name_asc') {
+      filtered.sort((a, b) => a.productName.compareTo(b.productName));
+    } else if (_retailSortBy == 'name_desc') {
+      filtered.sort((a, b) => b.productName.compareTo(a.productName));
+    } else if (_retailSortBy == 'recent') {
+      filtered = filtered.reversed.toList();
+    }
+
+    return filtered;
+  }
+
+  List<Items> _getFilteredRestaurantItems(List<Items> items) {
+    var filtered = items.toList();
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((item) {
+        final searchLower = _searchQuery.toLowerCase();
+        return item.name.toLowerCase().contains(searchLower) ||
+            (item.categoryOfItem?.toLowerCase().contains(searchLower) ?? false);
+      }).toList();
+    }
+
+    // Apply category filter
+    if (_selectedCategories.isNotEmpty) {
+      filtered = filtered.where((item) =>
+          item.categoryOfItem != null && _selectedCategories.contains(item.categoryOfItem!)).toList();
+    }
+
+    // Apply veg/non-veg filter
+    if (_selectedVegFilter != null && _selectedVegFilter != 'all') {
+      filtered = filtered.where((item) => item.isVeg == _selectedVegFilter).toList();
+    }
+
+    // Apply status filter
+    if (_selectedStatusFilter != null && _selectedStatusFilter != 'all') {
+      if (_selectedStatusFilter == 'active') {
+        filtered = filtered.where((item) => item.isEnabled).toList();
+      } else if (_selectedStatusFilter == 'disabled') {
+        filtered = filtered.where((item) => !item.isEnabled).toList();
+      }
+    }
+
+    // Apply sorting
+    if (_restaurantSortBy == 'name_asc') {
+      filtered.sort((a, b) => a.name.compareTo(b.name));
+    } else if (_restaurantSortBy == 'name_desc') {
+      filtered.sort((a, b) => b.name.compareTo(a.name));
+    } else if (_restaurantSortBy == 'price_asc') {
+      filtered.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+    } else if (_restaurantSortBy == 'price_desc') {
+      filtered.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+    }
+
+    return filtered;
+  }
+
+  int _getActiveFilterCount() {
+    int count = 0;
+    if (_selectedCategories.isNotEmpty) count++;
+    if (AppConfig.isRetail) {
+      if (_selectedProductType != null && _selectedProductType != 'all') count++;
+      if (_selectedBrands.isNotEmpty) count++;
+    } else {
+      if (_selectedVegFilter != null && _selectedVegFilter != 'all') count++;
+      if (_selectedStatusFilter != null && _selectedStatusFilter != 'all') count++;
+    }
+    return count;
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _searchQuery = '';
+      _searchController.clear();
+      _selectedCategories.clear();
+      _selectedProductType = 'all';
+      _selectedBrands.clear();
+      _selectedVegFilter = 'all';
+      _selectedStatusFilter = 'all';
+      _retailSortBy = 'name_asc';
+      _restaurantSortBy = 'name_asc';
+    });
+  }
+
+  Future<void> _showRetailFilterDialog() async {
+    final productStore = locator<ProductStore>();
+
+    // Get unique categories and brands from products
+    final categories = productStore.products
+        .map((p) => p.category)
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList()..sort();
+
+    final brands = productStore.products
+        .map((p) => p.brandName)
+        .where((b) => b != null && b.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList()..sort();
+
+    final tempCategories = Set<String>.from(_selectedCategories);
+    final tempBrands = Set<String>.from(_selectedBrands);
+    String tempProductType = _selectedProductType ?? 'all';
+    String tempSortBy = _retailSortBy;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Filter Products', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              TextButton(
+                onPressed: () {
+                  setDialogState(() {
+                    tempCategories.clear();
+                    tempBrands.clear();
+                    tempProductType = 'all';
+                    tempSortBy = 'name_asc';
+                  });
+                },
+                child: const Text('Clear All', style: TextStyle(color: AppColors.danger)),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Product Type Filter
+                  const Text('Product Type', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All'),
+                        selected: tempProductType == 'all',
+                        onSelected: (_) => setDialogState(() => tempProductType = 'all'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempProductType == 'all' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Simple'),
+                        selected: tempProductType == 'simple',
+                        onSelected: (_) => setDialogState(() => tempProductType = 'simple'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempProductType == 'simple' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Variable'),
+                        selected: tempProductType == 'variable',
+                        onSelected: (_) => setDialogState(() => tempProductType = 'variable'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempProductType == 'variable' ? Colors.white : Colors.black),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Category Filter
+                  if (categories.isNotEmpty) ...[
+                    const Text('Categories', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: categories.map((category) => FilterChip(
+                        label: Text(category),
+                        selected: tempCategories.contains(category),
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            if (selected) {
+                              tempCategories.add(category);
+                            } else {
+                              tempCategories.remove(category);
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempCategories.contains(category) ? Colors.white : Colors.black),
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Brand Filter
+                  if (brands.isNotEmpty) ...[
+                    const Text('Brands', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: brands.map((brand) => FilterChip(
+                        label: Text(brand),
+                        selected: tempBrands.contains(brand),
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            if (selected) {
+                              tempBrands.add(brand);
+                            } else {
+                              tempBrands.remove(brand);
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempBrands.contains(brand) ? Colors.white : Colors.black),
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Sort By
+                  const Text('Sort By', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Name (A-Z)'),
+                        selected: tempSortBy == 'name_asc',
+                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_asc'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempSortBy == 'name_asc' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Name (Z-A)'),
+                        selected: tempSortBy == 'name_desc',
+                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_desc'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempSortBy == 'name_desc' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Recently Added'),
+                        selected: tempSortBy == 'recent',
+                        onSelected: (_) => setDialogState(() => tempSortBy = 'recent'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempSortBy == 'recent' ? Colors.white : Colors.black),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _selectedCategories = tempCategories;
+                  _selectedBrands = tempBrands;
+                  _selectedProductType = tempProductType;
+                  _retailSortBy = tempSortBy;
+                });
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              child: const Text('Apply Filters', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showRestaurantFilterDialog(List<Items> items) async {
+    // Get unique categories from items
+    final categories = items
+        .map((i) => i.categoryOfItem)
+        .where((c) => c != null && c.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList()..sort();
+
+    final tempCategories = Set<String>.from(_selectedCategories);
+    String tempVegFilter = _selectedVegFilter ?? 'all';
+    String tempStatusFilter = _selectedStatusFilter ?? 'all';
+    String tempSortBy = _restaurantSortBy;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Filter Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              TextButton(
+                onPressed: () {
+                  setDialogState(() {
+                    tempCategories.clear();
+                    tempVegFilter = 'all';
+                    tempStatusFilter = 'all';
+                    tempSortBy = 'name_asc';
+                  });
+                },
+                child: const Text('Clear All', style: TextStyle(color: AppColors.danger)),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Veg/Non-Veg Filter
+                  const Text('Food Type', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All'),
+                        selected: tempVegFilter == 'all',
+                        onSelected: (_) => setDialogState(() => tempVegFilter = 'all'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempVegFilter == 'all' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Veg'),
+                        selected: tempVegFilter == 'veg',
+                        onSelected: (_) => setDialogState(() => tempVegFilter = 'veg'),
+                        selectedColor: AppColors.success,
+                        labelStyle: TextStyle(color: tempVegFilter == 'veg' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Non-Veg'),
+                        selected: tempVegFilter == 'non-veg',
+                        onSelected: (_) => setDialogState(() => tempVegFilter = 'non-veg'),
+                        selectedColor: AppColors.danger,
+                        labelStyle: TextStyle(color: tempVegFilter == 'non-veg' ? Colors.white : Colors.black),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Status Filter
+                  const Text('Status', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All'),
+                        selected: tempStatusFilter == 'all',
+                        onSelected: (_) => setDialogState(() => tempStatusFilter = 'all'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempStatusFilter == 'all' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Active'),
+                        selected: tempStatusFilter == 'active',
+                        onSelected: (_) => setDialogState(() => tempStatusFilter = 'active'),
+                        selectedColor: AppColors.success,
+                        labelStyle: TextStyle(color: tempStatusFilter == 'active' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Disabled'),
+                        selected: tempStatusFilter == 'disabled',
+                        onSelected: (_) => setDialogState(() => tempStatusFilter = 'disabled'),
+                        selectedColor: Colors.orange,
+                        labelStyle: TextStyle(color: tempStatusFilter == 'disabled' ? Colors.white : Colors.black),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Category Filter
+                  if (categories.isNotEmpty) ...[
+                    const Text('Categories', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: categories.map((category) => FilterChip(
+                        label: Text(category),
+                        selected: tempCategories.contains(category),
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            if (selected) {
+                              tempCategories.add(category);
+                            } else {
+                              tempCategories.remove(category);
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempCategories.contains(category) ? Colors.white : Colors.black),
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Sort By
+                  const Text('Sort By', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Name (A-Z)'),
+                        selected: tempSortBy == 'name_asc',
+                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_asc'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempSortBy == 'name_asc' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Name (Z-A)'),
+                        selected: tempSortBy == 'name_desc',
+                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_desc'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempSortBy == 'name_desc' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Price (Low-High)'),
+                        selected: tempSortBy == 'price_asc',
+                        onSelected: (_) => setDialogState(() => tempSortBy = 'price_asc'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempSortBy == 'price_asc' ? Colors.white : Colors.black),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Price (High-Low)'),
+                        selected: tempSortBy == 'price_desc',
+                        onSelected: (_) => setDialogState(() => tempSortBy = 'price_desc'),
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(color: tempSortBy == 'price_desc' ? Colors.white : Colors.black),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _selectedCategories = tempCategories;
+                  _selectedVegFilter = tempVegFilter;
+                  _selectedStatusFilter = tempStatusFilter;
+                  _restaurantSortBy = tempSortBy;
+                });
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              child: const Text('Apply Filters', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ==================== SETUP WIZARD NAVIGATION ====================

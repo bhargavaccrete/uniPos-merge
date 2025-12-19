@@ -63,6 +63,13 @@ mixin _$CartStore on _CartStore, Store {
       (_$grandTotalComputed ??= Computed<double>(() => super.grandTotal,
               name: '_CartStore.grandTotal'))
           .value;
+  Computed<BillingTabModel?>? _$activeTabComputed;
+
+  @override
+  BillingTabModel? get activeTab =>
+      (_$activeTabComputed ??= Computed<BillingTabModel?>(() => super.activeTab,
+              name: '_CartStore.activeTab'))
+          .value;
 
   late final _$itemsAtom = Atom(name: '_CartStore.items', context: context);
 
@@ -76,6 +83,37 @@ mixin _$CartStore on _CartStore, Store {
   set items(ObservableList<CartItemModel> value) {
     _$itemsAtom.reportWrite(value, super.items, () {
       super.items = value;
+    });
+  }
+
+  late final _$tabsAtom = Atom(name: '_CartStore.tabs', context: context);
+
+  @override
+  ObservableList<BillingTabModel> get tabs {
+    _$tabsAtom.reportRead();
+    return super.tabs;
+  }
+
+  @override
+  set tabs(ObservableList<BillingTabModel> value) {
+    _$tabsAtom.reportWrite(value, super.tabs, () {
+      super.tabs = value;
+    });
+  }
+
+  late final _$activeTabIndexAtom =
+      Atom(name: '_CartStore.activeTabIndex', context: context);
+
+  @override
+  int get activeTabIndex {
+    _$activeTabIndexAtom.reportRead();
+    return super.activeTabIndex;
+  }
+
+  @override
+  set activeTabIndex(int value) {
+    _$activeTabIndexAtom.reportWrite(value, super.activeTabIndex, () {
+      super.activeTabIndex = value;
     });
   }
 
@@ -124,10 +162,113 @@ mixin _$CartStore on _CartStore, Store {
     return _$clearCartAsyncAction.run(() => super.clearCart());
   }
 
+  late final _$createNewTabAsyncAction =
+      AsyncAction('_CartStore.createNewTab', context: context);
+
+  @override
+  Future<void> createNewTab() {
+    return _$createNewTabAsyncAction.run(() => super.createNewTab());
+  }
+
+  late final _$switchTabAsyncAction =
+      AsyncAction('_CartStore.switchTab', context: context);
+
+  @override
+  Future<void> switchTab(int index) {
+    return _$switchTabAsyncAction.run(() => super.switchTab(index));
+  }
+
+  late final _$closeTabAsyncAction =
+      AsyncAction('_CartStore.closeTab', context: context);
+
+  @override
+  Future<void> closeTab(int index) {
+    return _$closeTabAsyncAction.run(() => super.closeTab(index));
+  }
+
+  late final _$addItemToTabAsyncAction =
+      AsyncAction('_CartStore.addItemToTab', context: context);
+
+  @override
+  Future<CartOperationResult> addItemToTab(
+      ProductModel product, VarianteModel variant,
+      {CategoryModel? category}) {
+    return _$addItemToTabAsyncAction
+        .run(() => super.addItemToTab(product, variant, category: category));
+  }
+
+  late final _$removeItemFromTabAsyncAction =
+      AsyncAction('_CartStore.removeItemFromTab', context: context);
+
+  @override
+  Future<void> removeItemFromTab(String variantId) {
+    return _$removeItemFromTabAsyncAction
+        .run(() => super.removeItemFromTab(variantId));
+  }
+
+  late final _$incrementQuantityInTabAsyncAction =
+      AsyncAction('_CartStore.incrementQuantityInTab', context: context);
+
+  @override
+  Future<CartOperationResult> incrementQuantityInTab(String variantId) {
+    return _$incrementQuantityInTabAsyncAction
+        .run(() => super.incrementQuantityInTab(variantId));
+  }
+
+  late final _$decrementQuantityInTabAsyncAction =
+      AsyncAction('_CartStore.decrementQuantityInTab', context: context);
+
+  @override
+  Future<void> decrementQuantityInTab(String variantId) {
+    return _$decrementQuantityInTabAsyncAction
+        .run(() => super.decrementQuantityInTab(variantId));
+  }
+
+  late final _$clearCartAndSaveAsyncAction =
+      AsyncAction('_CartStore.clearCartAndSave', context: context);
+
+  @override
+  Future<void> clearCartAndSave() {
+    return _$clearCartAndSaveAsyncAction.run(() => super.clearCartAndSave());
+  }
+
+  late final _$updateTabCustomerInfoAsyncAction =
+      AsyncAction('_CartStore.updateTabCustomerInfo', context: context);
+
+  @override
+  Future<void> updateTabCustomerInfo(String? name, String? phone) {
+    return _$updateTabCustomerInfoAsyncAction
+        .run(() => super.updateTabCustomerInfo(name, phone));
+  }
+
+  late final _$clearAllTabsAsyncAction =
+      AsyncAction('_CartStore.clearAllTabs', context: context);
+
+  @override
+  Future<void> clearAllTabs() {
+    return _$clearAllTabsAsyncAction.run(() => super.clearAllTabs());
+  }
+
+  late final _$_CartStoreActionController =
+      ActionController(name: '_CartStore', context: context);
+
+  @override
+  dynamic setactiveTab(int index) {
+    final _$actionInfo = _$_CartStoreActionController.startAction(
+        name: '_CartStore.setactiveTab');
+    try {
+      return super.setactiveTab(index);
+    } finally {
+      _$_CartStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
   @override
   String toString() {
     return '''
 items: ${items},
+tabs: ${tabs},
+activeTabIndex: ${activeTabIndex},
 itemCount: ${itemCount},
 totalItems: ${totalItems},
 totalPrice: ${totalPrice},
@@ -135,7 +276,8 @@ totalTaxableAmount: ${totalTaxableAmount},
 totalGstAmount: ${totalGstAmount},
 totalCgstAmount: ${totalCgstAmount},
 totalSgstAmount: ${totalSgstAmount},
-grandTotal: ${grandTotal}
+grandTotal: ${grandTotal},
+activeTab: ${activeTab}
     ''';
   }
 }

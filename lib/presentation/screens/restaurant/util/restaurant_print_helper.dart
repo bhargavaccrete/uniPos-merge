@@ -66,7 +66,7 @@ class RestaurantPrintHelper {
             final double price = data['price'] as double;
 
             if (qty > 1) {
-              return '${qty}x $name(₹${price.toStringAsFixed(2)})';
+              return '${qty}x $name(Rs ${price.toStringAsFixed(2)})';
             } else {
               return '$name(₹${price.toStringAsFixed(2)})';
             }

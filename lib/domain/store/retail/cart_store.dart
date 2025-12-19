@@ -3,9 +3,11 @@ import 'package:mobx/mobx.dart';
 import 'package:unipos/data/models/retail/hive_model/category_model_215.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/cart_model_202.dart';
+import '../../../data/models/retail/hive_model/billing_tab_model.dart';
 import '../../services/retail/gst_service.dart';
 
 
@@ -50,15 +52,52 @@ class CartStore = _CartStore with _$CartStore;
 
 abstract class _CartStore with Store {
   late Box<CartItemModel> _cartBox;
+  late Box<BillingTabModel> _tabBox;
 
   _CartStore() {
     _cartBox = Hive.box<CartItemModel>('cartItems');
-    // Load cart items from Hive on initialization
-    items.addAll(_cartBox.values);
+    _tabBox = Hive.box<BillingTabModel>('billingTabs');
+
+    // Initialize tabs from Hive or create default tab
+    if (_tabBox.isEmpty) {
+      _createInitialTab();
+    } else {
+      tabs.addAll(_tabBox.values);
+    }
+
+    // Load cart items from the active tab
+    _loadActiveTabItems();
   }
 
   @observable
   ObservableList<CartItemModel> items = ObservableList<CartItemModel>();
+
+  @observable
+  ObservableList<BillingTabModel> tabs = ObservableList<BillingTabModel>();
+
+  @observable
+  int activeTabIndex = 0;
+
+  /// Create initial default tab
+  void _createInitialTab() {
+    final defaultTab = BillingTabModel(
+      id: const Uuid().v4(),
+      name: 'Tab 1',
+      items: [],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    _tabBox.put(defaultTab.id, defaultTab);
+    tabs.add(defaultTab);
+  }
+
+  /// Load items from the active tab
+  void _loadActiveTabItems() {
+    items.clear();
+    if (tabs.isNotEmpty && activeTabIndex < tabs.length) {
+      items.addAll(tabs[activeTabIndex].items);
+    }
+  }
 
   @computed
   int get itemCount => items.length;
@@ -438,4 +477,168 @@ abstract class _CartStore with Store {
     final availableStock = await getAvailableStock(variantId);
     return currentQty < availableStock;
   }
+  @action
+  setactiveTab(int index){
+    activeTabIndex = index;
+  }
+
+  // ==================== TAB MANAGEMENT METHODS ====================
+
+  /// Get current active tab
+  @computed
+  BillingTabModel? get activeTab {
+    if (tabs.isEmpty || activeTabIndex >= tabs.length) return null;
+    return tabs[activeTabIndex];
+  }
+
+  /// Create a new tab
+  @action
+  Future<void> createNewTab() async {
+    final tabNumber = tabs.length + 1;
+    final newTab = BillingTabModel(
+      id: const Uuid().v4(),
+      name: 'Tab $tabNumber',
+      items: [],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    // Save to Hive
+    await _tabBox.put(newTab.id, newTab);
+
+    // Add to tabs list
+    tabs.add(newTab);
+
+    // Switch to the new tab
+    activeTabIndex = tabs.length - 1;
+    _loadActiveTabItems();
+  }
+
+  /// Switch to a different tab
+  @action
+  Future<void> switchTab(int index) async {
+    if (index < 0 || index >= tabs.length) return;
+
+    // Save current tab items before switching
+    await _saveCurrentTabItems();
+
+    // Switch to new tab
+    activeTabIndex = index;
+    _loadActiveTabItems();
+  }
+
+  /// Close a tab
+  @action
+  Future<void> closeTab(int index) async {
+    if (index < 0 || index >= tabs.length) return;
+    if (tabs.length <= 1) {
+      // Don't allow closing the last tab, just clear it instead
+      await clearCart();
+      return;
+    }
+
+    final tabToClose = tabs[index];
+
+    // Remove from Hive
+    await _tabBox.delete(tabToClose.id);
+
+    // Remove from tabs list
+    tabs.removeAt(index);
+
+    // Adjust active tab index if necessary
+    if (activeTabIndex >= tabs.length) {
+      activeTabIndex = tabs.length - 1;
+    } else if (activeTabIndex > index) {
+      activeTabIndex--;
+    }
+
+    // Load items for the new active tab
+    _loadActiveTabItems();
+  }
+
+  /// Save current tab items to tab model and Hive
+  Future<void> _saveCurrentTabItems() async {
+    if (tabs.isEmpty || activeTabIndex >= tabs.length) return;
+
+    final currentTab = tabs[activeTabIndex];
+    final updatedTab = currentTab.copyWith(
+      items: List<CartItemModel>.from(items),
+      updatedAt: DateTime.now(),
+    );
+
+    // Update in Hive
+    await _tabBox.put(updatedTab.id, updatedTab);
+
+    // Update in observable list
+    tabs[activeTabIndex] = updatedTab;
+  }
+
+  /// Update all cart methods to save to active tab
+
+  @action
+  Future<CartOperationResult> addItemToTab(ProductModel product, VarianteModel variant, {CategoryModel? category}) async {
+    final result = await addItem(product, variant, category: category);
+    if (result.success) {
+      await _saveCurrentTabItems();
+    }
+    return result;
+  }
+
+  @action
+  Future<void> removeItemFromTab(String variantId) async {
+    await removeItem(variantId);
+    await _saveCurrentTabItems();
+  }
+
+  @action
+  Future<CartOperationResult> incrementQuantityInTab(String variantId) async {
+    final result = await incrementQuantity(variantId);
+    if (result.success) {
+      await _saveCurrentTabItems();
+    }
+    return result;
+  }
+
+  @action
+  Future<void> decrementQuantityInTab(String variantId) async {
+    await decrementQuantity(variantId);
+    await _saveCurrentTabItems();
+  }
+
+  @action
+  Future<void> clearCartAndSave() async {
+    await clearCart();
+    await _saveCurrentTabItems();
+  }
+
+  /// Update tab customer info
+  @action
+  Future<void> updateTabCustomerInfo(String? name, String? phone) async {
+    if (tabs.isEmpty || activeTabIndex >= tabs.length) return;
+
+    final currentTab = tabs[activeTabIndex];
+    final updatedTab = currentTab.copyWith(
+      customerName: name,
+      customerPhone: phone,
+      updatedAt: DateTime.now(),
+    );
+
+    // Update in Hive
+    await _tabBox.put(updatedTab.id, updatedTab);
+
+    // Update in observable list
+    tabs[activeTabIndex] = updatedTab;
+  }
+
+  /// Clear all tabs
+  @action
+  Future<void> clearAllTabs() async {
+    await _tabBox.clear();
+    tabs.clear();
+    _createInitialTab();
+    activeTabIndex = 0;
+    _loadActiveTabItems();
+  }
+
+
 }

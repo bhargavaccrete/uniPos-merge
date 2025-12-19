@@ -6,7 +6,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
-import '../domain/services/retail/backup_service.dart';
+import '../presentation/widget/componets/restaurant/componets/import/import.dart';
+import '../core/config/app_config.dart';
+import '../core/init/hive_init.dart';
+import '../core/di/service_locator.dart';
 
 class ExistingUserRestoreScreen extends StatefulWidget {
   const ExistingUserRestoreScreen({Key? key}) : super(key: key);
@@ -17,15 +20,7 @@ class ExistingUserRestoreScreen extends StatefulWidget {
 
 class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
   final PageController _pageController = PageController();
-
-  // Controllers
-  final _storeNameController = TextEditingController();
-  final _ownerNameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _securityCodeController = TextEditingController();
 
   // Animation controllers
   late AnimationController _animationController;
@@ -38,7 +33,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   String? _selectedFileName;
   Uint8List? _selectedFileBytes;
   bool _isLoading = false;
-  bool _obscureCode = true;
   bool _fileValidated = false;
   Map<String, dynamic>? _fileMetadata;
 
@@ -80,11 +74,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   @override
   void dispose() {
     _pageController.dispose();
-    _storeNameController.dispose();
-    _ownerNameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _securityCodeController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -93,7 +82,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['unipos', 'backup', 'json'],
+        allowedExtensions: ['zip', 'json'],
         withData: kIsWeb, // important for web: load file bytes
       );
 
@@ -135,41 +124,24 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     setState(() => _isLoading = true);
 
     try {
-      final backupService = BackupService();
       final backupFile = File(_selectedFilePath!);
 
-      // Validate the backup file
-      final validation = await backupService.validateBackupFile(backupFile);
-
-      if (validation['valid'] != true) {
-        setState(() {
-          _fileValidated = false;
-          _fileMetadata = null;
-          _isLoading = false;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Invalid backup file: ${validation['error']}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
+      // Basic validation - check if file exists and is a zip
+      if (!await backupFile.exists()) {
+        throw Exception('File does not exist');
       }
 
-      // Get backup info
-      final info = await backupService.getBackupInfo(backupFile);
-      final stats = info['statistics'] as Map<String, dynamic>? ?? {};
+      final fileSize = await backupFile.length();
+      final fileName = _selectedFileName ?? 'backup.zip';
 
       setState(() {
         _fileValidated = true;
         _fileMetadata = {
-          'storeName': info['fileName'] ?? 'Unknown',
-          'backupDate': _formatDate(info['exportDate']),
-          'dataSize': _formatFileSize(info['fileSize'] ?? 0),
-          'version': info['version'] ?? 'Unknown',
-          'recordCount': '${stats['totalProducts'] ?? 0} products, ${stats['totalSales'] ?? 0} sales',
+          'storeName': fileName.replaceAll('.zip', ''),
+          'backupDate': 'Recent',
+          'dataSize': _formatFileSize(fileSize),
+          'version': '1.0',
+          'recordCount': 'Backup file ready to restore',
         };
         _isLoading = false;
       });
@@ -207,7 +179,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   void _nextStep() {
-    if (_currentStep < 2) {
+    if (_currentStep < 1) {
       setState(() {
         _currentStep++;
       });
@@ -233,45 +205,45 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   Future<void> _restoreData() async {
-    if (_formKey.currentState!.validate() && _selectedFilePath != null) {
-      setState(() => _isLoading = true);
+    if (_selectedFilePath == null) return;
 
-      try {
-        final backupService = BackupService();
-        final backupFile = File(_selectedFilePath!);
+    setState(() => _isLoading = true);
 
-        // Restore the backup
-        final result = await backupService.restoreFromBackup(backupFile);
+    try {
+      // Import directly using the selected file path
+      await CategoryImportExport.importFromFilePath(context, _selectedFilePath!);
 
-        setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
 
-        if (result['success'] == true) {
-          // Show success dialog
-          _showSuccessDialog(
-            message: result['message'] ?? 'Data restored successfully',
-            errors: result['errors'] as List?,
-          );
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Restore failed: ${result['error']}'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 5),
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to restore backup: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      // Reload AppConfig to get the restored business mode
+      await AppConfig.init();
+      debugPrint("📦 AppConfig reloaded after restore: ${AppConfig.businessMode.name}");
+
+      // Initialize business-specific Hive boxes for the restored business mode
+      await HiveInit.initializeBusinessBoxes();
+      debugPrint("📦 Business boxes initialized for: ${AppConfig.businessMode.name}");
+
+      // Register business-specific GetIt dependencies
+      await registerBusinessDependencies(AppConfig.businessMode);
+      debugPrint("📦 Business dependencies registered for: ${AppConfig.businessMode.name}");
+
+      // Show success dialog
+      if (mounted) {
+        _showSuccessDialog(
+          message: 'All your store data has been successfully restored!',
+          errors: null,
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to restore backup: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -378,7 +350,11 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.pushReplacementNamed(context, '/retail-billing');
+                  // Navigate based on business mode
+                  final route = AppConfig.isRetail
+                      ? '/retail-billing'
+                      : '/restaurant-home';
+                  Navigator.pushReplacementNamed(context, route);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -444,7 +420,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _buildFileUploadStep(),
-              _buildVerificationStep(),
               _buildConfirmationStep(),
             ],
           ),
@@ -466,7 +441,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildFileUploadStep(),
-                  _buildVerificationStep(),
                   _buildConfirmationStep(),
                 ],
               ),
@@ -490,11 +464,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStepIndicator(0, 'Upload Backup', Icons.upload_file),
+                  _buildStepIndicator(0, 'Select Backup', Icons.upload_file),
                   _buildStepConnector(),
-                  _buildStepIndicator(1, 'Verify Identity', Icons.verified_user),
-                  _buildStepConnector(),
-                  _buildStepIndicator(2, 'Confirm & Restore', Icons.restore),
+                  _buildStepIndicator(1, 'Confirm & Restore', Icons.restore),
                 ],
               ),
             ),
@@ -508,7 +480,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildFileUploadStep(),
-                    _buildVerificationStep(),
                     _buildConfirmationStep(),
                   ],
                 ),
@@ -524,12 +495,11 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildProgressStep(0, 'Upload'),
+          _buildProgressStep(0, 'Select File'),
           _buildProgressLine(0),
-          _buildProgressStep(1, 'Verify'),
-          _buildProgressLine(1),
-          _buildProgressStep(2, 'Restore'),
+          _buildProgressStep(1, 'Restore'),
         ],
       ),
     );
@@ -708,7 +678,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Supported formats: .unipos, .backup, .json',
+                        'Supported formats: .zip, .json',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[500],
@@ -816,215 +786,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     );
   }
 
-  Widget _buildVerificationStep() {
-    return SlideTransition(
-      position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Verify Your Identity',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkNeutral,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Please confirm your store details for security',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 40),
-
-                // Store Name
-                TextFormField(
-                  controller: _storeNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Store/Outlet Name',
-                    prefixIcon: Icon(Icons.store, color: AppColors.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter store name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Owner Name
-                TextFormField(
-                  controller: _ownerNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Owner Name',
-                    prefixIcon: Icon(Icons.person, color: AppColors.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter owner name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Phone Number
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'Registered Phone Number',
-                    prefixIcon: Icon(Icons.phone, color: AppColors.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter phone number';
-                    }
-                    if (value.length < 10) {
-                      return 'Please enter valid phone number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Email (Optional)
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email (Optional)',
-                    prefixIcon: Icon(Icons.email, color: AppColors.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Security Code
-                TextFormField(
-                  controller: _securityCodeController,
-                  obscureText: _obscureCode,
-                  decoration: InputDecoration(
-                    labelText: 'Security Code',
-                    prefixIcon: Icon(Icons.lock, color: AppColors.primary),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureCode ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.grey[600],
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureCode = !_obscureCode;
-                        });
-                      },
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    helperText: 'Enter the security code you set during backup',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter security code';
-                    }
-                    if (value.length < 6) {
-                      return 'Security code must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 40),
-
-                // Action buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _previousStep,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          side: BorderSide(color: AppColors.primary),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Text(
-                          'Back',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            _nextStep();
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Verify & Continue',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildConfirmationStep() {
     return SlideTransition(
       position: _slideAnimation,
@@ -1079,12 +840,11 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       ),
                     ),
                     const Divider(height: 30),
-                    _buildSummaryRow('File:', _selectedFileName ?? 'N/A'),
-                    _buildSummaryRow('Store:', _storeNameController.text),
-                    _buildSummaryRow('Owner:', _ownerNameController.text),
-                    _buildSummaryRow('Phone:', _phoneController.text),
-                    if (_emailController.text.isNotEmpty)
-                      _buildSummaryRow('Email:', _emailController.text),
+                    _buildSummaryRow('Backup File:', _selectedFileName ?? 'N/A'),
+                    if (_fileMetadata != null) ...[
+                      _buildSummaryRow('File Size:', _fileMetadata!['dataSize']),
+                      _buildSummaryRow('Version:', _fileMetadata!['version']),
+                    ],
                   ],
                 ),
               ),

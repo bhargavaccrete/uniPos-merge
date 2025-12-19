@@ -71,16 +71,19 @@ class _AllTabState extends State<AllTab> {
               ValueListenableBuilder(
                 // Listens to the 'categories' box
                 valueListenable: Hive.box<Category>('categories').listenable(),
-                builder: (context, categoryBox, _) {
+                builder: (context, Box<Category> categoryBox, _) {
+                  final allCategories = categoryBox.values.toList();
+
                   return ValueListenableBuilder(
                     // Listens to the 'items' box
                     valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-                    builder: (context, itemBox, _) {
+                    builder: (context, Box<Items> itemBox, _) {
+                      final allItems = itemBox.values.toList();
+
                       return ValueListenableBuilder(
                         // Listens to the 'variants' box
                         valueListenable: Hive.box<VariantModel>('variante').listenable(),
-                        builder: (context, variantBox, _) {
-                          final allCategories = categoryBox.values.toList();
+                        builder: (context, Box<VariantModel> variantBox, _) {
 
                           final filtercat = query.isEmpty
                               ?allCategories
@@ -89,9 +92,6 @@ class _AllTabState extends State<AllTab> {
                             final queryLower = query.toLowerCase();
                             return name.contains(queryLower);
                           }).toList();
-
-
-                          final allItems = itemBox.values.toList();
 
                           // This logic now runs automatically whenever data changes
                           final Map<String, List<Items>> categoryItemsMap = {};

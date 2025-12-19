@@ -304,7 +304,11 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              nameController.dispose();
+              percentageController.dispose();
+              Navigator.pop(context);
+            },
             child: Text(
               'Cancel',
               style: GoogleFonts.poppins(color: Colors.grey),
@@ -328,16 +332,40 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
                 taxperecentage: percentage,
               );
 
+              // Save the tax
               await TaxBox.addTax(newTax);
-              _loadTaxes();
 
-              if (!mounted) return;
-              Navigator.pop(context);
+              // Unfocus keyboard
+              FocusScope.of(context).unfocus();
 
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$name added successfully')),
-              );
+              // Close the dialog
+              Navigator.of(context).pop();
+
+              // Dispose controllers after dialog is closed
+              await Future.delayed(const Duration(milliseconds: 100));
+              nameController.dispose();
+              percentageController.dispose();
+
+              // Auto-select the newly added tax
+              if (mounted) {
+                setState(() {
+                  selectedTaxId = newTax.id;
+                  selectedTaxRate = newTax.taxperecentage != null
+                      ? newTax.taxperecentage! / 100.0
+                      : null;
+                });
+                _loadTaxes();
+              }
+
+              // Show success message
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$name added and selected successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primarycolor,

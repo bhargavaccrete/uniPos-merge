@@ -61,9 +61,20 @@ class _ChoiceTabState extends State<ChoiceTab> {
     //   Do Not procced if input is empty
     if (trimmedName.isEmpty) return;
 
-    if (editingChoice != null) {
+    // Capture the editing state before clearing
+    final isEditing = editingChoice != null;
+    final editId = editingChoice?.id;
+
+    // Close the modal first
+    ChoiceController.clear();
+    OptionController.clear();
+    editingChoice = null;
+    Navigator.pop(context);
+
+    // Save to Hive after modal is closed to avoid widget tree conflicts
+    if (isEditing && editId != null) {
       final updateChoice = ChoicesModel(
-        id: editingChoice!.id,
+        id: editId,
         name: trimmedName,
         choiceOption: option,
       );
@@ -72,12 +83,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
       final newchoice = ChoicesModel(id: Uuid().v4(), name: trimmedName, choiceOption: option);
       await HiveChoice.addChoice(newchoice);
     }
-    ChoiceController.clear();
-    OptionController.clear();
-    editingChoice = null;
-
-    Navigator.pop(context);
-    // await loadHive();
+    // ValueListenableBuilder will auto-update the list
   }
 
   // delete
@@ -110,7 +116,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
             children: [
               ValueListenableBuilder(
                   valueListenable: Hive.box<ChoicesModel>('choice').listenable(),
-                  builder: (context, choicebox, _) {
+                  builder: (context, Box<ChoicesModel> choicebox, _) {
                     final allchoice = choicebox.values.toList();
 
                     if (allchoice.isEmpty) {

@@ -85,6 +85,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   void _nextStep() {
+    // Dismiss keyboard before moving to next step
+    FocusScope.of(context).unfocus();
+
     if (_store.currentStep < _totalSteps - 1) {
       setState(() {
         _stepsCompleted[_store.currentStep] = true;
@@ -100,6 +103,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   void _previousStep() {
+    // Dismiss keyboard before moving to previous step
+    FocusScope.of(context).unfocus();
+
     if (_store.currentStep > 0) {
       _store.previousStep();
       _pageController.previousPage(
@@ -110,6 +116,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   void _jumpToStep(int step) {
+    // Dismiss keyboard before jumping to step
+    FocusScope.of(context).unfocus();
+
     _store.setCurrentStep(step);
     _pageController.animateToPage(
       step,

@@ -161,7 +161,7 @@ class OrderCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('QTY   Items', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                  Text('#POS${order.kotNumber.toString().padLeft(2, '0')}-${order.id.substring(0, 4)}', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+                  Text('#POS${(order.kotNumbers.isNotEmpty ? order.kotNumbers.first : 0).toString().padLeft(2, '0')}-${order.id.substring(0, 4)}', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
                 ],
               ),
             ),
@@ -202,23 +202,53 @@ class OrderCard extends StatelessWidget {
                                   ),
                                 ),
                               if (item.extras != null && item.extras!.isNotEmpty)
-                                Text(
-                                  'Extras: ${item.extras!.map((extra) {
-                                    String displayName;
-                                    if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
-                                      displayName = extra['displayName'];
-                                    } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
-                                      displayName = '${extra['categoryName']} - ${extra['name']}';
-                                    } else {
-                                      displayName = extra['name'];
+                                Builder(
+                                  builder: (context) {
+                                    // Group extras by name and count quantities
+                                    Map<String, Map<String, dynamic>> groupedExtras = {};
+
+                                    for (var extra in item.extras!) {
+                                      final displayName = extra['displayName'] ?? extra['name'] ?? 'Unknown';
+                                      final price = extra['price']?.toDouble() ?? 0.0;
+                                      final quantity = extra['quantity']?.toInt() ?? 1;
+
+                                      String key = '$displayName-${price.toStringAsFixed(2)}';
+
+                                      if (groupedExtras.containsKey(key)) {
+                                        groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + quantity;
+                                      } else {
+                                        groupedExtras[key] = {
+                                          'displayName': displayName,
+                                          'price': price,
+                                          'quantity': quantity,
+                                        };
+                                      }
                                     }
-                                    return displayName;
-                                  }).join(', ')}',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                    fontStyle: FontStyle.italic,
-                                  ),
+
+                                    // Build display string
+                                    final extrasDisplay = groupedExtras.entries.map((entry) {
+                                      final data = entry.value;
+                                      final int qty = data['quantity'] as int;
+                                      final String name = data['displayName'] as String;
+                                      final double price = data['price'] as double;
+
+                                      if (qty > 1) {
+                                        return '${qty}x $name(₹${price.toStringAsFixed(2)})';
+                                      } else {
+                                        return '$name(₹${price.toStringAsFixed(2)})';
+                                      }
+                                    }).join(', ');
+
+                                    return Text(
+                                      'Extras: $extrasDisplay',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.orange.shade700,
+                                        fontStyle: FontStyle.italic,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    );
+                                  },
                                 ),
                             ],
                           ),

@@ -88,7 +88,7 @@ class _VariantTabState extends State<VariantTab> {
             children: [
               ValueListenableBuilder(
                   valueListenable: Hive.box<VariantModel>('variante').listenable(),
-                  builder: (context, variantebox, _) {
+                  builder: (context, Box<VariantModel> variantebox, _) {
                     final allvariante = variantebox.values.toList();
 
                     if (allvariante.isEmpty) {

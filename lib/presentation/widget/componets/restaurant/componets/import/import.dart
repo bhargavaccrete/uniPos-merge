@@ -154,6 +154,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
@@ -161,6 +162,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:unipos/core/init/hive_init.dart';
+import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
+
+// Conditional import for web file download
+import 'web_file_saver_stub.dart' if (dart.library.html) 'web_file_saver.dart';
 
 import '../../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../../data/models/restaurant/db/categorymodel_300.dart';
@@ -222,6 +228,12 @@ class CategoryImportExport {
   /// Saves backup directly to Downloads folder without prompting
   /// Returns the file path or null if failed
   static Future<String?> exportToDownloads({String? password}) async {
+    // Web doesn't support file system access like mobile
+    if (kIsWeb) {
+      debugPrint("⚠️ Web platform detected - using browser download instead");
+      return await _exportForWeb();
+    }
+
     try {
       debugPrint("📦 Starting backup to Downloads...");
 
@@ -262,7 +274,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting taxes...");
       try {
-        exportMap["taxes"] = Hive.box<Tax>("TaxBox").values.map((e) => e.toMap()).toList();
+        exportMap["taxes"] = Hive.box<Tax>("restaurant_taxes").values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ Tax box not found: $e");
         exportMap["taxes"] = [];
@@ -302,6 +314,30 @@ class CategoryImportExport {
       } catch (e) {
         debugPrint("⚠️ EOD box not found: $e");
         exportMap["eodReports"] = [];
+      }
+      await Future.delayed(Duration.zero);
+
+      debugPrint("📦 Exporting current orders...");
+      try {
+        exportMap["orders"] = Hive.box<OrderModel>("orderBox").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Orders box not found: $e");
+        exportMap["orders"] = [];
+      }
+      await Future.delayed(Duration.zero);
+
+      debugPrint("📦 Exporting app configuration...");
+      try {
+        final appStateBox = Hive.box("app_state");
+        final Map<String, dynamic> appStateMap = {};
+        for (var key in appStateBox.keys) {
+          appStateMap[key.toString()] = appStateBox.get(key);
+        }
+        exportMap["appState"] = [appStateMap]; // Wrap in list for consistency
+        debugPrint("📦 App state exported: ${appStateMap.keys.length} settings");
+      } catch (e) {
+        debugPrint("⚠️ App state box not found: $e");
+        exportMap["appState"] = [];
       }
       await Future.delayed(Duration.zero);
 
@@ -445,10 +481,154 @@ class CategoryImportExport {
   }
 
   /// ---------------------------
+  /// ✅ WEB-SPECIFIC EXPORT (Browser Download)
+  /// ---------------------------
+  static Future<String?> _exportForWeb() async {
+    try {
+      debugPrint("📦 Starting web backup...");
+
+      // 1️⃣ Collect Hive data
+      final exportMap = <String, List<Map<String, dynamic>>>{};
+
+      debugPrint("📦 Exporting categories...");
+      exportMap["categories"] = Hive.box<Category>("categories").values.map((e) => e.toMap()).toList();
+
+      debugPrint("📦 Exporting items...");
+      exportMap["items"] = Hive.box<Items>("itemBoxs").values.map((e) => e.toMap()).toList();
+
+      debugPrint("📦 Exporting variants...");
+      exportMap["variants"] = Hive.box<VariantModel>("variante").values.map((e) => e.toMap()).toList();
+
+      debugPrint("📦 Exporting choices...");
+      exportMap["choices"] = Hive.box<ChoicesModel>("choice").values.map((e) => e.toMap()).toList();
+
+      debugPrint("📦 Exporting extras...");
+      exportMap["extras"] = Hive.box<Extramodel>("extra").values.map((e) => e.toMap()).toList();
+
+      debugPrint("📦 Exporting company...");
+      exportMap["companyBox"] = Hive.box<Company>("companyBox").values.map((e) => e.toMap()).toList();
+
+      debugPrint("📦 Exporting staff...");
+      exportMap["staffBox"] = Hive.box<StaffModel>("staffBox").values.map((e) => e.toMap()).toList();
+
+      debugPrint("📦 Exporting taxes...");
+      try {
+        exportMap["taxes"] = Hive.box<Tax>("restaurant_taxes").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Tax box not found: $e");
+        exportMap["taxes"] = [];
+      }
+
+      debugPrint("📦 Exporting expense categories...");
+      try {
+        exportMap["expenseCategories"] = Hive.box<ExpenseCategory>("expenseCategory").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Expense category box not found: $e");
+        exportMap["expenseCategories"] = [];
+      }
+
+      debugPrint("📦 Exporting expenses...");
+      try {
+        exportMap["expenses"] = Hive.box<Expense>("expenseBox").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Expense box not found: $e");
+        exportMap["expenses"] = [];
+      }
+
+      debugPrint("📦 Exporting tables...");
+      try {
+        exportMap["tables"] = Hive.box<TableModel>("tablesBox").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Tables box not found: $e");
+        exportMap["tables"] = [];
+      }
+
+      debugPrint("📦 Exporting end of day reports...");
+      try {
+        exportMap["eodReports"] = Hive.box<EndOfDayReport>("eodBox").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ EOD box not found: $e");
+        exportMap["eodReports"] = [];
+      }
+
+      debugPrint("📦 Exporting current orders...");
+      try {
+        exportMap["orders"] = Hive.box<OrderModel>("orderBox").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Orders box not found: $e");
+        exportMap["orders"] = [];
+      }
+
+      debugPrint("📦 Exporting app configuration...");
+      try {
+        final appStateBox = Hive.box("app_state");
+        final Map<String, dynamic> appStateMap = {};
+        for (var key in appStateBox.keys) {
+          appStateMap[key.toString()] = appStateBox.get(key);
+        }
+        exportMap["appState"] = [appStateMap];
+        debugPrint("📦 App state exported: ${appStateMap.keys.length} settings");
+      } catch (e) {
+        debugPrint("⚠️ App state box not found: $e");
+        exportMap["appState"] = [];
+      }
+
+      debugPrint("📦 Exporting past orders...");
+      try {
+        final pastOrderBox = Hive.box<pastOrderModel>("pastorderBox");
+        final pastOrderCount = pastOrderBox.length;
+        debugPrint("📦 Past orders count: $pastOrderCount");
+
+        final List<Map<String, dynamic>> pastOrdersList = [];
+        final allOrders = pastOrderBox.values.toList();
+
+        const batchSize = 500;
+        for (int i = 0; i < allOrders.length; i += batchSize) {
+          final end = (i + batchSize < allOrders.length) ? i + batchSize : allOrders.length;
+          final batch = allOrders.sublist(i, end);
+          pastOrdersList.addAll(batch.map((e) => e.toMap()).toList());
+          debugPrint("📦 Processed ${end}/${allOrders.length} past orders...");
+        }
+
+        exportMap["pastOrders"] = pastOrdersList;
+        debugPrint("📦 Past orders exported: ${exportMap["pastOrders"]!.length}");
+      } catch (e) {
+        debugPrint("❌ Error exporting past orders: $e");
+        exportMap["pastOrders"] = [];
+      }
+
+      debugPrint("📦 Total items exported: ${exportMap.values.fold(0, (sum, list) => sum + list.length)}");
+
+      // 2️⃣ Convert to JSON
+      debugPrint("📦 Converting to JSON...");
+      final jsonString = jsonEncode(exportMap);
+      debugPrint("📦 JSON size: ${jsonString.length} bytes");
+
+      // 3️⃣ Trigger browser download
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final filename = "BillBerry_backup_$timestamp.json";
+      downloadFile(filename, jsonString);
+
+      debugPrint("✅ Backup downloaded via browser: $filename");
+      return filename;
+    } catch (e, stackTrace) {
+      debugPrint("❌ Web backup failed: $e");
+      debugPrint("Stack trace: $stackTrace");
+      return null;
+    }
+  }
+
+  /// ---------------------------
   /// ✅ EXPORT JSON + IMAGES WITH AUTOMATIC FOLDER (OPTIMIZED FOR LARGE DATA)
   /// ---------------------------
   /// Returns the file path of the created backup or null if cancelled
   static Future<String?> exportAllData({String? password, bool useAutoFolder = true}) async {
+    // Web doesn't support file system access like mobile
+    if (kIsWeb) {
+      debugPrint("⚠️ Web platform detected - using browser download instead");
+      return await _exportForWeb();
+    }
+
     try {
       debugPrint("📦 Starting backup export...");
 
@@ -504,7 +684,7 @@ class CategoryImportExport {
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting taxes...");
-      exportMap["taxes"] = Hive.box<Tax>("TaxBox").values.map((e) => e.toMap()).toList();
+      exportMap["taxes"] = Hive.box<Tax>("restaurant_taxes").values.map((e) => e.toMap()).toList();
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting expense categories...");
@@ -521,6 +701,30 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting end of day reports...");
       exportMap["eodReports"] = Hive.box<EndOfDayReport>("eodBox").values.map((e) => e.toMap()).toList();
+      await Future.delayed(Duration.zero);
+
+      debugPrint("📦 Exporting current orders...");
+      try {
+        exportMap["orders"] = Hive.box<OrderModel>("orderBox").values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Orders box not found: $e");
+        exportMap["orders"] = [];
+      }
+      await Future.delayed(Duration.zero);
+
+      debugPrint("📦 Exporting app configuration...");
+      try {
+        final appStateBox = Hive.box("app_state");
+        final Map<String, dynamic> appStateMap = {};
+        for (var key in appStateBox.keys) {
+          appStateMap[key.toString()] = appStateBox.get(key);
+        }
+        exportMap["appState"] = [appStateMap]; // Wrap in list for consistency
+        debugPrint("📦 App state exported: ${appStateMap.keys.length} settings");
+      } catch (e) {
+        debugPrint("⚠️ App state box not found: $e");
+        exportMap["appState"] = [];
+      }
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting past orders...");
@@ -640,16 +844,172 @@ class CategoryImportExport {
   }
 
   /// ---------------------------
+  /// ✅ IMPORT FROM SPECIFIED FILE PATH (No file picker)
+  /// ---------------------------
+  static Future<void> importFromFilePath(BuildContext context, String filePath) async {
+    try {
+      debugPrint("📦 Starting import from file: $filePath");
+
+      final file = File(filePath);
+      if (!await file.exists()) {
+        throw Exception("File not found: $filePath");
+      }
+
+      // Ensure all Hive boxes are opened before importing
+      await _ensureBoxesOpened();
+
+      // Use the same import logic
+      await _performImport(file);
+
+      debugPrint("✅ Import completed successfully");
+    } catch (e) {
+      debugPrint("❌ Import failed: $e");
+      rethrow;
+    }
+  }
+
+  /// ---------------------------
+  /// 🔧 REGISTER ALL HIVE ADAPTERS
+  /// ---------------------------
+  static Future<void> _registerAdapters() async {
+    try {
+      debugPrint("📦 Registering Hive adapters...");
+
+      // Use the existing HiveInit methods to properly register all adapters
+      // This ensures we use the correct type IDs (100-149 for restaurant, 150-223 for retail)
+      await HiveInit.registerRestaurantAdapters();
+      debugPrint("✅ Restaurant adapters registered");
+
+      await HiveInit.registerRetailAdapters();
+      debugPrint("✅ Retail adapters registered");
+
+      debugPrint("✅ All adapters registered successfully");
+    } catch (e) {
+      debugPrint("⚠️ Error registering adapters: $e");
+      // Don't rethrow - adapters may already be registered from app initialization
+    }
+  }
+
+  /// ---------------------------
+  /// 🔧 ENSURE ALL HIVE BOXES ARE OPENED
+  /// ---------------------------
+  static Future<void> _ensureBoxesOpened() async {
+    debugPrint("📦 Ensuring all Hive boxes are opened...");
+
+    try {
+      // Register all Hive adapters first
+      await _registerAdapters();
+
+      // Open app_state box (non-encrypted)
+      if (!Hive.isBoxOpen('app_state')) {
+        await Hive.openBox('app_state');
+        debugPrint("✅ Opened app_state box");
+      }
+
+      // Get or create encryption cipher
+      final storedKey = await secureStorage.read(key: 'hive_key');
+      HiveAesCipher? cipher;
+
+      if (storedKey != null) {
+        cipher = HiveAesCipher(base64Decode(storedKey));
+        debugPrint("✅ Using existing encryption key");
+      } else {
+        // Generate new encryption key if none exists
+        final key = Hive.generateSecureKey();
+        await secureStorage.write(key: 'hive_key', value: base64Encode(key));
+        cipher = HiveAesCipher(key);
+        debugPrint("✅ Generated new encryption key");
+      }
+
+      // Open all encrypted boxes
+      if (!Hive.isBoxOpen('categories')) {
+        await Hive.openBox<Category>('categories', encryptionCipher: cipher);
+        debugPrint("✅ Opened categories box");
+      }
+
+      if (!Hive.isBoxOpen('itemBoxs')) {
+        await Hive.openBox<Items>('itemBoxs', encryptionCipher: cipher);
+        debugPrint("✅ Opened itemBoxs box");
+      }
+
+      if (!Hive.isBoxOpen('variante')) {
+        await Hive.openBox<VariantModel>('variante', encryptionCipher: cipher);
+        debugPrint("✅ Opened variante box");
+      }
+
+      if (!Hive.isBoxOpen('choice')) {
+        await Hive.openBox<ChoicesModel>('choice', encryptionCipher: cipher);
+        debugPrint("✅ Opened choice box");
+      }
+
+      if (!Hive.isBoxOpen('extra')) {
+        await Hive.openBox<Extramodel>('extra', encryptionCipher: cipher);
+        debugPrint("✅ Opened extra box");
+      }
+
+      if (!Hive.isBoxOpen('companyBox')) {
+        await Hive.openBox<Company>('companyBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened companyBox box");
+      }
+
+      if (!Hive.isBoxOpen('staffBox')) {
+        await Hive.openBox<StaffModel>('staffBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened staffBox box");
+      }
+
+      if (!Hive.isBoxOpen('restaurant_taxes')) {
+        await Hive.openBox<Tax>('restaurant_taxes', encryptionCipher: cipher);
+        debugPrint("✅ Opened restaurant_taxes box");
+      }
+
+      if (!Hive.isBoxOpen('expenseCategory')) {
+        await Hive.openBox<ExpenseCategory>('expenseCategory', encryptionCipher: cipher);
+        debugPrint("✅ Opened expenseCategory box");
+      }
+
+      if (!Hive.isBoxOpen('expenseBox')) {
+        await Hive.openBox<Expense>('expenseBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened expenseBox box");
+      }
+
+      if (!Hive.isBoxOpen('tablesBox')) {
+        await Hive.openBox<TableModel>('tablesBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened tablesBox box");
+      }
+
+      if (!Hive.isBoxOpen('eodBox')) {
+        await Hive.openBox<EndOfDayReport>('eodBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened eodBox box");
+      }
+
+      if (!Hive.isBoxOpen('pastorderBox')) {
+        await Hive.openBox<pastOrderModel>('pastorderBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened pastorderBox box");
+      }
+
+      if (!Hive.isBoxOpen('orderBox')) {
+        await Hive.openBox<OrderModel>('orderBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened orderBox box");
+      }
+
+      debugPrint("✅ All Hive boxes are now open");
+    } catch (e) {
+      debugPrint("❌ Error ensuring boxes are opened: $e");
+      rethrow;
+    }
+  }
+
+  /// ---------------------------
   /// ✅ IMPORT JSON + IMAGES (AES DECRYPTED)
   /// ---------------------------
   static Future<bool> importAllData(BuildContext context, {String? password}) async {
     try {
       debugPrint("📦 Starting import process...");
 
-      // Pick ZIP file
+      // Pick ZIP or JSON file
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['zip'],
+        allowedExtensions: ['zip', 'json'],
       );
       if (picked == null) {
         debugPrint("❌ No file selected");
@@ -659,102 +1019,158 @@ class CategoryImportExport {
       final file = File(picked.files.single.path!);
       debugPrint("📦 Selected file: ${file.path}");
 
-      // Read ZIP file directly (unencrypted)
-      final zipBytes = await file.readAsBytes();
-      debugPrint("📦 ZIP file size: ${zipBytes.length} bytes");
+      // Check file extension to determine import method
+      final extension = p.extension(file.path).toLowerCase();
 
-      // 1️⃣ Extract ZIP
-      final appDir = await getApplicationDocumentsDirectory();
-      final restoreDir = Directory('${appDir.path}/restored_backup');
-      if (restoreDir.existsSync()) {
-        await restoreDir.delete(recursive: true);
-      }
-      restoreDir.createSync(recursive: true);
-
-      final archive = ZipDecoder().decodeBytes(zipBytes);
-      debugPrint("📦 Extracted ZIP contents: ${archive.map((f) => f.name).join(', ')}");
-      debugPrint("📦 Archive file count: ${archive.length}");
-
-      File? jsonFile;
-      for (final f in archive) {
-        debugPrint("📦 Processing file: ${f.name}, isFile: ${f.isFile}");
-        if (f.content == null) {
-          debugPrint("⚠️ Skipping ${f.name} - content is null");
-          continue;
-        }
-        final outFile = File(p.join(restoreDir.path, f.name))
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(f.content!);
-        if (f.name.toLowerCase() == 'data.json') {
-          jsonFile = outFile;
-          debugPrint("📦 Found data.json at: ${outFile.path}");
-        }
+      if (extension == '.json') {
+        // Web backup - JSON only
+        await _performJsonImport(file);
+      } else {
+        // Mobile backup - ZIP with images
+        await _performImport(file);
       }
 
-      if (jsonFile == null) {
-        debugPrint("❌ Available files in archive: ${archive.map((f) => f.name).toList()}");
-        throw Exception("Backup data file missing inside ZIP");
-      }
-
-      // 2️⃣ Parse JSON data
-      final data = jsonDecode(await jsonFile.readAsString());
-      debugPrint("📦 Parsed JSON data successfully");
-
-      // 3️⃣ Restore data directly (no key change, data stays encrypted with current key)
-      debugPrint("📦 Clearing and restoring data...");
-      await _restoreBox("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m), data);
-      await _restoreBox("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m), data);
-      await _restoreBox("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m), data);
-      await _restoreBox("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m), data);
-      await _restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m), data);
-      await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
-      await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
-      await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
-      await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
-      await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
-      await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
-      await _restoreBox("eodReports", Hive.box<EndOfDayReport>("eodBox"), (m) => EndOfDayReport.fromMap(m), data);
-      await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
-      debugPrint("📦 Data restored to Hive boxes");
-
-      // 4️⃣ Restore images
-      final productDir = Directory('${appDir.path}/product_images');
-      if (!productDir.existsSync()) productDir.createSync(recursive: true);
-      for (final f in archive) {
-        if (f.isFile && _isImageFile(f.name) && f.content != null) {
-          File(p.join(productDir.path, p.basename(f.name)))
-            ..createSync(recursive: true)
-            ..writeAsBytesSync(f.content!);
-        }
-      }
-      debugPrint("📦 Images restored");
-      debugPrint("✅ IMPORT COMPLETED SUCCESSFULLY!");
-
-      if (!context.mounted) {
-        debugPrint("⚠️ Context not mounted after import");
-        return true;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ Data & images restored successfully!"),
-          duration: Duration(seconds: 3),
-          backgroundColor: Colors.green,
-        ),
-      );
-      debugPrint("📦 Success message shown");
       return true;
     } catch (e) {
       debugPrint("❌ Import failed: $e");
-      if (!context.mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("❌ Import failed: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
       return false;
     }
+  }
+
+  /// ---------------------------
+  /// 🔧 JSON-ONLY IMPORT LOGIC (for web backups)
+  /// ---------------------------
+  static Future<void> _performJsonImport(File file) async {
+    debugPrint("📦 Processing JSON file: ${file.path}");
+
+    // Read JSON file directly
+    final jsonString = await file.readAsString();
+    final data = jsonDecode(jsonString);
+    debugPrint("📦 Parsed JSON data successfully");
+
+    // Restore data directly (no key change, data stays encrypted with current key)
+    debugPrint("📦 Clearing and restoring data...");
+    await _restoreBox("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m), data);
+    await _restoreBox("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m), data);
+    await _restoreBox("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m), data);
+    await _restoreBox("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m), data);
+    await _restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m), data);
+    await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
+    await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
+    await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
+    await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
+    await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
+    await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
+    await _restoreBox("eodReports", Hive.box<EndOfDayReport>("eodBox"), (m) => EndOfDayReport.fromMap(m), data);
+    await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
+    await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
+
+    // Restore app state (configuration settings)
+    if (data["appState"] != null && data["appState"].isNotEmpty) {
+      debugPrint("📦 Restoring app state...");
+      final appStateBox = Hive.box("app_state");
+      await appStateBox.clear();
+      final appStateData = data["appState"][0] as Map<String, dynamic>;
+      for (var entry in appStateData.entries) {
+        await appStateBox.put(entry.key, entry.value);
+      }
+      debugPrint("📦 App state restored: ${appStateData.keys.length} settings");
+    }
+
+    debugPrint("📦 Data restored to Hive boxes");
+    debugPrint("✅ JSON IMPORT COMPLETED SUCCESSFULLY!");
+  }
+
+  /// ---------------------------
+  /// 🔧 COMMON IMPORT LOGIC (for ZIP backups)
+  /// ---------------------------
+  static Future<void> _performImport(File file) async {
+    debugPrint("📦 Processing file: ${file.path}");
+
+    // Read ZIP file directly (unencrypted)
+    final zipBytes = await file.readAsBytes();
+    debugPrint("📦 ZIP file size: ${zipBytes.length} bytes");
+
+    // 1️⃣ Extract ZIP
+    final appDir = await getApplicationDocumentsDirectory();
+    final restoreDir = Directory('${appDir.path}/restored_backup');
+    if (restoreDir.existsSync()) {
+      await restoreDir.delete(recursive: true);
+    }
+    restoreDir.createSync(recursive: true);
+
+    final archive = ZipDecoder().decodeBytes(zipBytes);
+    debugPrint("📦 Extracted ZIP contents: ${archive.map((f) => f.name).join(', ')}");
+    debugPrint("📦 Archive file count: ${archive.length}");
+
+    File? jsonFile;
+    for (final f in archive) {
+      debugPrint("📦 Processing file: ${f.name}, isFile: ${f.isFile}");
+      if (f.content == null) {
+        debugPrint("⚠️ Skipping ${f.name} - content is null");
+        continue;
+      }
+      final outFile = File(p.join(restoreDir.path, f.name))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(f.content!);
+      if (f.name.toLowerCase() == 'data.json') {
+        jsonFile = outFile;
+        debugPrint("📦 Found data.json at: ${outFile.path}");
+      }
+    }
+
+    if (jsonFile == null) {
+      debugPrint("❌ Available files in archive: ${archive.map((f) => f.name).toList()}");
+      throw Exception("Backup data file missing inside ZIP");
+    }
+
+    // 2️⃣ Parse JSON data
+    final data = jsonDecode(await jsonFile.readAsString());
+    debugPrint("📦 Parsed JSON data successfully");
+
+    // 3️⃣ Restore data directly (no key change, data stays encrypted with current key)
+    debugPrint("📦 Clearing and restoring data...");
+    await _restoreBox("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m), data);
+    await _restoreBox("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m), data);
+    await _restoreBox("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m), data);
+    await _restoreBox("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m), data);
+    await _restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m), data);
+    await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
+    await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
+    await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
+    await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
+    await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
+    await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
+    await _restoreBox("eodReports", Hive.box<EndOfDayReport>("eodBox"), (m) => EndOfDayReport.fromMap(m), data);
+    await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
+    await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
+
+    // Restore app state (configuration settings)
+    if (data["appState"] != null && data["appState"].isNotEmpty) {
+      debugPrint("📦 Restoring app state...");
+      final appStateBox = Hive.box("app_state");
+      await appStateBox.clear();
+      final appStateData = data["appState"][0] as Map<String, dynamic>;
+      for (var entry in appStateData.entries) {
+        await appStateBox.put(entry.key, entry.value);
+      }
+      debugPrint("📦 App state restored: ${appStateData.keys.length} settings");
+    }
+
+    debugPrint("📦 Data restored to Hive boxes");
+
+    // 4️⃣ Restore images
+    final productDir = Directory('${appDir.path}/product_images');
+    if (!productDir.existsSync()) productDir.createSync(recursive: true);
+    for (final f in archive) {
+      if (f.isFile && _isImageFile(f.name) && f.content != null) {
+        File(p.join(productDir.path, p.basename(f.name)))
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(f.content!);
+      }
+    }
+    debugPrint("📦 Images restored");
+    debugPrint("✅ IMPORT COMPLETED SUCCESSFULLY!");
   }
 
   static Future<void> _restoreBox<T>(
@@ -901,7 +1317,7 @@ class CategoryImportExport {
     // First, pick the file
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['json'],
+      allowedExtensions: ['zip', 'json'],
     );
 
     if (picked == null) return;
@@ -1100,6 +1516,26 @@ class CategoryImportExport {
       await _restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m), data);
       await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
       await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
+      await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
+      await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
+      await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
+      await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
+      await _restoreBox("eodReports", Hive.box<EndOfDayReport>("eodBox"), (m) => EndOfDayReport.fromMap(m), data);
+      await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
+      await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
+
+      // Restore app state (configuration settings)
+      if (data["appState"] != null && data["appState"].isNotEmpty) {
+        debugPrint("📦 Restoring app state...");
+        final appStateBox = Hive.box("app_state");
+        await appStateBox.clear();
+        final appStateData = data["appState"][0] as Map<String, dynamic>;
+        for (var entry in appStateData.entries) {
+          await appStateBox.put(entry.key, entry.value);
+        }
+        debugPrint("📦 App state restored: ${appStateData.keys.length} settings");
+      }
+
       debugPrint("📦 Data restored to Hive boxes");
 
       // 8️⃣ Restore images

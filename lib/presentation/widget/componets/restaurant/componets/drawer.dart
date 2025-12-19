@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
@@ -685,17 +686,24 @@ class _DrawerrState extends State<Drawerr> {
                                   );
 
                                   String? filePath;
+                                  bool copiedSuccessfully = false;
                                   try {
                                     // Create backup in temp location
                                     filePath = await CategoryImportExport.exportAllData();
 
                                     if (filePath != null) {
-                                      // Copy to selected folder
-                                      final backupFile = File(filePath);
-                                      final fileName = filePath.split('/').last;
-                                      final newPath = '$selectedDirectory/$fileName';
-                                      await backupFile.copy(newPath);
-                                      debugPrint('✅ Backup copied to: $newPath');
+                                      // Try to copy to selected folder
+                                      try {
+                                        final backupFile = File(filePath);
+                                        final fileName = filePath.split('/').last;
+                                        final newPath = '$selectedDirectory/$fileName';
+                                        await backupFile.copy(newPath);
+                                        debugPrint('✅ Backup copied to: $newPath');
+                                        copiedSuccessfully = true;
+                                      } catch (copyError) {
+                                        debugPrint('⚠️ Copy failed: $copyError');
+                                        copiedSuccessfully = false;
+                                      }
                                     }
                                   } catch (e) {
                                     debugPrint('❌ Backup error: $e');
@@ -727,6 +735,44 @@ class _DrawerrState extends State<Drawerr> {
                                     return;
                                   }
 
+                                  if (!copiedSuccessfully) {
+                                    // Copy failed due to permissions, offer to share the file instead
+                                    final fileName = filePath.split('/').last;
+                                    ScaffoldMessenger.of(finalContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '⚠️ Cannot save to selected folder due to permissions.\nSharing file instead...',
+                                          style: TextStyle(fontSize: 14),
+                                        ),
+                                        duration: Duration(seconds: 3),
+                                        backgroundColor: Colors.orange,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+
+                                    // Share the file so user can save it manually
+                                    await Future.delayed(Duration(milliseconds: 500));
+                                    try {
+                                      await Share.shareXFiles(
+                                        [XFile(filePath)],
+                                        subject: 'UniPOS Backup',
+                                        text: 'Backup file: $fileName',
+                                      );
+                                    } catch (shareError) {
+                                      debugPrint('❌ Share failed: $shareError');
+                                      if (finalContext.mounted) {
+                                        ScaffoldMessenger.of(finalContext).showSnackBar(
+                                          SnackBar(
+                                            content: Text('❌ Failed to share backup file'),
+                                            duration: Duration(seconds: 3),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                    return;
+                                  }
+
                                   final fileName = filePath.split('/').last;
                                   ScaffoldMessenger.of(finalContext).showSnackBar(
                                     SnackBar(
@@ -736,7 +782,7 @@ class _DrawerrState extends State<Drawerr> {
                                           SizedBox(width: 12),
                                           Expanded(
                                             child: Text(
-                                              '✅ Backup saved successfully!\n📁 $fileName',
+                                              '✅ Backup saved successfully!\n📁 $selectedDirectory',
                                               style: TextStyle(fontSize: 14),
                                             ),
                                           ),

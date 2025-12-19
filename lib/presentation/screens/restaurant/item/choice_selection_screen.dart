@@ -36,9 +36,11 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
 
   void _loadChoices() {
     final choiceBox = Hive.box<ChoicesModel>('choice');
-    setState(() {
-      availableChoices = choiceBox.values.toList();
-    });
+    if (mounted) {
+      setState(() {
+        availableChoices = choiceBox.values.toList();
+      });
+    }
   }
 
   void _initializeSelections() {
@@ -205,25 +207,27 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
-                      children: choice.choiceOption.take(3).map((option) {
-                        return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            option.name,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: Colors.grey[700],
+                      children: [
+                        // Show first 3 options
+                        ...choice.choiceOption.take(3).map((option) {
+                          return Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                        );
-                      }).toList()
-                        ..add(
-                          choice.choiceOption.length > 3
-                              ? Container(
+                            child: Text(
+                              option.name,
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          );
+                        }),
+                        // Show "+X more" if more than 3 options
+                        if (choice.choiceOption.length > 3)
+                          Container(
                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.grey[300],
@@ -236,9 +240,8 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                                 color: Colors.grey[600],
                               ),
                             ),
-                          )
-                              : Container(),
-                        ),
+                          ),
+                      ],
                     ),
                     SizedBox(height: 5),
                   ],
@@ -307,6 +310,8 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
   }
 
   void _showAddChoiceDialog() {
+    final parentContext = context;
+
     final choiceNameController = TextEditingController();
     final List<TextEditingController> optionControllers = [TextEditingController()];
 
@@ -412,7 +417,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (choiceNameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(
                           content: Text('Please enter a choice name'),
                           backgroundColor: Colors.red,
@@ -431,7 +436,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                         .toList();
 
                     if (options.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
                         SnackBar(
                           content: Text('Please add at least one option'),
                           backgroundColor: Colors.red,
@@ -440,26 +445,41 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                       return;
                     }
 
+                    // Create the new choice object
                     final newChoice = ChoicesModel(
                       id: Uuid().v4(),
                       name: choiceNameController.text.trim(),
                       choiceOption: options,
                     );
 
+                    // Save to Hive
                     final choiceBox = Hive.box<ChoicesModel>('choice');
                     await choiceBox.put(newChoice.id, newChoice);
 
-                    _loadChoices();
+                    // Unfocus keyboard first
+                    FocusScope.of(parentContext).unfocus();
 
+                    // Close the dialog
+                    Navigator.of(context).pop();
+
+                    // After dialog is closed, dispose controllers
+                    await Future.delayed(Duration(milliseconds: 100));
                     for (var controller in optionControllers) {
                       controller.dispose();
                     }
                     choiceNameController.dispose();
-                    Navigator.pop(context);
 
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    // Reload choices in parent widget
+                    if (mounted) {
+                      _loadChoices();
+                    }
+
+                    // Show success message
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
                       SnackBar(
-                        content: Text('Choice "${newChoice.name}" added with ${options.length} options'),
+                        content: Text(
+                          'Choice "${newChoice.name}" added with ${options.length} options',
+                        ),
                         backgroundColor: Colors.green,
                       ),
                     );

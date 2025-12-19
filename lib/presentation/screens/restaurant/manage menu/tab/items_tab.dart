@@ -89,12 +89,12 @@ class _AllTabState extends State<ItemsTab> {
         children: [
           ValueListenableBuilder(
               valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-              builder: (context, itemBox, _) {
+              builder: (context, Box<Items> itemBox, _) {
                 final allItem = itemBox.values.toList();
 
                 return ValueListenableBuilder(
                     valueListenable: Hive.box<Category>('categories').listenable(),
-                    builder: (context, categorybox, _) {
+                    builder: (context, Box<Category> categorybox, _) {
                       if (allItem.isEmpty) {
                         return Container(
                           // color: Colors.red,

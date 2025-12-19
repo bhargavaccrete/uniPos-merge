@@ -312,17 +312,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     } else {
       final isLikelyBarcode = RegExp(r'^\d+$').hasMatch(barcode);
       if (mounted && isLikelyBarcode) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Product not found for barcode: $barcode'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showProductNotFoundDialog(barcode);
         _clearSearch();
       }
     }
+
+
   }
 
   void _showVariantSelectionDialog(
@@ -592,6 +587,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     return Column(
       children: [
         _buildSearchBarWithScanner(context),
+        if (!_showSearchResults) _buildTabBar(),
         if (_showSearchResults)
           _buildSearchResults()
         else ...[
@@ -644,6 +640,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           flex: 6,
           child: Column(
             children: [
+              _buildTabBar(),
               if (_isScannerActive) _buildScannerContainer(),
               _buildHeaderRow(context),
               const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
@@ -775,10 +772,13 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
+
+  /*----------------------------------SCANNER CONTAINER ----------------------------------*/
+
   Widget _buildScannerContainer() {
     return Container(
-      height: 250,
-      margin: const EdgeInsets.all(16),
+      height: 150,
+      margin: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: Colors.black,
         borderRadius: BorderRadius.circular(12),
@@ -809,7 +809,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             Center(
               child: Container(
                 width: 250,
-                height: 120,
+                height: 100,
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.greenAccent, width: 3),
                   borderRadius: BorderRadius.circular(12),
@@ -817,7 +817,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               ),
             ),
             const Positioned(
-              bottom: 16,
+              bottom: 5,
               left: 0,
               right: 0,
               child: Text(
@@ -825,7 +825,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 14,
+                  fontSize: 12 ,
                   fontWeight: FontWeight.w500,
                   shadows: [
                     Shadow(
@@ -838,9 +838,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             ),
             Positioned(
               top: 8,
-              right: 8,
+              right: 0,
               child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                icon: const Icon(Icons.close, color: Colors.white, size: 20),
                 onPressed: _toggleScanner,
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.black45,
@@ -853,25 +853,31 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
+
+  /*----------------------------------SEARCH BAR----------------------------------*/
   Widget _buildSearchBarWithScanner(BuildContext context) {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+      // color: Colors.red,
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       child: Row(
+        mainAxisAlignment:MainAxisAlignment.center,
+        crossAxisAlignment:CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Container(
-              height: 40,
+              height: 50,
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color:
+                // Colors.green,
+                Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
               ),
-              child: TextField(
+              child: TextFormField(
                 controller: _searchController,
                 textAlignVertical: TextAlignVertical.center,
                 onChanged: _onSearchChanged,
-                onSubmitted: (value) async {
+                onFieldSubmitted: (value) async {
                   if (value.isNotEmpty) {
                     await _handleBarcodeScanned(value);
                   }
@@ -1108,7 +1114,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   Widget _buildHeaderRow(BuildContext context) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       child: Row(
         children: const [
           Expanded(
@@ -1328,87 +1334,80 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         }
 
         return Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: const BoxDecoration(
             color: Colors.white,
             border: Border(top: BorderSide(color: Color(0xFFE8E8E8), width: 0.5)),
             boxShadow: [
               BoxShadow(
                 color: Color(0x0A000000),
-                blurRadius: 8,
-                offset: Offset(0, -2),
+                blurRadius: 4,
+                offset: Offset(0, -1),
               ),
             ],
           ),
           child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${cartStore.itemCount} Items',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B6B6B),
-                      ),
+                // Items count badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                      width: 1,
                     ),
-                    Text(
-                      '₹${cartStore.totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B6B6B),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.shopping_cart,
+                        size: 18,
+                        color: AppColors.primary,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Text(
+                        '${cartStore.itemCount}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Tax',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B6B6B),
+                const SizedBox(width: 12),
+                // Total price
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Total',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B6B6B),
+                        ),
                       ),
-                    ),
-                    Text(
-                      '₹${cartStore.totalGstAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B6B6B),
+                      Text(
+                        '₹${cartStore.totalPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A1A),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const Divider(height: 20, thickness: 0.5, color: Color(0xFFE8E8E8)),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Grand Total',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
-                    Text(
-                      '₹${cartStore.totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                // Checkout button
                 SizedBox(
-                  width: double.infinity,
-                  height: 54,
+                  height: 44,
                   child: ElevatedButton(
                     onPressed: () async {
                       final result = await Navigator.push(
@@ -1431,14 +1430,25 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Proceed to Checkout',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'Checkout',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Icon(Icons.arrow_forward, size: 18),
+                      ],
                     ),
                   ),
                 ),
@@ -1448,5 +1458,859 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         );
       },
     );
+  }
+
+
+  /*----------------------------------TAB BAR ----------------------------------*/
+  Widget _buildTabBar() {
+    return Observer(
+      builder: (context) {
+        return Container(
+          height: 48,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFE8E8E8), width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Tabs
+              Expanded(
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  itemCount: cartStore.tabs.length,
+                  itemBuilder: (context, index) {
+                    final tab = cartStore.tabs[index];
+                    final isActive = cartStore.activeTabIndex == index;
+                    final itemCount = tab.totalItems;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () async {
+                            await cartStore.switchTab(index);
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            constraints: const BoxConstraints(minWidth: 100, maxWidth: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? AppColors.primary
+                                  : const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    tab.displayName,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                                      color: isActive
+                                          ? Colors.white
+                                          : const Color(0xFF1A1A1A),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (itemCount > 0) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isActive
+                                          ? Colors.white.withOpacity(0.25)
+                                          : AppColors.primary.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$itemCount',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: isActive
+                                            ? Colors.white
+                                            : AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                if (cartStore.tabs.length > 1) ...[
+                                  const SizedBox(width: 6),
+                                  GestureDetector(
+                                    onTap: () async {
+                                      await cartStore.closeTab(index);
+                                    },
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: isActive
+                                          ? Colors.white.withOpacity(0.8)
+                                          : const Color(0xFF6B6B6B),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // New Tab Button
+              Padding(
+                padding: const EdgeInsets.only(right: 8, top: 6, bottom: 6),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      await cartStore.createNewTab();
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'New',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /*----------------------------------PRODUCT NOT FOUND DIALOG ----------------------------------*/
+  Future<void> _showProductNotFoundDialog(String barcode) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.search_off,
+                size: 48,
+                color: Colors.orange,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Product Not Found',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No product found for barcode:\n$barcode',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B6B6B),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Would you like to add this product?',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B6B6B),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _showAddProductBottomSheet(barcode);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Add Product',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /*----------------------------------ADD PRODUCT BOTTOM SHEET ----------------------------------*/
+  Future<void> _showAddProductBottomSheet(String barcode) async {
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    final mrpController = TextEditingController();
+    final stockController = TextEditingController(text: '1');
+    String selectedCategory = productStore.categories.isNotEmpty
+        ? productStore.categories.first
+        : 'General';
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8E8E8),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.add_box,
+                        color: AppColors.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add New Product',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Quick add with scanned barcode',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF6B6B6B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, color: Color(0xFF6B6B6B)),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Form
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(
+                    left: 24,
+                    right: 24,
+                    top: 24,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Barcode display
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.qr_code,
+                              color: AppColors.primary,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Scanned Barcode',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B6B6B),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  barcode,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Product Name
+                      const Text(
+                        'Product Name *',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: nameController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Enter product name',
+                          hintStyle: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFFB0B0B0),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF5F5F5),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE8E8E8),
+                              width: 1,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Category
+                      const Text(
+                        'Category *',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFE8E8E8),
+                            width: 1,
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: selectedCategory,
+                            isExpanded: true,
+                            icon: const Icon(Icons.keyboard_arrow_down),
+                            items: productStore.categories.map((String category) {
+                              return DropdownMenuItem<String>(
+                                value: category,
+                                child: Text(
+                                  category,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() {
+                                  selectedCategory = newValue;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Price fields
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Selling Price *',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1A1A1A),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: priceController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    hintText: '0.00',
+                                    prefixText: '₹ ',
+                                    hintStyle: const TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFFB0B0B0),
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF5F5F5),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFE8E8E8),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'MRP',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1A1A1A),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: mrpController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    hintText: '0.00',
+                                    prefixText: '₹ ',
+                                    hintStyle: const TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFFB0B0B0),
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF5F5F5),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFE8E8E8),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Stock
+                      const Text(
+                        'Stock Quantity *',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: stockController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: '1',
+                          hintStyle: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFFB0B0B0),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF5F5F5),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE8E8E8),
+                              width: 1,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: AppColors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Bottom buttons
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    top: BorderSide(color: Color(0xFFE8E8E8), width: 1),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 8,
+                      offset: Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: BorderSide(color: AppColors.primary),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            await _handleAddProduct(
+                              context,
+                              barcode,
+                              nameController.text,
+                              selectedCategory,
+                              priceController.text,
+                              mrpController.text,
+                              stockController.text,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Add to Cart',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /*----------------------------------HANDLE ADD PRODUCT ----------------------------------*/
+  Future<void> _handleAddProduct(
+    BuildContext bottomSheetContext,
+    String barcode,
+    String name,
+    String category,
+    String price,
+    String mrp,
+    String stock,
+  ) async {
+    // Validation
+    if (name.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter product name'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (price.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter selling price'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final parsedPrice = double.parse(price.trim());
+      final parsedMrp = mrp.trim().isEmpty ? parsedPrice : double.parse(mrp.trim());
+      final parsedStock = int.parse(stock.trim().isEmpty ? '1' : stock.trim());
+
+      // Create product
+      const uuid = Uuid();
+      final productId = uuid.v4();
+      final variantId = uuid.v4();
+      final now = DateTime.now().toIso8601String();
+
+      final product = ProductModel(
+        productId: productId,
+        productName: name.trim(),
+        category: category,
+        description: '',
+        hasVariants: false,
+        createdAt: now,
+        updateAt: now,
+        productType: 'simple',
+        defaultPrice: parsedPrice,
+        defaultMrp: parsedMrp,
+      );
+
+      final variant = VarianteModel(
+        varianteId: variantId,
+        productId: productId,
+        barcode: barcode,
+        sellingPrice: parsedPrice,
+        mrp: parsedMrp,
+        costPrice: 0,
+        stockQty: parsedStock,
+        sku: '',
+        createdAt: now,
+        updateAt: now,
+        isDefault: true,
+        status: 'active',
+      );
+
+      // Save to Hive
+      await productStore.addProduct(product);
+      await productStore.addVariant(variant);
+
+      // Add to cart
+      final result = await cartStore.addItem(product, variant);
+
+      // Close bottom sheet
+      if (mounted) {
+        Navigator.pop(bottomSheetContext);
+      }
+
+      // Show success message
+      if (mounted) {
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${product.productName} added to cart!'),
+              backgroundColor: const Color(0xFF4CAF50),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.errorMessage ?? 'Product added but could not add to cart'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding product: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

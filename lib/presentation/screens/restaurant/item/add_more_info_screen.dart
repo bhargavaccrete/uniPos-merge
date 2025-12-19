@@ -148,7 +148,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
               },
             ),
 
-            SizedBox(height: 20),
+/*            SizedBox(height: 20),
 
             // Add Tax Option
             _buildTaxCard(
@@ -175,7 +175,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                   });
                 }
               },
-            ),
+            ),*/
 
             Spacer(),
 

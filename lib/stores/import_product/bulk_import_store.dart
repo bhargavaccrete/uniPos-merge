@@ -69,8 +69,33 @@ abstract class _BulkImportStore with Store {
     isLoading = true;
     errorMessage = null;
     try {
-      // 1. Request Storage Permission (Mobile only)
-      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      // 1. Request Storage Permission (Mobile only) - Updated for Android 13+
+      if (!kIsWeb && Platform.isAndroid) {
+        // On Android 13+ (API 33+), we need to request different permissions
+        // For now, we'll use the app's private directory which doesn't require permissions
+        // Or request manageExternalStorage for Android 11+
+        final androidVersion = Platform.version;
+        print('Android version: $androidVersion');
+
+        // Try to request storage permission (works for Android 10 and below)
+        var status = await Permission.storage.status;
+        if (!status.isGranted) {
+          status = await Permission.storage.request();
+        }
+
+        // If still not granted, try manageExternalStorage for Android 11+
+        if (!status.isGranted) {
+          var manageStatus = await Permission.manageExternalStorage.status;
+          if (!manageStatus.isGranted) {
+            manageStatus = await Permission.manageExternalStorage.request();
+          }
+
+          // If still no permission, we'll save to app's private directory
+          if (!manageStatus.isGranted) {
+            print('No storage permission granted. Will save to app private directory.');
+          }
+        }
+      } else if (!kIsWeb && Platform.isIOS) {
         var status = await Permission.storage.status;
         if (!status.isGranted) {
           status = await Permission.storage.request();

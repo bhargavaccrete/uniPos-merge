@@ -33,7 +33,7 @@ class _OrderdetailsState extends State<Orderdetails> {
     currentOrder = widget.Order!;
   }
 
-  String _money(num? v) => '₹${(v ?? 0).toStringAsFixed(2)}';
+  String _money(num? v) => 'Rs ${(v ?? 0).toStringAsFixed(2)}';
 
   @override
   Widget build(BuildContext context) {
@@ -363,6 +363,105 @@ class _OrderdetailsState extends State<Orderdetails> {
                                             style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
                                         // This is where _metaChip was missing
                                         if (it.variantName != null) _metaChip(it.variantName!),
+                                        // Display extras with quantities
+                                        if (it.extras != null && it.extras!.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4.0),
+                                            child: Builder(
+                                              builder: (context) {
+                                                // Group extras by name and count them
+                                                Map<String, Map<String, dynamic>> groupedExtras = {};
+
+                                                for (var extra in it.extras!) {
+                                                  final displayName = extra['displayName'] ?? extra['name'] ?? 'Unknown';
+                                                  final price = extra['price']?.toDouble() ?? 0.0;
+                                                  final quantity = extra['quantity']?.toInt() ?? 1;
+
+                                                  String key = '$displayName-${price.toStringAsFixed(2)}';
+
+                                                  if (groupedExtras.containsKey(key)) {
+                                                    groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + quantity;
+                                                  } else {
+                                                    groupedExtras[key] = {
+                                                      'displayName': displayName,
+                                                      'price': price,
+                                                      'quantity': quantity,
+                                                    };
+                                                  }
+                                                }
+
+                                                // Build display string
+                                                final extrasDisplay = groupedExtras.entries.map((entry) {
+                                                  final data = entry.value;
+                                                  final int qty = data['quantity'] as int;
+                                                  final String name = data['displayName'] as String;
+                                                  final double price = data['price'] as double;
+
+                                                  if (qty > 1) {
+                                                    return '${qty}x $name(Rs ${price.toStringAsFixed(2)})';
+                                                  } else {
+                                                    return '$name(Rs ${price.toStringAsFixed(2)})';
+                                                  }
+                                                }).join(', ');
+
+                                                return Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.orange.shade50,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: Colors.orange.shade200, width: 0.5),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.add_circle_outline, size: 12, color: Colors.orange.shade700),
+                                                      SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          'Extras: $extrasDisplay',
+                                                          style: GoogleFonts.poppins(
+                                                            fontSize: 11,
+                                                            color: Colors.orange.shade900,
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        // Display choices/add-ons
+                                        if (it.choiceNames != null && it.choiceNames!.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4.0),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade50,
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: Colors.blue.shade200, width: 0.5),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.restaurant_menu, size: 12, color: Colors.blue.shade700),
+                                                  SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Add-ons: ${it.choiceNames!.join(", ")}',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 11,
+                                                        color: Colors.blue.shade900,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         // Display tax information
                                         if (it.taxRate != null && it.taxRate! > 0)
                                           Padding(

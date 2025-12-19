@@ -641,7 +641,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       final bool hasSize = data['hasSize'];
                       final Map<String, TextEditingController> variantControllers = data['variantPriceControllers'];
                       final Set<String> selectedVariants = data['selectedVariants'];
-                      
+
                       if (name.isEmpty) continue;
 
                       double basePrice = 0.0;
@@ -650,7 +650,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       if (hasSize) {
                         variantPrices = {};
                          if (selectedVariants.isEmpty) {
-                           // Skip if contains size but no variants selected? 
+                           // Skip if contains size but no variants selected?
                            // Or allow with 0 prices? Let's skip invalid ones or warn
                            // For now, continuing
                          }
@@ -695,16 +695,27 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                     final extraBox = Hive.box<Extramodel>('extra');
                     await extraBox.put(newExtra.Id, newExtra);
 
-                    _loadExtras();
+                    // Unfocus keyboard first
+                    FocusScope.of(context).unfocus();
 
+                    // Close the dialog
+                    Navigator.of(context).pop();
+
+                    // After dialog is closed, dispose controllers
+                    await Future.delayed(Duration(milliseconds: 100));
                     for (var data in toppingData) {
                       data['nameController'].dispose();
                       data['priceController'].dispose();
                       (data['variantPriceControllers'] as Map<String, TextEditingController>).values.forEach((c) => c.dispose());
                     }
                     extraNameController.dispose();
-                    Navigator.pop(context);
 
+                    // Reload extras in parent widget
+                    if (mounted) {
+                      _loadExtras();
+                    }
+
+                    // Show success message
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Extra "${newExtra.Ename}" added with ${toppings.length} toppings'),
