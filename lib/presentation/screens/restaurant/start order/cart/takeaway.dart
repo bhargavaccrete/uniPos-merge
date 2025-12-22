@@ -633,6 +633,21 @@ class _TakeawayState extends State<Takeaway> {
     await HiveOrders.addOrder(neworder);
     print("✅ New active order saved with Total: ${neworder.totalPrice}");
 
+    // Auto-print KOT directly to printer
+    if (mounted) {
+      try {
+        await RestaurantPrintHelper.printKOT(
+          context: context,
+          order: neworder,
+          kotNumber: newKotNumber,
+          autoPrint: true, // Direct print without preview
+        );
+      } catch (e) {
+        print("⚠️ KOT print failed: $e");
+        // Don't block order placement if print fails
+      }
+    }
+
     // Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
     print("✅ Stock deducted for order items");
@@ -731,6 +746,21 @@ class _TakeawayState extends State<Takeaway> {
       );
 
       await HiveOrders.updateOrder(updateOrder);
+
+      // Auto-print KOT for new items directly to printer
+      if (hasNewItems && newKotNumber != null && mounted) {
+        try {
+          await RestaurantPrintHelper.printKOT(
+            context: context,
+            order: updateOrder,
+            kotNumber: newKotNumber,
+            autoPrint: true, // Direct print without preview
+          );
+        } catch (e) {
+          print("⚠️ KOT print failed: $e");
+          // Don't block order update if print fails
+        }
+      }
 
       // Update the table's total price as well
       if (updateOrder.tableNo != null) {
@@ -1293,6 +1323,10 @@ class _TakeawayState extends State<Takeaway> {
   Future<void> completeOrder(OrderModel activeModel) async {
     print("--- Completing order KOT #${activeModel.kotNumber} ---");
 
+    // Generate daily bill number for completed order
+    final int billNumber = await HiveOrders.getNextBillNumber();
+    print('✅ Bill number generated: $billNumber');
+
     // Directly convert the active order to a past order.
     // All calculations (GST, subtotal) were already done and saved on the activeModel.
     final pastOrder = pastOrderModel(
@@ -1308,10 +1342,11 @@ class _TakeawayState extends State<Takeaway> {
       gstAmount: activeModel.gstAmount,
       kotNumbers: activeModel.kotNumbers, // Always present in new orders
       kotBoundaries: activeModel.kotBoundaries, // KOT boundaries for grouping items
+      billNumber: billNumber, // Daily bill number (resets every day)
     );
 
     await HivePastOrder.addOrder(pastOrder);
-    print("✅ Order saved to past orders history.");
+    print("✅ Order saved to past orders history with Bill #$billNumber");
 
     // This is the critical missing step: delete the order from the ACTIVE list.
     await HiveOrders.deleteOrder(activeModel.id);
@@ -1389,6 +1424,11 @@ class _TakeawayState extends State<Takeaway> {
 
     // No need for a temporary OrderModel. We create the final pastOrderModel directly.
     final int quickSettleKotNumber = await HiveOrders.getNextKotNumber();
+
+    // Generate daily bill number for quick settle
+    final int billNumber = await HiveOrders.getNextBillNumber();
+    print('✅ Bill number generated for quick settle: $billNumber');
+
     final pastOrder = pastOrderModel(
       id: Uuid().v4(), // Generate a unique ID for this transaction
       customerName: 'Quick Settle',
@@ -1408,6 +1448,7 @@ class _TakeawayState extends State<Takeaway> {
       // ✅ KOT tracking - REQUIRED
       kotNumbers: [quickSettleKotNumber],
       kotBoundaries: [plainItems.length], // Single KOT with all items
+      billNumber: billNumber, // Daily bill number (resets every day)
     );
 
     // 1. Add the completed order to history

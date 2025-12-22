@@ -23,6 +23,12 @@ class ReceiptData {
   // Restaurant-specific fields
   final String? orderType; // e.g., "Dine In", "Takeaway", "Delivery"
   final String? tableNo; // Table number for dine-in orders
+  final int? kotNumber; // KOT number for kitchen orders (single KOT prints)
+  final List<int>? kotNumbers; // All KOT numbers for this order (customer bill)
+  final DateTime? orderTimestamp; // Order timestamp for KOT
+  final String? orderNo; // Order number/ID for KOT
+  final bool? isAddonKot; // True if this is an additional KOT for existing order
+  final int? billNumber; // Daily bill number for completed orders (resets every day)
 
   // Store logo
   final Uint8List? logoBytes; // Store logo image
@@ -38,6 +44,12 @@ class ReceiptData {
     this.gstNumber,
     this.orderType,
     this.tableNo,
+    this.kotNumber,
+    this.kotNumbers,
+    this.orderTimestamp,
+    this.orderNo,
+    this.isAddonKot,
+    this.billNumber,
     this.logoBytes,
   });
 }
@@ -129,162 +141,220 @@ class ReceiptPdfService {
         _buildDashedLine(),
         pw.SizedBox(height: 4),
 
-        // Receipt Info
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Receipt #:', style: const pw.TextStyle(fontSize: 8)),
+        // Receipt Info / KOT Info
+        if (data.kotNumber != null) ...[
+          // KOT Format (simplified for kitchen)
+          pw.Text(
+            'KOT #: ${data.kotNumber.toString().padLeft(3, '0')}',
+            style: const pw.TextStyle(fontSize: 10),
+          ),
+          if (data.tableNo != null && data.tableNo!.isNotEmpty) ...[
             pw.Text(
-              data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
-              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+              'Table: ${data.tableNo}',
+              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
             ),
           ],
-        ),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Date:', style: const pw.TextStyle(fontSize: 8)),
+          if (data.orderNo != null && data.orderNo!.isNotEmpty) ...[
             pw.Text(
-              _formatDateTime(data.sale.date),
-              style: const pw.TextStyle(fontSize: 8),
+              'Order No: ${data.orderNo}',
+              style: const pw.TextStyle(fontSize: 10),
             ),
           ],
-        ),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Payment:', style: const pw.TextStyle(fontSize: 8)),
+          if (data.orderType != null) ...[
             pw.Text(
-              data.sale.paymentType.toUpperCase(),
-              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+              'Type: ${data.orderType!.toUpperCase()}${data.isAddonKot == true ? ' (ADD-ON)' : ''}',
+              style: const pw.TextStyle(fontSize: 10),
             ),
           ],
-        ),
-        if (data.customer != null) ...[
+          if (data.orderTimestamp != null) ...[
+            pw.Text(
+              _formatDateTime(data.orderTimestamp!.toIso8601String()),
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+          ],
+        ] else ...[
+          // Regular Receipt Info - Show Bill Number for completed orders
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Customer:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style: const pw.TextStyle(fontSize: 8)),
               pw.Text(
-                data.customer!.name,
+                data.billNumber != null
+                  ? data.billNumber.toString().padLeft(3, '0')
+                  : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
+                style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+              ),
+            ],
+          ),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Date:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(
+                _formatDateTime(data.sale.date),
                 style: const pw.TextStyle(fontSize: 8),
               ),
             ],
           ),
-        ],
-
-        pw.SizedBox(height: 4),
-        _buildDashedLine(),
-        pw.SizedBox(height: 4),
-
-        // Items Header
-        pw.Row(
-          children: [
-            pw.Expanded(
-              flex: 4,
-              child: pw.Text('Item', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
-            ),
-            pw.Expanded(
-              flex: 1,
-              child: pw.Text('Qty', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
-            ),
-            pw.Expanded(
-              flex: 2,
-              child: pw.Text('Amount', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Payment:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(
+                data.sale.paymentType.toUpperCase(),
+                style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+              ),
+            ],
+          ),
+          if (data.customer != null) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Customer:', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text(
+                  data.customer!.name,
+                  style: const pw.TextStyle(fontSize: 8)),
+              ],
             ),
           ],
-        ),
-        pw.SizedBox(height: 4),
-
-        // Items List
-        ...data.items.map((item) => _buildThermalItemRow(item)),
-
-        pw.SizedBox(height: 4),
-        _buildDashedLine(),
-        pw.SizedBox(height: 4),
-
-        // Totals
-        _buildThermalTotalRow('Subtotal', data.sale.subtotal),
-        if (data.sale.discountAmount > 0)
-          _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-        if (data.sale.taxAmount > 0)
-          _buildThermalTotalRow('Tax', data.sale.taxAmount),
-        pw.SizedBox(height: 4),
-        _buildDashedLine(),
-        pw.SizedBox(height: 4),
-        _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 12),
-
-        // Credit sale info
-        if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
-          pw.SizedBox(height: 4),
-          _buildDashedLine(),
-          pw.SizedBox(height: 4),
-          _buildThermalTotalRow('Paid', data.sale.paidAmount),
-          _buildThermalTotalRow('DUE', data.sale.dueAmount, isBold: true, fontSize: 11),
-          pw.SizedBox(height: 4),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(4),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(width: 0.5),
-            ),
-            child: pw.Text(
-              '** CREDIT SALE - PAYMENT PENDING **',
-              style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
-              textAlign: pw.TextAlign.center,
-            ),
-          ),
-        ],
-
-        pw.SizedBox(height: 8),
-        _buildDashedLine(),
-        pw.SizedBox(height: 4),
-
-        // Split Payment Breakdown
-        ..._buildSplitPaymentSection(data.sale),
-
-        pw.SizedBox(height: 4),
-        _buildDashedLine(),
-        pw.SizedBox(height: 8),
-
-        // Footer
-        pw.Text(
-          'Thank you for your purchase!',
-          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-        ),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          'Please come again',
-          style: const pw.TextStyle(fontSize: 8),
-        ),
-        pw.SizedBox(height: 8),
-
-        // Points earned (if customer)
-        if (data.customer != null) ...[
-          pw.Container(
-            padding: const pw.EdgeInsets.all(4),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(width: 0.5),
-            ),
-            child: pw.Column(
+          // Display all KOT numbers for this order
+          if (data.kotNumbers != null && data.kotNumbers!.isNotEmpty) ...[
+            pw.SizedBox(height: 2),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
+                pw.Text('KOT #:', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
-                  'Points Earned: ${(data.sale.totalAmount / 10).floor()}',
+                  data.kotNumbers!.map((num) => '#$num').join(', '),
                   style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
-                ),
-                pw.Text(
-                  'Total Points: ${data.customer!.pointsBalance}',
-                  style: const pw.TextStyle(fontSize: 8),
                 ),
               ],
             ),
-          ),
-          pw.SizedBox(height: 8),
+          ],
         ],
 
-        pw.Text(
-          _formatDateTime(DateTime.now().toIso8601String()),
-          style: const pw.TextStyle(fontSize: 7),
-        ),
+        pw.SizedBox(height: 4),
+        _buildDashedLine(),
+        pw.SizedBox(height: 4),
+
+        // Items List - Different format for KOT vs Regular Receipt
+        if (data.kotNumber != null) ...[
+          // KOT Format: Just item name and quantity (no prices)
+          ...data.items.map((item) => _buildKOTItemRow(item)),
+          pw.SizedBox(height: 4),
+          _buildDashedLine(),
+          // No footer for KOT - just end here
+        ] else ...[
+          // Regular Receipt Format: With headers and prices
+          // Items Header
+          pw.Row(
+            children: [
+              pw.Expanded(
+                flex: 4,
+                child: pw.Text('Item', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.Expanded(
+                flex: 1,
+                child: pw.Text('Qty', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Text('Amount', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+
+          // Items List
+          ...data.items.map((item) => _buildThermalItemRow(item)),
+
+          pw.SizedBox(height: 4),
+          _buildDashedLine(),
+          pw.SizedBox(height: 4),
+
+          // Totals
+          _buildThermalTotalRow('Subtotal', data.sale.subtotal),
+          if (data.sale.discountAmount > 0)
+            _buildThermalTotalRow('Discount', -data.sale.discountAmount),
+          if (data.sale.taxAmount > 0)
+            _buildThermalTotalRow('Tax', data.sale.taxAmount),
+          pw.SizedBox(height: 4),
+          _buildDashedLine(),
+          pw.SizedBox(height: 4),
+          _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 12),
+
+          // Credit sale info
+          if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
+            pw.SizedBox(height: 4),
+            _buildDashedLine(),
+            pw.SizedBox(height: 4),
+            _buildThermalTotalRow('Paid', data.sale.paidAmount),
+            _buildThermalTotalRow('DUE', data.sale.dueAmount, isBold: true, fontSize: 11),
+            pw.SizedBox(height: 4),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(4),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(width: 0.5),
+              ),
+              child: pw.Text(
+                '** CREDIT SALE - PAYMENT PENDING **',
+                style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+          ],
+
+          pw.SizedBox(height: 8),
+          _buildDashedLine(),
+          pw.SizedBox(height: 4),
+
+          // Split Payment Breakdown
+          ..._buildSplitPaymentSection(data.sale),
+
+          pw.SizedBox(height: 4),
+          _buildDashedLine(),
+          pw.SizedBox(height: 8),
+
+          // Footer
+          pw.Text(
+            'Thank you for your purchase!',
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'Please come again',
+            style: const pw.TextStyle(fontSize: 8),
+          ),
+          pw.SizedBox(height: 8),
+
+          // Points earned (if customer)
+          if (data.customer != null) ...[
+            pw.Container(
+              padding: const pw.EdgeInsets.all(4),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(width: 0.5),
+              ),
+              child: pw.Column(
+                children: [
+                  pw.Text(
+                    'Points Earned: ${(data.sale.totalAmount / 10).floor()}',
+                    style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(
+                    'Total Points: ${data.customer!.pointsBalance}',
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 8),
+          ],
+
+          pw.Text(
+            _formatDateTime(DateTime.now().toIso8601String()),
+            style: const pw.TextStyle(fontSize: 7),
+          ),
+        ],
       ],
     );
   }
@@ -611,6 +681,47 @@ class ReceiptPdfService {
           ),
         ),
       ],
+    );
+  }
+
+  /// Build item row for KOT (Kitchen Order Ticket) - Simple format without prices
+  pw.Widget _buildKOTItemRow(SaleItemModel item) {
+    final name = item.productName ?? 'Unknown';
+    // Format item name with variant in parentheses: "Veg Pizza (Medium)"
+    final displayName = item.size != null ? '$name (${item.size})' : name;
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(top: 3, bottom: 3),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Item name (with variant) and quantity in a row
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  displayName,
+                  style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+              pw.Text(
+                'x${item.qty}',
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+              ),
+            ],
+          ),
+          // Display extras and add-ons (stored in weight field)
+          if (item.weight != null && item.weight!.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(left: 4, top: 1),
+              child: pw.Text(
+                '  ${item.weight!}',
+                style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

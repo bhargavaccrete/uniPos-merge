@@ -5,13 +5,34 @@ import 'package:unipos/core/init/hive_init.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
 import 'package:unipos/presentation/screens/retail/home_screen.dart';
-import 'package:unipos/presentation/screens/retail/pos_screen.dart';
 import 'package:unipos/screen/existingUserRestoreScreen.dart';
 import 'package:unipos/screen/setupWizardScreen.dart';
 import 'package:unipos/screen/splashScreen.dart';
 import 'package:unipos/screen/userSelectionScreen.dart';
 import 'package:unipos/screen/walkthroughScreen.dart';
-import 'package:unipos/util/color.dart';
+// Retail Screens Imports
+import 'package:unipos/presentation/screens/retail/inventory_screen.dart';
+import 'package:unipos/presentation/screens/retail/add_product_screen.dart';
+import 'package:unipos/presentation/screens/retail/category_management_screen.dart';
+import 'package:unipos/presentation/screens/retail/stock_alerts_screen.dart';
+import 'package:unipos/presentation/screens/retail/checkout_screen.dart';
+import 'package:unipos/presentation/screens/retail/parked_sales_screen.dart';
+import 'package:unipos/presentation/screens/retail/customer_list_screen.dart';
+import 'package:unipos/presentation/screens/retail/credit_reports_screen.dart';
+import 'package:unipos/presentation/screens/retail/supplier_list_screen.dart';
+import 'package:unipos/presentation/screens/retail/purchase_history_screen.dart';
+import 'package:unipos/presentation/screens/retail/purchase_order_list_screen.dart';
+import 'package:unipos/presentation/screens/retail/add_purchase_screen.dart';
+import 'package:unipos/presentation/screens/retail/reports_screen.dart';
+import 'package:unipos/presentation/screens/retail/sales_history_screen.dart';
+import 'package:unipos/presentation/screens/retail/eod_report_screen.dart';
+import 'package:unipos/presentation/screens/retail/gst_report_screen.dart';
+import 'package:unipos/presentation/screens/retail/settings_screen.dart';
+import 'package:unipos/presentation/screens/retail/store_info_settings_screen.dart';
+import 'package:unipos/presentation/screens/retail/gst_settings_screen.dart';
+import 'package:unipos/presentation/screens/retail/payment_setup_screen.dart';
+import 'package:unipos/presentation/screens/retail/staff_setup_screen.dart';
+import 'package:unipos/presentation/screens/retail/backup_screen.dart';
 
 import 'domain/store/restaurant/appStore.dart';
 final appStore = AppStore();
@@ -76,34 +97,55 @@ class UniPOSApp extends StatelessWidget {
       // ),
       // Define all your routes here
       routes: {
+        // Core Routes
         '/': (context) => const SplashScreen(),
         '/walkthrough': (context) => const WalkthroughScreen(),
         '/userSelectionScreen': (context) => const UserSelectionScreen(),
         '/existingUserRestoreScreen': (context) => const ExistingUserRestoreScreen(),
         '/setup-wizard': (context) => const SetupWizardScreen(),
 
+        // Restaurant Route
+        '/restaurant-home': (context) => const AdminWelcome(),
+
+        // Retail Routes
         '/retail-billing': (context) => const RetailPosScreen(),
-         '/retail-menu': (context) => const HomeScreen(),
+        '/retail-menu': (context) => const HomeScreen(),
+        
+        // -- Retail: Sales --
+        '/checkout': (context) => const CheckoutScreen(),
+        '/parked-sales': (context) => const ParkedSalesScreen(),
+        // Note: '/sale-return' removed as it requires arguments
 
+        // -- Retail: Inventory --
+        '/inventory': (context) => const InventoryScreen(),
+        '/add-product': (context) => const AddProductScreen(),
+        '/categories': (context) => const CategoryManagementScreen(),
+        '/stock-alerts': (context) => const StockAlertsScreen(),
 
-        '/restaurant-home': (context) => const AdminWelcome()
+        // -- Retail: Customers --
+        '/customers': (context) => const CustomerListScreen(),
+        '/credit-reports': (context) => const CreditReportsScreen(),
 
+        // -- Retail: Purchasing --
+        '/suppliers': (context) => const SupplierListScreen(),
+        '/purchase-orders': (context) => const PurchaseOrderListScreen(),
+        '/add-purchase': (context) => const AddPurchaseScreen(),
+        '/purchase-history': (context) => const PurchaseHistoryScreen(),
+        // Note: '/material-receiving' removed as it requires arguments
 
-        // '/outlet-registration': (context) => const OutletRegistrationScreen(),
-        // '/tax-setup': (context) => const TaxConfigurationScreen(),
-        // '/category-setup': (context) => const CategorySetupScreen(),
-        // '/inventory-setup': (context) => const InventorySetupScreen(),
-        // '/payment-setup': (context) => const PaymentSetupScreen(),
-        // '/staff-setup': (context) => const StaffSetupScreen(),
-        // '/printer-setup': (context) => const PrinterSetupScreen(),
-        // '/login': (context) => const LoginScreen(),
-        // '/dashboard': (context) => const DashboardScreen(),
-        // '/adminDashboard': (context) => const AdminDashboardScreen(),
-        // '/pos': (context) => const POSScreen(),
-        // '/inventory': (context) => const InventoryScreen(),
-        // '/customers': (context) => const CustomersScreen(),
-        // '/reports': (context) => const ReportsScreen(),
-        // '/settings': (context) => const SettingsScreen(),
+        // -- Retail: Reports --
+        '/reports': (context) => const ReportsScreen(),
+        '/sales-history': (context) => const SalesHistoryScreen(),
+        '/eod-report': (context) => const EODReportScreen(), // Fixed class name
+        '/gst-report': (context) => const GstReportScreen(),
+
+        // -- Retail: Settings --
+        '/settings': (context) => const SettingsScreen(),
+        '/store-info': (context) => const StoreInfoSettingsScreen(),
+        '/gst-settings': (context) => const GstSettingsScreen(),
+        '/payment-setup': (context) => const PaymentSetupScreen(),
+        '/staff-setup': (context) => const StaffSetupScreen(),
+        '/backup': (context) => const BackupScreen(),
       },
 
       // Handle unknown routes

@@ -57,6 +57,22 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
 
   Future<void> _loadAttributes() async {
     await _attributeStore.loadAttributes();
+
+    // Refresh selected attributes with updated values
+    for (int i = 0; i < _selectedAttributes.length; i++) {
+      final attributeId = _selectedAttributes[i].attribute.attributeId;
+      final updatedValues = _attributeStore.getValues(attributeId);
+      final updatedAttribute = _attributeStore.attributes.firstWhere(
+        (a) => a.attributeId == attributeId,
+        orElse: () => _selectedAttributes[i].attribute,
+      );
+
+      _selectedAttributes[i] = _selectedAttributes[i].copyWith(
+        attribute: updatedAttribute,
+        availableValues: updatedValues,
+      );
+    }
+
     setState(() {});
   }
 
@@ -107,6 +123,177 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
       _updatePreview();
     });
     _notifyChange();
+  }
+
+  /// Show dialog to create a new attribute
+  Future<void> _showCreateAttributeDialog() async {
+    final TextEditingController nameController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create New Attribute'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Attribute Name',
+                hintText: 'e.g., Color, Size, Material',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter an attribute name'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
+
+              Navigator.pop(context, true);
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final name = nameController.text.trim();
+      await _attributeStore.addAttribute(name);
+      await _loadAttributes();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Attribute "$name" created successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Auto-select the newly created attribute
+      final newAttr = _attributeStore.attributes.firstWhere(
+        (a) => a.name.toLowerCase() == name.toLowerCase(),
+      );
+      _addAttribute(newAttr);
+    }
+  }
+
+  /// Show dialog to add a new value to an existing attribute
+  Future<void> _showAddValueDialog(AttributeWithValues attrWithValues) async {
+    final TextEditingController valueController = TextEditingController();
+    final TextEditingController colorController = TextEditingController();
+    final isColor = attrWithValues.attribute.name.toLowerCase().contains('color') ||
+        attrWithValues.attribute.name.toLowerCase().contains('colour');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Value to ${attrWithValues.attribute.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: valueController,
+              decoration: const InputDecoration(
+                labelText: 'Value',
+                hintText: 'e.g., Red, Large, Cotton',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+            ),
+            if (isColor) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: colorController,
+                decoration: const InputDecoration(
+                  labelText: 'Color Code (Optional)',
+                  hintText: '#FF0000',
+                  border: OutlineInputBorder(),
+                  prefixText: '#',
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final value = valueController.text.trim();
+              if (value.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a value'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
+
+              Navigator.pop(context, true);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final value = valueController.text.trim();
+      String? colorCode;
+      if (isColor && colorController.text.trim().isNotEmpty) {
+        colorCode = colorController.text.trim().startsWith('#')
+            ? colorController.text.trim()
+            : '#${colorController.text.trim()}';
+      }
+
+      await _attributeStore.addValue(
+        attrWithValues.attribute.attributeId,
+        value,
+        colorCode: colorCode,
+      );
+      await _loadAttributes();
+
+      // Refresh the selected attribute's available values
+      final index = _selectedAttributes.indexWhere(
+        (a) => a.attribute.attributeId == attrWithValues.attribute.attributeId,
+      );
+      if (index != -1) {
+        final updatedValues = _attributeStore.getValues(attrWithValues.attribute.attributeId);
+        setState(() {
+          _selectedAttributes[index] = _selectedAttributes[index].copyWith(
+            availableValues: updatedValues,
+          );
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Value "$value" added successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   void _selectAllValues(String attributeId) {
@@ -276,6 +463,7 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
                   onToggleValue: (value) => _toggleValue(attrWithValues.attribute.attributeId, value),
                   onSelectAll: () => _selectAllValues(attrWithValues.attribute.attributeId),
                   onClearAll: () => _clearValues(attrWithValues.attribute.attributeId),
+                  onAddValue: () => _showAddValueDialog(attrWithValues),
                 ),
               ),
 
@@ -314,15 +502,56 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
         .toList();
 
     if (availableAttributes.isEmpty) {
-      return TextButton.icon(
-        onPressed: () => _showManageAttributesInfo(),
-        icon: const Icon(Icons.add, size: 18),
-        label: const Text('Create Attributes'),
-        style: TextButton.styleFrom(foregroundColor: Colors.blue),
+      return PopupMenuButton<String>(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add, size: 18, color: Colors.blue),
+              SizedBox(width: 4),
+              Text('Add Attribute', style: TextStyle(color: Colors.blue)),
+            ],
+          ),
+        ),
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'create_new',
+            child: Row(
+              children: [
+                Icon(Icons.add_circle_outline, size: 18, color: Colors.green[700]),
+                const SizedBox(width: 8),
+                Text('Create New Attribute', style: TextStyle(color: Colors.green[700])),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            value: 'manage',
+            child: Row(
+              children: [
+                Icon(Icons.settings, size: 18, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text('Manage Attributes', style: TextStyle(color: Colors.grey[600])),
+              ],
+            ),
+          ),
+        ],
+        onSelected: (value) {
+          if (value == 'create_new') {
+            _showCreateAttributeDialog();
+          } else if (value == 'manage') {
+            _showManageAttributesInfo();
+          }
+        },
       );
     }
 
-    return PopupMenuButton<AttributeModel>(
+    return PopupMenuButton<dynamic>(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -345,7 +574,18 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
         )),
         const PopupMenuDivider(),
         PopupMenuItem(
-          value: null,
+          value: 'create_new',
+          child: Row(
+            children: [
+              Icon(Icons.add_circle_outline, size: 18, color: Colors.green[700]),
+              const SizedBox(width: 8),
+              Text('Create New Attribute', style: TextStyle(color: Colors.green[700])),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'manage',
           child: Row(
             children: [
               Icon(Icons.settings, size: 18, color: Colors.grey[600]),
@@ -355,10 +595,12 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
           ),
         ),
       ],
-      onSelected: (attr) {
-        if (attr != null) {
-          _addAttribute(attr);
-        } else {
+      onSelected: (value) {
+        if (value is AttributeModel) {
+          _addAttribute(value);
+        } else if (value == 'create_new') {
+          _showCreateAttributeDialog();
+        } else if (value == 'manage') {
           _showManageAttributesInfo();
         }
       },
@@ -529,6 +771,7 @@ class _AttributeSection extends StatelessWidget {
   final Function(AttributeValueModel) onToggleValue;
   final VoidCallback onSelectAll;
   final VoidCallback onClearAll;
+  final VoidCallback? onAddValue;
 
   const _AttributeSection({
     required this.attributeWithValues,
@@ -536,6 +779,7 @@ class _AttributeSection extends StatelessWidget {
     required this.onToggleValue,
     required this.onSelectAll,
     required this.onClearAll,
+    this.onAddValue,
   });
 
   @override
@@ -598,23 +842,77 @@ class _AttributeSection extends StatelessWidget {
 
           // Values
           if (available.isEmpty)
-            Text(
-              'No values defined. Add values in Settings → Attributes.',
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No values defined for this attribute.',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                ),
+                if (onAddValue != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: onAddValue,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add Value'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ],
             )
           else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: available.map((value) {
-                final isSelected = selected.any((v) => v.valueId == value.valueId);
-                return _ValueChip(
-                  value: value,
-                  isColor: isColor,
-                  isSelected: isSelected,
-                  onTap: () => onToggleValue(value),
-                );
-              }).toList(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ...available.map((value) {
+                      final isSelected = selected.any((v) => v.valueId == value.valueId);
+                      return _ValueChip(
+                        value: value,
+                        isColor: isColor,
+                        isSelected: isSelected,
+                        onTap: () => onToggleValue(value),
+                      );
+                    }),
+                    // Add Value button as a chip
+                    if (onAddValue != null)
+                      InkWell(
+                        onTap: onAddValue,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green.withOpacity(0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add, size: 14, color: Colors.green[700]),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Add Value',
+                                style: TextStyle(
+                                  color: Colors.green[700],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
         ],
       ),

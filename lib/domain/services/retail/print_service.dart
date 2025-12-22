@@ -49,6 +49,11 @@ class PrintService {
     String? gstNumber,
     String? orderType,
     String? tableNo,
+    int? kotNumber,
+    List<int>? kotNumbers,
+    DateTime? orderTimestamp,
+    String? orderNo,
+    bool? isAddonKot,
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -64,6 +69,11 @@ class PrintService {
       gstNumber: gstNumber,
       orderType: orderType,
       tableNo: tableNo,
+      kotNumber: kotNumber,
+      kotNumbers: kotNumbers,
+      orderTimestamp: orderTimestamp,
+      orderNo: orderNo,
+      isAddonKot: isAddonKot,
       logoBytes: logoBytes,
     );
 
@@ -72,7 +82,7 @@ class PrintService {
         : await _receiptPdfService.generateInvoice(receiptData);
 
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
+      onLayout: (PdfPageFormat pageFormat) async => pdf.save(),
       name: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}',
       format: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
     );
@@ -92,6 +102,12 @@ class PrintService {
     String? gstNumber,
     String? orderType,
     String? tableNo,
+    int? kotNumber,
+    List<int>? kotNumbers,
+    DateTime? orderTimestamp,
+    String? orderNo,
+    bool? isAddonKot,
+    int? billNumber,
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -107,6 +123,12 @@ class PrintService {
       gstNumber: gstNumber,
       orderType: orderType,
       tableNo: tableNo,
+      kotNumber: kotNumber,
+      kotNumbers: kotNumbers,
+      orderTimestamp: orderTimestamp,
+      orderNo: orderNo,
+      isAddonKot: isAddonKot,
+      billNumber: billNumber,
       logoBytes: logoBytes,
     );
 
@@ -136,13 +158,17 @@ class PrintService {
                     storePhone: storePhone,
                     storeEmail: storeEmail,
                     gstNumber: gstNumber,
+                    orderType: orderType,
+                    tableNo: tableNo,
+                    kotNumber: kotNumber,
+                    orderTimestamp: orderTimestamp,
                   );
                 },
               ),
             ],
           ),
           body: PdfPreview(
-            build: (format) async => pdf.save(),
+            build: (pageFormat) async => pdf.save(),
             canChangePageFormat: false,
             canChangeOrientation: false,
             pdfFileName: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
@@ -166,6 +192,9 @@ class PrintService {
     String? gstNumber,
     String? orderType,
     String? tableNo,
+    int? kotNumber,
+    DateTime? orderTimestamp,
+    int? billNumber,
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -181,6 +210,9 @@ class PrintService {
       gstNumber: gstNumber,
       orderType: orderType,
       tableNo: tableNo,
+      kotNumber: kotNumber,
+      orderTimestamp: orderTimestamp,
+      billNumber: billNumber,
       logoBytes: logoBytes,
     );
 
@@ -223,6 +255,7 @@ class PrintService {
     String? storePhone,
     String? storeEmail,
     String? gstNumber,
+    int? billNumber,
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -236,6 +269,7 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      billNumber: billNumber,
       logoBytes: logoBytes,
     );
 
@@ -319,6 +353,8 @@ class PrintService {
     String? storePhone,
     String? storeEmail,
     String? gstNumber,
+    int? billNumber, // Bill number for completed orders
+    List<int>? kotNumbers, // KOT numbers for restaurant orders
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -374,6 +410,8 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
+                  billNumber: billNumber, // Pass bill number
+                  kotNumbers: kotNumbers, // Pass KOT numbers
                 );
               },
             ),
@@ -396,6 +434,8 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
+                  billNumber: billNumber, // Pass bill number
+                  kotNumbers: kotNumbers, // Pass KOT numbers
                 );
               },
             ),
@@ -417,6 +457,7 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
+                  billNumber: billNumber, // Pass bill number
                 );
               },
             ),
@@ -438,6 +479,7 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
+                  billNumber: billNumber, // Pass bill number
                 );
                 if (context.mounted && path != null) {
                   ScaffoldMessenger.of(context).showSnackBar(

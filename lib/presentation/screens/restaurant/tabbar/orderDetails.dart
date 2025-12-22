@@ -613,6 +613,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         context: context,
         order: orderForPrint,
         calculations: calculations,
+        billNumber: currentOrder.billNumber, // Pass the bill number from past order
       );
     } catch (e) {
       NotificationService.instance.showError('Failed to print: $e');

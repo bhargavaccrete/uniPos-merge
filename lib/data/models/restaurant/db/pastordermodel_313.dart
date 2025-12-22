@@ -72,6 +72,10 @@ class pastOrderModel extends HiveObject{
   @HiveField(19)
   final List<int> kotBoundaries; // Item count at each KOT [3, 5, 6]
 
+  // --- DAILY BILL NUMBER ---
+  @HiveField(20)
+  final int? billNumber; // Daily bill number (resets every day) - e.g., 1, 2, 3...
+
   pastOrderModel({
     required this.id,
     required this.customerName,
@@ -93,6 +97,7 @@ class pastOrderModel extends HiveObject{
     this.orderStatus = 'COMPLETED',
     required this.kotNumbers, // REQUIRED
     required this.kotBoundaries, // REQUIRED
+    this.billNumber, // Optional - Daily bill number
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -119,7 +124,7 @@ class pastOrderModel extends HiveObject{
     String? orderStatus,
     List<int>? kotNumbers,
     List<int>? kotBoundaries,
-
+    int? billNumber,
   }) {
     return pastOrderModel(
       id: id ?? this.id,
@@ -142,6 +147,7 @@ class pastOrderModel extends HiveObject{
       orderStatus: orderStatus ?? this.orderStatus,
       kotNumbers: kotNumbers ?? this.kotNumbers,
       kotBoundaries: kotBoundaries ?? this.kotBoundaries,
+      billNumber: billNumber ?? this.billNumber,
     );
   }
 
@@ -192,6 +198,7 @@ class pastOrderModel extends HiveObject{
       'orderStatus': orderStatus,
       'kotNumbers': kotNumbers,
       'kotBoundaries': kotBoundaries,
+      'billNumber': billNumber,
     };
   }
 
@@ -218,6 +225,7 @@ class pastOrderModel extends HiveObject{
       orderStatus: map['orderStatus'] ?? 'COMPLETED',
       kotNumbers: (map['kotNumbers'] as List?)?.map((e) => e as int).toList() ?? [1],
       kotBoundaries: (map['kotBoundaries'] as List?)?.map((e) => e as int).toList() ?? [0],
+      billNumber: map['billNumber'],
     );
   }
 }

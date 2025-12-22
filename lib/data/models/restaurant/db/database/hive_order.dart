@@ -52,6 +52,40 @@ static Future<void> deleteOrder (String id )async{
     return newNumber;
   }
 
+  /// Get next daily bill number (resets every day)
+  /// This is separate from KOT numbers and only for completed bills
+  static Future<int> getNextBillNumber() async {
+    final counterBox = await Hive.openBox(_counterBoxName);
+
+    // Check if it's a new day
+    final lastBillDate = await counterBox.get('lastBillDate');
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    // If it's a new day, reset the counter
+    if (lastBillDate != todayStr) {
+      await counterBox.put('lastBillNumber', 0);
+      await counterBox.put('lastBillDate', todayStr);
+    }
+
+    // Get and increment the bill number
+    int lastNumber = await counterBox.get('lastBillNumber', defaultValue: 0);
+    int newNumber = lastNumber + 1;
+    await counterBox.put('lastBillNumber', newNumber);
+
+    return newNumber;
+  }
+
+  /// Reset daily bill number (called at end of day)
+  static Future<void> resetDailyBillNumber() async {
+    final counterBox = await Hive.openBox(_counterBoxName);
+    await counterBox.put('lastBillNumber', 0);
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    await counterBox.put('lastBillDate', todayStr);
+    print('✅ Daily bill number reset to 0');
+  }
+
   static Future<OrderModel?> getActiveOrderByTableId(String tableId) async{
     final box = await _getOrderBox();
     final allOrder = box.values.toList();

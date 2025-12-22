@@ -652,7 +652,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       tableNo: widget.tableid,
     );
     try {
-      await completeOrder(completedOrder, calculations);
+      final int billNumber = await completeOrder(completedOrder, calculations);
       await HiveTables.updateTableStatus(widget.tableid!, 'Available');
       // _showSnackBar('Order Completed Successfully!');
 
@@ -661,7 +661,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       );
 
       // Show success dialog with print option
-      await _showOrderSuccessDialog(completedOrder, calculations);
+      await _showOrderSuccessDialog(completedOrder, calculations, billNumber: billNumber);
     } catch (e) {
       // _showSnackBar('Failed to proceed with the order: $e', isError: true);
       NotificationService.instance.showError(
@@ -670,13 +670,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
   }
 
-  Future<void> completeOrder(
+  Future<int> completeOrder(
       OrderModel activeModel, CartCalculationService calculations) async {
     print('============this is complete order function=============');
 
     double preTaxSubtotal = AppSettings.isTaxInclusive
         ? calculations.subtotal - calculations.totalGST
         : calculations.subtotal;
+
+    // Generate daily bill number for completed order
+    final int billNumber = await HiveOrders.getNextBillNumber();
+    print('✅ Bill number generated: $billNumber');
 
     final pastOrder = pastOrderModel(
       id: activeModel.id,
@@ -695,9 +699,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
       kotNumbers: activeModel.kotNumbers, // Always present in new orders
       kotBoundaries:
           activeModel.kotBoundaries, // KOT boundaries for grouping items
+      billNumber: billNumber, // Daily bill number (resets every day)
     );
     await HivePastOrder.addOrder(pastOrder);
     await HiveOrders.deleteOrder(activeModel.id);
+
+    return billNumber; // Return the generated bill number
   }
 
   Future<void> _placeOrder(CartCalculationService calculations) async {
@@ -711,6 +718,51 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final int newKotNumber = await HiveOrders.getNextKotNumber();
     final String newId = Uuid().v4();
     final List<CartItem> orderItems = widget.cartitems ?? [];
+
+    // Check if this is a "Settle & Print" operation (immediate completion)
+    if (widget.isSettle == true) {
+      // Generate bill number for immediate settlement
+      final int billNumber = await HiveOrders.getNextBillNumber();
+      print('✅ Bill number generated for settle & print: $billNumber');
+
+      // Create completed order directly (skip active orders)
+      final pastOrder = pastOrderModel(
+        id: newId,
+        customerName: _nameController.text.trim(),
+        totalPrice: calculations.grandTotal,
+        items: orderItems,
+        orderAt: DateTime.now(),
+        orderType: widget.orderType ?? 'Take Away',
+        paymentmode: SelectedFilter,
+        remark: calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
+        Discount: calculations.discountAmount,
+        subTotal: preTaxSubtotal,
+        gstRate: 0,
+        gstAmount: calculations.totalGST,
+        kotNumbers: [newKotNumber],
+        kotBoundaries: [orderItems.length],
+        billNumber: billNumber, // Daily bill number
+      );
+
+      try {
+        await HivePastOrder.addOrder(pastOrder);
+        await HiveCart.clearCart();
+
+        NotificationService.instance.showSuccess(
+          'Order Settled Successfully',
+        );
+
+        // Show success dialog with bill number for printing
+        await _showOrderSuccessDialogWithBillNumber(pastOrder, calculations, billNumber);
+      } catch (e) {
+        NotificationService.instance.showError(
+          'Failed to settle order: $e',
+        );
+      }
+      return;
+    }
+
+    // Regular order placement (for kitchen - active order)
     final newOrder = OrderModel(
       id: newId,
       // kotNumber removed - using kotNumbers only
@@ -769,7 +821,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   // Success dialog with print option
   Future<void> _showOrderSuccessDialog(
-      OrderModel order, CartCalculationService calculations) async {
+      OrderModel order, CartCalculationService calculations, {int? billNumber}) async {
     if (!mounted) return;
 
     await showDialog(
@@ -805,12 +857,89 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 context: context,
                 order: order,
                 calculations: calculations,
+                billNumber: billNumber, // Pass the bill number if available
               );
               // We don't close the dialog automatically after print,
               // allowing user to print again or close manually
             },
             icon: const Icon(Icons.print, size: 18),
             label: const Text('Print Receipt'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primarycolor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Success dialog for settled orders (with bill number)
+  Future<void> _showOrderSuccessDialogWithBillNumber(
+      pastOrderModel pastOrder, CartCalculationService calculations, int billNumber) async {
+    if (!mounted) return;
+
+    // Convert pastOrderModel to OrderModel for printing
+    final orderForPrint = OrderModel(
+      id: pastOrder.id,
+      customerName: pastOrder.customerName,
+      customerNumber: '',
+      customerEmail: '',
+      items: pastOrder.items,
+      status: 'Completed',
+      timeStamp: pastOrder.orderAt ?? DateTime.now(),
+      orderType: pastOrder.orderType ?? 'Take Away',
+      tableNo: '',
+      totalPrice: pastOrder.totalPrice,
+      kotNumbers: pastOrder.kotNumbers,
+      itemCountAtLastKot: pastOrder.items.length,
+      kotBoundaries: pastOrder.kotBoundaries,
+      subTotal: pastOrder.subTotal,
+      gstAmount: pastOrder.gstAmount,
+      gstRate: pastOrder.gstRate,
+      discount: pastOrder.Discount,
+    );
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Column(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 50),
+            const SizedBox(height: 10),
+            Text(
+              'Order Settled',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Bill #${billNumber.toString().padLeft(3, '0')} generated successfully.\nDo you want to print the bill?',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              _navigateToHome(); // Go to home
+            },
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await RestaurantPrintHelper.printOrderReceipt(
+                context: context,
+                order: orderForPrint,
+                calculations: calculations,
+                billNumber: billNumber, // Pass the bill number
+              );
+              // We don't close the dialog automatically after print,
+              // allowing user to print again or close manually
+            },
+            icon: const Icon(Icons.print, size: 18),
+            label: const Text('Print Bill'),
             style: ElevatedButton.styleFrom(
               backgroundColor: primarycolor,
               foregroundColor: Colors.white,

@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import 'package:flutter/foundation.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 
 class DayManagementService {
   static const String _boxName = 'dayManagementBox';
@@ -60,7 +61,11 @@ class DayManagementService {
     final box = await _getBox();
     await box.put(_openingBalanceKey, 0.0);
     await box.put(_dayStartedKey, false);
-    debugPrint('Day reset - opening balance cleared');
+
+    // Reset daily bill number counter
+    await HiveOrders.resetDailyBillNumber();
+
+    debugPrint('Day reset - opening balance cleared, bill counter reset');
   }
 
   /// Get the last day's date

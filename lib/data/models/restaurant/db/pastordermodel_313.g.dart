@@ -37,13 +37,14 @@ class pastOrderModelAdapter extends TypeAdapter<pastOrderModel> {
       orderStatus: fields[17] as String?,
       kotNumbers: (fields[18] as List).cast<int>(),
       kotBoundaries: (fields[19] as List).cast<int>(),
+      billNumber: fields[20] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, pastOrderModel obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -83,7 +84,9 @@ class pastOrderModelAdapter extends TypeAdapter<pastOrderModel> {
       ..writeByte(18)
       ..write(obj.kotNumbers)
       ..writeByte(19)
-      ..write(obj.kotBoundaries);
+      ..write(obj.kotBoundaries)
+      ..writeByte(20)
+      ..write(obj.billNumber);
   }
 
   @override

@@ -9,15 +9,215 @@ import 'package:unipos/domain/services/retail/print_service.dart';
 import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/domain/services/restaurant/cart_calculation_service.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
 
 class RestaurantPrintHelper {
-  
+
+  /// Print KOT (Kitchen Order Ticket) for a specific KOT number
+  /// This prints only the items for the specified KOT in thermal receipt format
+  static Future<void> printKOT({
+    required BuildContext context,
+    required OrderModel order,
+    required int kotNumber,
+    bool autoPrint = false,
+  }) async {
+    try {
+      final storeSettings = StoreSettingsService();
+
+      // 1. Fetch Store Details
+      final storeName = await storeSettings.getStoreName() ?? 'Restaurant';
+      final storeAddress = await storeSettings.getFormattedAddress();
+      final storePhone = await storeSettings.getStorePhone();
+
+      // 2. Get items for this specific KOT
+      final Map<int, List<CartItem>> itemsByKot = order.getItemsByKot();
+      final List<CartItem>? kotItems = itemsByKot[kotNumber];
+
+      if (kotItems == null || kotItems.isEmpty) {
+        if (context.mounted && !autoPrint) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No items found for this KOT'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 3. Map Items to SaleItemModel format (for KOT display - NO PRICES)
+      final saleItems = kotItems.map((item) {
+        // Format extras WITHOUT prices for KOT
+        String? extrasInfo;
+        if (item.extras != null && item.extras!.isNotEmpty) {
+          Map<String, int> groupedExtras = {};
+
+          for (var extra in item.extras!) {
+            final displayName = extra['displayName'] ?? extra['name'] ?? 'Unknown';
+            final int quantity = (extra['quantity'] ?? 1) is int
+                ? (extra['quantity'] ?? 1) as int
+                : ((extra['quantity'] ?? 1) as num).toInt();
+
+            if (groupedExtras.containsKey(displayName)) {
+              final int currentQty = groupedExtras[displayName]!;
+              groupedExtras[displayName] = currentQty + quantity;
+            } else {
+              groupedExtras[displayName] = quantity;
+            }
+          }
+
+          extrasInfo = groupedExtras.entries.map((entry) {
+            final String name = entry.key;
+            final int qty = entry.value;
+
+            if (qty > 1) {
+              return '${qty}x $name';
+            } else {
+              return name;
+            }
+          }).join(', ');
+
+          if (extrasInfo!.isNotEmpty) {
+            extrasInfo = 'Extras: $extrasInfo';
+          }
+        }
+
+        // Format choices for display
+        String? choicesInfo;
+        if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
+          choicesInfo = 'Add-ons: ${item.choiceNames!.join(', ')}';
+        }
+
+        // Combine extras and choices with instruction
+        String? additionalInfo;
+        List<String> infoParts = [];
+        if (choicesInfo != null) infoParts.add(choicesInfo);
+        if (extrasInfo != null) infoParts.add(extrasInfo);
+        if (item.instruction != null && item.instruction!.isNotEmpty) {
+          infoParts.add('NOTE: ${item.instruction}');
+        }
+
+        if (infoParts.isNotEmpty) {
+          additionalInfo = infoParts.join(' | ');
+        }
+
+        return SaleItemModel.create(
+          saleId: order.id,
+          varianteId: item.id,
+          productId: item.productId,
+          productName: item.title,
+          size: item.variantName,
+          weight: additionalInfo,
+          price: 0, // Price set to 0 for KOT - kitchen doesn't need pricing
+          qty: item.quantity,
+          discountAmount: 0,
+          gstRate: 0, // No tax info needed for KOT
+        );
+      }).toList();
+
+      // 4. Create a minimal SaleModel for KOT (no payment info needed)
+      final kotId = 'KOT-$kotNumber';
+      final saleModel = SaleModel.createWithGst(
+        saleId: kotId,
+        customerId: null,
+        totalItems: kotItems.length,
+        subtotal: 0, // Not needed for KOT
+        discountAmount: 0,
+        totalTaxableAmount: 0,
+        totalGstAmount: 0,
+        grandTotal: 0, // Not needed for KOT
+        paymentType: 'Pending',
+        isReturn: false,
+      );
+
+      // 5. Determine order number and if this is an add-on KOT
+      final orderNo = order.id.substring(0, 8).toUpperCase(); // Use first 8 chars of order ID
+      final isAddonKot = order.kotNumbers.length > 1 && order.kotNumbers.first != kotNumber;
+
+      // 6. Create ReceiptData for KOT
+      final receiptData = ReceiptData(
+        sale: saleModel,
+        items: saleItems,
+        customer: null,
+        storeName: storeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        storeEmail: null,
+        gstNumber: null,
+        orderType: order.orderType,
+        tableNo: order.tableNo,
+        // Add KOT-specific info
+        kotNumber: kotNumber,
+        orderTimestamp: order.timeStamp,
+        orderNo: orderNo,
+        isAddonKot: isAddonKot,
+      );
+
+      // 7. Print or show preview based on autoPrint flag
+      final printService = locator<PrintService>();
+
+      if (autoPrint) {
+        // Auto-print directly to thermal printer
+        await printService.printReceipt(
+          context: context,
+          sale: receiptData.sale,
+          items: receiptData.items,
+          format: ReceiptFormat.thermal,
+          storeName: receiptData.storeName,
+          storeAddress: receiptData.storeAddress,
+          storePhone: receiptData.storePhone,
+          orderType: receiptData.orderType,
+          tableNo: receiptData.tableNo,
+          kotNumber: kotNumber,
+          orderTimestamp: order.timeStamp,
+          orderNo: orderNo,
+          isAddonKot: isAddonKot,
+        );
+
+        if (context.mounted) {
+          NotificationService.instance.showSuccess(
+            'KOT #$kotNumber sent to printer',
+          );
+        }
+      } else {
+        // Show preview for manual print
+        await printService.showPrintPreview(
+          context: context,
+          sale: receiptData.sale,
+          items: receiptData.items,
+          format: ReceiptFormat.thermal,
+          storeName: receiptData.storeName,
+          storeAddress: receiptData.storeAddress,
+          storePhone: receiptData.storePhone,
+          orderType: receiptData.orderType,
+          tableNo: receiptData.tableNo,
+          kotNumber: kotNumber,
+          orderTimestamp: order.timeStamp,
+          orderNo: orderNo,
+          isAddonKot: isAddonKot,
+        );
+      }
+
+    } catch (e) {
+      debugPrint('Error printing KOT: $e');
+      if (context.mounted && !autoPrint) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error printing KOT: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   static Future<void> printOrderReceipt({
     required BuildContext context,
     required OrderModel order,
     required CartCalculationService calculations,
+    int? billNumber, // Bill number for completed orders (from pastOrderModel)
   }) async {
     try {
       final storeSettings = StoreSettingsService();
@@ -109,14 +309,14 @@ class RestaurantPrintHelper {
       }).toList();
 
       // 3. Create Sale Model (Adapter: OrderModel -> SaleModel)
-      // Use KOT number for invoice ID if available
-      final invoiceId = order.kotNumbers.isNotEmpty 
-          ? 'KOT-${order.kotNumbers.first}' 
+      // Use last KOT number for invoice ID if available, or use order ID
+      final invoiceId = order.kotNumbers.isNotEmpty
+          ? 'KOT-${order.kotNumbers.last}'
           : order.id.substring(0, 8).toUpperCase();
 
       final saleModel = SaleModel.createWithGst(
         saleId: invoiceId,
-        customerId: order.customerName.isNotEmpty ? 'GUEST' : null, 
+        customerId: order.customerName.isNotEmpty ? 'GUEST' : null,
         totalItems: order.items.length,
         subtotal: calculations.subtotal,
         discountAmount: calculations.discountAmount,
@@ -135,7 +335,7 @@ class RestaurantPrintHelper {
           name: order.customerName,
           phone: order.customerNumber,
           email: order.customerEmail,
-          address: '', 
+          address: '',
           totalPurchaseAmount: 0, // Fixed: totalSales -> totalPurchaseAmount
           pointsBalance: 0,
           // creditBalance: 0, // Removed: Not in constructor or named parameter default is 0.0
@@ -158,11 +358,13 @@ class RestaurantPrintHelper {
         // Restaurant-specific fields
         orderType: order.orderType,
         tableNo: order.tableNo,
+        kotNumbers: order.kotNumbers, // Pass all KOT numbers for customer bill
+        billNumber: billNumber, // Pass bill number for completed orders
       );
 
       // 6. Show Print Options
       final printService = locator<PrintService>();
-      
+
       // Fixed: Pass individual parameters instead of ReceiptData object
       await printService.showPrintOptionsDialog(
         context: context,
@@ -174,6 +376,8 @@ class RestaurantPrintHelper {
         storePhone: receiptData.storePhone,
         storeEmail: receiptData.storeEmail,
         gstNumber: receiptData.gstNumber,
+        billNumber: billNumber, // Pass bill number for bill receipts
+        kotNumbers: order.kotNumbers, // Pass all KOT numbers to display on bill
       );
       
     } catch (e) {

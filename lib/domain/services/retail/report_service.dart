@@ -283,29 +283,29 @@ class ReportService {
 
   // ==================== Supplier-wise Purchase Report ====================
 
-  /// Get purchase report grouped by suppliers
+  /// Get purchase report grouped by suppliers (includes Purchase Orders)
   Future<List<Map<String, dynamic>>> getSupplierWisePurchaseReport({DateTime? startDate, DateTime? endDate}) async {
-    final allPurchases = purchaseStore.purchases;
+    final allPurchaseOrders = purchaseOrderStore.purchaseOrders.toList();
     final allSuppliers = supplierStore.suppliers;
 
     // Filter by date if provided
-    List<PurchaseModel> filteredPurchases = allPurchases;
+    List<dynamic> filteredPOs = allPurchaseOrders;
     if (startDate != null || endDate != null) {
-      filteredPurchases = allPurchases.where((purchase) {
-        final purchaseDate = DateTime.parse(purchase.purchaseDate);
-        return (startDate == null || purchaseDate.isAfter(startDate)) &&
-            (endDate == null || purchaseDate.isBefore(endDate));
+      filteredPOs = allPurchaseOrders.where((po) {
+        final poDate = DateTime.parse(po.createdAt);
+        return (startDate == null || poDate.isAfter(startDate)) &&
+            (endDate == null || poDate.isBefore(endDate));
       }).toList();
     }
 
     // Group by supplierId
     final Map<String, Map<String, dynamic>> supplierStats = {};
 
-    for (var purchase in filteredPurchases) {
-      final supplier = allSuppliers.where((s) => s.supplierId == purchase.supplierId).firstOrNull;
+    for (var po in filteredPOs) {
+      final supplier = allSuppliers.where((s) => s.supplierId == po.supplierId).firstOrNull;
 
-      final supplierName = supplier?.name ?? 'Unknown Supplier';
-      final supplierId = purchase.supplierId;
+      final supplierName = supplier?.name ?? po.supplierName ?? 'Unknown Supplier';
+      final supplierId = po.supplierId;
 
       if (!supplierStats.containsKey(supplierId)) {
         supplierStats[supplierId] = {
@@ -318,8 +318,8 @@ class ReportService {
       }
 
       supplierStats[supplierId]!['totalPurchases'] += 1;
-      supplierStats[supplierId]!['totalAmount'] += purchase.totalAmount;
-      supplierStats[supplierId]!['totalItems'] += purchase.totalItems;
+      supplierStats[supplierId]!['totalAmount'] += (po.estimatedTotal ?? 0.0);
+      supplierStats[supplierId]!['totalItems'] += po.totalItems;
     }
 
     // Convert to list and sort by total amount
