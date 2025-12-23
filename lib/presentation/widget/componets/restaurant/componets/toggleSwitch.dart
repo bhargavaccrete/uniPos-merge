@@ -5,6 +5,7 @@ class ToggleSwitch extends StatefulWidget {
   final bool? showBorder;
   final String? label;
   final double? widthc;
+  final Function(bool)? onChanged;
   // User-provided label text
   const ToggleSwitch({
     Key? key,
@@ -12,6 +13,7 @@ class ToggleSwitch extends StatefulWidget {
     this.label,
     this.widthc,
     this.showBorder = false,
+    this.onChanged,
   }) : super(key: key);
 
   @override
@@ -25,6 +27,15 @@ class _CustomToggleSwitchState extends State<ToggleSwitch> {
   void initState() {
     super.initState();
     _isOn = widget.initialValue;
+  }
+
+  @override
+  void didUpdateWidget(ToggleSwitch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update internal state if initialValue changes from parent
+    if (widget.initialValue != oldWidget.initialValue) {
+      _isOn = widget.initialValue;
+    }
   }
 
   @override
@@ -65,6 +76,10 @@ class _CustomToggleSwitchState extends State<ToggleSwitch> {
                 setState(() {
                   _isOn = value;
                 });
+                // Call the callback if provided
+                if (widget.onChanged != null) {
+                  widget.onChanged!(value);
+                }
               },
               activeColor: Colors.green,
               inactiveTrackColor: Colors.grey.shade400,

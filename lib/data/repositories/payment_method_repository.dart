@@ -92,10 +92,20 @@ class PaymentMethodRepository {
 
   /// Get all payment methods
   List<PaymentMethod> getAll() {
+    // Try to get the box if not already set
     if (_box == null || !_box!.isOpen) {
-      return [];
+      print('🗄️  PaymentMethodRepository.getAll(): Box not initialized, attempting to get it');
+      if (Hive.isBoxOpen(_boxName)) {
+        print('🗄️  PaymentMethodRepository.getAll(): Box is open in Hive, getting reference');
+        _box = Hive.box<PaymentMethod>(_boxName);
+      } else {
+        print('⚠️  PaymentMethodRepository.getAll(): Box is not open in Hive, returning empty list');
+        return [];
+      }
     }
-    return _box!.values.toList()..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final items = _box!.values.toList();
+    print('🗄️  PaymentMethodRepository.getAll(): Returning ${items.length} items');
+    return items..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
   /// Get only enabled payment methods
@@ -103,13 +113,26 @@ class PaymentMethodRepository {
     return getAll().where((method) => method.isEnabled).toList();
   }
 
+  /// Ensure box is initialized
+  void _ensureBox() {
+    if (_box == null || !_box!.isOpen) {
+      if (Hive.isBoxOpen(_boxName)) {
+        _box = Hive.box<PaymentMethod>(_boxName);
+      } else {
+        throw Exception('Payment methods box is not open. Call init() first.');
+      }
+    }
+  }
+
   /// Add a new payment method
   Future<void> add(PaymentMethod method) async {
+    _ensureBox();
     await _box!.add(method);
   }
 
   /// Update an existing payment method
   Future<void> update(PaymentMethod method) async {
+    _ensureBox();
     final index = _box!.values.toList().indexWhere((m) => m.id == method.id);
     if (index != -1) {
       await _box!.putAt(index, method);
@@ -118,6 +141,7 @@ class PaymentMethodRepository {
 
   /// Delete a payment method
   Future<void> delete(String id) async {
+    _ensureBox();
     final index = _box!.values.toList().indexWhere((m) => m.id == id);
     if (index != -1) {
       await _box!.deleteAt(index);
@@ -126,6 +150,7 @@ class PaymentMethodRepository {
 
   /// Toggle payment method enabled status
   Future<void> toggleEnabled(String id) async {
+    _ensureBox();
     final methods = _box!.values.toList();
     final index = methods.indexWhere((m) => m.id == id);
     if (index != -1) {

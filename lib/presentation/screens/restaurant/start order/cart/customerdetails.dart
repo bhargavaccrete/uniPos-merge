@@ -16,6 +16,8 @@ import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
+import '../../../../../util/restaurant/decimal_settings.dart';
+import '../../../../../util/restaurant/currency_helper.dart';
 import '../../../../../stores/payment_method_store.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
@@ -83,6 +85,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
     'other'
   ];
 
+  // Currency symbol
+  // Currency symbol is now loaded from CurrencyHelper.currentSymbol (reactive)
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +101,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
         text: widget.existingModel?.customerEmail ?? '');
     _mobileController = TextEditingController(
         text: widget.existingModel?.customerNumber ?? '');
+
+    // Currency is loaded in main.dart via CurrencyHelper.load()
   }
 
   @override
@@ -554,7 +561,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     );
   }
 
-// ✅ This widget is now simple and only displays data.
+// ✅ This widget is now simple and only displays data with reactive currency symbol
   Widget _buildBillSummary(CartCalculationService calcs) {
     double subtotal = AppSettings.isTaxInclusive
         ? calcs.subtotal - calcs.totalGST
@@ -563,27 +570,33 @@ class _CustomerdetailsState extends State<Customerdetails> {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         children: [
-          _buildSummaryRow('Sub Total:', '₹${subtotal.toStringAsFixed(2)}'),
+          _buildSummaryRow('Sub Total:', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(subtotal)}'),
           if (calcs.discountAmount > 0.009)
             _buildSummaryRow('Total Discount:',
-                '-₹${calcs.discountAmount.toStringAsFixed(2)}'),
+                '-${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.discountAmount)}'),
           if (calcs.totalGST > 0.009)
             (AppSettings.isTaxInclusive
                 ? _buildSummaryRow('Total GST(Inclusive):',
-                    '₹${calcs.totalGST.toStringAsFixed(2)}')
+                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}')
                 : _buildSummaryRow(
-                    'Total GST:', '₹${calcs.totalGST.toStringAsFixed(2)}')),
+                    'Total GST:', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}')),
 
           if (calcs.serviceChargeAmount > 0.009)
             _buildSummaryRow(
                 widget.orderType == 'Delivery'
                     ? 'Delivery Charge:'
                     : 'Service Charge:',
-                '₹${calcs.serviceChargeAmount.toStringAsFixed(2)}'),
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.serviceChargeAmount)}'),
+
+          // Show round off amount if enabled and non-zero
+          if (AppSettings.roundOff && calcs.roundOffAmount.abs() > 0.009)
+            _buildSummaryRow(
+                'Round Off:',
+                '${calcs.roundOffAmount >= 0 ? '+' : ''}${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.roundOffAmount)}'),
 
           Divider(thickness: 2, height: 20),
           _buildSummaryRow(
-              'Grand Total:', '₹${calcs.grandTotal.toStringAsFixed(2)}',
+              'Grand Total:', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal)}',
               isBold: true),
         ],
       ),

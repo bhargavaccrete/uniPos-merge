@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../util/restaurant/order_settings.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../../widget/componets/restaurant/componets/toggleSwitch.dart';
 
@@ -9,8 +10,14 @@ class Ordersettings extends StatefulWidget {
 }
 
 class _orderSettingsState extends State<Ordersettings> {
-  bool _isSelected = false;
   String selectedFilter = "Take Away";
+
+  @override
+  void initState() {
+    super.initState();
+    // Load order settings when screen opens
+    OrderSettings.load();
+  }
 
   Widget _getBody() {
     switch (selectedFilter) {
@@ -99,30 +106,87 @@ class _orderSettingsState extends State<Ordersettings> {
   Widget takeAway() {
     return Column(
       children: [
-        ToggleSwitch(widthc:0.9,initialValue: false, label:"Enable Take Away  ? "),
-        SizedBox(height: 10,),
-
-        ToggleSwitch(widthc:0.9 ,initialValue: false, label:"Enable place Order Diallog ? ")
+        ValueListenableBuilder<bool>(
+          valueListenable: OrderSettings.enableTakeAwayNotifier,
+          builder: (context, isEnabled, child) {
+            return ToggleSwitch(
+              widthc: 0.9,
+              initialValue: isEnabled,
+              label: "Enable Take Away?",
+              onChanged: (value) async {
+                await OrderSettings.setEnableTakeAway(value);
+              },
+            );
+          },
+        ),
+        SizedBox(height: 10),
+        ValueListenableBuilder<bool>(
+          valueListenable: OrderSettings.showTakeAwayDialogNotifier,
+          builder: (context, showDialog, child) {
+            return ToggleSwitch(
+              widthc: 0.9,
+              initialValue: showDialog,
+              label: "Enable Place Order Dialog?",
+              onChanged: (value) async {
+                await OrderSettings.setShowTakeAwayDialog(value);
+              },
+            );
+          },
+        ),
       ],
     );
   }
 
   Widget dineIn() {
-    return  Column(
+    return Column(
       children: [
-        ToggleSwitch(widthc:0.5,initialValue: false, label:"dine in ? "),
-        // SizedBox(height: 10,),
-        ToggleSwitch(widthc:1,initialValue: false, label:"Enable place Order Diallog ? ")
+        ValueListenableBuilder<bool>(
+          valueListenable: OrderSettings.enableDineInNotifier,
+          builder: (context, isEnabled, child) {
+            return ToggleSwitch(
+              widthc: 0.9,
+              initialValue: isEnabled,
+              label: "Enable Dine In?",
+              onChanged: (value) async {
+                await OrderSettings.setEnableDineIn(value);
+              },
+            );
+          },
+        ),
+        SizedBox(height: 10),
+        ValueListenableBuilder<bool>(
+          valueListenable: OrderSettings.showDineInDialogNotifier,
+          builder: (context, showDialog, child) {
+            return ToggleSwitch(
+              widthc: 0.9,
+              initialValue: showDialog,
+              label: "Enable Place Order Dialog?",
+              onChanged: (value) async {
+                await OrderSettings.setShowDineInDialog(value);
+              },
+            );
+          },
+        ),
       ],
     );
-
   }
 
   Widget homeDelivery() {
     return Column(
       children: [
-        ToggleSwitch(
-            widthc:0.95, initialValue: false, label:" Enabel Home Delivery  ? ")
+        ValueListenableBuilder<bool>(
+          valueListenable: OrderSettings.enableDeliveryNotifier,
+          builder: (context, isEnabled, child) {
+            return ToggleSwitch(
+              widthc: 0.9,
+              initialValue: isEnabled,
+              label: "Enable Home Delivery?",
+              onChanged: (value) async {
+                await OrderSettings.setEnableDelivery(value);
+              },
+            );
+          },
+        ),
       ],
     );
   }

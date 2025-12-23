@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.dart';
 
 import '../../../../util/restaurant/currency_helper.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../../widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
@@ -18,36 +19,36 @@ class Settingsscreen extends StatefulWidget {
 }
 
 class _settingsScreenState extends State<Settingsscreen> {
-  bool _isSelected = false;
-  String selectedFilter = "None";
   String selectedCurrency = "INR";
 
   @override
   void initState() {
     super.initState();
-    _loadSelectedCurrency();
+    _loadSettings();
   }
 
-  // Load saved currency from preferences
-  Future<void> _loadSelectedCurrency() async {
-    final currency = await CurrencyHelper.getCurrencyCode();
+  // Load saved settings
+  Future<void> _loadSettings() async {
+    await DecimalSettings.load();
+    // Currency is already loaded in main.dart, just get current value
     setState(() {
-      selectedCurrency = currency;
+      selectedCurrency = CurrencyHelper.currentCurrencyCode;
     });
   }
 
-  Widget _getBody() {
-    switch (selectedFilter) {
-      case "None":
-        return takeAway();
-      case "0.0":
-        return dineIn();
-      case "0.00":
-        return homeDelivery();
-      case "0.000":
-        return delivery();
+  // Get decimal filter string from precision value
+  String _getDecimalFilter(int precision) {
+    switch (precision) {
+      case 0:
+        return "None";
+      case 1:
+        return "0.0";
+      case 2:
+        return "0.00";
+      case 3:
+        return "0.000";
       default:
-        return takeAway();
+        return "0.00";
     }
   }
 
@@ -87,13 +88,15 @@ class _settingsScreenState extends State<Settingsscreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  MultipleListViewWithNavigation(
+              /*------ADDRESS CUSTOMIZATION--------------*/
+
+              /*    MultipleListViewWithNavigation(
                     displayTitle: "Address Customization",
                     displayicon: Icons.keyboard_arrow_right,
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => AddressCustomizationScreen()));
                     },
-                  ),
+                  ),*/
                   MultipleListViewWithNavigation(
                     displayTitle: "Password Change",
                     displayicon: Icons.keyboard_arrow_right,
@@ -101,6 +104,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => Changepassword()));
                     },
                   ),
+
                   MultipleListViewWithNavigation(
                     displayTitle: "Order Settings",
                     displayicon: Icons.keyboard_arrow_right,
@@ -108,6 +112,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => Ordersettings()));
                     },
                   ),
+
                   MultipleListViewWithNavigation(
                     displayTitle: "Payment Methods",
                     displayicon: Icons.keyboard_arrow_right,
@@ -115,13 +120,14 @@ class _settingsScreenState extends State<Settingsscreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => Paymentsmethods()));
                     },
                   ),
-                  MultipleListViewWithNavigation(
-                    displayTitle: 'Online Order Notification Settings',
-                    displayicon: Icons.keyboard_arrow_right,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => OrderNotificationsettings()));
-                    },
-                  ),
+
+                  // MultipleListViewWithNavigation(
+                  //   displayTitle: 'Online Order Notification Settings',
+                  //   displayicon: Icons.keyboard_arrow_right,
+                  //   onTap: () {
+                  //     Navigator.push(context, MaterialPageRoute(builder: (context) => OrderNotificationsettings()));
+                  //   },
+                  // ),
                   MultipleListViewWithNavigation(
                     displayTitle: 'Performance Test Data Generator',
                     displayicon: Icons.keyboard_arrow_right,
@@ -129,82 +135,81 @@ class _settingsScreenState extends State<Settingsscreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => DataGeneratorScreen()));
                     },
                   ),
-                  // 👇 Fix the Decimal point section
-                  MultipleListViewWithNavigation(
-                    screenheightt: screenheight * 0.16,
-                    displayTitle: "Decimal point",
-                    displayicon: Icons.keyboard_arrow_down,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => Ordersettings()));
-                    },
-                    child: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        Filterbutton(
+                  // 💰 Decimal Precision Section
+                  ValueListenableBuilder<int>(
+                    valueListenable: DecimalSettings.precisionNotifier,
+                    builder: (context, currentPrecision, child) {
+                      final selectedFilter = _getDecimalFilter(currentPrecision);
 
-                          title: 'None',
-                          selectedFilter: selectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              selectedFilter = "None";
-                            });
-                          },
+                      return MultipleListViewWithNavigation(
+                        screenheightt: screenheight * 0.16,
+                        displayTitle: "Decimal Precision",
+                        displayicon: Icons.keyboard_arrow_down,
+                        onTap: () {},
+                        child: Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            Filterbutton(
+                              title: 'None',
+                              selectedFilter: selectedFilter,
+                              onpressed: () async {
+                                await DecimalSettings.updatePrecision(0);
+                              },
+                            ),
+                            Filterbutton(
+                              title: '0.0',
+                              selectedFilter: selectedFilter,
+                              onpressed: () async {
+                                await DecimalSettings.updatePrecision(1);
+                              },
+                            ),
+                            Filterbutton(
+                              title: '0.00',
+                              selectedFilter: selectedFilter,
+                              onpressed: () async {
+                                await DecimalSettings.updatePrecision(2);
+                              },
+                            ),
+                            Filterbutton(
+                              title: '0.000',
+                              selectedFilter: selectedFilter,
+                              onpressed: () async {
+                                await DecimalSettings.updatePrecision(3);
+                              },
+                            ),
+                          ],
                         ),
-                        Filterbutton(
-                          title: '0.0',
-                          selectedFilter: selectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              selectedFilter = "0.0";
-                            });
-                          },
-                        ),
-                        Filterbutton(
-                          title: '0.00',
-                          selectedFilter: selectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              selectedFilter = "0.00";
-                            });
-                          },
-                        ),
-                        Filterbutton(
-                          title: '0.000',
-                          selectedFilter: selectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              selectedFilter = "0.000";
-                            });
-                          },
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                  // 💰 Currency Selection Section
-                  MultipleListViewWithNavigation(
-                    screenheightt: screenheight * 0.25,
-                    displayTitle: "Currency Symbol",
-                    displayicon: Icons.keyboard_arrow_down,
-                    onTap: () {},
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: CurrencyHelper.currencies.entries.map((entry) {
-                        final currencyInfo = entry.value;
-                        final buttonTitle = '${currencyInfo.symbol} ${currencyInfo.code}';
-                        return Filterbutton(
-                          title: buttonTitle,
-                          selectedFilter: '${CurrencyHelper.currencies[selectedCurrency]?.symbol ?? '\$'} $selectedCurrency',
-                          onpressed: () async {
-                            setState(() {
-                              selectedCurrency = currencyInfo.code;
-                            });
-                            await CurrencyHelper.setCurrency(currencyInfo.code);
-                          },
-                        );
-                      }).toList(),
-                    ),
+                  // 💰 Currency Selection Section (Reactive)
+                  ValueListenableBuilder<String>(
+                    valueListenable: CurrencyHelper.currencyNotifier,
+                    builder: (context, currentCurrency, child) {
+                      return MultipleListViewWithNavigation(
+                        screenheightt: screenheight * 0.25,
+                        displayTitle: "Currency Symbol",
+                        displayicon: Icons.keyboard_arrow_down,
+                        onTap: () {},
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: CurrencyHelper.currencies.entries.map((entry) {
+                            final currencyInfo = entry.value;
+                            final buttonTitle = '${currencyInfo.symbol} ${currencyInfo.code}';
+                            final selectedDisplay = '${CurrencyHelper.currentSymbol} ${CurrencyHelper.currentCurrencyCode}';
+                            return Filterbutton(
+                              title: buttonTitle,
+                              selectedFilter: selectedDisplay,
+                              onpressed: () async {
+                                await CurrencyHelper.setCurrency(currencyInfo.code);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -217,33 +222,4 @@ class _settingsScreenState extends State<Settingsscreen> {
           islogout: true,
         ));
   }
-}
-
-Widget takeAway() {
-  return Column(
-    children: [
-      ToggleSwitch(widthc: 0.7, initialValue: false, label: "None "),
-      ToggleSwitch(widthc: 0.85, initialValue: false, label: "0.0 ")
-    ],
-  );
-}
-
-Widget dineIn() {
-  return Column(
-    children: [
-      ToggleSwitch(widthc: 0.5, initialValue: false, label: "0.00 "),
-    ],
-  );
-}
-
-Widget homeDelivery() {
-  return Column(
-    children: [ToggleSwitch(widthc: 0.85, initialValue: false, label: " 0.00")],
-  );
-}
-
-Widget delivery() {
-  return Column(
-    children: [ToggleSwitch(widthc: 0.85, initialValue: false, label: " 0.000 ")],
-  );
 }

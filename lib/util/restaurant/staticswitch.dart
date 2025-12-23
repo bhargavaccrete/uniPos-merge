@@ -21,31 +21,32 @@ class AppSettings {
     // Input & Interaction
     "Visual Keyboard": true,
     "Addresss Suggestion": true,
-    "Separate Quantity": false,
+    // "Separate Quantity": false, // ❌ NOT IMPLEMENTED - Commented out
 
     // Order Processing
-    "Auto Print KOT On Delete Item": false,
-    "Estimate": false,
-    "Generate KOT": false,
-    "Show Payment Method": false,
-    "Tax Is Inclusive": false, // ✅ ADD THIS LINE
-    "Discount On Items": false, // 🔑 New
+    // "Auto Print KOT On Delete Item": false, // ❌ NOT IMPLEMENTED - Commented out
+    // "Estimate": false, // ✅ WORKING
+    "Generate KOT": false, // ✅ WORKING
+    // "Show Payment Method": false, // ❌ NOT IMPLEMENTED - Commented out
+    "Tax Is Inclusive": false, // ✅ WORKING
+    "Discount On Items": false, // ✅ WORKING
+    "Decimal Precision": true, // 🔢 Decimal places control
 
 
 
     // Printing
-    "Label Printer": false,
-    "Section Wise Print": false,
-    "auto Print End Day Summary": false,
-    "Print End Day Extra Details": false,
-    "Print Qr Code For E-Incoice": false,
-    "Show Payment Method (Quick Settle)": false,
-    "Auto Print Kot of New Local Other": false,
+    // "Label Printer": false, // ❌ NOT IMPLEMENTED - Commented out
+    // "Section Wise Print": false, // ❌ NOT IMPLEMENTED - Commented out
+    // "auto Print End Day Summary": false, // ❌ NOT IMPLEMENTED - Commented out
+    // "Print End Day Extra Details": false,
+    // "Print Qr Code For E-Incoice": false, // ❌ NOT IMPLEMENTED - Commented out
+    // "Show Payment Method (Quick Settle)": false, // ❌ NOT IMPLEMENTED - Commented out
+    // "Auto Print Kot of New Local Other": false, // ❌ NOT IMPLEMENTED - Commented out
 
-    // Online Order Settings
-    "Online Order Notification": false,
-    "Online Order Bill Auto Print": false,
-    "Online Order Auto Kot Print": false,
+    // // Online Order Settings
+    // "Online Order Notification": false,
+    // "Online Order Bill Auto Print": false,
+    // "Online Order Auto Kot Print": false,
   };
 
   /// ---- Grouped Settings for UI ----
@@ -61,29 +62,30 @@ class AppSettings {
     "Input & Interaction": [
       "Visual Keyboard",
       "Addresss Suggestion",
+      // "Separate Quantity", // ❌ NOT IMPLEMENTED - Commented out
     ],
     "Order Processing": [
-      "Separate Quantity",
-      "Auto Print KOT On Delete Item",
-      "Estimate",
-      "Generate KOT",
-      "Show Payment Method",
-      "Tax Is Inclusive", // ✅ ADD THIS LINE
-      "Discount On Items", // 🔑 New
+      // "Auto Print KOT On Delete Item", // ❌ NOT IMPLEMENTED - Commented out
+      // "Estimate", // ✅ WORKING
+      "Generate KOT", // ✅ WORKING
+      // "Show Payment Method", // ❌ NOT IMPLEMENTED - Commented out
+      "Tax Is Inclusive", // ✅ WORKING
+      "Discount On Items", // ✅ WORKING
     ],
-    "Printing": [
-      "Label Printer",
-      "Section Wise Print",
-      "auto Print End Day Summary",
-      "Print Qr Code For E-Incoice",
-      "Show Payment Method (Quick Settle)",
-      "Auto Print Kot of New Local Other",
-    ],
-    "Online Order Settings": [
-      "Online Order Notification",
-      "Online Order Bill Auto Print",
-      "Online Order Auto Kot Print",
-    ],
+    // "Printing": [
+    //   // "Label Printer", // ❌ NOT IMPLEMENTED - Commented out
+    //   // "Section Wise Print", // ❌ NOT IMPLEMENTED - Commented out
+    //   // "auto Print End Day Summary", // ❌ NOT IMPLEMENTED - Commented out
+    //   "Print End Day Extra Details",
+    //   // "Print Qr Code For E-Incoice", // ❌ NOT IMPLEMENTED - Commented out
+    //   // "Show Payment Method (Quick Settle)", // ❌ NOT IMPLEMENTED - Commented out
+    //   // "Auto Print Kot of New Local Other", // ❌ NOT IMPLEMENTED - Commented out
+    // ],
+    // "Online Order Settings": [
+    //   "Online Order Notification",
+    //   "Online Order Bill Auto Print",
+    //   "Online Order Auto Kot Print",
+    // ],
   };
 
   /// ---- Notifiers ----
@@ -151,9 +153,9 @@ class AppSettings {
   static bool get visualKeyboard => values["Visual Keyboard"] ?? true;
   static bool get addressSuggestion => values["Addresss Suggestion"] ?? true;
 
-  static bool get  sepratedQuantity => values["Separate Quantity"] ?? false;
-  static bool get autoPrintKotOnDelete => values["Auto Print KOT On Delete Item"] ?? false;
-  static bool get  estimate=> values["Estimate"] ?? false;
+  // static bool get  sepratedQuantity => values["Separate Quantity"] ?? false;
+  // static bool get autoPrintKotOnDelete => values["Auto Print KOT On Delete Item"] ?? false;
+  // static bool get  estimate=> values["Estimate"] ?? false;
   static bool get generateKOT => values["Generate KOT"] ?? false;
 
   static bool get showPaymentMethod => values["Show Payment Method"] ?? false;
@@ -163,22 +165,22 @@ class AppSettings {
 
 
 
-  static bool get  labelPrinter => values["Label Printer"] ?? false;
-  static bool get sectionWisePrint => values["Section Wise Print"] ?? false;
-  static bool get  autoPrintEndDaySummary=> values["auto Print End Day Summary"] ?? false;
-  static bool get printEndDayExtraDetails => values["Print End Day Extra Details"] ?? false;
-  static bool get printQrCodeForEIncoice => values["Print Qr Code For E-Incoice"] ?? false;
- static bool get showPaymentMethodQuickSettle => values["Show Payment Method (Quick Settle)"] ?? false;
-  static bool get  printKotofNewLocalOther => values["Auto Print Kot of New Local Other"] ?? false;
+ //  static bool get  labelPrinter => values["Label Printer"] ?? false;
+ //  static bool get sectionWisePrint => values["Section Wise Print"] ?? false;
+ //  static bool get  autoPrintEndDaySummary=> values["auto Print End Day Summary"] ?? false;
+ //  static bool get printEndDayExtraDetails => values["Print End Day Extra Details"] ?? false;
+ //  static bool get printQrCodeForEIncoice => values["Print Qr Code For E-Incoice"] ?? false;
+ // static bool get showPaymentMethodQuickSettle => values["Show Payment Method (Quick Settle)"] ?? false;
+ //  static bool get  printKotofNewLocalOther => values["Auto Print Kot of New Local Other"] ?? false;
 
 
 
-  static bool get onlineOrderNotification =>
-      values["Online Order Notification"] ?? false;
-  static bool get onlineOrderAutoPrint =>
-      values["Online Order Bill Auto Print"] ?? true;
-  static bool get onlineOrderKotPrint =>
-      values["Online Order Auto Kot Print"] ?? true;
-
+  // static bool get onlineOrderNotification =>
+  //     values["Online Order Notification"] ?? false;
+  // static bool get onlineOrderAutoPrint =>
+  //     values["Online Order Bill Auto Print"] ?? true;
+  // static bool get onlineOrderKotPrint =>
+  //     values["Online Order Auto Kot Print"] ?? true;
+  //
 
 }

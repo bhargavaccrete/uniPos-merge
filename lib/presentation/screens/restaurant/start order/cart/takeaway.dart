@@ -17,6 +17,9 @@ import '../../../../../domain/services/restaurant/cart_calculation_service.dart'
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
+import '../../../../../util/restaurant/decimal_settings.dart';
+import '../../../../../util/restaurant/order_settings.dart';
+import '../../../../../util/restaurant/currency_helper.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../tabbar/table.dart';
@@ -358,7 +361,7 @@ class _TakeawayState extends State<Takeaway> {
                 ),
                 Expanded(
                   child: Text(
-                    'Rs ${item.totalPrice.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(item.totalPrice)}',
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -379,7 +382,7 @@ class _TakeawayState extends State<Takeaway> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  'Size: ${item.variantName} (Rs.${item.variantPrice?.toStringAsFixed(2)})',
+                  'Size: ${item.variantName} (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variantPrice ?? 0)})',
                 ),
               ),
 
@@ -633,8 +636,8 @@ class _TakeawayState extends State<Takeaway> {
     await HiveOrders.addOrder(neworder);
     print("✅ New active order saved with Total: ${neworder.totalPrice}");
 
-    // Auto-print KOT directly to printer
-    if (mounted) {
+    // Auto-print KOT directly to printer (only if Generate KOT setting is enabled)
+    if (mounted && AppSettings.generateKOT) {
       try {
         await RestaurantPrintHelper.printKOT(
           context: context,
@@ -642,10 +645,13 @@ class _TakeawayState extends State<Takeaway> {
           kotNumber: newKotNumber,
           autoPrint: true, // Direct print without preview
         );
+        print("✅ KOT printed successfully");
       } catch (e) {
         print("⚠️ KOT print failed: $e");
         // Don't block order placement if print fails
       }
+    } else if (!AppSettings.generateKOT) {
+      print("ℹ️ KOT printing skipped - Generate KOT setting is disabled");
     }
 
     // Deduct stock after successfully adding the order
@@ -747,8 +753,8 @@ class _TakeawayState extends State<Takeaway> {
 
       await HiveOrders.updateOrder(updateOrder);
 
-      // Auto-print KOT for new items directly to printer
-      if (hasNewItems && newKotNumber != null && mounted) {
+      // Auto-print KOT for new items directly to printer (only if Generate KOT setting is enabled)
+      if (hasNewItems && newKotNumber != null && mounted && AppSettings.generateKOT) {
         try {
           await RestaurantPrintHelper.printKOT(
             context: context,
@@ -756,10 +762,13 @@ class _TakeawayState extends State<Takeaway> {
             kotNumber: newKotNumber,
             autoPrint: true, // Direct print without preview
           );
+          print("✅ KOT #$newKotNumber printed successfully");
         } catch (e) {
           print("⚠️ KOT print failed: $e");
           // Don't block order update if print fails
         }
+      } else if (hasNewItems && !AppSettings.generateKOT) {
+        print("ℹ️ KOT printing skipped - Generate KOT setting is disabled");
       }
 
       // Update the table's total price as well
@@ -1100,6 +1109,22 @@ class _TakeawayState extends State<Takeaway> {
               width: width * 0.40,
               height: height * 0.05,
               onTap: () {
+                // Check if dialog should be shown based on order type and settings
+                bool shouldShowDialog = false;
+
+                if (widget.isDineIn && OrderSettings.showDineInDialog) {
+                  shouldShowDialog = true;
+                } else if (!widget.isDineIn && !widget.isdelivery && OrderSettings.showTakeAwayDialog) {
+                  shouldShowDialog = true;
+                }
+
+                // If dialog is disabled, directly place order
+                if (!shouldShowDialog) {
+                  _placeOrder(calculations);
+                  return;
+                }
+
+                // Show dialog for customer details
                 showDialog(
                   context: context,
                   builder: (BuildContext context) {

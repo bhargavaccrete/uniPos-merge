@@ -15,7 +15,10 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
+import '../../../../util/restaurant/currency_helper.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
+import '../../../widget/componets/restaurant/componets/visual_keyboard.dart';
 import '../Desktop/online_Order_desktop/online.dart';
 import 'WeightItemDialog.dart';
 import 'item_options_dialog.dart';
@@ -40,6 +43,10 @@ class _MenuScreenState extends State<MenuScreen> {
   String? activeCategory;
   String query = '';
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  // final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _codehereFocusNode = FocusNode();
 
 
   @override
@@ -58,6 +65,40 @@ class _MenuScreenState extends State<MenuScreen> {
       });
     });
 
+    // Listen for search field focus - show visual keyboard if enabled
+    _searchFocusNode.addListener(() {
+      if (_searchFocusNode.hasFocus && AppSettings.visualKeyboard) {
+        // Hide system keyboard
+        FocusScope.of(context).requestFocus(FocusNode());
+        // Show visual keyboard
+        VisualKeyboardHelper.show(
+          context: context,
+          controller: _searchController,
+          keyboardType: KeyboardType.text,
+        );
+      }
+    });
+
+
+    _codehereFocusNode.addListener(() {
+      if (_codehereFocusNode.hasFocus && AppSettings.visualKeyboard) {
+        // Hide system keyboard
+        FocusScope.of(context).requestFocus(FocusNode());
+        // Show visual keyboard
+        VisualKeyboardHelper.show(
+          context: context,
+          controller: _codeController,
+          keyboardType: KeyboardType.text,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   void _storeSelectedTable(String tableId) async {
@@ -498,10 +539,22 @@ class _MenuScreenState extends State<MenuScreen> {
                                             // color: Colors.red,
                                             child: TextField(
                                               textAlign: TextAlign.center,
+                                              controller: _codeController,
+                                              focusNode: _codehereFocusNode,
+                                              readOnly: AppSettings.visualKeyboard,
+                                              onTap: AppSettings.visualKeyboard? (){
+                                                VisualKeyboardHelper.show(
+                                                  context: context,
+                                                  controller: _codeController,
+                                                  keyboardType: KeyboardType.text,
+                                                );
+                                              } : null,
                                               decoration: InputDecoration(
-
                                                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                                   hintText: 'Code Here',
+                                                  suffixIcon: AppSettings.visualKeyboard
+                                                      ? Icon(Icons.keyboard, size: 18, color: primarycolor)
+                                                      : null,
                                                   hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
                                                   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
                                                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
@@ -520,9 +573,22 @@ class _MenuScreenState extends State<MenuScreen> {
                                             child: TextField(
                                               textAlign: TextAlign.center,
                                               controller: _searchController,
+                                              focusNode: _searchFocusNode,
+                                              readOnly: AppSettings.visualKeyboard, // Prevent system keyboard when visual keyboard is enabled
+                                              onTap: AppSettings.visualKeyboard ? () {
+                                                // Show visual keyboard on tap
+                                                VisualKeyboardHelper.show(
+                                                  context: context,
+                                                  controller: _searchController,
+                                                  keyboardType: KeyboardType.text,
+                                                );
+                                              } : null,
                                               decoration: InputDecoration(
                                                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                                  hintText: 'Items Here',
+                                                  hintText: 'Search Items',
+                                                  suffixIcon: AppSettings.visualKeyboard
+                                                      ? Icon(Icons.keyboard, size: 18, color: primarycolor)
+                                                      : null,
                                                   hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
                                                   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
                                                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
@@ -747,9 +813,9 @@ class _MenuScreenState extends State<MenuScreen> {
                                                               AppSettings.showItemPrice
                                                                   ? Text(
                                                                   item.price != null
-                                                                      ? "Price: ₹${item.price!.toStringAsFixed(2)}"
+                                                                      ? "Price: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}"
                                                                       : (item.variant != null && item.variant!.isNotEmpty)
-                                                                      ? "Price: ₹${item.variant!.first.price.toStringAsFixed(2)}+"
+                                                                      ? "Price: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variant!.first.price)}+"
                                                                       : "Price: N/A",
                                                                   textAlign: TextAlign.center,
                                                                   style: GoogleFonts.poppins(color: Colors.indigo.shade900, fontWeight: FontWeight.w600))

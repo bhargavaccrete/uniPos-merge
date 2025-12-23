@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Currency Helper
@@ -19,6 +20,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 class CurrencyHelper {
   static const String _currencyKey = 'selected_currency';
 
+  /// Notifier for currency changes - listen to this for reactive UI updates
+  static final ValueNotifier<String> currencyNotifier = ValueNotifier('INR');
+
   // Available currencies with their symbols
   static const Map<String, CurrencyInfo> currencies = {
     'USD': CurrencyInfo(code: 'USD', symbol: '\$', name: 'US Dollar'),
@@ -38,22 +42,40 @@ class CurrencyHelper {
     'SGD': CurrencyInfo(code: 'SGD', symbol: 'S\$', name: 'Singapore Dollar'),
   };
 
-  /// Get the currently selected currency code (default: USD)
+  /// Get the currently selected currency code (default: INR)
   static Future<String> getCurrencyCode() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_currencyKey) ?? 'USD';
+    return prefs.getString(_currencyKey) ?? 'INR';
   }
 
   /// Get the currency symbol for the selected currency
   static Future<String> getCurrencySymbol() async {
     final code = await getCurrencyCode();
-    return currencies[code]?.symbol ?? '\$';
+    return currencies[code]?.symbol ?? '₹';
   }
 
   /// Get the full currency info for the selected currency
   static Future<CurrencyInfo> getCurrencyInfo() async {
     final code = await getCurrencyCode();
-    return currencies[code] ?? currencies['USD']!;
+    return currencies[code] ?? currencies['INR']!;
+  }
+
+  /// Get current currency code synchronously from notifier
+  static String get currentCurrencyCode => currencyNotifier.value;
+
+  /// Get current currency symbol synchronously
+  static String get currentSymbol => currencies[currentCurrencyCode]?.symbol ?? '₹';
+
+  /// Get current currency info synchronously
+  static CurrencyInfo get currentCurrencyInfo =>
+      currencies[currentCurrencyCode] ?? currencies['INR']!;
+
+  /// Load currency from SharedPreferences on app start
+  static Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedCurrency = prefs.getString(_currencyKey) ?? 'INR';
+    currencyNotifier.value = savedCurrency;
+    print('💰 Currency loaded: $savedCurrency (${currencies[savedCurrency]?.symbol})');
   }
 
   /// Set the selected currency
@@ -61,8 +83,10 @@ class CurrencyHelper {
     if (!currencies.containsKey(currencyCode)) {
       throw ArgumentError('Invalid currency code: $currencyCode');
     }
+    currencyNotifier.value = currencyCode; // Update notifier for reactive UI
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_currencyKey, currencyCode);
+    print('💰 Currency changed to: $currencyCode (${currencies[currencyCode]?.symbol})');
   }
 
   /// Format an amount with the selected currency symbol

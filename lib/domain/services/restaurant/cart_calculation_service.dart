@@ -21,6 +21,7 @@ class CartCalculationService {
   late final double totalGST;
   late final double serviceChargeAmount;
   late final double grandTotal;
+  late final double roundOffAmount; // Amount added/subtracted for rounding
 
   CartCalculationService({
     required this.items,
@@ -40,6 +41,7 @@ class CartCalculationService {
       discountAmount = 0;
       totalGST = 0;
       serviceChargeAmount = 0;
+      roundOffAmount = 0;
       grandTotal = 0;
       return;
     }
@@ -89,10 +91,27 @@ class CartCalculationService {
       serviceChargeAmount = baseForServiceCharge > 0 ? baseForServiceCharge * (serviceChargePercentage / 100) : 0;
     }
 
-    // Step 6: Calculate Grand Total
-    grandTotal = (AppSettings.isTaxInclusive)
+    // Step 6: Calculate Grand Total (before rounding)
+    double calculatedTotal = (AppSettings.isTaxInclusive)
         ? (subtotal - discountAmount + serviceChargeAmount)
         : (subtotal + totalGST - discountAmount + serviceChargeAmount);
+
+    // Step 7: Apply Round Off if enabled
+    if (AppSettings.roundOff) {
+      final roundTo = double.parse(AppSettings.selectedRoundOffValue);
+      final roundedTotal = _roundToNearest(calculatedTotal, roundTo);
+      roundOffAmount = roundedTotal - calculatedTotal;
+      grandTotal = roundedTotal;
+    } else {
+      roundOffAmount = 0;
+      grandTotal = calculatedTotal;
+    }
+  }
+
+  /// Round a value to the nearest specified amount
+  double _roundToNearest(double value, double nearest) {
+    if (nearest <= 0) return value;
+    return (value / nearest).round() * nearest;
   }
 
   // Helper method to calculate GST from a given base amount

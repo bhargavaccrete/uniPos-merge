@@ -35,6 +35,11 @@ import 'package:unipos/presentation/screens/retail/staff_setup_screen.dart';
 import 'package:unipos/presentation/screens/retail/backup_screen.dart';
 
 import 'domain/store/restaurant/appStore.dart';
+import 'util/restaurant/staticswitch.dart';
+import 'util/restaurant/print_settings.dart';
+import 'util/restaurant/decimal_settings.dart';
+import 'util/restaurant/order_settings.dart';
+import 'util/restaurant/currency_helper.dart';
 final appStore = AppStore();
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -58,6 +63,28 @@ void main() async{
   // Setup GetIt dependency injection
   // IMPORTANT: This must be called AFTER boxes are initialized
   await setupServiceLocator();
+
+  // Load restaurant customization settings from SharedPreferences
+  if (AppConfig.isRestaurant) {
+    await AppSettings.load();
+    print('⚙️  Restaurant settings loaded');
+
+    // Load print customization settings
+    await PrintSettings.load();
+    print('🖨️  Print settings loaded');
+
+    // Load decimal precision settings
+    await DecimalSettings.load();
+    print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
+
+    // Load order settings
+    await OrderSettings.load();
+    print('📋 Order settings loaded');
+
+    // Load currency settings
+    await CurrencyHelper.load();
+    print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
+  }
 
   // Debug: Print initialization status
   print('🔧 App Initialization Complete');

@@ -81,6 +81,12 @@ Future<void> setupServiceLocator() async {
     () => PaymentMethodStore(locator<PaymentMethodRepository>()),
   );
 
+  // Initialize PaymentMethodStore (load payment methods from Hive)
+  print('💳 Initializing PaymentMethodStore...');
+  final paymentStore = locator<PaymentMethodStore>();
+  await paymentStore.init();
+  print('💳 PaymentMethodStore initialized with ${paymentStore.paymentMethods.length} methods');
+
   // Register PrintService as a common dependency for both Retail and Restaurant
   locator.registerLazySingleton<PrintService>(() => PrintService());
 

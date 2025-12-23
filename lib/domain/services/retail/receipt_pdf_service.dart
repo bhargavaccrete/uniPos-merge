@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
+import '../../../util/restaurant/print_settings.dart';
+import '../../../core/config/app_config.dart';
 
 /// Data class to hold all receipt information
 class ReceiptData {
@@ -97,6 +99,14 @@ class ReceiptPdfService {
     final storeAddress = data.storeAddress ?? defaultStoreAddress;
     final storePhone = data.storePhone ?? defaultStorePhone;
 
+    // Debug: Print current settings
+    print('🖨️  Generating receipt with settings:');
+    print('   Restaurant Name: ${PrintSettings.showRestaurantName}');
+    print('   Restaurant Address: ${PrintSettings.showRestaurantAddress}');
+    print('   Restaurant Mobile: ${PrintSettings.showRestaurantMobile}');
+    print('   Order Type: ${data.orderType}');
+    print('   Is Restaurant: ${data.orderType != null}');
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
@@ -114,23 +124,29 @@ class ReceiptPdfService {
         ],
 
         // Store Header
-        pw.Text(
-          storeName,
-          style: pw.TextStyle(
-            fontSize: 14,
-            fontWeight: pw.FontWeight.bold,
+        if (PrintSettings.showRestaurantName) ...[
+          pw.Text(
+            storeName,
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
-        ),
-        pw.SizedBox(height: 2),
-        pw.Text(
-          storeAddress,
-          style: const pw.TextStyle(fontSize: 8),
-          textAlign: pw.TextAlign.center,
-        ),
-        pw.Text(
-          'Tel: $storePhone',
-          style: const pw.TextStyle(fontSize: 8),
-        ),
+          pw.SizedBox(height: 2),
+        ],
+        if (PrintSettings.showRestaurantAddress) ...[
+          pw.Text(
+            storeAddress,
+            style: const pw.TextStyle(fontSize: 8),
+            textAlign: pw.TextAlign.center,
+          ),
+        ],
+        if (PrintSettings.showRestaurantMobile) ...[
+          pw.Text(
+            'Tel: $storePhone',
+            style: const pw.TextStyle(fontSize: 8),
+          ),
+        ],
         if (data.gstNumber != null) ...[
           pw.Text(
             'GST: ${data.gstNumber}',
@@ -174,39 +190,45 @@ class ReceiptPdfService {
           ],
         ] else ...[
           // Regular Receipt Info - Show Bill Number for completed orders
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style: const pw.TextStyle(fontSize: 8)),
-              pw.Text(
-                data.billNumber != null
-                  ? data.billNumber.toString().padLeft(3, '0')
-                  : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
-                style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
-              ),
-            ],
-          ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Date:', style: const pw.TextStyle(fontSize: 8)),
-              pw.Text(
-                _formatDateTime(data.sale.date),
-                style: const pw.TextStyle(fontSize: 8),
-              ),
-            ],
-          ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Payment:', style: const pw.TextStyle(fontSize: 8)),
-              pw.Text(
-                data.sale.paymentType.toUpperCase(),
-                style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
-              ),
-            ],
-          ),
-          if (data.customer != null) ...[
+          if (PrintSettings.showOrderId) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text(
+                  data.billNumber != null
+                    ? data.billNumber.toString().padLeft(3, '0')
+                    : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
+                  style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+          if (PrintSettings.showOrderedTime) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Date:', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text(
+                  _formatDateTime(data.sale.date),
+                  style: const pw.TextStyle(fontSize: 8),
+                ),
+              ],
+            ),
+          ],
+          if (PrintSettings.showPaymentType) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Payment:', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text(
+                  data.sale.paymentType.toUpperCase(),
+                  style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+          if (PrintSettings.showCustomerName && data.customer != null) ...[
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -273,10 +295,11 @@ class ReceiptPdfService {
           pw.SizedBox(height: 4),
 
           // Totals
-          _buildThermalTotalRow('Subtotal', data.sale.subtotal),
+          if (PrintSettings.showSubtotal)
+            _buildThermalTotalRow('Subtotal', data.sale.subtotal),
           if (data.sale.discountAmount > 0)
             _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-          if (data.sale.taxAmount > 0)
+          if (PrintSettings.showTax && data.sale.taxAmount > 0)
             _buildThermalTotalRow('Tax', data.sale.taxAmount),
           pw.SizedBox(height: 4),
           _buildDashedLine(),
@@ -309,22 +332,33 @@ class ReceiptPdfService {
           pw.SizedBox(height: 4),
 
           // Split Payment Breakdown
-          ..._buildSplitPaymentSection(data.sale),
+          if (PrintSettings.showPaymentPaid)
+            ..._buildSplitPaymentSection(data.sale),
 
-          pw.SizedBox(height: 4),
-          _buildDashedLine(),
-          pw.SizedBox(height: 8),
+          if (PrintSettings.showPaymentPaid) ...[
+            pw.SizedBox(height: 4),
+            _buildDashedLine(),
+            pw.SizedBox(height: 8),
+          ] else ...[
+            pw.SizedBox(height: 8),
+          ],
 
           // Footer
-          pw.Text(
-            'Thank you for your purchase!',
-            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'Please come again',
-            style: const pw.TextStyle(fontSize: 8),
-          ),
+          if (PrintSettings.showPoweredBy) ...[
+            pw.Text(
+              AppConfig.isRestaurant
+                ? 'Thank you for dining with us!'
+                : 'Thank you for your purchase!',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              AppConfig.isRestaurant
+                ? 'Visit us again!'
+                : 'Please come again',
+              style: const pw.TextStyle(fontSize: 8),
+            ),
+          ],
           pw.SizedBox(height: 8),
 
           // Points earned (if customer)
@@ -1140,6 +1174,18 @@ class ReceiptPdfService {
           );
         }
       }
+    } else {
+      // No payment list - use paymentType from sale (e.g., for restaurant orders)
+      final method = sale.paymentType.toUpperCase();
+      widgets.add(
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text('Paid by $method:', style: const pw.TextStyle(fontSize: 8)),
+            pw.Text(_formatCurrency(sale.totalAmount), style: const pw.TextStyle(fontSize: 8)),
+          ],
+        ),
+      );
     }
 
     return widgets;

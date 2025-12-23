@@ -229,8 +229,39 @@ class RestaurantPrintHelper {
       final storeEmail = await storeSettings.getStoreEmail();
       final storeGst = await storeSettings.getGSTNumber();
 
-      // 2. Map Items (Adapter: CartItem -> SaleItemModel)
-      final saleItems = order.items.map((item) {
+      // 2. Group identical items together (same product, variant, extras, choices)
+      Map<String, CartItem> groupedItems = {};
+
+      for (var item in order.items) {
+        // Create a unique key based on product, variant, extras, and choices
+        final extrasKey = item.extras?.map((e) => '${e['name']}_${e['price']}_${e['quantity']}').join('|') ?? '';
+        final choicesKey = item.choiceNames?.join('|') ?? '';
+        final uniqueKey = '${item.productId}_${item.variantName ?? ''}_${extrasKey}_${choicesKey}';
+
+        if (groupedItems.containsKey(uniqueKey)) {
+          // Item already exists, combine quantities and prices
+          final existing = groupedItems[uniqueKey]!;
+          groupedItems[uniqueKey] = CartItem(
+            id: existing.id,
+            productId: existing.productId,
+            title: existing.title,
+            imagePath: existing.imagePath,
+            price: existing.price, // Keep unit price same
+            quantity: existing.quantity + item.quantity, // Add quantities
+            variantName: existing.variantName,
+            extras: existing.extras,
+            choiceNames: existing.choiceNames,
+            taxRate: existing.taxRate,
+            instruction: existing.instruction,
+          );
+        } else {
+          // New unique item
+          groupedItems[uniqueKey] = item;
+        }
+      }
+
+      // 3. Map Items (Adapter: CartItem -> SaleItemModel)
+      final saleItems = groupedItems.values.map((item) {
         // Calculate tax for this item if possible, otherwise distribute total tax
         final itemTaxRate = (item.taxRate ?? 0) * 100;
 

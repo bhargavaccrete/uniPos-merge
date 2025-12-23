@@ -13,6 +13,7 @@ import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
@@ -66,7 +67,20 @@ class _CartScreenState extends State<CartScreen>
   void initState() {
     super.initState();
     _selectedTableNoForUI = widget.selectedTableNo;
+    _setDefaultOrderType();
     _initializeCart();
+  }
+
+  // Set default order type based on enabled settings
+  void _setDefaultOrderType() {
+    // Use the first enabled order type as default
+    if (OrderSettings.enableTakeAway) {
+      selectedFilter = "Take Away";
+    } else if (OrderSettings.enableDineIn) {
+      selectedFilter = "Dine In";
+    } else if (OrderSettings.enableDelivery) {
+      selectedFilter = "Delivery";
+    }
   }
   void _navigateAndAddMoreItems() async {
     // Navigate to the menu to add more items
@@ -387,41 +401,47 @@ class _CartScreenState extends State<CartScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Filterbutton(
-                        title: 'Take Away',
-                        selectedFilter: selectedFilter,
-                        onpressed: () =>
-                            setState(() => selectedFilter = "Take Away"),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(2.0),
-                        child: Filterbutton(
-                          title: 'Dine In',
+                      // Take Away button - only show if enabled
+                      if (OrderSettings.enableTakeAway)
+                        Filterbutton(
+                          title: 'Take Away',
                           selectedFilter: selectedFilter,
-                          onpressed: () async {
-
-
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const TableScreen(isfromcart: true,)),
-                            );
-                            if (result is String) {
-                              setState(() {
-                                selectedFilter = "Dine In";
-                                _selectedTableNoForUI = result;
-                              });
-                            }
-                          },
+                          onpressed: () =>
+                              setState(() => selectedFilter = "Take Away"),
                         ),
-                      ),
-                      Filterbutton(
+                      // Dine In button - only show if enabled
+                      if (OrderSettings.enableDineIn)
+                        Padding(
+                          padding: const EdgeInsets.all(2.0),
+                          child: Filterbutton(
+                            title: 'Dine In',
+                            selectedFilter: selectedFilter,
+                            onpressed: () async {
 
-                        title: 'Delivery',
-                        selectedFilter: selectedFilter,
-                        onpressed: () =>
-                            setState(() => selectedFilter = "Delivery"),
-                      ),
+
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const TableScreen(isfromcart: true,)),
+                              );
+                              if (result is String) {
+                                setState(() {
+                                  selectedFilter = "Dine In";
+                                  _selectedTableNoForUI = result;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      // Delivery button - only show if enabled
+                      if (OrderSettings.enableDelivery)
+                        Filterbutton(
+
+                          title: 'Delivery',
+                          selectedFilter: selectedFilter,
+                          onpressed: () =>
+                              setState(() => selectedFilter = "Delivery"),
+                        ),
                     ],
                   ),
                 ),

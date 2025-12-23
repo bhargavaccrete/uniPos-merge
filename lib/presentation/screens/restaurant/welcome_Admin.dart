@@ -13,6 +13,7 @@ import 'ManageStaff/manageStaff.dart';
 import 'Settings/settingsScreen.dart';
 import 'TaxSetting/taxSettings.dart';
 import 'auth/admin_login.dart';
+import 'auth/restaurant_login.dart';
 import 'inventory/manage_Inventory.dart';
 import 'language.dart';
 import 'manage menu/managemenu.dart';
@@ -323,11 +324,19 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                                             context, 0.05),
                                         bgcolor: primarycolor,
                                         onTap: () {
-                                          Navigator.push(
+                                          // Navigate to restaurant login screen
+                                          Navigator.pushReplacement(
                                               context,
                                               MaterialPageRoute(
                                                   builder: (context) =>
-                                                      AdminLogin()));
+                                                      const RestaurantLogin()));
+
+                                          // Old navigation - commented out
+                                          // Navigator.push(
+                                          //     context,
+                                          //     MaterialPageRoute(
+                                          //         builder: (context) =>
+                                          //             AdminLogin()));
                                         },
                                         child: Text(
                                           "Yes",
