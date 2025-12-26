@@ -93,6 +93,13 @@ dependencies:
   excel: ^4.0.6
 
 
+# server
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  shelf_web_socket: ^1.0.4
+  web_socket_channel: ^2.4.0
+
+
 
 
 

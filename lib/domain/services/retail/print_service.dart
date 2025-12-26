@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
+import 'package:unipos/domain/services/retail/retail_printer_settings_service.dart';
+import 'package:unipos/core/config/app_config.dart';
 
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';

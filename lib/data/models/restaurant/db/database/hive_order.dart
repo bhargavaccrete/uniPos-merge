@@ -1,7 +1,10 @@
 
 import 'package:hive/hive.dart';
+import 'package:unipos/server/websocket.dart' as ws;
 
 import '../ordermodel_309.dart';
+import '../cartmodel_308.dart';
+
 
 class HiveOrders {
   static const String _boxName = 'orderBox';
@@ -86,6 +89,42 @@ static Future<void> deleteOrder (String id )async{
     print('✅ Daily bill number reset to 0');
   }
 
+  /// Get next daily order number (resets every day)
+  /// This is assigned when order is PLACED (not when paid like bill number)
+  static Future<int> getNextOrderNumber() async {
+    final counterBox = await Hive.openBox(_counterBoxName);
+
+    // Check if it's a new day
+    final lastOrderDate = await counterBox.get('lastOrderDate');
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    // If it's a new day, reset the counter
+    if (lastOrderDate != todayStr) {
+      await counterBox.put('lastOrderNumber', 0);
+      await counterBox.put('lastOrderDate', todayStr);
+      print('🔄 New day detected - Order number reset to 0');
+    }
+
+    // Get and increment the order number
+    int lastNumber = await counterBox.get('lastOrderNumber', defaultValue: 0);
+    int newNumber = lastNumber + 1;
+    await counterBox.put('lastOrderNumber', newNumber);
+
+    print('📋 Order Number Generated: #$newNumber');
+    return newNumber;
+  }
+
+  /// Reset daily order number (called at end of day)
+  static Future<void> resetDailyOrderNumber() async {
+    final counterBox = await Hive.openBox(_counterBoxName);
+    await counterBox.put('lastOrderNumber', 0);
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    await counterBox.put('lastOrderDate', todayStr);
+    print('✅ Daily order number reset to 0');
+  }
+
   static Future<OrderModel?> getActiveOrderByTableId(String tableId) async{
     final box = await _getOrderBox();
     final allOrder = box.values.toList();
@@ -142,6 +181,68 @@ static Future<void> deleteOrder (String id )async{
       // This can happen if the order was deleted elsewhere
       print("❌ Error: Could not find order with ID ${updatedOrder.id} to update.");
     }
+  }
+
+  /// Updates order with new items added (e.g., when adding items to existing order)
+  /// Automatically handles:
+  /// - Resetting status to "Processing" if it was "Ready" or "Served"
+  /// - Generating new KOT number for additional items
+  /// - Updating KOT boundaries
+  /// - Broadcasting WebSocket event for real-time updates
+  static Future<OrderModel> updateOrderWithNewItems({
+    required OrderModel existingOrder,
+    required List<CartItem> newItems,
+    bool broadcastUpdate = true,
+  }) async {
+    // Check if we need to reset status (order was Ready or Served)
+    bool needsStatusReset = existingOrder.status == 'Ready' || existingOrder.status == 'Served';
+
+    // Generate new KOT number for the additional items
+    final newKotNumber = await getNextKotNumber();
+
+    // Combine existing and new items
+    final combinedItems = [...existingOrder.items, ...newItems];
+
+    // Update KOT tracking
+    final updatedKotNumbers = [...existingOrder.kotNumbers, newKotNumber];
+    final updatedBoundaries = [...existingOrder.kotBoundaries, combinedItems.length];
+
+    // Create updated order
+    final updatedOrder = existingOrder.copyWith(
+      items: combinedItems,
+      status: needsStatusReset ? 'Processing' : existingOrder.status,
+      kotNumbers: updatedKotNumbers,
+      itemCountAtLastKot: combinedItems.length,
+      kotBoundaries: updatedBoundaries,
+    );
+
+    // Save to database
+    await updateOrder(updatedOrder);
+
+    print('✅ Order ${existingOrder.id} updated with ${newItems.length} new items');
+    print('   New KOT #$newKotNumber generated');
+    print('   Status: ${existingOrder.status} → ${updatedOrder.status}');
+
+    // Broadcast update via WebSocket if requested
+    if (broadcastUpdate) {
+      try {
+
+        ws.broadcastEvent({
+          'type': needsStatusReset ? 'ORDER_UPDATED' : 'NEW_ITEMS_ADDED',
+          'orderId': updatedOrder.id,
+          'status': updatedOrder.status,
+          'tableNo': updatedOrder.tableNo,
+          'kotNumber': newKotNumber,
+          'newItemCount': newItems.length,
+          'allKotNumbers': updatedKotNumbers,
+        });
+        print('📡 WebSocket event broadcast: ${needsStatusReset ? "ORDER_UPDATED" : "NEW_ITEMS_ADDED"}');
+      } catch (e) {
+        print('⚠️ Failed to broadcast WebSocket event: $e');
+      }
+    }
+
+    return updatedOrder;
   }
 
 

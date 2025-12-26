@@ -1,0 +1,137 @@
+// ==========================================
+// FIX FOR: New items added to Ready/Served orders should appear as separate NEW order in KDS
+// ==========================================
+
+// STEP 1: Add this import at the top of takeaway.dart (around line 13)
+import '../../../../../server/websocket.dart' as ws;
+
+// STEP 2: Replace the section starting at line 725 (inside the `if (hasNewItems)` block)
+// REPLACE THIS CODE:
+/*
+      if (hasNewItems) {
+        // Generate a new KOT for the newly added items
+        newKotNumber = await HiveOrders.getNextKotNumber();
+        updatedKotNumbers.add(newKotNumber);
+        updatedKotBoundaries.add(newItemCount); // Add boundary at new item count
+
+        print('====== NEW KOT GENERATED ======');
+        print('Previous item count: $previousItemCount');
+        print('New item count: $newItemCount');
+        print('New KOT Number: $newKotNumber');
+        print('All KOT Numbers: $updatedKotNumbers');
+        print('KOT Boundaries: $updatedKotBoundaries');
+      }
+*/
+
+// WITH THIS CODE:
+      if (hasNewItems) {
+        // Generate a new KOT for the newly added items
+        newKotNumber = await HiveOrders.getNextKotNumber();
+
+        print('====== NEW KOT GENERATED ======');
+        print('Previous item count: $previousItemCount');
+        print('New item count: $newItemCount');
+        print('New KOT Number: $newKotNumber');
+        print('Existing Order Status: ${existingModel.status}');
+        print('Existing Order ID: ${existingModel.id}');
+
+        // ✅ FIX: If existing order is Ready or Served, create SEPARATE order for new items
+        if (existingModel.status == 'Ready' || existingModel.status == 'Served') {
+          // Get only the NEW items (items added after the last KOT)
+          final newItemsOnly = plainItems.sublist(previousItemCount);
+
+          // Create a SEPARATE new order with only the new items
+          final String newOrderId = Uuid().v4();
+          final newOrder = OrderModel(
+            id: newOrderId,
+            customerName: existingModel.customerName,
+            customerNumber: existingModel.customerNumber,
+            customerEmail: existingModel.customerEmail,
+            items: newItemsOnly,
+            status: 'Processing', // New items start fresh
+            timeStamp: DateTime.now(),
+            orderType: existingModel.orderType,
+            tableNo: existingModel.tableNo,
+            subTotal: 0,
+            discount: 0,
+            serviceCharge: 0,
+            gstAmount: 0,
+            gstRate: 0,
+            totalPrice: 0,
+            paymentMethod: existingModel.paymentMethod,
+            completedAt: null,
+            paymentStatus: "Unpaid",
+            isPaid: false,
+            remark: 'Additional items - Parent Order: ${existingModel.id.substring(0, 8)}',
+            kotNumbers: [newKotNumber],
+            itemCountAtLastKot: newItemsOnly.length,
+            kotBoundaries: [newItemsOnly.length],
+          );
+
+          // Add the new separate order
+          await HiveOrders.addOrder(newOrder);
+
+          print('✅ Created SEPARATE order for new items');
+          print('   Parent Order ID: ${existingModel.id}');
+          print('   Parent Order KOT: ${existingModel.kotNumbers.first}');
+          print('   Parent Order Status: ${existingModel.status}');
+          print('   New Order ID: $newOrderId');
+          print('   New Order Status: Processing');
+          print('   New Items Count: ${newItemsOnly.length}');
+
+          // Broadcast NEW_ORDER event to KDS with parent order info
+          try {
+            ws.broadcastEvent({
+              'type': 'NEW_ORDER',
+              'orderId': newOrderId,
+              'kotNumber': newKotNumber,
+              'tableNo': newOrder.tableNo,
+              'orderType': newOrder.orderType,
+              'parentOrderId': existingModel.id,
+              'parentOrderKot': existingModel.kotNumbers.first,
+              'isAdditionalItems': true,
+            });
+            print('📡 WebSocket broadcast: NEW_ORDER for additional items');
+          } catch (e) {
+            print('⚠️ Failed to broadcast WebSocket event: $e');
+          }
+
+          // Print KOT for new order
+          if (mounted && AppSettings.generateKOT) {
+            try {
+              await RestaurantPrintHelper.printKOT(
+                context: context,
+                order: newOrder,
+                kotNumber: newKotNumber,
+                autoPrint: true,
+              );
+              print("✅ KOT #$newKotNumber printed successfully");
+            } catch (e) {
+              print("⚠️ KOT print failed: $e");
+            }
+          }
+
+          if (mounted) {
+            Navigator.of(context).pop(true);
+            NotificationService.instance.showSuccess(
+              'New Items Added - KOT #$newKotNumber (Separate Order)',
+            );
+          }
+          return; // Exit early, don't update existing order
+        }
+
+        // If order is NOT Ready/Served, add to existing order normally
+        updatedKotNumbers.add(newKotNumber);
+        updatedKotBoundaries.add(newItemCount);
+        print('All KOT Numbers: $updatedKotNumbers');
+        print('KOT Boundaries: $updatedKotBoundaries');
+      }
+
+// ==========================================
+// RESULT:
+// - When new items are added to a Ready/Served order, a completely separate order is created
+// - The new order will appear in KDS as a NEW order with "Processing" status
+// - The original Ready/Served order stays untouched in its current status
+// - The remark field contains parent order ID reference for kitchen staff
+// - KDS receives a NEW_ORDER WebSocket event with parent order info
+// ==========================================

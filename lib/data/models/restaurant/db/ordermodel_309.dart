@@ -80,6 +80,12 @@ class OrderModel extends HiveObject {
   @HiveField(23)
   final List<int> kotBoundaries; // Item count at each KOT [3, 5, 6] means items 0-2 in KOT1, 3-4 in KOT2, 5-5 in KOT3
 
+  @HiveField(24)
+  final Map<int, String>? kotStatuses; // Status for each KOT number {1: 'Ready', 2: 'Processing'}
+
+  @HiveField(25)
+  final int? orderNumber; // Daily order number (resets every day, starts from 1)
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -107,6 +113,8 @@ class OrderModel extends HiveObject {
     required this.kotNumbers,
     required this.itemCountAtLastKot,
     required this.kotBoundaries,
+    this.kotStatuses,
+    this.orderNumber, // Optional - assigned when order is placed
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -137,6 +145,8 @@ class OrderModel extends HiveObject {
     List<int>? kotNumbers,
     int? itemCountAtLastKot,
     List<int>? kotBoundaries,
+    Map<int, String>? kotStatuses,
+    int? orderNumber,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -163,6 +173,8 @@ class OrderModel extends HiveObject {
       kotNumbers: kotNumbers ?? this.kotNumbers,
       itemCountAtLastKot: itemCountAtLastKot ?? this.itemCountAtLastKot,
       kotBoundaries: kotBoundaries ?? this.kotBoundaries,
+      kotStatuses: kotStatuses ?? this.kotStatuses,
+      orderNumber: orderNumber ?? this.orderNumber,
     );
   }
 
@@ -198,6 +210,16 @@ class OrderModel extends HiveObject {
     return itemsByKot;
   }
 
+  // Helper method to get status for a specific KOT
+  String getKotStatus(int kotNumber) {
+    // If KOT-level statuses exist, use them
+    if (kotStatuses != null && kotStatuses!.containsKey(kotNumber)) {
+      return kotStatuses![kotNumber]!;
+    }
+    // Otherwise fall back to order-level status
+    return status;
+  }
+
   // Serialization methods for backup/restore
   Map<String, dynamic> toMap() {
     return {
@@ -225,6 +247,8 @@ class OrderModel extends HiveObject {
       'kotNumbers': kotNumbers,
       'itemCountAtLastKot': itemCountAtLastKot,
       'kotBoundaries': kotBoundaries,
+      'kotStatuses': kotStatuses,
+      if (orderNumber != null) 'orderNumber': orderNumber,
     };
   }
 
@@ -256,6 +280,10 @@ class OrderModel extends HiveObject {
       kotNumbers: (map['kotNumbers'] as List<dynamic>).map((e) => e as int).toList(),
       itemCountAtLastKot: map['itemCountAtLastKot'] as int,
       kotBoundaries: (map['kotBoundaries'] as List<dynamic>).map((e) => e as int).toList(),
+      kotStatuses: map['kotStatuses'] != null
+          ? Map<int, String>.from(map['kotStatuses'] as Map)
+          : null,
+      orderNumber: map['orderNumber'] as int?,
     );
   }
 }

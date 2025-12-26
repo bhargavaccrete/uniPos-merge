@@ -26,6 +26,7 @@ import '../../tabbar/table.dart';
 import '../startorder.dart';
 import 'customerdetails.dart';
 import '../../util/restaurant_print_helper.dart';
+import '../../../../../server/websocket.dart' as ws;
 
 class Takeaway extends StatefulWidget {
   bool isexisting = false;
@@ -542,7 +543,7 @@ class _TakeawayState extends State<Takeaway> {
       customerNumber: mobileController.text,
       customerEmail: emailController.text,
       items: plainItems,
-      status: 'Cooking',
+      status: 'Processing',
       timeStamp: DateTime.now(),
       orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
       totalPrice: totalPrice,
@@ -605,13 +606,16 @@ class _TakeawayState extends State<Takeaway> {
 
     final int newKotNumber = await HiveOrders.getNextKotNumber();
 
+    // Generate daily order number
+    final int orderNumber = await HiveOrders.getNextOrderNumber();
+
     final neworder = OrderModel(
       id: Uuid().v4(),
       customerName: nameController.text.trim(),
       customerNumber: mobileController.text.trim(),
       customerEmail: emailController.text.trim(),
       items: plainItems,
-      status: 'Cooking',
+      status: 'Processing',
       timeStamp: DateTime.now(),
       orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
       // kotNumber removed - using kotNumbers only
@@ -631,6 +635,8 @@ class _TakeawayState extends State<Takeaway> {
       kotNumbers: [newKotNumber],
       itemCountAtLastKot: plainItems.length,
       kotBoundaries: [plainItems.length], // First KOT boundary at item count
+      kotStatuses: {newKotNumber: 'Processing'}, // Initialize first KOT status
+      orderNumber: orderNumber, // Daily order number
     );
 
     await HiveOrders.addOrder(neworder);
@@ -722,11 +728,17 @@ class _TakeawayState extends State<Takeaway> {
       List<int> updatedKotNumbers = List<int>.from(existingModel.getKotNumbers());
       List<int> updatedKotBoundaries = List<int>.from(existingModel.kotBoundaries);
 
+      // Track KOT statuses
+      Map<int, String> updatedKotStatuses = Map<int, String>.from(existingModel.kotStatuses ?? {});
+
       if (hasNewItems) {
         // Generate a new KOT for the newly added items
         newKotNumber = await HiveOrders.getNextKotNumber();
         updatedKotNumbers.add(newKotNumber);
         updatedKotBoundaries.add(newItemCount); // Add boundary at new item count
+
+        // Set new KOT status to 'Processing' (not inheriting parent order status)
+        updatedKotStatuses[newKotNumber] = 'Processing';
 
         print('====== NEW KOT GENERATED ======');
         print('Previous item count: $previousItemCount');
@@ -734,6 +746,7 @@ class _TakeawayState extends State<Takeaway> {
         print('New KOT Number: $newKotNumber');
         print('All KOT Numbers: $updatedKotNumbers');
         print('KOT Boundaries: $updatedKotBoundaries');
+        print('KOT Statuses: $updatedKotStatuses');
       }
 
       final updateOrder = existingModel.copyWith(
@@ -749,9 +762,33 @@ class _TakeawayState extends State<Takeaway> {
         kotNumbers: updatedKotNumbers,
         itemCountAtLastKot: newItemCount,
         kotBoundaries: updatedKotBoundaries, // Update KOT boundaries
+        kotStatuses: updatedKotStatuses, // Update KOT statuses
       );
 
       await HiveOrders.updateOrder(updateOrder);
+
+      // Broadcast update to KDS via WebSocket
+      if (hasNewItems && newKotNumber != null) {
+        try {
+          // Convert integer keys to strings for JSON encoding
+          final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
+
+          ws.broadcastEvent({
+            'type': 'NEW_ITEMS_ADDED',
+            'orderId': updateOrder.id,
+            'status': updateOrder.status,
+            'tableNo': updateOrder.tableNo,
+            'kotNumber': newKotNumber,
+            'newItemCount': newItemCount - previousItemCount,
+            'allKotNumbers': updatedKotNumbers,
+            'kotBoundaries': updatedKotBoundaries,
+            'kotStatuses': kotStatusesJson,
+          });
+          print('📡 WebSocket event broadcast: NEW_ITEMS_ADDED to KDS');
+        } catch (e) {
+          print('⚠️ Failed to broadcast WebSocket event: $e');
+        }
+      }
 
       // Auto-print KOT for new items directly to printer (only if Generate KOT setting is enabled)
       if (hasNewItems && newKotNumber != null && mounted && AppSettings.generateKOT) {
@@ -775,6 +812,9 @@ class _TakeawayState extends State<Takeaway> {
       if (updateOrder.tableNo != null) {
         await HiveTables.updateTableStatus(updateOrder.tableNo!, 'Reserved', total: calculations.grandTotal);
       }
+
+      // Clear the cart after successfully updating the order
+      await clearCart();
 
       if (mounted) {
         // Pop with 'true' to let the previous screen know the update was successful.

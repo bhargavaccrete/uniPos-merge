@@ -1,3 +1,5 @@
+
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
@@ -12,6 +14,8 @@ import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/OrderCard.dart';
 import '../start order/cart/cart.dart';
+import '../../../../services/websocket_client_service.dart';
+import '../../../../server/websocket.dart' as ws;
 
 
 class Activeorder extends StatefulWidget {
@@ -23,6 +27,8 @@ class Activeorder extends StatefulWidget {
 
 class _ActiveorderState extends State<Activeorder> {
   String dropDownValue = 'All';
+  StreamSubscription? _wsSubscription;
+  final _wsService = WebSocketClientService();
 
   List<String> dropdownItems = [
     'All',
@@ -30,6 +36,118 @@ class _ActiveorderState extends State<Activeorder> {
     'Delivery',
     'Dine In',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeWebSocket();
+  }
+
+  Future<void> _initializeWebSocket() async {
+    // Start WebSocket client service
+    await _wsService.start();
+
+    // Listen for real-time updates from KDS
+    _wsSubscription = _wsService.messageStream.listen((message) {
+      final type = message['type'] as String?;
+
+      if (type == 'STATUS_UPDATE') {
+        final orderId = message['orderId'] as String?;
+        final status = message['status'] as String?;
+        final tableNo = message['tableNo'] as String?;
+        final kotNumber = message['kotNumber'];
+
+        print('🔔 UniPOS: Order status updated - KOT #$kotNumber (Table $tableNo) → $status');
+
+        // Show notification to user
+        if (mounted && status != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.update, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'KOT #$kotNumber: Status updated to $status',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.blue,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+
+        // UI will automatically refresh via ValueListenableBuilder
+        // because server already updated Hive database
+      } else if (type == 'ORDER_UPDATED' || type == 'NEW_ITEMS_ADDED') {
+        final kotNumber = message['kotNumber'];
+        final newItemCount = message['newItemCount'];
+        final tableNo = message['tableNo'];
+
+        print('🔔 UniPOS: Order updated - KOT #$kotNumber with $newItemCount new items');
+
+        // Show notification
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.add_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'New KOT #$kotNumber: $newItemCount items added to Table $tableNo',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else if (type == 'NEW_ORDER') {
+        final kotNumber = message['kotNumber'];
+        final tableNo = message['tableNo'];
+
+        print('🔔 UniPOS: New order received - KOT #$kotNumber (Table $tableNo)');
+
+        // Show notification
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.restaurant_menu, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Text(
+                    'New Order: KOT #$kotNumber - Table $tableNo',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _wsSubscription?.cancel();
+    super.dispose();
+  }
 
   Future<void> _deleteOrder(String orderId) async {
     // Show a confirmation dialog
@@ -66,80 +184,282 @@ class _ActiveorderState extends State<Activeorder> {
   // In _ActiveorderState class
   Color _getColorForStatus(String? status) {
     switch (status) {
+      case 'Processing':
+        return Colors.red.shade500; // Red for Processing (new orders)
       case 'Cooking':
         return Colors.red.shade500; // Red for Cooking
       case 'Ready':
         return Colors.orange.shade300; // Orange for Ready
+      case 'Served':
+        return Colors.green.shade300; // Green for Served (awaiting payment)
       default:
-        return Colors.white; // Default color
+        return Colors.grey.shade400; // Default color for unknown status
     }
   }
 
   // In _ActiveorderState class
 
-// This function shows the main dialog
+// This function shows the main dialog with KOT-level status updates
   void _showStatusUpdateDialog(OrderModel order, bool istakeaway,) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Get current KOT statuses
+            final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
 
-            children: [
-              Text('Update Status #${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id.substring(0, 8)}'),
+            // Initialize missing KOT statuses
+            for (var kotNum in order.kotNumbers) {
+              if (!kotStatuses.containsKey(kotNum)) {
+                kotStatuses[kotNum] = order.status;
+              }
+            }
 
-              InkWell(
-                  onTap: (){
-                    Navigator.pop(context);
-                  },
-                  child: Icon(Icons.cancel))
-            ],
-          ),
-          content: Text('What is the status of this order?'),
-          actions: <Widget>[
-            // Button 1: Ready to Pickup
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                order.status == 'Ready'
-                    ? SizedBox()
-                    : CommonButton(
-                  bgcolor: Colors.white,
-                  width: 300,
-                  height: 50,
-                  child: Text(istakeaway?'Ready to Pickup':'Ready to Served',style:GoogleFonts.poppins(color: Colors.black)),
-                  onTap: () {
-                    Navigator.of(context).pop(); // Close the dialog
-                    _updateOrderStatus(order, 'Ready');
-                  },
+            return AlertDialog(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Update Order Status',
+                      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(Icons.cancel, color: Colors.grey),
+                  )
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Container(
+                  width: 400,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Order Info
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (order.tableNo != null && order.tableNo!.isNotEmpty)
+                                  ? 'Table ${order.tableNo}'
+                                  : order.orderType,
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Overall Status: ${order.status}',
+                              style: GoogleFonts.poppins(color: Colors.grey.shade700),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16),
+
+                      // KOT Status Updates
+                      Text(
+                        'Update KOT Status:',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      SizedBox(height: 12),
+
+                      // List all KOTs with status buttons
+                      ...order.kotNumbers.map((kotNum) {
+                        final currentStatus = kotStatuses[kotNum] ?? order.status;
+                        final kotIndex = order.kotNumbers.indexOf(kotNum);
+                        final startIndex = kotIndex == 0 ? 0 : order.kotBoundaries[kotIndex - 1];
+                        final endIndex = order.kotBoundaries[kotIndex];
+                        final itemCount = endIndex - startIndex;
+
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: _getColorForStatus(currentStatus)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'KOT #$kotNum',
+                                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    '$itemCount item${itemCount > 1 ? 's' : ''}',
+                                    style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Status: $currentStatus',
+                                style: GoogleFonts.poppins(
+                                  color: _getColorForStatus(currentStatus),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  if (currentStatus != 'Cooking')
+                                    _buildStatusButton('Cooking', Colors.orange, () {
+                                      _updateKotStatus(order, kotNum, 'Cooking');
+                                      Navigator.pop(context);
+                                    }),
+                                  if (currentStatus != 'Ready')
+                                    _buildStatusButton('Ready', Colors.blue, () {
+                                      _updateKotStatus(order, kotNum, 'Ready');
+                                      Navigator.pop(context);
+                                    }),
+                                  if (currentStatus != 'Served')
+                                    _buildStatusButton('Served', Colors.green, () {
+                                      if (order.paymentStatus == 'Paid') {
+                                        // Check if all KOTs are served
+                                        final allServed = order.kotNumbers.every((k) =>
+                                          (k == kotNum) || (kotStatuses[k] == 'Served')
+                                        );
+                                        if (allServed) {
+                                          _moveOrderToPast(order);
+                                        } else {
+                                          _updateKotStatus(order, kotNum, 'Served');
+                                        }
+                                      } else {
+                                        _updateKotStatus(order, kotNum, 'Served');
+                                      }
+                                      Navigator.pop(context);
+                                    }),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 10,),
-                // Button 2: Picked Up
-                CommonButton(
-                  bgcolor: Colors.white,
-                  width: 300,
-                  height: 50,
-                  child: Text(istakeaway?'Picked Up':'Served',style:GoogleFonts.poppins(color: Colors.black)),
-                  onTap: () {
-                    Navigator.of(context).pop(); // Close the dialog
-
-                    if(order.paymentStatus == 'Paid'){
-                      _moveOrderToPast(order);
-                    }
-                    _updateOrderStatus(order, 'Ready');
-                  },
-                ),
-              ],
-            )
-          ],
+              ),
+            );
+          },
         );
       },
     );
   }
 
-// ACTION 1: Updates the status and changes the color
+  // Helper to build status button
+  Widget _buildStatusButton(String status, Color color, VoidCallback onTap) {
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      child: Text(
+        status,
+        style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+      ),
+    );
+  }
+
+// ACTION 1: Updates KOT status and syncs with KDS
+  Future<void> _updateKotStatus(OrderModel order, int kotNumber, String newStatus) async {
+    try {
+      print('🔄 Updating KOT #$kotNumber to $newStatus');
+
+      // Update KOT status map
+      Map<int, String> updatedKotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+      updatedKotStatuses[kotNumber] = newStatus;
+
+      // Calculate overall order status
+      String overallStatus = _calculateOverallStatus(updatedKotStatuses, order.kotNumbers);
+
+      // Update the order in database
+      final updatedOrder = order.copyWith(
+        kotStatuses: updatedKotStatuses,
+        status: overallStatus,
+      );
+      await HiveOrders.updateOrder(updatedOrder);
+
+      print('✅ KOT #$kotNumber updated to $newStatus (Overall: $overallStatus)');
+
+      // Broadcast to KDS via WebSocket
+      try {
+        // Convert integer keys to strings for JSON encoding
+        final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
+
+        ws.broadcastEvent({
+          'type': 'KOT_STATUS_UPDATE',
+          'orderId': order.id,
+          'kotNumber': kotNumber,
+          'kotStatus': newStatus,
+          'overallStatus': overallStatus,
+          'tableNo': order.tableNo,
+          'allKotNumbers': order.kotNumbers,
+          'kotStatuses': kotStatusesJson,
+        });
+        print('📡 Status update broadcast to KDS');
+      } catch (e) {
+        print('⚠️ Failed to broadcast to KDS: $e');
+      }
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('KOT #$kotNumber updated to $newStatus'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error updating KOT status: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update status: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Helper function to calculate overall order status from KOT statuses
+  String _calculateOverallStatus(Map<int, String> kotStatuses, List<int> kotNumbers) {
+    if (kotStatuses.isEmpty) return 'Processing';
+
+    // Get all statuses
+    final statuses = kotNumbers.map((kot) => kotStatuses[kot] ?? 'Processing').toList();
+
+    // If all KOTs are Served, order is Served
+    if (statuses.every((s) => s == 'Served')) return 'Served';
+
+    // If all KOTs are Ready or Served, order is Ready
+    if (statuses.every((s) => s == 'Ready' || s == 'Served')) return 'Ready';
+
+    // If any KOT is Cooking, order is Cooking
+    if (statuses.any((s) => s == 'Cooking')) return 'Cooking';
+
+    // Otherwise, order is Processing
+    return 'Processing';
+  }
+
+  // Legacy: Updates the overall order status (kept for backward compatibility)
   Future<void> _updateOrderStatus(OrderModel order, String newStatus) async {
     // Create an updated version of the order
     final updatedOrder = order.copyWith(status: newStatus);
@@ -225,12 +545,19 @@ class _ActiveorderState extends State<Activeorder> {
                   valueListenable: Hive.box<OrderModel>('orderBox').listenable(),
                   builder: (context, orders ,_){
 
-                    final allOrders = orders.values.toList();
+                    // Show all orders except 'Served' orders that are already paid
+                    // Keep 'Served' orders in active view if payment is not complete
+                    final activeOrders = orders.values
+                        .where((order) =>
+                          order.status != 'Served' ||
+                          (order.status == 'Served' && order.paymentStatus != 'Paid')
+                        )
+                        .toList();
 
-                    allOrders.sort((a,b)=> b.timeStamp.compareTo(a.timeStamp));
+                    activeOrders.sort((a,b)=> b.timeStamp.compareTo(a.timeStamp));
 
 
-                    if(allOrders.isEmpty){
+                    if(activeOrders.isEmpty){
                       return Center(
                         child: Text(
                           'No Active Orders',
@@ -244,8 +571,8 @@ class _ActiveorderState extends State<Activeorder> {
                     }
 
                     final filterOrderList = dropDownValue == 'All'
-                        ? allOrders
-                        : allOrders.where((order)=> order.orderType == dropDownValue)
+                        ? activeOrders
+                        : activeOrders.where((order)=> order.orderType == dropDownValue)
                         .toList();
 
                     if(filterOrderList.isEmpty){
@@ -262,7 +589,7 @@ class _ActiveorderState extends State<Activeorder> {
                           order: order,
                           onDelete: _deleteOrder,
                           ontapcooking: () async {
-                            if (order.status == 'Cooking' || order.status == 'Ready') {
+                            if (order.status == 'Processing' || order.status == 'Cooking' || order.status == 'Ready' || order.status == 'Served') {
                               _showStatusUpdateDialog(order,order.orderType == 'Take Away'? true : false);
                             }
                           },

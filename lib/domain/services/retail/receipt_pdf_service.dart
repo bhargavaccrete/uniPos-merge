@@ -8,8 +8,10 @@ import 'package:intl/intl.dart';
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
+import '../../../data/models/retail/printer_settings_model.dart';
 import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
+import 'retail_printer_settings_service.dart';
 
 /// Data class to hold all receipt information
 class ReceiptData {
@@ -63,13 +65,40 @@ class ReceiptPdfService {
   static const String defaultStoreAddress = 'Your Store Address';
   static const String defaultStorePhone = '+91 1234567890';
 
+  /// Get retail printer settings if in retail mode
+  RetailPrinterSettings? _getRetailSettings() {
+    if (AppConfig.isRetail) {
+      return RetailPrinterSettingsService().settings;
+    }
+    return null;
+  }
+
+  /// Get paper format based on retail settings or default
+  PdfPageFormat _getPaperFormat() {
+    final retailSettings = _getRetailSettings();
+    if (retailSettings != null) {
+      switch (retailSettings.paperSize) {
+        case PaperSize.mm58:
+          // Note: Using roll80 as PDF package doesn't have roll58, can be customized
+          return const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 8);
+        case PaperSize.mm80:
+          return PdfPageFormat.roll80;
+        case PaperSize.a4:
+          return PdfPageFormat.a4;
+      }
+    }
+    // Default to 80mm for restaurant/undefined
+    return PdfPageFormat.roll80;
+  }
+
   /// Generate a thermal receipt style PDF (narrow, suitable for 80mm printers)
   Future<pw.Document> generateThermalReceipt(ReceiptData data) async {
     final pdf = pw.Document();
+    final pageFormat = _getPaperFormat();
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.roll80,
+        pageFormat: pageFormat,
         margin: const pw.EdgeInsets.all(8),
         build: (context) => _buildThermalReceiptContent(data),
       ),
@@ -99,19 +128,34 @@ class ReceiptPdfService {
     final storeAddress = data.storeAddress ?? defaultStoreAddress;
     final storePhone = data.storePhone ?? defaultStorePhone;
 
-    // Debug: Print current settings
-    print('🖨️  Generating receipt with settings:');
-    print('   Restaurant Name: ${PrintSettings.showRestaurantName}');
-    print('   Restaurant Address: ${PrintSettings.showRestaurantAddress}');
-    print('   Restaurant Mobile: ${PrintSettings.showRestaurantMobile}');
-    print('   Order Type: ${data.orderType}');
-    print('   Is Restaurant: ${data.orderType != null}');
+    // Get settings based on mode
+    final retailSettings = _getRetailSettings();
+    final isRetail = AppConfig.isRetail;
+
+    // Determine what to show based on mode
+    final showLogo = isRetail ? (retailSettings?.showLogo ?? true) : true;
+    final showStoreName = isRetail ? (retailSettings?.showStoreName ?? true) : PrintSettings.showRestaurantName;
+    final showStoreAddress = isRetail ? (retailSettings?.showStoreAddress ?? true) : PrintSettings.showRestaurantAddress;
+    final showStorePhone = isRetail ? (retailSettings?.showStorePhone ?? true) : PrintSettings.showRestaurantMobile;
+    final showGST = isRetail ? (retailSettings?.showGSTNumber ?? true) : true;
+    final showInvoiceNumber = isRetail ? (retailSettings?.showInvoiceNumber ?? true) : PrintSettings.showOrderId;
+    final showInvoiceDate = isRetail ? (retailSettings?.showInvoiceDate ?? true) : PrintSettings.showOrderedTime;
+    final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : PrintSettings.showPaymentType;
+    final showCustomer = isRetail ? (retailSettings?.showCustomerDetails ?? true) : PrintSettings.showCustomerName;
+    final showSubtotal = isRetail ? (retailSettings?.showSubtotal ?? true) : PrintSettings.showSubtotal;
+    final showTax = isRetail ? (retailSettings?.showTax ?? true) : PrintSettings.showTax;
+    final showPaymentPaid = isRetail ? (retailSettings?.showSplitPayment ?? true) : PrintSettings.showPaymentPaid;
+    final showFooter = isRetail ? (retailSettings?.showFooter ?? true) : PrintSettings.showPoweredBy;
+
+    // Custom text for retail
+    final headerText = isRetail ? (retailSettings?.headerText ?? '') : '';
+    final footerText = isRetail ? (retailSettings?.footerText ?? 'Visit Again!') : '';
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        // Store Logo (Both retail and restaurant)
-        if (data.logoBytes != null) ...[
+        // Store Logo
+        if (showLogo && data.logoBytes != null) ...[
           pw.Container(
             width: 60,
             height: 60,
@@ -123,8 +167,18 @@ class ReceiptPdfService {
           pw.SizedBox(height: 8),
         ],
 
+        // Custom Header Text (Retail only)
+        if (isRetail && headerText.isNotEmpty) ...[
+          pw.Text(
+            headerText,
+            style: const pw.TextStyle(fontSize: 9),
+            textAlign: pw.TextAlign.center,
+          ),
+          pw.SizedBox(height: 4),
+        ],
+
         // Store Header
-        if (PrintSettings.showRestaurantName) ...[
+        if (showStoreName) ...[
           pw.Text(
             storeName,
             style: pw.TextStyle(
@@ -134,20 +188,20 @@ class ReceiptPdfService {
           ),
           pw.SizedBox(height: 2),
         ],
-        if (PrintSettings.showRestaurantAddress) ...[
+        if (showStoreAddress) ...[
           pw.Text(
             storeAddress,
             style: const pw.TextStyle(fontSize: 8),
             textAlign: pw.TextAlign.center,
           ),
         ],
-        if (PrintSettings.showRestaurantMobile) ...[
+        if (showStorePhone) ...[
           pw.Text(
             'Tel: $storePhone',
             style: const pw.TextStyle(fontSize: 8),
           ),
         ],
-        if (data.gstNumber != null) ...[
+        if (showGST && data.gstNumber != null) ...[
           pw.Text(
             'GST: ${data.gstNumber}',
             style: const pw.TextStyle(fontSize: 8),
@@ -190,7 +244,7 @@ class ReceiptPdfService {
           ],
         ] else ...[
           // Regular Receipt Info - Show Bill Number for completed orders
-          if (PrintSettings.showOrderId) ...[
+          if (showInvoiceNumber) ...[
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -204,7 +258,7 @@ class ReceiptPdfService {
               ],
             ),
           ],
-          if (PrintSettings.showOrderedTime) ...[
+          if (showInvoiceDate) ...[
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -216,7 +270,7 @@ class ReceiptPdfService {
               ],
             ),
           ],
-          if (PrintSettings.showPaymentType) ...[
+          if (showPaymentMethod) ...[
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -228,7 +282,7 @@ class ReceiptPdfService {
               ],
             ),
           ],
-          if (PrintSettings.showCustomerName && data.customer != null) ...[
+          if (showCustomer && data.customer != null) ...[
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -295,11 +349,11 @@ class ReceiptPdfService {
           pw.SizedBox(height: 4),
 
           // Totals
-          if (PrintSettings.showSubtotal)
+          if (showSubtotal)
             _buildThermalTotalRow('Subtotal', data.sale.subtotal),
-          if (data.sale.discountAmount > 0)
+          if (data.sale.discountAmount > 0 && showSubtotal)
             _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-          if (PrintSettings.showTax && data.sale.taxAmount > 0)
+          if (showTax && data.sale.taxAmount > 0)
             _buildThermalTotalRow('Tax', data.sale.taxAmount),
           pw.SizedBox(height: 4),
           _buildDashedLine(),
@@ -332,10 +386,10 @@ class ReceiptPdfService {
           pw.SizedBox(height: 4),
 
           // Split Payment Breakdown
-          if (PrintSettings.showPaymentPaid)
+          if (showPaymentPaid)
             ..._buildSplitPaymentSection(data.sale),
 
-          if (PrintSettings.showPaymentPaid) ...[
+          if (showPaymentPaid) ...[
             pw.SizedBox(height: 4),
             _buildDashedLine(),
             pw.SizedBox(height: 8),
@@ -344,20 +398,28 @@ class ReceiptPdfService {
           ],
 
           // Footer
-          if (PrintSettings.showPoweredBy) ...[
-            pw.Text(
-              AppConfig.isRestaurant
-                ? 'Thank you for dining with us!'
-                : 'Thank you for your purchase!',
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              AppConfig.isRestaurant
-                ? 'Visit us again!'
-                : 'Please come again',
-              style: const pw.TextStyle(fontSize: 8),
-            ),
+          if (showFooter) ...[
+            if (isRetail && footerText.isNotEmpty) ...[
+              pw.Text(
+                footerText,
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                textAlign: pw.TextAlign.center,
+              ),
+            ] else ...[
+              pw.Text(
+                AppConfig.isRestaurant
+                    ? 'Thank you for dining with us!'
+                    : 'Thank you for your purchase!',
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                AppConfig.isRestaurant
+                    ? 'Visit us again!'
+                    : 'Please come again',
+                style: const pw.TextStyle(fontSize: 8),
+              ),
+            ],
           ],
           pw.SizedBox(height: 8),
 

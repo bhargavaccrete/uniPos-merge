@@ -59,7 +59,33 @@ class OrderCard extends StatelessWidget {
               // Color(0xffc52b33),
               child: Row(
                 children: [
+                  // Order Type
                   Expanded(child: buildHeaderItem(orderTypeIcon(), order.orderType)),
+
+                  // Order Number (if available)
+                  if (order.orderNumber != null)
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '#${order.orderNumber}',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Order No.',
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // KOT Numbers
                   Expanded(
                     child: Column(
                       children: [
@@ -77,7 +103,7 @@ class OrderCard extends StatelessWidget {
                                 border: Border.all(color: Colors.white, width: 1),
                               ),
                               child: Text(
-                                'AU-$kotNum',
+                                '$kotNum',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -88,10 +114,12 @@ class OrderCard extends StatelessWidget {
                           }).toList(),
                         ),
                         SizedBox(height: 4),
-                        Text('KOT NO.', style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+                        Text('KOT', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10)),
                       ],
                     ),
                   ),
+
+                  // Time
                   Expanded(child: Center(child: Text(DateFormat.jm().format(order.timeStamp), style: GoogleFonts.poppins(color: Colors.white)))),
                 ],
               ),

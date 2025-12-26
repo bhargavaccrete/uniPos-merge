@@ -6,6 +6,7 @@ import 'package:unipos/presentation/screens/retail/gst_settings_screen.dart';
 import 'package:unipos/presentation/screens/retail/gst_report_screen.dart';
 import 'package:unipos/presentation/screens/retail/attributes_screen.dart';
 import 'package:unipos/presentation/screens/retail/store_info_settings_screen.dart';
+import 'package:unipos/presentation/screens/retail/settings/printer_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -74,6 +75,34 @@ class SettingsScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const BackupScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Printing Section
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'PRINTING',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6B6B6B),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          _buildSettingsCard(
+            context,
+            icon: Icons.print,
+            title: 'Printer Settings',
+            subtitle: 'Configure invoice layout, paper size, and print options',
+            iconColor: const Color(0xFF673AB7),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PrinterSettingsScreen()),
               );
             },
           ),

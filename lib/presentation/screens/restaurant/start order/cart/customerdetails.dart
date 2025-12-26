@@ -783,7 +783,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       customerNumber: _mobileController.text.trim(),
       customerEmail: _emailController.text.trim(),
       items: orderItems,
-      status: 'Cooking',
+      status: 'Processing',
       timeStamp: DateTime.now(),
       orderType: widget.orderType ?? 'Take Away',
       tableNo: widget.tableid ?? '',
@@ -796,8 +796,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
       totalPrice: calculations.grandTotal,
       paymentMethod: SelectedFilter,
       completedAt: null,
-      paymentStatus: "Paid",
-      isPaid: true,
+      paymentStatus: "Unpaid",
+      isPaid: false,
       remark:
           calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
       // Initialize KOT tracking fields - single source of truth
