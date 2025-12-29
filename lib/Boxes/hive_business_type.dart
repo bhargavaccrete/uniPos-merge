@@ -5,8 +5,9 @@ class BusinessTypeBox {
   static const String _boxName = 'businessTypeBox';
   static const String _selectedKey = 'selectedBusinessType';
 
-  static Future<Box<BusinessType>> openBox() async {
-    return await Hive.openBox<BusinessType>(_boxName);
+  static Box<BusinessType> openBox() {
+    // Box is already opened during app startup in HiveInit
+    return Hive.box<BusinessType>(_boxName);
   }
 
   static Box<BusinessType> getBox() {

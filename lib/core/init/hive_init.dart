@@ -62,10 +62,21 @@ import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
 class HiveInit {
   HiveInit._();
 
+  // ⚠️ LIFECYCLE GUARDS - Prevent box re-opening during runtime
+  static bool _isHiveInitialized = false;
+  static bool _areCommonBoxesOpen = false;
+  static bool _areRetailBoxesOpen = false;
+  static bool _areRestaurantBoxesOpen = false;
+
   /// Initialize Hive with Flutter
   static Future<void> init() async {
+    if (_isHiveInitialized) {
+      print('⚠️ HiveInit.init() already called - skipping');
+      return;
+    }
     await Hive.initFlutter();
     await _registerCommonAdapters();
+    _isHiveInitialized = true;
   }
 
   /// Register common adapters (needed regardless of business mode)
@@ -94,6 +105,10 @@ class HiveInit {
 
   /// Open common boxes (needed regardless of business mode)
   static Future<void> openCommonBoxes() async {
+    if (_areCommonBoxesOpen) {
+      print('⚠️ Common boxes already open - skipping');
+      return;
+    }
     await Hive.openBox('storebox');
     await Hive.openBox('app_state');
     await Hive.openBox<TaxDetails>('taxBox');
@@ -112,6 +127,9 @@ class HiveInit {
     } else {
       print('📦 HiveInit: Payment box already has ${paymentBox.length} methods');
     }
+
+    _areCommonBoxesOpen = true;
+    print('✅ Common boxes opened and guard flag set');
   }
 
   /// Initialize default payment methods
@@ -321,7 +339,7 @@ class HiveInit {
       for (final boxName in oldBoxNames) {
         if (Hive.isBoxOpen(boxName)) {
           await Hive.box(boxName).clear();
-          await Hive.box(boxName).close();
+          // await Hive.box(boxName).close();
         }
         await Hive.deleteBoxFromDisk(boxName);
         print('🗑️ Deleted old attribute box: $boxName');

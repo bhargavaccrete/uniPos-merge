@@ -1477,37 +1477,13 @@ class CategoryImportExport {
       final data = jsonDecode(await jsonFile.readAsString());
       debugPrint("📦 Parsed JSON data successfully");
 
-      // 4️⃣ Update encryption key FIRST
-      await secureStorage.write(key: 'hive_key', value: backupKey);
-      debugPrint("📦 Updated encryption key in secure storage");
+      // 4️⃣ CRITICAL: Use box.clear() instead of Hive.close()
+      // ⚠️ NEVER close boxes during runtime - this causes race conditions
+      // Instead: Clear existing data and write new data to already-open boxes
+      // The boxes will re-encrypt data with the app's CURRENT encryption key
+      debugPrint("📦 Clearing existing data from all boxes...");
 
-      // 5️⃣ Close Hive completely
-      debugPrint("📦 Closing all Hive boxes...");
-      await Hive.close();
-
-      // 6️⃣ Reopen Hive with new key
-      final cipher = HiveAesCipher(base64Decode(backupKey));
-      debugPrint("📦 Reopening Hive boxes with new encryption key...");
-
-      await Hive.openBox('app_state');
-      await Hive.openBox<Company>('companyBox', encryptionCipher: cipher);
-      await Hive.openBox<Extramodel>('extra', encryptionCipher: cipher);
-      await Hive.openBox<Items>('itemBoxs', encryptionCipher: cipher);
-      await Hive.openBox<Category>('categories', encryptionCipher: cipher);
-      await Hive.openBox<CartItem>('cart', encryptionCipher: cipher);
-      await Hive.openBox<StaffModel>('staffBox', encryptionCipher: cipher);
-      await Hive.openBox<OrderModel>('orderBox', encryptionCipher: cipher);
-      await Hive.openBox<TableModel>('tablesBox', encryptionCipher: cipher);
-      await Hive.openBox<VariantModel>('variante', encryptionCipher: cipher);
-      await Hive.openBox<ChoicesModel>('choice', encryptionCipher: cipher);
-      await Hive.openBox<pastOrderModel>('pastorderBox', encryptionCipher: cipher);
-      await Hive.openBox<Tax>('restaurant_taxes', encryptionCipher: cipher);
-      await Hive.openBox<ExpenseCategory>('expenseCategory', encryptionCipher: cipher);
-      await Hive.openBox<Expense>('expenseBox', encryptionCipher: cipher);
-      await Hive.openBox<EndOfDayReport>('eodBox', encryptionCipher: cipher);
-      debugPrint("📦 All boxes reopened successfully");
-
-      // 7️⃣ Restore JSON data
+      // 5️⃣ Restore JSON data to ALREADY-OPEN boxes
       debugPrint("📦 Clearing and restoring data...");
       await _restoreBox("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m), data);
       await _restoreBox("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m), data);
@@ -1550,12 +1526,38 @@ class CategoryImportExport {
       }
       debugPrint("📦 Images restored");
 
+      // ⚠️ IMPORTANT: App restart recommended after restore
+      // Why? The restore may change encryption keys or data structure.
+      // All existing UI state and cached data should be cleared.
+      // Best practice: User should restart the app to ensure clean state.
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ Data & images restored successfully! Please restart the app manually."),
-          duration: Duration(seconds: 5),
-        ),
+
+      // Show success dialog asking user to restart app
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          return WillPopScope(
+            onWillPop: () async => false, // Prevent dismissal
+            child: AlertDialog(
+              title: const Text('✅ Restore Complete'),
+              content: const Text(
+                'Your data has been restored successfully!\n\n'
+                'Please restart the app to ensure all changes take effect properly.',
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    // Exit the app so user can restart manually
+                    exit(0);
+                  },
+                  child: const Text('OK - Exit App'),
+                ),
+              ],
+            ),
+          );
+        },
       );
     } catch (e) {
       debugPrint("❌ Import failed: $e");

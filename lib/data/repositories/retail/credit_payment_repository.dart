@@ -11,10 +11,9 @@ class CreditPaymentRepository {
   }
 
   /// Initialize the repository (ensure box is open)
-  Future<void> init() async {
-    if (!Hive.isBoxOpen('credit_payments')) {
-      _paymentBox = await Hive.openBox<CreditPaymentModel>('credit_payments');
-    }
+  void init() {
+    // Box is already opened during app startup in HiveInit
+    _paymentBox = Hive.box<CreditPaymentModel>('credit_payments');
   }
 
   /// Get all credit payments

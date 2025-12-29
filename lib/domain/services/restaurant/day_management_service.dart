@@ -9,17 +9,17 @@ class DayManagementService {
   static const String _lastDayDateKey = 'lastDayDate';
   static Box? _box;
 
-  static Future<Box> _getBox() async {
-    if (_box != null && _box!.isOpen) {
-      return _box!;
+  static Box _getBox() {
+    // Box is already opened during app startup in HiveInit
+    if (_box == null || !_box!.isOpen) {
+      _box = Hive.box(_boxName);
     }
-    _box = await Hive.openBox(_boxName);
     return _box!;
   }
 
   /// Set the opening balance for the current day
   static Future<void> setOpeningBalance(double balance) async {
-    final box = await _getBox();
+    final box = _getBox();
     await box.put(_openingBalanceKey, balance);
     await box.put(_dayStartedKey, true);
     await box.put(_lastDayDateKey, DateTime.now().toIso8601String());
@@ -28,14 +28,14 @@ class DayManagementService {
 
   /// Get the current opening balance
   static Future<double> getOpeningBalance() async {
-    final box = await _getBox();
+    final box = _getBox();
     final balance = box.get(_openingBalanceKey, defaultValue: 0.0);
     return balance is double ? balance : 0.0;
   }
 
   /// Check if the day has been started (opening balance set)
   static Future<bool> isDayStarted() async {
-    final box = await _getBox();
+    final box = _getBox();
     final started = box.get(_dayStartedKey, defaultValue: false);
 
     // Check if it's a new day
@@ -58,7 +58,7 @@ class DayManagementService {
 
   /// Reset the day (called after End of Day)
   static Future<void> resetDay() async {
-    final box = await _getBox();
+    final box = _getBox();
     await box.put(_openingBalanceKey, 0.0);
     await box.put(_dayStartedKey, false);
 
@@ -70,7 +70,7 @@ class DayManagementService {
 
   /// Get the last day's date
   static Future<DateTime?> getLastDayDate() async {
-    final box = await _getBox();
+    final box = _getBox();
     final dateStr = box.get(_lastDayDateKey);
     if (dateStr != null) {
       return DateTime.parse(dateStr);
@@ -80,7 +80,7 @@ class DayManagementService {
 
   /// Clear all day management data
   static Future<void> clearAll() async {
-    final box = await _getBox();
+    final box = _getBox();
     await box.clear();
     debugPrint('All day management data cleared');
   }

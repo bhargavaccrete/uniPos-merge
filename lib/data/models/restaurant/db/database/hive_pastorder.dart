@@ -9,38 +9,34 @@ class HivePastOrder{
 
   static Box<pastOrderModel>? _box;
 
-  static Future<Box<pastOrderModel>> _getPastOrderBox()async{
-    // if the box us already open , return it immediately
-    if(_box != null && _box!.isOpen){
-      return _box!;
+  static Box<pastOrderModel> _getPastOrderBox(){
+    // Box is already opened during app startup in HiveInit
+    if(_box == null || !_box!.isOpen){
+      _box = Hive.box<pastOrderModel>(_boxName);
     }
-
-  //   otherwise , open it and store the instance for future use.
-    _box = await Hive.openBox<pastOrderModel>(_boxName);
     return _box!;
-
   }
 
 
 
   static Future<void> addOrder (pastOrderModel pastOrder)async{
-    final box = await _getPastOrderBox();
+    final box = _getPastOrderBox();
     await box.put(pastOrder.id, pastOrder);
   }
 
   static Future<List<pastOrderModel>> getAllPastOrderModel ()async{
-    final box = await _getPastOrderBox();
+    final box = _getPastOrderBox();
     return  box.values.toList();
   }
 
 
   static Future<void> deleteOrder(String id)async{
-    final box = await _getPastOrderBox();
+    final box = _getPastOrderBox();
     await box.delete(id);
   }
 
   static Future<void> updateOrder(pastOrderModel updatedOrder) async {
-    final box = await _getPastOrderBox();
+    final box = _getPastOrderBox();
     await box.put(updatedOrder.id, updatedOrder);
   }
 

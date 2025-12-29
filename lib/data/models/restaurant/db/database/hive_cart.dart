@@ -8,16 +8,14 @@ import '../itemmodel_302.dart';
 class HiveCart {
   static const String boxName = 'cart_box';
 
-  static Future<Box<CartItem>> _openBox() async {
-    if (!Hive.isBoxOpen(boxName)) {
-      return await Hive.openBox<CartItem>(boxName);
-    }
+  static Box<CartItem> _openBox() {
+    // Box is already opened during app startup in HiveInit
     return Hive.box<CartItem>(boxName);
   }
 
   static Future<Map<String, dynamic>> addToCart(CartItem item) async {
     try {
-      final box = await _openBox();
+      final box = _openBox();
       
       // Check for existing item
       // The corrected code
@@ -47,7 +45,8 @@ class HiveCart {
           : item.quantity;
 
       // Check stock availability
-      final itemBox = await Hive.openBox<Items>('itemBoxs');
+      // Box is already opened during app startup in HiveInit
+      final itemBox = Hive.box<Items>('itemBoxs');
       Items? inventoryItem;
       
       try {
@@ -123,7 +122,7 @@ class HiveCart {
 
   static Future<void> removeFromCart(String itemId) async {
     try {
-      final box = await _openBox();
+      final box = _openBox();
       final itemToDelete = box.values.firstWhere((item) => item.id == itemId);
       final index = box.values.toList().indexOf(itemToDelete);
       await box.deleteAt(index);
@@ -135,7 +134,7 @@ class HiveCart {
 
   static Future<void> updateQuantity(String itemId, int newQuantity) async {
     try {
-      final box = await _openBox();
+      final box = _openBox();
       final item = box.values.firstWhere((item) => item.id == itemId);
       final index = box.values.toList().indexOf(item);
       item.quantity = newQuantity;
@@ -148,7 +147,7 @@ class HiveCart {
 
   static Future<List<CartItem>> getAllCartItems() async {
     try {
-      final box = await _openBox();
+      final box = _openBox();
       return box.values.toList();
     } catch (e) {
       print('Error getting cart items: $e');
@@ -158,7 +157,7 @@ class HiveCart {
 
   static Future<void> clearCart() async {
     try {
-      final box = await _openBox();
+      final box = _openBox();
       await box.clear();
     } catch (e) {
       print('Error clearing cart: $e');
@@ -168,7 +167,7 @@ class HiveCart {
 
   static Future<int> getCartItemCount() async {
     try {
-      final box = await _openBox();
+      final box = _openBox();
       return box.length;
     } catch (e) {
       print('Error getting cart item count: $e');
@@ -178,7 +177,7 @@ class HiveCart {
 
   static Future<double> getCartTotal() async {
     try {
-      final box = await _openBox();
+      final box = _openBox();
       double total = 0.0;
       for (var item in box.values) {
         total += item.price * item.quantity;

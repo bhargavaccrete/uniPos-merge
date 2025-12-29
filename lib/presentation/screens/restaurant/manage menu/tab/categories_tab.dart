@@ -43,7 +43,8 @@ class _CategoryTabState extends State<CategoryTab> {
   Map<String , bool>  toggleState = {};
 
   Future<void> loadCategoriesAndItems ()async {
-    final categoryBox = await Hive.openBox<Category>('categories');
+    // Box is already opened during app startup in HiveInit
+    final categoryBox = Hive.box<Category>('categories');
     final itemBox = await itemsBoxes.getItemBox();
 
     final allCategories = categoryBox.values.toList();

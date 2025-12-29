@@ -6,8 +6,9 @@ class TaxBox {
   static const String _key = 'tax';
 
   // Open the tax box
-  static Future<Box<TaxDetails>> openBox() async {
-    return await Hive.openBox<TaxDetails>(_boxName);
+  static Box<TaxDetails> openBox() {
+    // Box is already opened during app startup in HiveInit
+    return Hive.box<TaxDetails>(_boxName);
   }
 
   // Get already-opened box

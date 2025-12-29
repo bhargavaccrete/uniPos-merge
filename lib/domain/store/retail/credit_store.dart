@@ -99,7 +99,7 @@ abstract class _CreditStore with Store {
   }
 
   Future<void> _init() async {
-    await _paymentRepository.init();
+    _paymentRepository.init(); // No await - init() is now synchronous
     await loadData();
   }
 

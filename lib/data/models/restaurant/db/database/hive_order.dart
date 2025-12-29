@@ -15,38 +15,37 @@ class HiveOrders {
   // Keep a static reference to the box instance
   static Box<OrderModel>? _box;
 
-  static Future<Box<OrderModel>> _getOrderBox() async {
-    // If the box is already open, return it immediately.
-    if (_box != null && _box!.isOpen) {
-      return _box!;
+  static Box<OrderModel> _getOrderBox() {
+    // Box is already opened during app startup in HiveInit
+    if (_box == null || !_box!.isOpen) {
+      _box = Hive.box<OrderModel>(_boxName);
     }
-    // Otherwise, open it and store the instance for future use.
-    _box = await Hive.openBox<OrderModel>(_boxName);
     return _box!;
   }
 
 
 // Add an Order to the Box
 static Future<void> addOrder(OrderModel order) async{
-  final box = await _getOrderBox();
+  final box = _getOrderBox();
   await box.put(order.id, order);
 }
 
 // Get All saved Orders
 static Future<List<OrderModel>> getAllOrder()async {
-  final box = await _getOrderBox();
+  final box = _getOrderBox();
   return box.values.toList();
 }
 
 // delete Box
 static Future<void> deleteOrder (String id )async{
-  final box = await _getOrderBox();
+  final box = _getOrderBox();
   await box.delete(id);
 }
 
 
   static Future<int> getNextKotNumber() async {
-    final counterBox = await Hive.openBox(_counterBoxName);
+    // Box is already opened during app startup in HiveInit
+    final counterBox = Hive.box(_counterBoxName);
     // Get the last number, defaulting to 0 if it doesn't exist
     int lastNumber = await counterBox.get('lastKotNumber', defaultValue: 0);
     int newNumber = lastNumber + 1;
@@ -58,7 +57,8 @@ static Future<void> deleteOrder (String id )async{
   /// Get next daily bill number (resets every day)
   /// This is separate from KOT numbers and only for completed bills
   static Future<int> getNextBillNumber() async {
-    final counterBox = await Hive.openBox(_counterBoxName);
+    // Box is already opened during app startup in HiveInit
+    final counterBox = Hive.box(_counterBoxName);
 
     // Check if it's a new day
     final lastBillDate = await counterBox.get('lastBillDate');
@@ -81,7 +81,8 @@ static Future<void> deleteOrder (String id )async{
 
   /// Reset daily bill number (called at end of day)
   static Future<void> resetDailyBillNumber() async {
-    final counterBox = await Hive.openBox(_counterBoxName);
+    // Box is already opened during app startup in HiveInit
+    final counterBox = Hive.box(_counterBoxName);
     await counterBox.put('lastBillNumber', 0);
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
@@ -92,7 +93,8 @@ static Future<void> deleteOrder (String id )async{
   /// Get next daily order number (resets every day)
   /// This is assigned when order is PLACED (not when paid like bill number)
   static Future<int> getNextOrderNumber() async {
-    final counterBox = await Hive.openBox(_counterBoxName);
+    // Box is already opened during app startup in HiveInit
+    final counterBox = Hive.box(_counterBoxName);
 
     // Check if it's a new day
     final lastOrderDate = await counterBox.get('lastOrderDate');
@@ -117,7 +119,8 @@ static Future<void> deleteOrder (String id )async{
 
   /// Reset daily order number (called at end of day)
   static Future<void> resetDailyOrderNumber() async {
-    final counterBox = await Hive.openBox(_counterBoxName);
+    // Box is already opened during app startup in HiveInit
+    final counterBox = Hive.box(_counterBoxName);
     await counterBox.put('lastOrderNumber', 0);
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
@@ -126,7 +129,7 @@ static Future<void> deleteOrder (String id )async{
   }
 
   static Future<OrderModel?> getActiveOrderByTableId(String tableId) async{
-    final box = await _getOrderBox();
+    final box = _getOrderBox();
     final allOrder = box.values.toList();
 
     try{
@@ -150,7 +153,7 @@ static Future<void> deleteOrder (String id )async{
   /// Updates an existing order in the database.
   /// Finds the order by its unique ID and replaces it with the updated version.
   static Future<void> updateOrder(OrderModel updatedOrder) async {
-    final box = await _getOrderBox(); // Your function to open the order box
+    final box = _getOrderBox(); // Your function to open the order box
     dynamic orderKey;
 
     print('🔍 Looking for order with ID: ${updatedOrder.id}');

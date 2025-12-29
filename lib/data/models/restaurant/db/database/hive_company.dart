@@ -5,8 +5,9 @@ import 'package:unipos/data/models/restaurant/db/companymodel_301.dart';
 class CompanyBox {
   static const String _boxName = 'companyBox';
 
-  static Future<Box<Company>> openBox() async {
-    return await Hive.openBox<Company>(_boxName);
+  static Box<Company> openBox() {
+    // Box is already opened during app startup in HiveInit
+    return Hive.box<Company>(_boxName);
   }
 
   static Box<Company> getBox() {

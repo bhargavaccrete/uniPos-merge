@@ -8,15 +8,11 @@ class StaffBox {
   static Box<StaffModel>? _box;
   static const String _boxName = 'staffBox';
 
-  /// Lazily opens and returns the singleton instance of the 'staffBox'.
-  /// Includes error handling for robustness.
-  static Future<Box<StaffModel>> getStaffBox() async {
+  /// Lazily returns the singleton instance of the 'staffBox'.
+  /// Box is already opened during app startup in HiveInit.
+  static Box<StaffModel> getStaffBox() {
     if(_box == null || !_box!.isOpen){
-      try{
-        _box = await Hive.openBox<StaffModel>(_boxName);
-      }catch(e){
-        print("Error opening '$_boxName' Hive Box: $e");
-      }
+      _box = Hive.box<StaffModel>(_boxName);
     }
     return _box!;
   }
@@ -26,13 +22,13 @@ class StaffBox {
   /// FIX: Uses put() with the staff's own unique ID as the key.
   /// This ensures a unique, predictable key for every staff member.
   static Future<void> addStaff(StaffModel staff, ) async {
-    final box = await getStaffBox();
+    final box = getStaffBox();
     await box.put(staff.id, staff);
   }
 
   /// Retrieves a list of all staff members from the box.
   static Future<List<StaffModel>> getAllStaff() async {
-    final box = await getStaffBox();
+    final box = getStaffBox();
     return box.values.toList();
   }
 
@@ -41,7 +37,7 @@ class StaffBox {
   /// FIX: Deletes by the unique string ID, not an integer index.
   /// This is reliable even after other items have been deleted.
   static Future<void> deleteStaff(String id) async {
-    final box = await getStaffBox();
+    final box = getStaffBox();
     await box.delete(id);
   }
 
@@ -54,7 +50,7 @@ class StaffBox {
     // This logic is identical to addStaff, as put() handles both
     // creation and updates.
     // await addStaff( staff);
- final box = await getStaffBox();
+ final box = getStaffBox();
  await box.put(staff.id, staff);
 
   }

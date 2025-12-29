@@ -230,7 +230,8 @@ class _CartScreenState extends State<CartScreen>
       },
       onIncreseQty: (item) async {
         // Check stock availability before increasing quantity
-        final itemBox = await Hive.openBox<Items>('itemBoxs');
+        // Box is already opened during app startup in HiveInit
+        final itemBox = Hive.box<Items>('itemBoxs');
         Items? inventoryItem;
 
         try {

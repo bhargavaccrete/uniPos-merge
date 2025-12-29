@@ -298,8 +298,8 @@ class _SalesbyitemState extends State<Salesbyitem> {
   }
 
   Future<void> _initAndLoadData() async {
-    // Make sure your box name matches what you used to open it elsewhere
-    _ordersBox = await Hive.openBox<pastOrderModel>('pastorderBox');
+    // Box is already opened during app startup in HiveInit
+    _ordersBox = Hive.box<pastOrderModel>('pastorderBox');
     _updateReportData();
   }
 

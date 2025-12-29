@@ -15,25 +15,25 @@ class AttributeRepository {
   Box<AttributeValueModel>? _valuesBox;
   Box<ProductAttributeModel>? _productAttributesBox;
 
-  Future<Box<AttributeModel>> get attributesBox async {
-    _attributesBox ??= await Hive.openBox<AttributeModel>(_attributesBoxName);
+  Box<AttributeModel> get attributesBox {
+    _attributesBox ??= Hive.box<AttributeModel>(_attributesBoxName);
     return _attributesBox!;
   }
 
-  Future<Box<AttributeValueModel>> get valuesBox async {
-    _valuesBox ??= await Hive.openBox<AttributeValueModel>(_attributeValuesBoxName);
+  Box<AttributeValueModel> get valuesBox {
+    _valuesBox ??= Hive.box<AttributeValueModel>(_attributeValuesBoxName);
     return _valuesBox!;
   }
 
-  Future<Box<ProductAttributeModel>> get productAttributesBox async {
-    _productAttributesBox ??= await Hive.openBox<ProductAttributeModel>(_productAttributesBoxName);
+  Box<ProductAttributeModel> get productAttributesBox {
+    _productAttributesBox ??= Hive.box<ProductAttributeModel>(_productAttributesBoxName);
     return _productAttributesBox!;
   }
 
   /// Check if boxes are corrupted and auto-reset if needed
   Future<bool> checkAndFixCorruption() async {
     try {
-      final box = await attributesBox;
+      final box = attributesBox;
       // Try to access values - this will throw if corrupted
       box.values.length;
       return false; // Not corrupted
@@ -48,6 +48,10 @@ class AttributeRepository {
   }
 
   /// Reset all attribute boxes
+  ///
+  /// ⚠️ WARNING: This is an administrative operation that closes and deletes boxes.
+  /// DO NOT call this while any UI is actively using attributes.
+  /// This should only be called from admin/settings screens with user confirmation.
   Future<void> resetAllBoxes() async {
     try {
       // Close boxes
@@ -60,7 +64,7 @@ class AttributeRepository {
       await Hive.deleteBoxFromDisk(_attributeValuesBoxName);
       await Hive.deleteBoxFromDisk(_productAttributesBoxName);
 
-      // Reopen
+      // Reopen boxes
       _attributesBox = await Hive.openBox<AttributeModel>(_attributesBoxName);
       _valuesBox = await Hive.openBox<AttributeValueModel>(_attributeValuesBoxName);
       _productAttributesBox = await Hive.openBox<ProductAttributeModel>(_productAttributesBoxName);
@@ -75,7 +79,7 @@ class AttributeRepository {
 
   /// Get all global attributes
   Future<List<AttributeModel>> getAllAttributes() async {
-    final box = await attributesBox;
+    final box = attributesBox;
     try {
       return box.values.where((a) => a.isActive).toList()
         ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
@@ -100,7 +104,7 @@ class AttributeRepository {
 
   /// Get attribute by ID
   Future<AttributeModel?> getAttributeById(String attributeId) async {
-    final box = await attributesBox;
+    final box = attributesBox;
     try {
       return box.values.firstWhere((a) => a.attributeId == attributeId);
     } catch (_) {
@@ -110,7 +114,7 @@ class AttributeRepository {
 
   /// Get attribute by slug
   Future<AttributeModel?> getAttributeBySlug(String slug) async {
-    final box = await attributesBox;
+    final box = attributesBox;
     try {
       return box.values.firstWhere(
         (a) => a.slug.toLowerCase() == slug.toLowerCase(),
@@ -122,19 +126,19 @@ class AttributeRepository {
 
   /// Add a new attribute
   Future<void> addAttribute(AttributeModel attribute) async {
-    final box = await attributesBox;
+    final box = attributesBox;
     await box.put(attribute.attributeId, attribute);
   }
 
   /// Update an attribute
   Future<void> updateAttribute(AttributeModel attribute) async {
-    final box = await attributesBox;
+    final box = attributesBox;
     await box.put(attribute.attributeId, attribute);
   }
 
   /// Delete an attribute and its values
   Future<void> deleteAttribute(String attributeId) async {
-    final box = await attributesBox;
+    final box = attributesBox;
     await box.delete(attributeId);
 
     // Also delete all values for this attribute
@@ -159,7 +163,7 @@ class AttributeRepository {
 
   /// Get all values for an attribute
   Future<List<AttributeValueModel>> getValuesForAttribute(String attributeId) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     try {
       return box.values
           .where((v) => v.attributeId == attributeId && v.isActive)
@@ -186,7 +190,7 @@ class AttributeRepository {
 
   /// Get value by ID
   Future<AttributeValueModel?> getValueById(String valueId) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     try {
       return box.values.firstWhere((v) => v.valueId == valueId);
     } catch (_) {
@@ -196,31 +200,31 @@ class AttributeRepository {
 
   /// Get multiple values by IDs
   Future<List<AttributeValueModel>> getValuesByIds(List<String> valueIds) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     return box.values.where((v) => valueIds.contains(v.valueId)).toList();
   }
 
   /// Add a value to an attribute
   Future<void> addValue(AttributeValueModel value) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     await box.put(value.valueId, value);
   }
 
   /// Update a value
   Future<void> updateValue(AttributeValueModel value) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     await box.put(value.valueId, value);
   }
 
   /// Delete a value
   Future<void> deleteValue(String valueId) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     await box.delete(valueId);
   }
 
   /// Delete all values for an attribute
   Future<void> deleteValuesForAttribute(String attributeId) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     final valuesToDelete = box.values
         .where((v) => v.attributeId == attributeId)
         .map((v) => v.valueId)
@@ -233,7 +237,7 @@ class AttributeRepository {
 
   /// Add multiple values at once
   Future<void> addValues(List<AttributeValueModel> values) async {
-    final box = await valuesBox;
+    final box = valuesBox;
     for (final value in values) {
       await box.put(value.valueId, value);
     }
@@ -243,7 +247,7 @@ class AttributeRepository {
 
   /// Get all attributes assigned to a product
   Future<List<ProductAttributeModel>> getProductAttributes(String productId) async {
-    final box = await productAttributesBox;
+    final box = productAttributesBox;
     try {
       return box.values.where((pa) => pa.productId == productId).toList()
         ..sort((a, b) => a.position.compareTo(b.position));
@@ -268,19 +272,19 @@ class AttributeRepository {
 
   /// Assign an attribute to a product
   Future<void> assignAttributeToProduct(ProductAttributeModel productAttribute) async {
-    final box = await productAttributesBox;
+    final box = productAttributesBox;
     await box.put(productAttribute.id, productAttribute);
   }
 
   /// Update product attribute assignment
   Future<void> updateProductAttribute(ProductAttributeModel productAttribute) async {
-    final box = await productAttributesBox;
+    final box = productAttributesBox;
     await box.put(productAttribute.id, productAttribute);
   }
 
   /// Remove an attribute from a product
   Future<void> removeAttributeFromProduct(String productId, String attributeId) async {
-    final box = await productAttributesBox;
+    final box = productAttributesBox;
     final toRemove = box.values.where(
       (pa) => pa.productId == productId && pa.attributeId == attributeId,
     ).toList();
@@ -292,7 +296,7 @@ class AttributeRepository {
 
   /// Remove all attributes from a product
   Future<void> removeAllAttributesFromProduct(String productId) async {
-    final box = await productAttributesBox;
+    final box = productAttributesBox;
     final toRemove = box.values.where((pa) => pa.productId == productId).toList();
 
     for (final pa in toRemove) {
@@ -302,7 +306,7 @@ class AttributeRepository {
 
   /// Remove an attribute from all products
   Future<void> removeAttributeFromAllProducts(String attributeId) async {
-    final box = await productAttributesBox;
+    final box = productAttributesBox;
     final toRemove = box.values.where((pa) => pa.attributeId == attributeId).toList();
 
     for (final pa in toRemove) {
@@ -312,7 +316,7 @@ class AttributeRepository {
 
   /// Get products using a specific attribute
   Future<List<String>> getProductsUsingAttribute(String attributeId) async {
-    final box = await productAttributesBox;
+    final box = productAttributesBox;
     return box.values
         .where((pa) => pa.attributeId == attributeId)
         .map((pa) => pa.productId)
@@ -358,7 +362,7 @@ class AttributeRepository {
 
   /// Search attributes by name
   Future<List<AttributeModel>> searchAttributes(String query) async {
-    final box = await attributesBox;
+    final box = attributesBox;
     final lowercaseQuery = query.toLowerCase();
     return box.values
         .where((a) =>
@@ -371,7 +375,7 @@ class AttributeRepository {
   /// Check if attribute name exists
   Future<bool> attributeNameExists(String name, {String? excludeId}) async {
     try {
-      final box = await attributesBox;
+      final box = attributesBox;
       return box.values.any((a) =>
           a.name.toLowerCase() == name.toLowerCase() &&
           (excludeId == null || a.attributeId != excludeId));
@@ -379,7 +383,7 @@ class AttributeRepository {
       print('⚠️ Error checking attribute name exists: $e');
       // If we can't read the box, try to check one by one
       try {
-        final box = await attributesBox;
+        final box = attributesBox;
         for (var key in box.keys) {
           try {
             final attr = box.get(key);

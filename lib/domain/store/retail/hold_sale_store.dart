@@ -41,7 +41,7 @@ abstract class _HoldSaleStore with Store {
   /// Initialize and load all hold sales
   @action
   Future<void> init() async {
-    await _repository.init();
+    _repository.init(); // No await - init() is now synchronous
     await loadHoldSales();
   }
 

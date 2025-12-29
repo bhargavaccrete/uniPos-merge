@@ -8,14 +8,10 @@ class PaymentMethodRepository {
 
   Future<void> init() async {
     print('🗄️  PaymentMethodRepository: init() called');
-    if (!Hive.isBoxOpen(_boxName)) {
-      print('🗄️  PaymentMethodRepository: Opening box $_boxName');
-      _box = await Hive.openBox<PaymentMethod>(_boxName);
-      print('🗄️  PaymentMethodRepository: Box opened successfully');
-    } else {
-      print('🗄️  PaymentMethodRepository: Box already open');
-      _box = Hive.box<PaymentMethod>(_boxName);
-    }
+    // Box is already opened during app startup in HiveInit
+    print('🗄️  PaymentMethodRepository: Getting box $_boxName');
+    _box = Hive.box<PaymentMethod>(_boxName);
+    print('🗄️  PaymentMethodRepository: Box reference obtained successfully');
 
     print('🗄️  PaymentMethodRepository: Box has ${_box!.length} items');
 

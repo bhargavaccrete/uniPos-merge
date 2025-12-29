@@ -139,7 +139,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   Future<void> _saveStaffToDatabase() async {
     try {
       if (AppConfig.isRetail) {
-        final box = await Hive.openBox<RetailStaffModel>('retail_staff');
+        // Box is already opened during app startup in HiveInit
+        final box = Hive.box<RetailStaffModel>('retail_staff');
         for (var staff in _staffMembers) {
           if (staff is RetailStaffModel) {
             await box.add(staff);
@@ -147,7 +148,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
           }
         }
       } else {
-        final box = await Hive.openBox<StaffModel>('staffBox');
+        // Box is already opened during app startup in HiveInit
+        final box = Hive.box<StaffModel>('staffBox');
         for (var staff in _staffMembers) {
           if (staff is StaffModel) {
             await box.add(staff);
