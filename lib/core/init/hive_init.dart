@@ -273,6 +273,42 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailBillingTab)) {
       Hive.registerAdapter(BillingTabModelAdapter());
     }
+
+    // EOD adapters (shared with restaurant mode)
+    // EOD - 117
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantEod)) {
+      Hive.registerAdapter(EndOfDayReportAdapter());
+    }
+    // OrderTypeSummary - 18
+    if (!Hive.isAdapterRegistered(18)) {
+      Hive.registerAdapter(OrderTypeSummaryAdapter());
+    }
+    // CategorySales - 19
+    if (!Hive.isAdapterRegistered(19)) {
+      Hive.registerAdapter(CategorySalesAdapter());
+    }
+    // PaymentSummary - 20
+    if (!Hive.isAdapterRegistered(20)) {
+      Hive.registerAdapter(PaymentSummaryAdapter());
+    }
+    // TaxSummary - 21
+    if (!Hive.isAdapterRegistered(21)) {
+      Hive.registerAdapter(TaxSummaryAdapter());
+    }
+    // CashReconciliation - 22
+    if (!Hive.isAdapterRegistered(22)) {
+      Hive.registerAdapter(CashReconciliationAdapter());
+    }
+
+    // Expense adapters (shared with restaurant mode - needed for EOD)
+    // ExpenseCategory - 115
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantExpense)) {
+      Hive.registerAdapter(ExpenseCategoryAdapter());
+    }
+    // Expense - 116
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantExpense1)) {
+      Hive.registerAdapter(ExpenseAdapter());
+    }
   }
 
   /// Clean up old incorrectly-named attribute boxes
@@ -328,6 +364,13 @@ class HiveInit {
     await Hive.openBox<ProductAttributeModel>('product_attributes');
     await Hive.openBox<RetailStaffModel>('retail_staff');
     await Hive.openBox<BillingTabModel>('billingTabs');
+
+    // EOD box (shared with restaurant mode)
+    await Hive.openBox<EndOfDayReport>('eodBox');
+
+    // Expense boxes (shared with restaurant mode - needed for EOD)
+    await Hive.openBox<ExpenseCategory>('expenseCategory');
+    await Hive.openBox<Expense>('expenseBox');
 
     print('✅ All retail boxes opened successfully');
   }
@@ -405,6 +448,26 @@ class HiveInit {
     // EOD - 117
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantEod)) {
       Hive.registerAdapter(EndOfDayReportAdapter());
+    }
+    // OrderTypeSummary - 18
+    if (!Hive.isAdapterRegistered(18)) {
+      Hive.registerAdapter(OrderTypeSummaryAdapter());
+    }
+    // CategorySales - 19
+    if (!Hive.isAdapterRegistered(19)) {
+      Hive.registerAdapter(CategorySalesAdapter());
+    }
+    // PaymentSummary - 20
+    if (!Hive.isAdapterRegistered(20)) {
+      Hive.registerAdapter(PaymentSummaryAdapter());
+    }
+    // TaxSummary - 21
+    if (!Hive.isAdapterRegistered(21)) {
+      Hive.registerAdapter(TaxSummaryAdapter());
+    }
+    // CashReconciliation - 22
+    if (!Hive.isAdapterRegistered(22)) {
+      Hive.registerAdapter(CashReconciliationAdapter());
     }
     // TestBill - 118
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantTestBill)) {

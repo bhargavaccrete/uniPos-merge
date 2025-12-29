@@ -4,6 +4,8 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/stores/payment_method_store.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 /// Payment entry for split payment
 class PaymentEntry {
@@ -105,7 +107,11 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   void initState() {
     super.initState();
     _paymentMethodStore = locator<PaymentMethodStore>();
-    _paymentMethodStore.loadPaymentMethods();
+
+    // Initialize payment methods if not already loaded
+    if (_paymentMethodStore.paymentMethods.isEmpty) {
+      _paymentMethodStore.init();
+    }
 
     // Add initial payment entry with full amount (without notifying parent during build)
     final entry = PaymentEntry(amount: widget.billTotal);
@@ -348,6 +354,18 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                   ),
                   child: Observer(
                     builder: (_) {
+                      // Check if store is loading
+                      if (_paymentMethodStore.isLoading) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      }
+
                       final enabledMethods = _paymentMethodStore.enabledMethods;
 
                       // If no enabled methods, show empty state
@@ -361,9 +379,20 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                         );
                       }
 
+                      // Validate current payment method exists in enabled methods
+                      final currentMethodExists = enabledMethods.any((m) => m.value == payment.method);
+                      final currentMethod = currentMethodExists ? payment.method : enabledMethods.first.value;
+
+                      // Update payment method if it doesn't exist
+                      if (!currentMethodExists) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _updatePaymentMethod(index, enabledMethods.first.value);
+                        });
+                      }
+
                       return DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: payment.method,
+                          value: currentMethod,
                           isExpanded: true,
                           icon: const Icon(Icons.keyboard_arrow_down, size: 20),
                           items: enabledMethods.map((method) {
@@ -409,7 +438,7 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                   ],
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   decoration: InputDecoration(
-                    prefixText: '₹ ',
+                    prefixText: '${CurrencyHelper.currentSymbol} ',
                     hintText: '0.00',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     border: OutlineInputBorder(
@@ -523,13 +552,20 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                   color: Color(0xFF6B6B6B),
                 ),
               ),
-              Text(
-                '₹${payment.amount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A1A),
-                ),
+              ValueListenableBuilder<int>(
+                valueListenable: DecimalSettings.precisionNotifier,
+                builder: (context, precision, child) {
+                  final symbol = CurrencyHelper.currentSymbol;
+                  final formattedAmount = payment.amount.toStringAsFixed(precision);
+                  return Text(
+                    '$symbol$formattedAmount',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -560,7 +596,7 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.right,
                   decoration: InputDecoration(
-                    prefixText: '₹ ',
+                    prefixText: '${CurrencyHelper.currentSymbol} ',
                     hintText: '0.00',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
@@ -603,19 +639,26 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           // Insufficient amount warning
           if (isInsufficient) ...[
             const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.warning_amber, size: 16, color: Colors.red),
-                const SizedBox(width: 4),
-                Text(
-                  'Insufficient! Need ₹${(payment.amount - payment.cashReceived).toStringAsFixed(2)} more',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            ValueListenableBuilder<int>(
+              valueListenable: DecimalSettings.precisionNotifier,
+              builder: (context, precision, child) {
+                final symbol = CurrencyHelper.currentSymbol;
+                final shortage = (payment.amount - payment.cashReceived).toStringAsFixed(precision);
+                return Row(
+                  children: [
+                    const Icon(Icons.warning_amber, size: 16, color: Colors.red),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Insufficient! Need $symbol$shortage more',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
 
@@ -646,13 +689,20 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                       ),
                     ],
                   ),
-                  Text(
-                    '₹${payment.cashChange.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.orange.shade700,
-                    ),
+                  ValueListenableBuilder<int>(
+                    valueListenable: DecimalSettings.precisionNotifier,
+                    builder: (context, precision, child) {
+                      final symbol = CurrencyHelper.currentSymbol;
+                      final formattedChange = payment.cashChange.toStringAsFixed(precision);
+                      return Text(
+                        '$symbol$formattedChange',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.orange.shade700,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -662,22 +712,29 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           // Payment complete indicator
           if (payment.cashReceived >= payment.amount && payment.cashReceived > 0) ...[
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle, size: 16, color: const Color(0xFF4CAF50)),
-                const SizedBox(width: 4),
-                Text(
-                  payment.cashChange > 0
-                      ? 'Cash received - Return change ₹${payment.cashChange.toStringAsFixed(2)}'
-                      : 'Exact amount received',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF4CAF50),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            ValueListenableBuilder<int>(
+              valueListenable: DecimalSettings.precisionNotifier,
+              builder: (context, precision, child) {
+                final symbol = CurrencyHelper.currentSymbol;
+                final formattedChange = payment.cashChange.toStringAsFixed(precision);
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, size: 16, color: const Color(0xFF4CAF50)),
+                    const SizedBox(width: 4),
+                    Text(
+                      payment.cashChange > 0
+                          ? 'Cash received - Return change $symbol$formattedChange'
+                          : 'Exact amount received',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF4CAF50),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ],
@@ -688,77 +745,84 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   Widget _buildCalculationPanel() {
     final hasError = _totalPaid > 0 && _totalPaid < widget.billTotal;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: hasError ? Colors.red.withOpacity(0.05) : const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: hasError ? Colors.red.withOpacity(0.3) : const Color(0xFFE8E8E8),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Total Paid
-          _buildCalcRow(
-            'Total Paid',
-            '₹${_totalPaid.toStringAsFixed(2)}',
-            valueColor: _totalPaid >= widget.billTotal ? const Color(0xFF4CAF50) : null,
-            isBold: true,
+    return ValueListenableBuilder<int>(
+      valueListenable: DecimalSettings.precisionNotifier,
+      builder: (context, precision, child) {
+        final symbol = CurrencyHelper.currentSymbol;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: hasError ? Colors.red.withOpacity(0.05) : const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: hasError ? Colors.red.withOpacity(0.3) : const Color(0xFFE8E8E8),
+            ),
           ),
-          const SizedBox(height: 8),
+          child: Column(
+            children: [
+              // Total Paid
+              _buildCalcRow(
+                'Total Paid',
+                '$symbol${_totalPaid.toStringAsFixed(precision)}',
+                valueColor: _totalPaid >= widget.billTotal ? const Color(0xFF4CAF50) : null,
+                isBold: true,
+              ),
+              const SizedBox(height: 8),
 
-          // Remaining Amount
-          if (_remaining > 0) ...[
-            _buildCalcRow(
-              'Remaining',
-              '₹${_remaining.toStringAsFixed(2)}',
-              valueColor: Colors.red,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Add ₹${_remaining.toStringAsFixed(2)} more to complete payment',
-              style: const TextStyle(fontSize: 12, color: Colors.red),
-            ),
-          ],
-
-          // Change to Return
-          if (_change > 0) ...[
-            const Divider(height: 16),
-            _buildCalcRow(
-              'Change to Return',
-              '₹${_change.toStringAsFixed(2)}',
-              valueColor: Colors.orange,
-              isBold: true,
-              fontSize: 16,
-            ),
-          ],
-
-          // Validation Status
-          if (_isValid) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  color: const Color(0xFF4CAF50),
-                  size: 18,
+              // Remaining Amount
+              if (_remaining > 0) ...[
+                _buildCalcRow(
+                  'Remaining',
+                  '$symbol${_remaining.toStringAsFixed(precision)}',
+                  valueColor: Colors.red,
                 ),
-                const SizedBox(width: 6),
-                const Text(
-                  'Payment complete',
-                  style: TextStyle(
-                    color: Color(0xFF4CAF50),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                  ),
+                const SizedBox(height: 4),
+                Text(
+                  'Add $symbol${_remaining.toStringAsFixed(precision)} more to complete payment',
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
                 ),
               ],
-            ),
-          ],
-        ],
-      ),
+
+              // Change to Return
+              if (_change > 0) ...[
+                const Divider(height: 16),
+                _buildCalcRow(
+                  'Change to Return',
+                  '$symbol${_change.toStringAsFixed(precision)}',
+                  valueColor: Colors.orange,
+                  isBold: true,
+                  fontSize: 16,
+                ),
+              ],
+
+              // Validation Status
+              if (_isValid) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: const Color(0xFF4CAF50),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Payment complete',
+                      style: TextStyle(
+                        color: Color(0xFF4CAF50),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 

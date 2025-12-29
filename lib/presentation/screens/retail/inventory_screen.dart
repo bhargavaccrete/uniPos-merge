@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/util/responsive.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
@@ -74,7 +76,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
               final variant = variants[index];
               return ListTile(
                 title: Text(_getVariantDisplayName(variant)),
-                subtitle: Text('₹${variant.costPrice?.toStringAsFixed(2) ?? '0.00'} • Stock: ${variant.stockQty}'),
+                subtitle: ValueListenableBuilder<String>(
+                  valueListenable: CurrencyHelper.currencyNotifier,
+                  builder: (context, currencyCode, child) {
+                    return ValueListenableBuilder<int>(
+                      valueListenable: DecimalSettings.precisionNotifier,
+                      builder: (context, precision, child) {
+                        final symbol = CurrencyHelper.currentSymbol;
+                        final price = variant.costPrice?.toStringAsFixed(precision) ?? '0${precision > 0 ? '.${'0' * precision}' : ''}';
+                        return Text('$symbol$price • Stock: ${variant.stockQty}');
+                      },
+                    );
+                  },
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   cartStore.addItem(product, variant);
@@ -187,11 +201,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       children: [
                         const Icon(Icons.attach_money, color: Colors.orange, size: 20),
                         const SizedBox(height: 4),
-                        Text(
-                          variants.isNotEmpty
-                            ? '₹${variants.first.sellingPrice?.toStringAsFixed(0) ?? '0'}'
-                            : '₹0',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ValueListenableBuilder<String>(
+                          valueListenable: CurrencyHelper.currencyNotifier,
+                          builder: (context, currencyCode, child) {
+                            return ValueListenableBuilder<int>(
+                              valueListenable: DecimalSettings.precisionNotifier,
+                              builder: (context, precision, child) {
+                                final symbol = CurrencyHelper.currentSymbol;
+                                final price = variants.isNotEmpty && variants.first.sellingPrice != null
+                                    ? variants.first.sellingPrice!.toStringAsFixed(precision)
+                                    : '0${precision > 0 ? '.${'0' * precision}' : ''}';
+                                return Text(
+                                  '$symbol$price',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                );
+                              },
+                            );
+                          },
                         ),
                         const Text(
                           'Price',
@@ -263,24 +289,37 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 ),
                             ],
                           ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '₹${variant.sellingPrice?.toStringAsFixed(2) ?? '0.00'}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              if (variant.costPrice != null)
-                                Text(
-                                  'Cost: ₹${variant.costPrice!.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                ),
-                            ],
+                          trailing: ValueListenableBuilder<String>(
+                            valueListenable: CurrencyHelper.currencyNotifier,
+                            builder: (context, currencyCode, child) {
+                              return ValueListenableBuilder<int>(
+                                valueListenable: DecimalSettings.precisionNotifier,
+                                builder: (context, precision, child) {
+                                  final symbol = CurrencyHelper.currentSymbol;
+                                  final sellingPrice = variant.sellingPrice?.toStringAsFixed(precision) ?? '0${precision > 0 ? '.${'0' * precision}' : ''}';
+                                  final costPrice = variant.costPrice?.toStringAsFixed(precision);
+                                  return Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '$symbol$sellingPrice',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                      if (costPrice != null)
+                                        Text(
+                                          'Cost: $symbol$costPrice',
+                                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
                           ),
                         ),
                       );
@@ -625,13 +664,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   const SizedBox(height: 12),
                   // Price
-                  Text(
-                    '₹${price.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF4CAF50),
-                    ),
+                  ValueListenableBuilder<String>(
+                    valueListenable: CurrencyHelper.currencyNotifier,
+                    builder: (context, currencyCode, child) {
+                      return ValueListenableBuilder<int>(
+                        valueListenable: DecimalSettings.precisionNotifier,
+                        builder: (context, precision, child) {
+                          final symbol = CurrencyHelper.currentSymbol;
+                          final formattedPrice = price.toStringAsFixed(precision);
+                          return Text(
+                            '$symbol$formattedPrice',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF4CAF50),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ],
               ),
@@ -870,13 +921,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        '₹${price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF4CAF50),
-                        ),
+                      ValueListenableBuilder<String>(
+                        valueListenable: CurrencyHelper.currencyNotifier,
+                        builder: (context, currencyCode, child) {
+                          return ValueListenableBuilder<int>(
+                            valueListenable: DecimalSettings.precisionNotifier,
+                            builder: (context, precision, child) {
+                              final symbol = CurrencyHelper.currentSymbol;
+                              final formattedPrice = price.toStringAsFixed(precision);
+                              return Text(
+                                '$symbol$formattedPrice',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF4CAF50),
+                                ),
+                              );
+                            },
+                          );
+                        },
                       ),
                     ],
                   ),

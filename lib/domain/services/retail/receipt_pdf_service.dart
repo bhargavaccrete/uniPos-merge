@@ -11,6 +11,8 @@ import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/printer_settings_model.dart';
 import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
+import '../../../util/common/currency_helper.dart';
+import '../../../util/common/decimal_settings.dart';
 import 'retail_printer_settings_service.dart';
 
 /// Data class to hold all receipt information
@@ -1091,15 +1093,20 @@ class ReceiptPdfService {
     }
   }
 
-  /// Format currency
-  /// Note: Using "Rs." instead of "₹" because default PDF fonts don't support the Rupee symbol
+  /// Format currency with dynamic symbol and decimal precision
   String _formatCurrency(double amount) {
     final absAmount = amount.abs();
-    final formatted = NumberFormat('#,##0.00', 'en_IN').format(absAmount);
+    final precision = DecimalSettings.precision;
+    final symbol = CurrencyHelper.currentSymbol;
+
+    // Create format pattern based on precision
+    final decimalPattern = precision > 0 ? '.${'0' * precision}' : '';
+    final formatted = NumberFormat('#,##0$decimalPattern', 'en_IN').format(absAmount);
+
     if (amount < 0) {
-      return '-Rs.$formatted';
+      return '-$symbol$formatted';
     }
-    return 'Rs.$formatted';
+    return '$symbol$formatted';
   }
 
   /// Build split payment section for thermal receipt

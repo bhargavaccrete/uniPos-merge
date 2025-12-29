@@ -95,6 +95,14 @@ void main() async{
     // Load retail printer settings from SharedPreferences
     await RetailPrinterSettingsService().initialize();
     print('🖨️  Retail printer settings loaded');
+
+    // Load decimal precision settings (shared with restaurant)
+    await DecimalSettings.load();
+    print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
+
+    // Load currency settings (shared with restaurant)
+    await CurrencyHelper.load();
+    print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
   }
 
   // Debug: Print initialization status

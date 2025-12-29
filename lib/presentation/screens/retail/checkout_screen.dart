@@ -7,6 +7,8 @@ import 'package:unipos/domain/services/retail/gst_service.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/presentation/screens/retail/customer_selection_screen.dart';
 import 'package:unipos/presentation/widget/retail/split_payment_widget.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -96,9 +98,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!canCredit) {
       final availableCredit = await customerStore.getAvailableCredit(customerId);
       if (mounted) {
+        final symbol = CurrencyHelper.currentSymbol;
+        final precision = DecimalSettings.precision;
+        final formattedCredit = availableCredit.toStringAsFixed(precision);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Credit limit exceeded. Available credit: ₹${availableCredit.toStringAsFixed(2)}'),
+            content: Text('Credit limit exceeded. Available credit: $symbol$formattedCredit'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
@@ -108,6 +113,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     // Confirm credit sale
+    final symbol = CurrencyHelper.currentSymbol;
+    final precision = DecimalSettings.precision;
+    final formattedTotal = _grandTotal.toStringAsFixed(precision);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -118,7 +126,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             Text('Customer: ${customerStore.selectedCustomer!.name}'),
             const SizedBox(height: 8),
-            Text('Amount: ₹${_grandTotal.toStringAsFixed(2)}'),
+            Text('Amount: $symbol$formattedTotal'),
             const SizedBox(height: 8),
             const Text(
               'This will create a credit sale. The amount will be added to the customer\'s outstanding balance.',
@@ -497,11 +505,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : Text(
-                                  _changeReturn > 0
-                                    ? 'Pay (₹${_changeReturn.toStringAsFixed(0)} change)'
-                                    : 'Complete Payment',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                              : ValueListenableBuilder<String>(
+                                  valueListenable: CurrencyHelper.currencyNotifier,
+                                  builder: (context, currencyCode, child) {
+                                    return ValueListenableBuilder<int>(
+                                      valueListenable: DecimalSettings.precisionNotifier,
+                                      builder: (context, precision, child) {
+                                        final symbol = CurrencyHelper.currentSymbol;
+                                        final formattedChange = _changeReturn.toStringAsFixed(precision);
+                                        return Text(
+                                          _changeReturn > 0
+                                            ? 'Pay ($symbol$formattedChange change)'
+                                            : 'Complete Payment',
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                        );
+                                      },
+                                    );
+                                  },
                                 ),
                         ),
                       ),
@@ -539,7 +559,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           _buildSummaryRow('Total Items', '${cartStore.totalItems}', isBold: false),
           const SizedBox(height: 12),
-          _buildSummaryRow('Subtotal', '₹${_subtotal.toStringAsFixed(2)}', isBold: false),
+          ValueListenableBuilder<String>(
+            valueListenable: CurrencyHelper.currencyNotifier,
+            builder: (context, currencyCode, child) {
+              return ValueListenableBuilder<int>(
+                valueListenable: DecimalSettings.precisionNotifier,
+                builder: (context, precision, child) {
+                  final symbol = CurrencyHelper.currentSymbol;
+                  final formattedSubtotal = _subtotal.toStringAsFixed(precision);
+                  return _buildSummaryRow('Subtotal', '$symbol$formattedSubtotal', isBold: false);
+                },
+              );
+            },
+          ),
         ],
       ),
     );
@@ -575,7 +607,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   textAlign: TextAlign.right,
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   decoration: InputDecoration(
-                    prefixText: 'Rs. ',
+                    prefixText: '${CurrencyHelper.currentSymbol} ',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
@@ -631,70 +663,81 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             final rate = entry.key;
             final data = entry.value;
             if (data.totalGstAmount == 0) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'GST ${GstService.formatGstRate(rate)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF6B6B6B),
-                        ),
+            return ValueListenableBuilder<String>(
+              valueListenable: CurrencyHelper.currencyNotifier,
+              builder: (context, currencyCode, child) {
+                return ValueListenableBuilder<int>(
+                  valueListenable: DecimalSettings.precisionNotifier,
+                  builder: (context, precision, child) {
+                    final symbol = CurrencyHelper.currentSymbol;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'GST ${GstService.formatGstRate(rate)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6B6B6B),
+                                ),
+                              ),
+                              Text(
+                                '$symbol${data.totalGstAmount.toStringAsFixed(precision)}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '  CGST ${GstService.formatGstRate(rate / 2)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF9E9E9E),
+                                ),
+                              ),
+                              Text(
+                                '$symbol${data.cgstAmount.toStringAsFixed(precision)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF9E9E9E),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '  SGST ${GstService.formatGstRate(rate / 2)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF9E9E9E),
+                                ),
+                              ),
+                              Text(
+                                '$symbol${data.sgstAmount.toStringAsFixed(precision)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF9E9E9E),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      Text(
-                        'Rs. ${data.totalGstAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '  CGST ${GstService.formatGstRate(rate / 2)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9E9E9E),
-                        ),
-                      ),
-                      Text(
-                        'Rs. ${data.cgstAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9E9E9E),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '  SGST ${GstService.formatGstRate(rate / 2)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9E9E9E),
-                        ),
-                      ),
-                      Text(
-                        'Rs. ${data.sgstAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9E9E9E),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    );
+                  },
+                );
+              },
             );
           }),
         ],
@@ -703,34 +746,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildTotalSummaryCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF4CAF50).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.2), width: 1),
-      ),
-      child: Column(
-        children: [
-          if (_discountAmount > 0) ...[
-            _buildSummaryRow('Subtotal', 'Rs. ${_subtotal.toStringAsFixed(2)}', isBold: false),
-            const SizedBox(height: 8),
-            _buildSummaryRow('Discount', '- Rs. ${_discountAmount.toStringAsFixed(2)}', isBold: false, color: Colors.red),
-            const SizedBox(height: 8),
-            _buildSummaryRow('Taxable Amount', 'Rs. ${_totalTaxableAmount.toStringAsFixed(2)}', isBold: false),
-            const SizedBox(height: 8),
-          ],
-          if (_totalGstAmount > 0) ...[
-            _buildSummaryRow('CGST', '+ Rs. ${_totalCgstAmount.toStringAsFixed(2)}', isBold: false, color: const Color(0xFF4CAF50)),
-            const SizedBox(height: 4),
-            _buildSummaryRow('SGST', '+ Rs. ${_totalSgstAmount.toStringAsFixed(2)}', isBold: false, color: const Color(0xFF4CAF50)),
-            const SizedBox(height: 8),
-            _buildSummaryRow('Total GST', '+ Rs. ${_totalGstAmount.toStringAsFixed(2)}', isBold: false, color: const Color(0xFF4CAF50)),
-            const Divider(height: 20, thickness: 0.5, color: Color(0xFFE8E8E8)),
-          ],
-          _buildSummaryRow('Grand Total', 'Rs. ${_grandTotal.toStringAsFixed(2)}', isBold: true, fontSize: 20),
-        ],
-      ),
+    return ValueListenableBuilder<String>(
+      valueListenable: CurrencyHelper.currencyNotifier,
+      builder: (context, currencyCode, child) {
+        return ValueListenableBuilder<int>(
+          valueListenable: DecimalSettings.precisionNotifier,
+          builder: (context, precision, child) {
+            final symbol = CurrencyHelper.currentSymbol;
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.2), width: 1),
+              ),
+              child: Column(
+                children: [
+                  if (_discountAmount > 0) ...[
+                    _buildSummaryRow('Subtotal', '$symbol${_subtotal.toStringAsFixed(precision)}', isBold: false),
+                    const SizedBox(height: 8),
+                    _buildSummaryRow('Discount', '- $symbol${_discountAmount.toStringAsFixed(precision)}', isBold: false, color: Colors.red),
+                    const SizedBox(height: 8),
+                    _buildSummaryRow('Taxable Amount', '$symbol${_totalTaxableAmount.toStringAsFixed(precision)}', isBold: false),
+                    const SizedBox(height: 8),
+                  ],
+                  if (_totalGstAmount > 0) ...[
+                    _buildSummaryRow('CGST', '+ $symbol${_totalCgstAmount.toStringAsFixed(precision)}', isBold: false, color: const Color(0xFF4CAF50)),
+                    const SizedBox(height: 4),
+                    _buildSummaryRow('SGST', '+ $symbol${_totalSgstAmount.toStringAsFixed(precision)}', isBold: false, color: const Color(0xFF4CAF50)),
+                    const SizedBox(height: 8),
+                    _buildSummaryRow('Total GST', '+ $symbol${_totalGstAmount.toStringAsFixed(precision)}', isBold: false, color: const Color(0xFF4CAF50)),
+                    const Divider(height: 20, thickness: 0.5, color: Color(0xFFE8E8E8)),
+                  ],
+                  _buildSummaryRow('Grand Total', '$symbol${_grandTotal.toStringAsFixed(precision)}', isBold: true, fontSize: 20),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -817,13 +871,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   color: const Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  '₹${sale.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF4CAF50),
-                  ),
+                child: ValueListenableBuilder<String>(
+                  valueListenable: CurrencyHelper.currencyNotifier,
+                  builder: (context, currencyCode, child) {
+                    return ValueListenableBuilder<int>(
+                      valueListenable: DecimalSettings.precisionNotifier,
+                      builder: (context, precision, child) {
+                        final symbol = CurrencyHelper.currentSymbol;
+                        final formattedAmount = sale.totalAmount.toStringAsFixed(precision);
+                        return Text(
+                          '$symbol$formattedAmount',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF4CAF50),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 24),
@@ -958,62 +1024,75 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3)),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total Amount',
-                          style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-                        ),
-                        Text(
-                          '₹${sale.totalAmount.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFFF9800),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Customer',
-                          style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-                        ),
-                        Text(
-                          customer.name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'New Balance',
-                          style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-                        ),
-                        Text(
-                          '₹${(customer.creditBalance + sale.totalAmount).toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                child: ValueListenableBuilder<String>(
+                  valueListenable: CurrencyHelper.currencyNotifier,
+                  builder: (context, currencyCode, child) {
+                    return ValueListenableBuilder<int>(
+                      valueListenable: DecimalSettings.precisionNotifier,
+                      builder: (context, precision, child) {
+                        final symbol = CurrencyHelper.currentSymbol;
+                        final formattedTotal = sale.totalAmount.toStringAsFixed(precision);
+                        final formattedBalance = (customer.creditBalance + sale.totalAmount).toStringAsFixed(precision);
+                        return Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Amount',
+                                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                                ),
+                                Text(
+                                  '$symbol$formattedTotal',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFFF9800),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Customer',
+                                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                                ),
+                                Text(
+                                  customer.name,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1A1A1A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'New Balance',
+                                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                                ),
+                                Text(
+                                  '$symbol$formattedBalance',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 8),

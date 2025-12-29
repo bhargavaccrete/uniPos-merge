@@ -274,6 +274,191 @@ class EODService {
     final latestEOD = await HiveEOD.getLatestEOD();
     return latestEOD?.closingBalance ?? 0.0;
   }
+
+  // ==================== RETAIL EOD GENERATION ====================
+
+  static Future<EndOfDayReport> generateRetailEODReport({
+    required DateTime date,
+    required double openingBalance,
+    required double actualCash,
+    String? remarks,
+  }) async {
+    // Get all sales for the day using SaleStore
+    final allSales = await saleStore.getSalesByDateRange(
+      DateTime(date.year, date.month, date.day),
+      DateTime(date.year, date.month, date.day, 23, 59, 59),
+    );
+
+    // Filter out returns for count-based stats, but include them in financial calculations
+    final activeSales = allSales.where((sale) => sale.isReturn != true).toList();
+
+    // Calculate payment summaries (Cash, Card, UPI, Credit, Split)
+    final paymentSummaries = _calculateRetailPaymentSummaries(activeSales);
+
+    // Calculate totals
+    final totalSales = allSales.fold<double>(0.0, (sum, sale) {
+      // Returns have negative amounts
+      return sum + (sale.isReturn == true ? -sale.totalAmount : sale.totalAmount);
+    });
+
+    final totalDiscount = allSales.fold<double>(0.0, (sum, sale) => sum + sale.discountAmount);
+    final totalTax = allSales.fold<double>(0.0, (sum, sale) => sum + (sale.totalGstAmount ?? sale.taxAmount));
+
+    // Calculate tax summaries (CGST/SGST breakdown)
+    final taxSummaries = _calculateRetailTaxSummaries(allSales);
+
+    // Calculate total returns
+    final totalRefunds = allSales
+        .where((sale) => sale.isReturn == true)
+        .fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
+
+    final totalSaleCount = activeSales.length;
+
+    // Calculate expenses for the day (reuse restaurant expense system)
+    final allExpenses = await HiveExpenceL.getAllItems();
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+    final dayExpenses = allExpenses.where((expense) {
+      return (expense.dateandTime.isAfter(startOfDay) || expense.dateandTime.isAtSameMomentAs(startOfDay)) &&
+          (expense.dateandTime.isBefore(endOfDay) || expense.dateandTime.isAtSameMomentAs(endOfDay));
+    }).toList();
+
+    final totalExpenses = dayExpenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
+    final cashExpenses = dayExpenses
+        .where((expense) => expense.paymentType?.toLowerCase().trim() == 'cash')
+        .fold<double>(0.0, (sum, expense) => sum + expense.amount);
+
+    // Calculate expected cash
+    final expectedCash = paymentSummaries
+        .where((payment) => payment.paymentType.toLowerCase() == 'cash')
+        .fold<double>(0.0, (sum, payment) => sum + payment.totalAmount);
+
+    // Calculate closing balance and difference
+    final closingBalance = openingBalance + expectedCash - cashExpenses;
+    final cashDifference = actualCash - (openingBalance + expectedCash - cashExpenses);
+
+    String reconciliationStatus;
+    if (cashDifference == 0) {
+      reconciliationStatus = 'Balanced';
+    } else if (cashDifference > 0) {
+      reconciliationStatus = 'Overage';
+    } else {
+      reconciliationStatus = 'Shortage';
+    }
+
+    final cashReconciliation = CashReconciliation(
+      systemExpectedCash: expectedCash,
+      actualCash: actualCash,
+      difference: cashDifference,
+      reconciliationStatus: reconciliationStatus,
+      remarks: remarks,
+    );
+
+    final reportId = _uuid.v4();
+
+    return EndOfDayReport(
+      reportId: reportId,
+      date: date,
+      openingBalance: openingBalance,
+      orderSummaries: [], // Empty for retail - not applicable
+      totalDiscount: totalDiscount,
+      totalTax: totalTax,
+      categorySales: [], // Empty for retail - can be added later if needed
+      paymentSummaries: paymentSummaries,
+      cashReconciliation: cashReconciliation,
+      totalSales: totalSales,
+      closingBalance: closingBalance,
+      taxSummaries: taxSummaries,
+      totalOrderCount: totalSaleCount,
+      totalRefunds: totalRefunds,
+      totalExpenses: totalExpenses,
+      cashExpenses: cashExpenses,
+      mode: 'retail', // Mark as retail EOD
+    );
+  }
+
+  static List<PaymentSummary> _calculateRetailPaymentSummaries(List sales) {
+    final Map<String, double> paymentTotals = {};
+    final Map<String, int> paymentCounts = {};
+    double grandTotal = 0.0;
+
+    for (final sale in sales) {
+      String paymentType = sale.paymentType ?? 'Unknown';
+
+      // Handle split payments - expand into individual payment methods
+      if (sale.isSplitPayment == true && sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty) {
+        for (final payment in sale.paymentList) {
+          final method = payment['method'] as String;
+          final amount = payment['amount'] as double;
+
+          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amount;
+          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
+          grandTotal += amount;
+        }
+      } else {
+        // Single payment
+        final amount = sale.totalAmount as double;
+        paymentTotals[paymentType] = (paymentTotals[paymentType] ?? 0.0) + amount;
+        paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
+        grandTotal += amount;
+      }
+    }
+
+    return paymentTotals.entries.map((entry) {
+      final paymentType = entry.key;
+      final totalAmount = entry.value;
+      final transactionCount = paymentCounts[paymentType] ?? 0;
+      final percentage = grandTotal > 0 ? (totalAmount / grandTotal) * 100 : 0.0;
+
+      return PaymentSummary(
+        paymentType: paymentType,
+        totalAmount: totalAmount,
+        transactionCount: transactionCount,
+        percentage: percentage,
+      );
+    }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+  }
+
+  static List<TaxSummary> _calculateRetailTaxSummaries(List sales) {
+    double totalCgst = 0.0;
+    double totalSgst = 0.0;
+    double totalTaxableAmount = 0.0;
+
+    for (final sale in sales) {
+      if (sale.isReturn == true) continue; // Skip returns
+
+      if (sale.totalCgstAmount != null && sale.totalSgstAmount != null) {
+        totalCgst += sale.totalCgstAmount!;
+        totalSgst += sale.totalSgstAmount!;
+        totalTaxableAmount += (sale.totalTaxableAmount ?? 0.0);
+      }
+    }
+
+    List<TaxSummary> summaries = [];
+
+    // Add CGST summary if present
+    if (totalCgst > 0) {
+      summaries.add(TaxSummary(
+        taxName: 'CGST',
+        taxRate: 0.0, // Rate varies by product, so we'll show 0 for overall
+        taxAmount: totalCgst,
+        taxableAmount: totalTaxableAmount / 2, // Half for CGST
+      ));
+    }
+
+    // Add SGST summary if present
+    if (totalSgst > 0) {
+      summaries.add(TaxSummary(
+        taxName: 'SGST',
+        taxRate: 0.0,
+        taxAmount: totalSgst,
+        taxableAmount: totalTaxableAmount / 2, // Half for SGST
+      ));
+    }
+
+    return summaries;
+  }
 }
 
 class TaxInfo {

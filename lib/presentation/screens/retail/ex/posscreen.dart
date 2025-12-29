@@ -13,6 +13,9 @@ import 'package:unipos/presentation/screens/retail/parked_sales_screen.dart';
 import 'package:unipos/presentation/widget/retail/variant_picker_dialog.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/retail/price_formatter.dart';
 
 class RetailPosScreen extends StatefulWidget {
   const RetailPosScreen({super.key});
@@ -934,6 +937,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+
                   Text(
                     '${_searchResults.length} products found',
                     style: const TextStyle(
@@ -1068,13 +1072,25 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        '₹${price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1A1A),
-                        ),
+                      ValueListenableBuilder<String>(
+                        valueListenable: CurrencyHelper.currencyNotifier,
+                        builder: (context, currencyCode, child) {
+                          return ValueListenableBuilder<int>(
+                            valueListenable: DecimalSettings.precisionNotifier,
+                            builder: (context, precision, child) {
+                              final symbol = CurrencyHelper.currentSymbol;
+                              final formattedPrice = price.toStringAsFixed(precision);
+                              return Text(
+                                '$symbol$formattedPrice',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              );
+                            },
+                          );
+                        },
                       ),
                       const SizedBox(height: 4),
                       Container(
@@ -1224,12 +1240,24 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                '₹${item.price.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF6B6B6B),
-                                ),
+                              ValueListenableBuilder<String>(
+                                valueListenable: CurrencyHelper.currencyNotifier,
+                                builder: (context, currencyCode, child) {
+                                  return ValueListenableBuilder<int>(
+                                    valueListenable: DecimalSettings.precisionNotifier,
+                                    builder: (context, precision, child) {
+                                      final symbol = CurrencyHelper.currentSymbol;
+                                      final formattedPrice = item.price.toStringAsFixed(precision);
+                                      return Text(
+                                        '$symbol$formattedPrice',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6B6B6B),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -1293,14 +1321,26 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         const SizedBox(width: 10),
                         SizedBox(
                           width: 60,
-                          child: Text(
-                            '₹${item.total.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1A1A1A),
-                            ),
-                            textAlign: TextAlign.right,
+                          child: ValueListenableBuilder<String>(
+                            valueListenable: CurrencyHelper.currencyNotifier,
+                            builder: (context, currencyCode, child) {
+                              return ValueListenableBuilder<int>(
+                                valueListenable: DecimalSettings.precisionNotifier,
+                                builder: (context, precision, child) {
+                                  final symbol = CurrencyHelper.currentSymbol;
+                                  final formattedTotal = item.total.toStringAsFixed(precision);
+                                  return Text(
+                                    '$symbol$formattedTotal',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1A1A1A),
+                                    ),
+                                    textAlign: TextAlign.right,
+                                  );
+                                },
+                              );
+                            },
                           ),
                         ),
                         SizedBox(
@@ -1394,13 +1434,25 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           color: Color(0xFF6B6B6B),
                         ),
                       ),
-                      Text(
-                        '₹${cartStore.totalPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1A1A),
-                        ),
+                      ValueListenableBuilder<String>(
+                        valueListenable: CurrencyHelper.currencyNotifier,
+                        builder: (context, currencyCode, child) {
+                          return ValueListenableBuilder<int>(
+                            valueListenable: DecimalSettings.precisionNotifier,
+                            builder: (context, precision, child) {
+                              final symbol = CurrencyHelper.currentSymbol;
+                              final formattedTotal = cartStore.totalPrice.toStringAsFixed(precision);
+                              return Text(
+                                '$symbol$formattedTotal',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              );
+                            },
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -1974,7 +2026,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
                                     hintText: '0.00',
-                                    prefixText: '₹ ',
+                                    prefixText: '${CurrencyHelper.currentSymbol} ',
                                     hintStyle: const TextStyle(
                                       fontSize: 14,
                                       color: Color(0xFFB0B0B0),
@@ -2027,7 +2079,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
                                     hintText: '0.00',
-                                    prefixText: '₹ ',
+                                    prefixText: '${CurrencyHelper.currentSymbol} ',
                                     hintStyle: const TextStyle(
                                       fontSize: 14,
                                       color: Color(0xFFB0B0B0),

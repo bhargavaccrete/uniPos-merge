@@ -65,7 +65,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildPaperSizeSection(),
+          // _buildPaperSizeSection(),
           const SizedBox(height: 24),
           _buildLogoSection(),
           const SizedBox(height: 24),
@@ -90,7 +90,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   }
 
   // ==================== PAPER SIZE SECTION ====================
-  Widget _buildPaperSizeSection() {
+/*  Widget _buildPaperSizeSection() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -132,7 +132,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         ),
       ),
     );
-  }
+  }*/
 
   // ==================== LOGO SECTION ====================
   Widget _buildLogoSection() {

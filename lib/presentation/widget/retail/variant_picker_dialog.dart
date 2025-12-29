@@ -3,6 +3,8 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:unipos/domain/store/retail/attribute_store.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 
 
@@ -520,12 +522,24 @@ class _VariantListItem extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '₹${variant.effectivePrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                    ValueListenableBuilder<String>(
+                      valueListenable: CurrencyHelper.currencyNotifier,
+                      builder: (context, currencyCode, child) {
+                        return ValueListenableBuilder<int>(
+                          valueListenable: DecimalSettings.precisionNotifier,
+                          builder: (context, precision, child) {
+                            final symbol = CurrencyHelper.currentSymbol;
+                            final formattedPrice = variant.effectivePrice.toStringAsFixed(precision);
+                            return Text(
+                              '$symbol$formattedPrice',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
                     const SizedBox(height: 4),
                     Container(

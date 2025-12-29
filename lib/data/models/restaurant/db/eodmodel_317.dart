@@ -55,6 +55,9 @@ class EndOfDayReport extends HiveObject{
   @HiveField(15)
   final double cashExpenses;
 
+  @HiveField(16)
+  final String? mode; // 'retail' or 'restaurant' (nullable for backward compatibility)
+
   EndOfDayReport({
     required this.date,
     required this.openingBalance,
@@ -72,6 +75,7 @@ class EndOfDayReport extends HiveObject{
     required this.reportId,
     required this.totalExpenses,
     required this.cashExpenses,
+    this.mode, // Nullable - null means restaurant (for backward compatibility)
   });
 
   Map<String, dynamic> toMap() {
@@ -92,6 +96,7 @@ class EndOfDayReport extends HiveObject{
       'reportId': reportId,
       'totalExpenses': totalExpenses,
       'cashExpenses': cashExpenses,
+      'mode': mode,
     };
   }
 
@@ -113,6 +118,7 @@ class EndOfDayReport extends HiveObject{
       reportId: map['reportId'] ?? '',
       totalExpenses: (map['totalExpenses'] ?? 0).toDouble(),
       cashExpenses: (map['cashExpenses'] ?? 0).toDouble(),
+      mode: map['mode'],
     );
   }
 
