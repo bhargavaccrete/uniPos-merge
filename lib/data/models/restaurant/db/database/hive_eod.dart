@@ -9,6 +9,10 @@ class HiveEOD {
   static Box<EndOfDayReport> _getEODBox() {
     // Box is already opened during app startup in HiveInit
     if (_box == null || !_box!.isOpen) {
+      // Check if box is actually open before trying to access it
+      if (!Hive.isBoxOpen(_boxName)) {
+        throw Exception('EOD box not initialized. Please ensure HiveInit.openRestaurantBoxes() was called during app startup.');
+      }
       _box = Hive.box<EndOfDayReport>(_boxName);
     }
     return _box!;

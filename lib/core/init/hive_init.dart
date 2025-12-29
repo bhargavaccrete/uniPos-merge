@@ -352,6 +352,11 @@ class HiveInit {
 
   /// Open all retail Hive boxes
   static Future<void> openRetailBoxes() async {
+    if (_areRetailBoxesOpen) {
+      print('⚠️ Retail boxes already open - skipping');
+      return;
+    }
+
     // Clean up old incorrectly-named boxes first (one-time migration)
     await _cleanupOldAttributeBoxes();
 
@@ -390,7 +395,8 @@ class HiveInit {
     await Hive.openBox<ExpenseCategory>('expenseCategory');
     await Hive.openBox<Expense>('expenseBox');
 
-    print('✅ All retail boxes opened successfully');
+    _areRetailBoxesOpen = true;
+    print('✅ All retail boxes opened successfully and guard flag set');
   }
 
   /// Register all restaurant adapters (typeIds: 100-149)
@@ -495,6 +501,11 @@ class HiveInit {
 
   /// Open all restaurant Hive boxes
   static Future<void> openRestaurantBoxes() async {
+    if (_areRestaurantBoxesOpen) {
+      print('⚠️ Restaurant boxes already open - skipping');
+      return;
+    }
+
     // Core restaurant boxes - use actual box names from database files
     await Hive.openBox<Category>('categories');  // ✅ Actual name used in HiveBoxes
     await Hive.openBox<Company>('companyBox');
@@ -526,9 +537,13 @@ class HiveInit {
     // EOD
     await Hive.openBox<EndOfDayReport>('eodBox');
 
+    // Day Management (for opening balance tracking)
+    await Hive.openBox('dayManagementBox');
+
     await Hive.openBox<TestBillModel>('testBillBox');
 
-    print('✅ All restaurant boxes opened successfully with correct names');
+    _areRestaurantBoxesOpen = true;
+    print('✅ All restaurant boxes opened successfully with correct names and guard flag set');
   }
 
   /// Initialize boxes based on business mode
@@ -582,7 +597,11 @@ class HiveInit {
              Hive.isBoxOpen('restaurant_taxes') &&
              Hive.isBoxOpen('extra') &&
              Hive.isBoxOpen('variante') &&
-             Hive.isBoxOpen('choice');
+             Hive.isBoxOpen('choice') &&
+             Hive.isBoxOpen('eodBox') &&
+             Hive.isBoxOpen('dayManagementBox') &&
+             Hive.isBoxOpen('expenseCategory') &&
+             Hive.isBoxOpen('expenseBox');
     } catch (_) {
       return false;
     }

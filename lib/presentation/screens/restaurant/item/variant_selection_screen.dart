@@ -30,7 +30,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   void initState() {
     super.initState();
     _loadVariants();
-    _initializeSelections();
+    // _initializeSelections();
   }
 
   // void _loadVariants() {
@@ -51,24 +51,47 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   //   }
   // }
 
+  // void _loadVariants() {
+  //   final variantBox = Hive.box<VariantModel>('variante');
+  //   final variants = variantBox.values.toList();
+  //
+  //   // Create controllers BEFORE setState
+  //   for (var variant in variants) {
+  //
+  //     priceControllers.putIfAbsent(
+  //       variant.id,
+  //           () => TextEditingController(),
+  //     );
+  //     selectedVariantIds.putIfAbsent(variant.id, () => false);
+  //   }
+  //
+  //   if (!mounted) return;
+  //
+  //   setState(() {
+  //     availableVariants = variants;
+  //   });
+  //   _initializeSelections();
+  //
+  // }
+
   void _loadVariants() {
     final variantBox = Hive.box<VariantModel>('variante');
     final variants = variantBox.values.toList();
 
-    // Create controllers BEFORE setState
+    // Ensure we don't leak controllers
     for (var variant in variants) {
-      priceControllers.putIfAbsent(
-        variant.id,
-            () => TextEditingController(),
-      );
+      if (!priceControllers.containsKey(variant.id)) {
+        priceControllers[variant.id] = TextEditingController();
+      }
       selectedVariantIds.putIfAbsent(variant.id, () => false);
     }
 
-    if (!mounted) return;
-
-    setState(() {
-      availableVariants = variants;
-    });
+    if (mounted) {
+      setState(() {
+        availableVariants = variants;
+      });
+      _initializeSelections();
+    }
   }
 
 
@@ -371,7 +394,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text(
             'Add New Variant',
@@ -402,7 +425,118 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(color: Colors.grey[600]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final String name = variantNameController.text.trim();
+
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a variant name'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  return;
+                }
+
+                // Create and save the variant
+                final newVariant = VariantModel(
+                  id: const Uuid().v4(),
+                  name: name,
+                );
+
+                final variantBox = Hive.box<VariantModel>('variante');
+                await variantBox.put(newVariant.id, newVariant);
+
+                // Close dialog and pass the variant name for success message
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop(name);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primarycolor,
+              ),
+              child: Text(
+                'Add',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    ).then((variantName) {
+      // CRITICAL: Dispose controller AFTER dialog is completely closed
+      // Wait one frame to ensure dialog animation is complete
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        variantNameController.dispose();
+      });
+
+      // Handle success case
+      if (variantName != null && variantName is String) {
+        // Wait for dialog to fully close before updating UI
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (!mounted) return;
+
+          // Reload variants
+          _loadVariants();
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Variant "$variantName" added successfully'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        });
+      }
+    });
+  }
+
+ /* void _showAddVariantDialog() {
+    final variantNameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text(
+            'Add New Variant',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Enter variant name (e.g., Small, Medium, Large)',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                SizedBox(height: 15),
+                CommonTextForm(
+                  controller: variantNameController,
+                  labelText: 'Variant Name',
+                  obsecureText: false,
+                  borderc: 8,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(color: Colors.grey[600]),
@@ -414,7 +548,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 final String name = variantNameController.text.trim();
 
                 if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(
                       content: Text('Please enter a variant name'),
                       backgroundColor: Colors.red,
@@ -433,31 +567,38 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 final variantBox = Hive.box<VariantModel>('variante');
                 await variantBox.put(newVariant.id, newVariant);
 
-                if (!mounted) return;
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop(true); // Pass 'true' to indicate success
+                }
+                // Controller will be disposed in .then() callback
 
                 // 1. Capture the "Screen" context before popping the dialog
-                final screenContext = this.context;
+                // final screenContext = this.context;
 
                 // 2. Pop the dialog first
-                Navigator.pop(context);
+                // Navigator.pop(context);
 
-                // 3. Use a microtask to ensure the snackbar and refresh happen
-                // after the dialog is completely removed from the widget tree
-                Future.microtask(() {
-                  if (!mounted) return;
-
-                  // Refresh the list on the main screen
-                  _loadVariants();
-
-                  // Use the screenContext to show the success message
-                  ScaffoldMessenger.of(screenContext).showSnackBar(
-                    SnackBar(
-                      content: Text('Variant "$name" added successfully'),
-                      backgroundColor: Colors.green,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                });
+        // WidgetsBinding.instance.addPostFrameCallback((_) {
+        // if (!mounted) return;
+        //
+        //
+        //         // 3. Use a microtask to ensure the snackbar and refresh happen
+        //         // after the dialog is completely removed from the widget tree
+        //         // Future.microtask(() {
+        //         //   if (!mounted) return;
+        //
+        //           // Refresh the list on the main screen
+        //           _loadVariants();
+        //
+        //           // Use the screenContext to show the success message
+        //           // ScaffoldMessenger.of(screenContext).showSnackBar(
+        //           //   SnackBar(
+        //           //     content: Text('Variant "$name" added successfully'),
+        //           //     backgroundColor: Colors.green,
+        //           //     duration: const Duration(seconds: 2),
+        //           //   ),
+        //           // );
+        //         });
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primarycolor,
@@ -467,7 +608,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 style: GoogleFonts.poppins(color: Colors.white),
               ),
             )
-            /*ElevatedButton(
+            *//*ElevatedButton(
               onPressed: () async {
                 if (variantNameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -507,12 +648,36 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 'Add',
                 style: GoogleFonts.poppins(color: Colors.white),
               ),
-            ),*/
+            ),*//*
           ],
         );
       },
-    ).then((_) {
+    ).then((wasAdded) {
+      // Dispose controller immediately
       variantNameController.dispose();
+
+      // Use postFrameCallback to ensure widget tree is stable
+      if (wasAdded == true && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+
+          _loadVariants();
+
+          // Show success message on SCREEN context
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Variant added successfully'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        });
+      }
     });
+
+    // variantNameController.dispose();
+
+
   }
+ */
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -46,8 +47,35 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     setState(() => _isLoading = true);
 
     try {
+      // Verify ALL required boxes are initialized before proceeding
+      final requiredBoxes = {
+        'eodBox': 'EOD reports',
+        'dayManagementBox': 'day management',
+        'pastorderBox': 'past orders',
+        'expenseCategory': 'expense categories',
+        'expenseBox': 'expenses',
+      };
+
+      final missingBoxes = <String>[];
+      for (final entry in requiredBoxes.entries) {
+        if (!Hive.isBoxOpen(entry.key)) {
+          missingBoxes.add('${entry.value} (${entry.key})');
+        }
+      }
+
+      if (missingBoxes.isNotEmpty) {
+        throw Exception(
+          'EOD system not fully initialized. Missing boxes:\n${missingBoxes.join('\n')}\n\n'
+          'Please restart the app completely (stop and relaunch).'
+        );
+      }
+
+      print('✅ All boxes reported as open, attempting to access data...');
+
       // Check if there are any past orders (transactions) to display
+      print('📦 Fetching past orders...');
       final pastOrders = await HivePastOrder.getAllPastOrderModel();
+      print('✅ Got ${pastOrders.length} past orders');
 
       // If there are no past orders, show empty state
       if (pastOrders.isEmpty) {
@@ -62,14 +90,18 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       }
 
       // 1) Get opening balance
+      print('📊 Getting opening balance...');
       final currentOpeningBalance = await DayManagementService.getOpeningBalance();
+      print('✅ Opening balance: $currentOpeningBalance');
 
       // 2) Always generate EOD from Past Orders for selectedDate
+      print('📋 Generating EOD report...');
       final report = await EODService.generateEODReport(
         date: selectedDate,
         openingBalance: currentOpeningBalance,
         actualCash: 0.0,
       );
+      print('✅ EOD report generated');
 
       // 3) Expected CASH only
       final expectedCashAmount = report.paymentSummaries
