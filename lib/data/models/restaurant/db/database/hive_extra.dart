@@ -4,45 +4,37 @@ import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 
 class HiveExtra {
-  static Box<Extramodel>? _box;
   static const _boxName = 'extra';
 
-  static Future<Box<Extramodel>> getextra() async {
-    if (_box == null || !_box!.isOpen) {
-      try {
-        _box = await Hive.openBox<Extramodel>(_boxName);
-      } catch (e) {
-        print("Error opening '$_boxName' Hive Box: $e");
-        rethrow; // Re-throw so UI can handle the error
-      }
-    }
-    return _box!;
+  /// Get the extra box (already opened in main.dart)
+  static Box<Extramodel> getextra() {
+    return Hive.box<Extramodel>(_boxName);
   }
 
   static Future<void> addextra(Extramodel extraModel) async {
-    final box = await getextra();
+    final box = getextra();
     await box.put(extraModel.Id, extraModel);
   }
 
   static Future<void> updateExtra(Extramodel extraModel) async {
-    final box = await getextra();
+    final box = getextra();
     await box.put(extraModel.Id, extraModel);
   }
 
   static Future<void> deleteExtra(Extramodel extraModel) async {
-    final box = await getextra();
+    final box = getextra();
     await box.delete(extraModel.Id);
   }
 
   static Future<List<Extramodel>> getAllExtra() async {
-    final box = await getextra();
+    final box = getextra();
     return box.values.toList();
   }
 
   // Fixed method - uses proper copyWith approach
   static Future<bool> addToppingToExtra(String extraId, Topping topping) async {
     try {
-      final box = await getextra();
+      final box = getextra();
       final extra = box.get(extraId);
 
       if (extra != null) {
@@ -65,7 +57,7 @@ class HiveExtra {
   // Fixed method - uses proper copyWith approach
   static Future<bool> removeToppingFromExtra(String extraId, int toppingIndex) async {
     try {
-      final box = await getextra();
+      final box = getextra();
       final extra = box.get(extraId);
 
       if (extra != null && extra.topping != null) {
@@ -90,7 +82,7 @@ class HiveExtra {
   // New method needed by the optimized UI
   static Future<bool> updateToppingInExtra(String extraId, int toppingIndex, Topping updatedTopping) async {
     try {
-      final box = await getextra();
+      final box = getextra();
       final extra = box.get(extraId);
 
       if (extra != null && extra.topping != null) {

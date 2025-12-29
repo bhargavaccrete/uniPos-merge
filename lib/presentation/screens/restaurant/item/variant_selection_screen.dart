@@ -33,12 +33,44 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
     _initializeSelections();
   }
 
+  // void _loadVariants() {
+  //   final variantBox = Hive.box<VariantModel>('variante');
+  //   if (mounted) {
+  //     setState(() {
+  //       availableVariants = variantBox.values.toList();
+  //       // Initialize controllers for any new variants
+  //       for (var variant in availableVariants) {
+  //         if (!priceControllers.containsKey(variant.id)) {
+  //           priceControllers[variant.id] = TextEditingController();
+  //         }
+  //         if (!selectedVariantIds.containsKey(variant.id)) {
+  //           selectedVariantIds[variant.id] = false;
+  //         }
+  //       }
+  //     });
+  //   }
+  // }
+
   void _loadVariants() {
     final variantBox = Hive.box<VariantModel>('variante');
+    final variants = variantBox.values.toList();
+
+    // Create controllers BEFORE setState
+    for (var variant in variants) {
+      priceControllers.putIfAbsent(
+        variant.id,
+            () => TextEditingController(),
+      );
+      selectedVariantIds.putIfAbsent(variant.id, () => false);
+    }
+
+    if (!mounted) return;
+
     setState(() {
-      availableVariants = variantBox.values.toList();
+      availableVariants = variants;
     });
   }
+
 
   void _initializeSelections() {
     // Initialize from existing selections
@@ -347,24 +379,26 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Enter variant name (e.g., Small, Medium, Large)',
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.grey[600],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Enter variant name (e.g., Small, Medium, Large)',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
                 ),
-              ),
-              SizedBox(height: 15),
-              CommonTextForm(
-                controller: variantNameController,
-                labelText: 'Variant Name',
-                obsecureText: false,
-                borderc: 8,
-              ),
-            ],
+                SizedBox(height: 15),
+                CommonTextForm(
+                  controller: variantNameController,
+                  labelText: 'Variant Name',
+                  obsecureText: false,
+                  borderc: 8,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -374,7 +408,66 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 style: GoogleFonts.poppins(color: Colors.grey[600]),
               ),
             ),
+
             ElevatedButton(
+              onPressed: () async {
+                final String name = variantNameController.text.trim();
+
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a variant name'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                // Create the model
+                final newVariant = VariantModel(
+                  id: const Uuid().v4(),
+                  name: name,
+                );
+
+                // Save to Hive
+                final variantBox = Hive.box<VariantModel>('variante');
+                await variantBox.put(newVariant.id, newVariant);
+
+                if (!mounted) return;
+
+                // 1. Capture the "Screen" context before popping the dialog
+                final screenContext = this.context;
+
+                // 2. Pop the dialog first
+                Navigator.pop(context);
+
+                // 3. Use a microtask to ensure the snackbar and refresh happen
+                // after the dialog is completely removed from the widget tree
+                Future.microtask(() {
+                  if (!mounted) return;
+
+                  // Refresh the list on the main screen
+                  _loadVariants();
+
+                  // Use the screenContext to show the success message
+                  ScaffoldMessenger.of(screenContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Variant "$name" added successfully'),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primarycolor,
+              ),
+              child: Text(
+                'Add',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+            )
+            /*ElevatedButton(
               onPressed: () async {
                 if (variantNameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -394,20 +487,18 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 final variantBox = Hive.box<VariantModel>('variante');
                 await variantBox.put(newVariant.id, newVariant);
 
-                _loadVariants();
-
-                // Initialize controllers for the new variant
-                priceControllers[newVariant.id] = TextEditingController();
-                selectedVariantIds[newVariant.id] = false;
-
                 Navigator.pop(context);
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Variant "${newVariant.name}" added successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                _loadVariants();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Variant "${newVariant.name}" added successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primarycolor,
@@ -416,7 +507,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 'Add',
                 style: GoogleFonts.poppins(color: Colors.white),
               ),
-            ),
+            ),*/
           ],
         );
       },

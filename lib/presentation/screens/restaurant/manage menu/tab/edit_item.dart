@@ -111,20 +111,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
 // In _EdititemScreenState
 
   Future<EditScreenData> _loadInitialData() async {
-    // ✅ FIX: Use your helper classes to get the correct boxes
-    final results = await Future.wait([
-      Hive.openBox<Category>('categories'),
-      HiveVariante.getVariante(), // <-- Use your helper
-      HiveChoice.getchoice(),     // <-- Use your helper
-      HiveExtra.getextra(),
-      Hive.openBox<Items>('items'),
-    ]);
-
-    final categoryBox = results[0] as Box<Category>;
-    final variantBox = results[1] as Box<VariantModel>;
-    final choiceBox = results[2] as Box<ChoicesModel>;
-    final extraBox = results[3] as Box<Extramodel>;
-    final itemBox = results[4] as Box<Items>;
+    // ✅ FIX: Use synchronous box access since boxes are already open from main.dart
+    final categoryBox = HiveBoxes.getCategory();
+    final variantBox = HiveVariante.getVariante();
+    final choiceBox = HiveChoice.getchoice();
+    final extraBox = HiveExtra.getextra();
+    final itemBox = itemsBoxes.getItemBox();
 
     final allCategories = categoryBox.values.toList();
     final allVariants = variantBox.values.toList();
@@ -873,7 +865,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
     );
 
     if (confirmed == true) {
-      await Hive.box<Category>('categories').delete(categoryId);
+      await HiveBoxes.getCategory().delete(categoryId);
       // Refresh the list inside the sheet
       setState(() {
         _currentCategories.removeWhere((cat) => cat.id == categoryId);
@@ -889,7 +881,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
 
     if (newCategoryName != null && newCategoryName.isNotEmpty) {
       final newCategory = Category(id: const Uuid().v4(), name: newCategoryName);
-      await Hive.box<Category>('categories').put(newCategory.id, newCategory);
+      await HiveBoxes.getCategory().put(newCategory.id, newCategory);
       // Refresh the list inside this sheet to show the new category
       setState(() {
         _currentCategories.add(newCategory);

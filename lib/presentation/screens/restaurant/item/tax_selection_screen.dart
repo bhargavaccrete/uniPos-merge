@@ -276,31 +276,33 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
           'Add New Tax',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: 'Tax Name',
-                labelStyle: GoogleFonts.poppins(),
-                border: const OutlineInputBorder(),
-                hintText: 'e.g., GST, VAT, Sales Tax',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Tax Name',
+                  labelStyle: GoogleFonts.poppins(),
+                  border: const OutlineInputBorder(),
+                  hintText: 'e.g., GST, VAT, Sales Tax',
+                ),
               ),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: percentageController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Tax Percentage',
-                labelStyle: GoogleFonts.poppins(),
-                border: const OutlineInputBorder(),
-                hintText: 'e.g., 18',
-                suffixText: '%',
+              const SizedBox(height: 15),
+              TextField(
+                controller: percentageController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Tax Percentage',
+                  labelStyle: GoogleFonts.poppins(),
+                  border: const OutlineInputBorder(),
+                  hintText: 'e.g., 18',
+                  suffixText: '%',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(

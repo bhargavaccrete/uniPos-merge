@@ -814,67 +814,50 @@ class _AddProductScreenState extends State<AddProductScreen>
         },
       );
     } else {
-      // Restaurant mode - use FutureBuilder with category selector
-      return FutureBuilder<Box<Category>>(
-        future: HiveBoxes.getCategory(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Category*',
-                prefixIcon: const Icon(Icons.category, color: AppColors.primary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                suffixIcon: const CircularProgressIndicator(),
-              ),
-              child: const Text('Loading...'),
-            );
-          }
+      // Restaurant mode - use synchronous box access
+      final categoryBox = HiveBoxes.getCategory();
+      final categories = categoryBox.values.toList();
+      final categoryIds = categories.map((c) => c.id).toList();
 
-          final categoryBox = snapshot.data!;
-          final categories = categoryBox.values.toList();
-          final categoryIds = categories.map((c) => c.id).toList();
+      // Ensure selected value is valid
+      final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
+          ? _formStore.selectedCategoryId
+          : null;
 
-          // Ensure selected value is valid
-          final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
-              ? _formStore.selectedCategoryId
-              : null;
-
-          return InkWell(
-            onTap: () async {
-              // Show category selector bottom sheet
-              final result = await CategorySelectorSheet.show(
-                context,
-                selectedCategoryId: selectedValue,
-                onAddCategory: () async {
-                  Navigator.pop(context);
-                  await AddCategoryDialog.show(context);
-                },
-              );
-
-              if (result != null) {
-                setState(() {
-                  _formStore.setSelectedCategoryId(result.id);
-                });
-              }
+      return InkWell(
+        onTap: () async {
+          // Show category selector bottom sheet
+          final result = await CategorySelectorSheet.show(
+            context,
+            selectedCategoryId: selectedValue,
+            onAddCategory: () async {
+              Navigator.pop(context);
+              await AddCategoryDialog.show(context);
             },
-            child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Category*',
-                prefixIcon: const Icon(Icons.category, color: AppColors.primary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                suffixIcon: const Icon(Icons.arrow_drop_down),
-              ),
-              child: Text(
-                selectedValue != null && categories.isNotEmpty
-                    ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
-                    : 'Select or Add Category',
-                style: TextStyle(
-                  color: selectedValue != null ? Colors.black : Colors.grey[600],
-                ),
-              ),
-            ),
           );
+
+          if (result != null) {
+            setState(() {
+              _formStore.setSelectedCategoryId(result.id);
+            });
+          }
         },
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'Category*',
+            prefixIcon: const Icon(Icons.category, color: AppColors.primary),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            suffixIcon: const Icon(Icons.arrow_drop_down),
+          ),
+          child: Text(
+            selectedValue != null && categories.isNotEmpty
+                ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
+                : 'Select or Add Category',
+            style: TextStyle(
+              color: selectedValue != null ? Colors.black : Colors.grey[600],
+            ),
+          ),
+        ),
       );
     }
   }
@@ -918,51 +901,46 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildRestaurantTaxDropdown() {
-    // Use FutureBuilder to avoid box type conflicts
-    return FutureBuilder<Box<Tax>>(
-      future: TaxBox.getTaxBox(),
-      builder: (context, snapshot) {
-        List<Map<String, String>> taxRates = [
-          {'id': '', 'name': 'No Tax', 'rate': '0'},
-        ];
+    // Use synchronous box access since boxes are already open
+    final taxBox = TaxBox.getTaxBox();
+    final taxes = taxBox.values.toList();
 
-        if (snapshot.hasData) {
-          final taxes = snapshot.data!.values.toList();
-          taxRates.addAll(
-            taxes.map((tax) => {
-              'id': tax.id,
-              'name': tax.taxname,
-              'rate': tax.taxperecentage.toString(),
-            }),
-          );
-        }
+    List<Map<String, String>> taxRates = [
+      {'id': '', 'name': 'No Tax', 'rate': '0'},
+    ];
 
-        // Find current selected value
-        final currentValue = _taxRateController.text.isEmpty ? null : _taxRateController.text;
+    taxRates.addAll(
+      taxes.map((tax) => {
+        'id': tax.id,
+        'name': tax.taxname,
+        'rate': tax.taxperecentage.toString(),
+      }),
+    );
 
-        return DropdownButtonFormField<String>(
-          value: currentValue,
-          decoration: InputDecoration(
-            labelText: 'Tax Rate',
-            prefixIcon: const Icon(Icons.receipt_outlined, color: AppColors.primary),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          items: taxRates.map<DropdownMenuItem<String>>((tax) {
-            return DropdownMenuItem<String>(
-              value: tax['rate']!,
-              child: Text('${tax['name']} (${tax['rate']}%)'),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _taxRateController.text = value ?? '';
-            });
-          },
-          hint: const Text('Select tax rate'),
+    // Find current selected value
+    final currentValue = _taxRateController.text.isEmpty ? null : _taxRateController.text;
+
+    return DropdownButtonFormField<String>(
+      value: currentValue,
+      decoration: InputDecoration(
+        labelText: 'Tax Rate',
+        prefixIcon: const Icon(Icons.receipt_outlined, color: AppColors.primary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      items: taxRates.map<DropdownMenuItem<String>>((tax) {
+        return DropdownMenuItem<String>(
+          value: tax['rate']!,
+          child: Text('${tax['name']} (${tax['rate']}%)'),
         );
+      }).toList(),
+      onChanged: (value) {
+        setState(() {
+          _taxRateController.text = value ?? '';
+        });
       },
+      hint: const Text('Select tax rate'),
     );
   }
 

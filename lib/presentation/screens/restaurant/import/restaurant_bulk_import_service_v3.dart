@@ -376,8 +376,8 @@ class RestaurantBulkImportServiceV3 {
     print('📂 Loading caches...');
 
     try {
-      // Load categories - handle Hive box type conflicts
-      final categories = await _loadCategoriesSafe();
+      // Load categories
+      final categories = await HiveBoxes.getAllCategories();
       _categoryCache = {for (var cat in categories) cat.id: cat};
       _categoryByNameCache = {for (var cat in categories) cat.name.toLowerCase(): cat};
       print('✅ Cached ${categories.length} categories');
@@ -411,35 +411,6 @@ class RestaurantBulkImportServiceV3 {
       print('✅ Cached ${variants.length} variants');
     } catch (e) {
       print('⚠️ Error loading variants: $e');
-    }
-  }
-
-  /// Safe category loading with Hive box conflict handling
-  Future<List<Category>> _loadCategoriesSafe() async {
-    try {
-      // Try normal method first
-      return await HiveBoxes.getAllCategories();
-    } catch (e) {
-      if (e.toString().contains('already open')) {
-        print('⚠️ Category box conflict detected, using alternative method');
-
-        // Box is already open with wrong type - try to close and reopen
-        try {
-          if (Hive.isBoxOpen('categories')) {
-            final existingBox = Hive.box('categories');
-            await existingBox.close();
-            print('✅ Closed conflicting categories box');
-          }
-
-          // Now open with correct type
-          final box = await Hive.openBox<Category>('categories');
-          return box.values.toList();
-        } catch (e2) {
-          print('❌ Could not resolve category box conflict: $e2');
-          return []; // Return empty list
-        }
-      }
-      rethrow;
     }
   }
 
@@ -999,11 +970,11 @@ class RestaurantBulkImportServiceV3 {
     try {
       print('📦 Flushing Hive boxes...');
 
-      final categoryBox = await HiveBoxes.getCategory();
-      final itemBox = await itemsBoxes.getItemBox();
-      final variantBox = await HiveVariante.getVariante();
-      final extraBox = await HiveExtra.getextra();
-      final choiceBox = await HiveChoice.getchoice();
+      final categoryBox = HiveBoxes.getCategory();
+      final itemBox = itemsBoxes.getItemBox();
+      final variantBox = HiveVariante.getVariante();
+      final extraBox = HiveExtra.getextra();
+      final choiceBox = HiveChoice.getchoice();
 
       await categoryBox.flush();
       await itemBox.flush();

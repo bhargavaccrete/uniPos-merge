@@ -352,8 +352,8 @@ class HiveInit {
     await Hive.openBox<PurchaseOrderItemModel>('purchaseOrderItems');
     await Hive.openBox<GRNModel>('grns');
     await Hive.openBox<GRNItemModel>('grnItems');
-    // Note: Retail categories use Box<String> named 'categories', not CategoryModel
-    await Hive.openBox<String>('categories');
+    // Note: Retail categories use Box<String> named 'retail_categories' to avoid conflict
+    await Hive.openBox<String>('retail_categories');
     // CategoryModel box for GST support
     await Hive.openBox<CategoryModel>('category_models');
     await Hive.openBox<PaymentEntryModel>('paymentEntries');

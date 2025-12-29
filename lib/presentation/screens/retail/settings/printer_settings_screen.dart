@@ -1,4 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import '../../../../data/models/retail/printer_settings_model.dart';
 import '../../../../domain/services/retail/retail_printer_settings_service.dart';
 
@@ -157,19 +161,72 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
               },
             ),
             if (_settings.showLogo) ...[
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(Icons.image),
-                title: const Text('Logo Image'),
-                subtitle: Text(_settings.logoPath ?? 'Using default logo'),
-                trailing: const Icon(Icons.edit),
-                onTap: () {
-                  // TODO: Implement image picker
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Image picker coming soon')),
-                  );
-                },
+              const SizedBox(height: 16),
+              // Logo Preview
+              if (_settings.logoPath != null) ...[
+                Center(
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(_settings.logoPath!),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                                SizedBox(height: 8),
+                                Text('Unable to load image', style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              // Action Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _pickLogoImage,
+                    icon: Icon(_settings.logoPath == null ? Icons.add_photo_alternate : Icons.edit),
+                    label: Text(_settings.logoPath == null ? 'Select Logo' : 'Change Logo'),
+                  ),
+                  if (_settings.logoPath != null) ...[
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: _removeLogoImage,
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      label: const Text('Remove', style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ],
               ),
+              if (_settings.logoPath == null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Center(
+                    child: Text(
+                      'Using default logo',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ),
+                ),
             ],
           ],
         ),
@@ -698,6 +755,108 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         ),
       ),
     );
+  }
+
+  // ==================== IMAGE PICKER ====================
+
+  Future<void> _pickLogoImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Get app's documents directory
+        final Directory appDir = await getApplicationDocumentsDirectory();
+        final String logoDir = '${appDir.path}/logos';
+
+        // Create logos directory if it doesn't exist
+        final Directory logosDirectory = Directory(logoDir);
+        if (!await logosDirectory.exists()) {
+          await logosDirectory.create(recursive: true);
+        }
+
+        // Delete old logo file if exists
+        if (_settings.logoPath != null) {
+          try {
+            final File oldFile = File(_settings.logoPath!);
+            if (await oldFile.exists()) {
+              await oldFile.delete();
+            }
+          } catch (e) {
+            // Ignore error if old file can't be deleted
+            print('Error deleting old logo: $e');
+          }
+        }
+
+        // Copy new image to permanent location
+        final String fileName = 'store_logo${path.extension(image.path)}';
+        final String newPath = '$logoDir/$fileName';
+        final File newFile = await File(image.path).copy(newPath);
+
+        // Save new logo path
+        await _printerService.setLogoPath(newFile.path);
+        _loadSettings();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Logo updated successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeLogoImage() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Logo?'),
+        content: const Text('This will remove the custom logo and use the default logo.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // Delete the logo file if it exists
+      if (_settings.logoPath != null) {
+        try {
+          final File logoFile = File(_settings.logoPath!);
+          if (await logoFile.exists()) {
+            await logoFile.delete();
+          }
+        } catch (e) {
+          print('Error deleting logo file: $e');
+        }
+      }
+
+      await _printerService.setLogoPath(null);
+      _loadSettings();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logo removed')),
+        );
+      }
+    }
   }
 
   // ==================== ACTIONS ====================

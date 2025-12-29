@@ -464,6 +464,27 @@ class ReceiptPdfService {
     final storePhone = data.storePhone ?? defaultStorePhone;
     final storeEmail = data.storeEmail ?? 'store@example.com';
 
+    // Get settings based on mode
+    final retailSettings = _getRetailSettings();
+    final isRetail = AppConfig.isRetail;
+
+    // Determine what to show based on mode
+    final showLogo = isRetail ? (retailSettings?.showLogo ?? true) : true;
+    final showStoreName = isRetail ? (retailSettings?.showStoreName ?? true) : true;
+    final showStoreAddress = isRetail ? (retailSettings?.showStoreAddress ?? true) : true;
+    final showStorePhone = isRetail ? (retailSettings?.showStorePhone ?? true) : true;
+    final showStoreEmail = isRetail ? (retailSettings?.showStoreEmail ?? false) : true;
+    final showGST = isRetail ? (retailSettings?.showGSTNumber ?? true) : true;
+    final showInvoiceNumber = isRetail ? (retailSettings?.showInvoiceNumber ?? true) : true;
+    final showInvoiceDate = isRetail ? (retailSettings?.showInvoiceDate ?? true) : true;
+    final showCustomer = isRetail ? (retailSettings?.showCustomerDetails ?? true) : true;
+    final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : true;
+    final showSubtotal = isRetail ? (retailSettings?.showSubtotal ?? true) : true;
+    final showDiscount = isRetail ? (retailSettings?.showDiscount ?? true) : true;
+    final showTax = isRetail ? (retailSettings?.showTax ?? true) : true;
+    final showGrandTotal = isRetail ? (retailSettings?.showGrandTotal ?? true) : true;
+    final showLoyaltyPoints = isRetail ? (retailSettings?.showLoyaltyPoints ?? true) : true;
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -478,7 +499,7 @@ class ReceiptPdfService {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   // Logo (Both retail and restaurant)
-                  if (data.logoBytes != null) ...[
+                  if (showLogo && data.logoBytes != null) ...[
                     pw.Container(
                       width: 80,
                       height: 80,
@@ -494,19 +515,23 @@ class ReceiptPdfService {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text(
-                          storeName,
-                          style: pw.TextStyle(
-                            fontSize: 24,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.green800,
+                        if (showStoreName)
+                          pw.Text(
+                            storeName,
+                            style: pw.TextStyle(
+                              fontSize: 24,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.green800,
+                            ),
                           ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(storeAddress, style: const pw.TextStyle(fontSize: 10)),
-                        pw.Text('Phone: $storePhone', style: const pw.TextStyle(fontSize: 10)),
-                        pw.Text('Email: $storeEmail', style: const pw.TextStyle(fontSize: 10)),
-                        if (data.gstNumber != null)
+                        if (showStoreName) pw.SizedBox(height: 4),
+                        if (showStoreAddress)
+                          pw.Text(storeAddress, style: const pw.TextStyle(fontSize: 10)),
+                        if (showStorePhone)
+                          pw.Text('Phone: $storePhone', style: const pw.TextStyle(fontSize: 10)),
+                        if (showStoreEmail)
+                          pw.Text('Email: $storeEmail', style: const pw.TextStyle(fontSize: 10)),
+                        if (showGST && data.gstNumber != null)
                           pw.Text('GST No: ${data.gstNumber}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                       ],
                     ),
@@ -533,16 +558,18 @@ class ReceiptPdfService {
                     ),
                   ),
                 ),
-                pw.SizedBox(height: 8),
-                pw.Text(
-                  '# ${data.sale.saleId.substring(0, min(13, data.sale.saleId.length)).toUpperCase()}',
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  'Date: ${_formatDate(data.sale.date)}',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
+                if (showInvoiceNumber || showInvoiceDate) pw.SizedBox(height: 8),
+                if (showInvoiceNumber)
+                  pw.Text(
+                    '# ${data.sale.saleId.substring(0, min(13, data.sale.saleId.length)).toUpperCase()}',
+                    style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  ),
+                if (showInvoiceNumber && showInvoiceDate) pw.SizedBox(height: 4),
+                if (showInvoiceDate)
+                  pw.Text(
+                    'Date: ${_formatDate(data.sale.date)}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
               ],
             ),
           ],
@@ -685,13 +712,15 @@ class ReceiptPdfService {
               width: 250,
               child: pw.Column(
                 children: [
-                  _buildInvoiceTotalRow('Subtotal', data.sale.subtotal),
-                  if (data.sale.discountAmount > 0)
+                  if (showSubtotal)
+                    _buildInvoiceTotalRow('Subtotal', data.sale.subtotal),
+                  if (showDiscount && data.sale.discountAmount > 0)
                     _buildInvoiceTotalRow('Discount', -data.sale.discountAmount, isRed: true),
-                  if (data.sale.taxAmount > 0)
+                  if (showTax && data.sale.taxAmount > 0)
                     _buildInvoiceTotalRow('Tax', data.sale.taxAmount),
-                  pw.Divider(thickness: 1),
-                  _buildInvoiceTotalRow('Grand Total', data.sale.totalAmount, isBold: true, fontSize: 14),
+                  if (showGrandTotal) pw.Divider(thickness: 1),
+                  if (showGrandTotal)
+                    _buildInvoiceTotalRow('Grand Total', data.sale.totalAmount, isBold: true, fontSize: 14),
                   // Credit sale payment info
                   if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
                     pw.SizedBox(height: 8),
@@ -731,7 +760,7 @@ class ReceiptPdfService {
         pw.SizedBox(height: 16),
 
         // Customer Points Section
-        if (data.customer != null) ...[
+        if (showLoyaltyPoints && data.customer != null) ...[
           pw.Container(
             padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(

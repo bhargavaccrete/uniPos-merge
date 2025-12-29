@@ -125,7 +125,7 @@ class _AddtaxState extends State<Addtax> {
                   height: height * 0.6,
                   child:
                   FutureBuilder<Box<Tax>>(
-                      future: TaxBox.getTaxBox(),
+                      future: Future.value(TaxBox.getTaxBox()),
                       builder: (context, snapshot){
                         if (!snapshot.hasData) {
                           return const Center(child: CircularProgressIndicator());

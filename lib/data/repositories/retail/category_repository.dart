@@ -7,7 +7,7 @@ class CategoryRepository {
   late Box<String> _categoryBox;
 
   CategoryRepository() {
-    _categoryBox = Hive.box<String>('categories');
+    _categoryBox = Hive.box<String>('retail_categories');
   }
 
   /// Get all categories from Hive
