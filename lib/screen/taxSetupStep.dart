@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../util/color.dart';
 import '../core/config/app_config.dart';
 import '../core/di/service_locator.dart';
+import 'package:unipos/util/restaurant/staticswitch.dart';
 
 /// Tax Setup Step
 /// UI Only - uses Observer to listen to store changes
@@ -42,6 +43,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     // Load existing tax data from store and database
     _loadFromStore();
     _loadFromDatabase();
+    _loadRestaurantSettings();
   }
 
   void _loadFromStore() {
@@ -50,6 +52,21 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
       _taxes = [
         TaxItem(widget.store.taxName, widget.store.taxRate, true),
       ];
+    }
+  }
+
+  /// Load tax settings from AppSettings for restaurant mode
+  /// This ensures the setup wizard toggle syncs with the restaurant customization settings
+  Future<void> _loadRestaurantSettings() async {
+    if (AppConfig.isRestaurant) {
+      // Load AppSettings to get current "Tax Is Inclusive" setting
+      // This is the SAME setting controlled in:
+      // Restaurant → Settings & Customization → Order Processing → "Tax Is Inclusive"
+      await AppSettings.load();
+
+      // Sync the loaded value to the store so the toggle shows correct state
+      widget.store.setTaxEnabled(AppSettings.isTaxInclusive);
+      print('📥 Loaded restaurant tax settings from AppSettings: Tax Is Inclusive = ${AppSettings.isTaxInclusive}');
     }
   }
 
@@ -223,18 +240,45 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 ),
                 const SizedBox(height: 20),
 
-                // Include Tax Toggle - uses Observer
+                // ✅ Tax Inclusive Toggle
+                // This toggle is CONNECTED to Restaurant → Settings & Customization → "Tax Is Inclusive"
+                // Both toggles control the SAME setting via AppSettings
                 Observer(
                   builder: (_) => Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Include Tax in Pricing',
-                        style: TextStyle(fontSize: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Include Tax in Pricing',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                            if (AppConfig.isRestaurant)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Text(
+                                  'Also accessible in Settings & Customization',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                       Switch(
                         value: widget.store.taxEnabled,
-                        onChanged: (value) => widget.store.setTaxEnabled(value),
+                        onChanged: (value) async {
+                          // Update the store value for UI reactivity
+                          widget.store.setTaxEnabled(value);
+
+                          // ✅ CRITICAL: For restaurant mode, sync to AppSettings
+                          // This ensures the toggle in "Settings & Customization" shows the same value
+                          if (AppConfig.isRestaurant) {
+                            await AppSettings.updateSetting('Tax Is Inclusive', value);
+                            print('✅ Tax setting synced to AppSettings: Tax Is Inclusive = $value');
+                          }
+                        },
                         activeColor: AppColors.primary,
                       ),
                     ],
@@ -311,6 +355,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                       ),
                     ),
                   ],
+
                 ),
                 const SizedBox(height: 20),
 
@@ -472,10 +517,9 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                             // Save to configuration store
                             widget.store.saveTaxDetails();
 
-                            // ✅ CRITICAL FIX: Save tax inclusive/exclusive setting to GstService
-                            // This ensures the setting is persisted to SharedPreferences
-                            // and used during billing calculations
+                            // ✅ Save tax settings based on mode
                             if (AppConfig.isRetail) {
+                              // Retail: Save to GstService
                               await gstService.setTaxInclusiveMode(widget.store.taxInclusive);
                               // Also save the default tax rate if one is selected
                               if (_taxes.isNotEmpty) {
@@ -488,6 +532,11 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                               print('✅ Tax settings saved to GstService:');
                               print('   - Tax Inclusive: ${widget.store.taxInclusive}');
                               print('   - Default Rate: ${_taxes.isNotEmpty ? _taxes.firstWhere((t) => t.isDefault, orElse: () => _taxes.first).rate : 0}%');
+                            } else if (AppConfig.isRestaurant) {
+                              // Restaurant: Save to AppSettings
+                              await AppSettings.updateSetting('Tax Is Inclusive', widget.store.taxEnabled);
+                              print('✅ Restaurant tax settings saved to AppSettings:');
+                              print('   - Tax Is Inclusive: ${widget.store.taxEnabled}');
                             }
 
                             // Save to restaurant database

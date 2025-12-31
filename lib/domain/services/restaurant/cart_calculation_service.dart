@@ -16,7 +16,20 @@ class CartCalculationService {
 
 
   // --- Final Calculated Properties ---
-  late final double subtotal;
+  /// Item Total = Gross total of all items (before discount)
+  /// In tax-inclusive mode: includes GST in prices
+  /// In tax-exclusive mode: base prices only
+  late final double itemTotal;
+
+  /// Taxable Amount = Base amount after discount (before adding GST)
+  /// In tax-inclusive mode: extracted base from discounted gross
+  /// In tax-exclusive mode: discounted base price
+  late final double taxableAmount;
+
+  /// For backward compatibility - same as taxableAmount
+  /// @deprecated Use taxableAmount instead
+  double get subtotal => taxableAmount;
+
   late final double discountAmount;
   late final double totalGST;
   late final double serviceChargeAmount;
@@ -37,7 +50,8 @@ class CartCalculationService {
 
   void _calculate() {
     if (items.isEmpty) {
-      subtotal = 0;
+      itemTotal = 0;
+      taxableAmount = 0;
       discountAmount = 0;
       totalGST = 0;
       serviceChargeAmount = 0;
@@ -46,57 +60,106 @@ class CartCalculationService {
       return;
     }
 
-    // Step 1: Calculate gross subtotal
-    subtotal = items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    // STEP 1: Calculate original total
+    final double totalOriginalAmount = items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    itemTotal = totalOriginalAmount;
 
-    // Step 2: Determine taxable amount. This depends on when the discount is applied.
-    double taxableAmount = subtotal;
+    // STEP 2: Accumulators
+    double accumulatedTaxableAmount = 0;
+    double accumulatedGST = 0;
+    double accumulatedDiscount = 0;
 
-    if (AppSettings.discountOnItems) {
-      taxableAmount = (discountType == DiscountType.percentage)
-          ? subtotal * (1 - (discountValue / 100))
-          : subtotal - discountValue;
+    // STEP 3: Loop through items
+    for (final item in items) {
+      final double itemOriginalAmount = item.price * item.quantity;
+      final double itemTaxRate = item.taxRate ?? 0;
+
+      double itemDiscount = 0;
+      double itemBase;
+      double itemGST;
+
+      // ================= DISCOUNT ON ITEMS =================
+      if (AppSettings.discountOnItems) {
+        // Calculate discount per item
+        if (discountType == DiscountType.percentage) {
+          itemDiscount = itemOriginalAmount * (discountValue / 100);
+        } else {
+          itemDiscount = totalOriginalAmount > 0
+              ? (itemOriginalAmount / totalOriginalAmount) * discountValue
+              : 0;
+        }
+        itemDiscount = itemDiscount.clamp(0, itemOriginalAmount);
+
+        // Discount applied FIRST, then GST on discounted amount
+        final discountedItemAmount = itemOriginalAmount - itemDiscount;
+
+        if (AppSettings.isTaxInclusive) {
+          itemBase = itemTaxRate > 0
+              ? discountedItemAmount / (1 + itemTaxRate)
+              : discountedItemAmount;
+          itemGST = discountedItemAmount - itemBase;
+        } else {
+          itemBase = discountedItemAmount;
+          itemGST = itemBase * itemTaxRate;
+        }
+      }
+
+      // ================= DISCOUNT OFF ITEMS =================
+      else {
+        // Calculate bill-level discount (but apply proportionally later)
+        double billDiscount = 0;
+        if (discountType == DiscountType.percentage) {
+          billDiscount = totalOriginalAmount * (discountValue / 100);
+        } else {
+          billDiscount = discountValue;
+        }
+
+        // Calculate this item's share after bill discount
+        final double afterDiscountTotal = totalOriginalAmount - billDiscount;
+        final double itemShare = totalOriginalAmount > 0
+            ? (itemOriginalAmount / totalOriginalAmount) * afterDiscountTotal
+            : 0;
+
+        // Item's portion of discount
+        itemDiscount = itemOriginalAmount - itemShare;
+
+        // GST calculated on discounted share
+        if (AppSettings.isTaxInclusive) {
+          itemBase = itemTaxRate > 0
+              ? itemShare / (1 + itemTaxRate)
+              : itemShare;
+          itemGST = itemShare - itemBase;
+        } else {
+          itemBase = itemShare;
+          itemGST = itemBase * itemTaxRate;
+        }
+      }
+
+      // Accumulate totals
+      accumulatedTaxableAmount += itemBase;
+      accumulatedGST += itemGST;
+      accumulatedDiscount += itemDiscount;
     }
-    taxableAmount = taxableAmount.clamp(0, double.infinity);
 
-    // Step 3: Calculate total GST based on the taxable amount.
-    totalGST = _calculateGstOnBase(taxableAmount);
+    // STEP 4: Assign final values (ONLY ONCE!)
+    taxableAmount = accumulatedTaxableAmount;
+    totalGST = accumulatedGST;
+    discountAmount = accumulatedDiscount;
 
-    // ✅ 2. FIX: Use a local variable for all discount calculations first.
-    double calculatedDiscount;
-    if (AppSettings.discountOnItems) {
-      // If discount is on items, it's the difference between the original and taxable amount.
-      calculatedDiscount = subtotal - taxableAmount;
-    } else {
-      // If discount is on the total, calculate it based on the cart total.
-      double baseForCartDiscount = AppSettings.isTaxInclusive ? subtotal : (subtotal + totalGST);
-      calculatedDiscount = (discountType == DiscountType.percentage)
-          ? baseForCartDiscount * (discountValue / 100)
-          : discountValue;
-    }
-
-    // ✅ 2 . FIX: Assign to the 'late final' field only ONCE, after clamping the result.
-    discountAmount = calculatedDiscount.clamp(0, subtotal + totalGST);
-
-    // Step 5: Calculate Service Charge or Delivery Charge
+    // STEP 5: Service Charge
     if (isDeliveryOrder) {
-      // For delivery orders, use flat delivery charge
       serviceChargeAmount = deliveryCharge;
     } else {
-      // For other orders, calculate percentage-based service charge
-      double baseForServiceCharge = AppSettings.isTaxInclusive
-          ? (subtotal - discountAmount)
-          : (subtotal + totalGST - discountAmount);
-
-      serviceChargeAmount = baseForServiceCharge > 0 ? baseForServiceCharge * (serviceChargePercentage / 100) : 0;
+      double payableBeforeServiceCharge = taxableAmount + totalGST;
+      serviceChargeAmount = payableBeforeServiceCharge > 0
+          ? payableBeforeServiceCharge * (serviceChargePercentage / 100)
+          : 0;
     }
 
-    // Step 6: Calculate Grand Total (before rounding)
-    double calculatedTotal = (AppSettings.isTaxInclusive)
-        ? (subtotal - discountAmount + serviceChargeAmount)
-        : (subtotal + totalGST - discountAmount + serviceChargeAmount);
+    // STEP 6: Grand Total
+    double calculatedTotal = taxableAmount + totalGST + serviceChargeAmount;
 
-    // Step 7: Apply Round Off if enabled
+    // STEP 7: Round Off
     if (AppSettings.roundOff) {
       final roundTo = double.parse(AppSettings.selectedRoundOffValue);
       final roundedTotal = _roundToNearest(calculatedTotal, roundTo);
@@ -112,25 +175,5 @@ class CartCalculationService {
   double _roundToNearest(double value, double nearest) {
     if (nearest <= 0) return value;
     return (value / nearest).round() * nearest;
-  }
-
-  // Helper method to calculate GST from a given base amount
-  double _calculateGstOnBase(double taxableBase) {
-    if (taxableBase <= 0 || subtotal <= 0) return 0;
-    double calculatedGst = 0; // Renamed for clarity
-
-    for (final item in items) {
-      // This prevents division by zero if subtotal is somehow 0
-      final double itemProportion = subtotal > 0 ? (item.price * item.quantity) / subtotal : 0;
-      final double itemTaxableAmount = taxableBase * itemProportion;
-      final double itemTaxRate = item.taxRate ?? 0;
-
-      if (itemTaxRate > 0) {
-        calculatedGst += AppSettings.isTaxInclusive
-            ? itemTaxableAmount - (itemTaxableAmount / (1 + itemTaxRate))
-            : itemTaxableAmount * itemTaxRate;
-      }
-    }
-    return calculatedGst;
   }
 }

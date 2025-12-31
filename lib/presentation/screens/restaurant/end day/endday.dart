@@ -49,11 +49,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     try {
       // Verify ALL required boxes are initialized before proceeding
       final requiredBoxes = {
-        'eodBox': 'EOD reports',
+        'restaurant_eodBox': 'EOD reports',
         'dayManagementBox': 'day management',
         'pastorderBox': 'past orders',
-        'expenseCategory': 'expense categories',
-        'expenseBox': 'expenses',
+        'restaurant_expenseCategory': 'expense categories',
+        'restaurant_expenseBox': 'expenses',
       };
 
       final missingBoxes = <String>[];

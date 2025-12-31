@@ -11,8 +11,9 @@ import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/printer_settings_model.dart';
 import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
-import '../../../util/common/currency_helper.dart';
-import '../../../util/common/decimal_settings.dart';
+import '../../../util/restaurant/staticswitch.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import 'retail_printer_settings_service.dart';
 
 /// Data class to hold all receipt information
@@ -39,6 +40,10 @@ class ReceiptData {
   // Store logo
   final Uint8List? logoBytes; // Store logo image
 
+  // Restaurant-specific: Pre-calculated item total (before discount)
+  // This should come from CartCalculationService.itemTotal
+  final double? itemTotal;
+
   ReceiptData({
     required this.sale,
     required this.items,
@@ -57,6 +62,7 @@ class ReceiptData {
     this.isAddonKot,
     this.billNumber,
     this.logoBytes,
+    this.itemTotal,
   });
 }
 
@@ -350,17 +356,80 @@ class ReceiptPdfService {
           _buildDashedLine(),
           pw.SizedBox(height: 4),
 
-          // Totals
-          if (showSubtotal)
-            _buildThermalTotalRow('Subtotal', data.sale.subtotal),
-          if (data.sale.discountAmount > 0 && showSubtotal)
-            _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-          if (showTax && data.sale.taxAmount > 0)
-            _buildThermalTotalRow('Tax', data.sale.taxAmount),
+          // Totals - Display only (NO calculations)
+          // All values pre-calculated by CartCalculationService
+          () {
+            final isRestaurantInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
+
+            // ✅ GOLDEN RULE: Only display pre-calculated values
+            // itemTotal: From CartCalculationService.itemTotal
+            // discountAmount: From CartCalculationService.discountAmount
+            // subtotal: From CartCalculationService.taxableAmount (mapped to sale.subtotal)
+            // taxAmount: From CartCalculationService.totalGST (mapped to sale.taxAmount)
+            // totalAmount: From CartCalculationService.grandTotal (mapped to sale.totalAmount)
+
+            if (isRestaurantInclusive) {
+              // TAX INCLUSIVE MODE - Labels only
+              return pw.Column(
+                children: [
+                  // Item Total (Incl. GST) - Pre-calculated
+                  if (showSubtotal && data.itemTotal != null)
+                    _buildThermalTotalRow('Item Total (Incl. GST)', data.itemTotal!),
+                  // Discount - Pre-calculated
+                  if (data.sale.discountAmount > 0 && showSubtotal)
+                    _buildThermalTotalRow('Discount', -data.sale.discountAmount),
+
+                  // Separator
+                  if (showSubtotal) pw.SizedBox(height: 4),
+                  if (showSubtotal) _buildDashedLine(),
+                  if (showSubtotal) pw.SizedBox(height: 4),
+
+                  // Taxable Amount - Pre-calculated
+                  if (showSubtotal)
+                    _buildThermalTotalRow('Taxable Amount', data.sale.subtotal),
+                  // GST (Included) - Pre-calculated
+                  if (showTax && data.sale.taxAmount > 0)
+                    _buildThermalTotalRow('GST (Included)', data.sale.taxAmount),
+                ],
+              );
+            } else {
+              // TAX EXCLUSIVE MODE - Labels only
+              return pw.Column(
+                children: [
+                  // Item Total - Pre-calculated
+                  if (showSubtotal && data.itemTotal != null)
+                    _buildThermalTotalRow('Item Total', data.itemTotal!),
+                  // Discount - Pre-calculated
+                  if (data.sale.discountAmount > 0 && showSubtotal)
+                    _buildThermalTotalRow('Discount', -data.sale.discountAmount),
+
+                  // Separator
+                  if (showSubtotal) pw.SizedBox(height: 4),
+                  if (showSubtotal) _buildDashedLine(),
+                  if (showSubtotal) pw.SizedBox(height: 4),
+
+                  // Sub Total (Before Tax) - Pre-calculated
+                  if (showSubtotal)
+                    _buildThermalTotalRow('Sub Total (Before Tax)', data.sale.subtotal),
+                  // GST - Pre-calculated
+                  if (showTax && data.sale.taxAmount > 0)
+                    _buildThermalTotalRow('GST', data.sale.taxAmount),
+                ],
+              );
+            }
+          }(),
+
+          // Second Separator
           pw.SizedBox(height: 4),
           _buildDashedLine(),
           pw.SizedBox(height: 4),
+
+          // Grand Total
           _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 12),
+
+          // Paid by [Payment Method]
+          if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit')
+            _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 10),
 
           // Credit sale info
           if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
@@ -704,50 +773,87 @@ class ReceiptPdfService {
 
         pw.SizedBox(height: 16),
 
-        // Totals Section
+        // Totals Section - Display only (NO calculations)
+        // All values pre-calculated by CartCalculationService
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.end,
           children: [
             pw.Container(
               width: 250,
-              child: pw.Column(
-                children: [
-                  if (showSubtotal)
-                    _buildInvoiceTotalRow('Subtotal', data.sale.subtotal),
-                  if (showDiscount && data.sale.discountAmount > 0)
-                    _buildInvoiceTotalRow('Discount', -data.sale.discountAmount, isRed: true),
-                  if (showTax && data.sale.taxAmount > 0)
-                    _buildInvoiceTotalRow('Tax', data.sale.taxAmount),
-                  if (showGrandTotal) pw.Divider(thickness: 1),
-                  if (showGrandTotal)
-                    _buildInvoiceTotalRow('Grand Total', data.sale.totalAmount, isBold: true, fontSize: 14),
-                  // Credit sale payment info
-                  if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
-                    pw.SizedBox(height: 8),
-                    pw.Divider(thickness: 0.5),
-                    _buildInvoiceTotalRow('Amount Paid', data.sale.paidAmount, isRed: false),
-                    _buildInvoiceTotalRow('Amount Due', data.sale.dueAmount, isBold: true, isRed: true, fontSize: 12),
-                    if (data.sale.paymentType == 'credit')
-                      pw.Container(
-                        margin: const pw.EdgeInsets.only(top: 8),
-                        padding: const pw.EdgeInsets.all(8),
-                        decoration: pw.BoxDecoration(
-                          color: PdfColors.red50,
-                          borderRadius: pw.BorderRadius.circular(4),
-                          border: pw.Border.all(color: PdfColors.red),
-                        ),
-                        child: pw.Text(
-                          'CREDIT SALE - PAYMENT PENDING',
-                          style: pw.TextStyle(
-                            fontSize: 10,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.red,
+              child: () {
+                final isRestaurantInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
+
+                // ✅ GOLDEN RULE: Only display pre-calculated values
+                // itemTotal: From CartCalculationService.itemTotal
+                // discountAmount: From CartCalculationService.discountAmount
+                // subtotal: From CartCalculationService.taxableAmount (mapped to sale.subtotal)
+                // taxAmount: From CartCalculationService.totalGST (mapped to sale.taxAmount)
+                // totalAmount: From CartCalculationService.grandTotal (mapped to sale.totalAmount)
+
+                return pw.Column(
+                  children: [
+                    // Item Total - Pre-calculated
+                    if (showSubtotal && data.itemTotal != null)
+                      _buildInvoiceTotalRow('Item Total', data.itemTotal!),
+                    // Discount - Pre-calculated
+                    if (showDiscount && data.sale.discountAmount > 0)
+                      _buildInvoiceTotalRow('Discount', -data.sale.discountAmount, isRed: true),
+
+                    // First Separator
+                    if (showSubtotal) pw.Divider(thickness: 0.5),
+
+                    // Taxable Amount / Sub Total - Pre-calculated (mode-aware label only)
+                    if (showSubtotal)
+                      _buildInvoiceTotalRow(
+                        isRestaurantInclusive ? 'Taxable Amount' : 'Sub Total (Before Tax)',
+                        data.sale.subtotal
+                      ),
+                    // GST - Pre-calculated (mode-aware label only)
+                    if (showTax && data.sale.taxAmount > 0)
+                      _buildInvoiceTotalRow(
+                        isRestaurantInclusive ? 'GST (Included)' : 'GST',
+                        data.sale.taxAmount
+                      ),
+
+                    // Second Separator
+                    if (showGrandTotal) pw.Divider(thickness: 1),
+
+                    // Grand Total - Pre-calculated
+                    if (showGrandTotal)
+                      _buildInvoiceTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 14),
+
+                    // Paid by [Payment Method]
+                    if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit')
+                      _buildInvoiceTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 11),
+
+                    // Credit sale payment info
+                    if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
+                      pw.SizedBox(height: 8),
+                      pw.Divider(thickness: 0.5),
+                      _buildInvoiceTotalRow('Amount Paid', data.sale.paidAmount, isRed: false),
+                      _buildInvoiceTotalRow('Amount Due', data.sale.dueAmount, isBold: true, isRed: true, fontSize: 12),
+                      if (data.sale.paymentType == 'credit')
+                        pw.Container(
+                          margin: const pw.EdgeInsets.only(top: 8),
+                          padding: const pw.EdgeInsets.all(8),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColors.red50,
+                            borderRadius: pw.BorderRadius.circular(4),
+                            border: pw.Border.all(color: PdfColors.red),
+                          ),
+                          child: pw.Text(
+                            'CREDIT SALE - PAYMENT PENDING',
+                            style: pw.TextStyle(
+                              fontSize: 10,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.red,
+                            ),
                           ),
                         ),
-                      ),
+                    ],
                   ],
-                ],
-              ),
+                );
+              }(),
             ),
           ],
         ),
@@ -1233,24 +1339,29 @@ class ReceiptPdfService {
         );
       }
     } else if (paymentList.isNotEmpty) {
-      // Single payment - show paid amount with cash details if applicable
+      // Single payment - only show if there are additional details (cash received, change)
+      // For restaurant: payment info is already shown after TOTAL, so skip basic payment line
       final payment = paymentList.first;
       final method = (payment['method'] as String?)?.toUpperCase() ?? 'CASH';
       final received = (payment['received'] as num?)?.toDouble();
       final change = (payment['change'] as num?)?.toDouble();
 
-      widgets.add(
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Paid by $method:', style: const pw.TextStyle(fontSize: 8)),
-            pw.Text(_formatCurrency(sale.totalAmount), style: const pw.TextStyle(fontSize: 8)),
-          ],
-        ),
-      );
-
-      // Show cash received and change for single cash payment
+      // Only show cash received and change if they exist (retail feature)
+      // Skip the basic "Paid by X" line for restaurant orders (already shown after TOTAL)
       if (method == 'CASH' && received != null && received > 0) {
+        // For retail: show "Paid by CASH:" line before cash details
+        if (!AppConfig.isRestaurant) {
+          widgets.add(
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Paid by $method:', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text(_formatCurrency(sale.totalAmount), style: const pw.TextStyle(fontSize: 8)),
+              ],
+            ),
+          );
+        }
+
         widgets.add(
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1271,19 +1382,22 @@ class ReceiptPdfService {
             ),
           );
         }
+      } else if (!AppConfig.isRestaurant) {
+        // For retail: show basic payment line if no cash details
+        widgets.add(
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Paid by $method:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(_formatCurrency(sale.totalAmount), style: const pw.TextStyle(fontSize: 8)),
+            ],
+          ),
+        );
       }
+      // For restaurant: skip everything if no cash details - payment already shown after TOTAL
     } else {
-      // No payment list - use paymentType from sale (e.g., for restaurant orders)
-      final method = sale.paymentType.toUpperCase();
-      widgets.add(
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('Paid by $method:', style: const pw.TextStyle(fontSize: 8)),
-            pw.Text(_formatCurrency(sale.totalAmount), style: const pw.TextStyle(fontSize: 8)),
-          ],
-        ),
-      );
+      // No payment list - payment info is already shown after TOTAL
+      // Return empty to avoid duplication
     }
 
     return widgets;

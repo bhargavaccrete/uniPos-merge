@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'billing_tab_model.dart';
+part of 'billing_tab_model_173.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
@@ -8,7 +8,7 @@ part of 'billing_tab_model.dart';
 
 class BillingTabModelAdapter extends TypeAdapter<BillingTabModel> {
   @override
-  final int typeId = 220;
+  final int typeId = 173;
 
   @override
   BillingTabModel read(BinaryReader reader) {

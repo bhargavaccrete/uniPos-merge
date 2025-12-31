@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyposuser/todayByPosUser.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Report/customebyvoid.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Report/monthbyvoid.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Report/thisweekbyvoid.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Report/yearbyvoid.dart';
 
 class SalesByPOsUSer extends StatefulWidget {
   const SalesByPOsUSer({super.key});
@@ -21,17 +17,43 @@ class _SalesByPOsUSerState extends State<SalesByPOsUSer> {
     switch (selectedFilter) {
       case "Today":
         return TodayByposUser();
-      case "Week Wise":
-        return WeekByVoid();
-      case "Month Wise":
-        return MonthbyVoid();
-      case "Year Wise":
-        return YearWisebyVoid();
+      case "This Week":
+      case "Month Wisee":
+      case "Year Wisee":
       case "Custome":
-        return CustomByVoid();
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(40.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.info_outline, size: 64, color: Colors.orange),
+                SizedBox(height: 20),
+                Text(
+                  'Feature Not Available',
+                  textScaler: TextScaler.linear(1),
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'POS user tracking is not yet implemented in the order system.\n\nTo enable this feature, orders need to track which POS user created them.',
+                  textScaler: TextScaler.linear(1),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       default:
         return Center(
-          child: Text('NO DATA AVAILABE'),
+          child: Text('NO DATA AVAILABLE'),
         );
     }
   }

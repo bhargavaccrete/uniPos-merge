@@ -561,26 +561,45 @@ class _CustomerdetailsState extends State<Customerdetails> {
     );
   }
 
-// ✅ This widget is now simple and only displays data with reactive currency symbol
+// ✅ Mode-aware labels matching PetPooja/Billberry standard
   Widget _buildBillSummary(CartCalculationService calcs) {
-    double subtotal = AppSettings.isTaxInclusive
-        ? calcs.subtotal - calcs.totalGST
-        : calcs.subtotal;
+    final isInclusive = AppSettings.isTaxInclusive;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         children: [
-          _buildSummaryRow('Sub Total:', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(subtotal)}'),
-          if (calcs.discountAmount > 0.009)
-            _buildSummaryRow('Total Discount:',
-                '-${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.discountAmount)}'),
-          if (calcs.totalGST > 0.009)
-            (AppSettings.isTaxInclusive
-                ? _buildSummaryRow('Total GST(Inclusive):',
-                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}')
-                : _buildSummaryRow(
-                    'Total GST:', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}')),
+          // Item Total (with mode-aware label)
+          _buildSummaryRow(
+            isInclusive ? 'Item Total (Incl GST):' : 'Item Total:',
+            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.itemTotal)}'
+          ),
 
+          // Discount
+          if (calcs.discountAmount > 0.009)
+            _buildSummaryRow(
+              'Discount:',
+              '-${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.discountAmount)}'
+            ),
+
+          // Divider after discount
+          if (calcs.discountAmount > 0.009 || calcs.totalGST > 0.009)
+            Divider(thickness: 1, height: 16),
+
+          // Taxable Amount / Sub Total (mode-aware label)
+          _buildSummaryRow(
+            isInclusive ? 'Taxable Amount:' : 'Sub Total (Before Tax):',
+            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.subtotal)}'
+          ),
+
+          // GST (mode-aware label)
+          if (calcs.totalGST > 0.009)
+            _buildSummaryRow(
+              isInclusive ? 'GST (Included):' : 'GST:',
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}'
+            ),
+
+          // Service/Delivery Charge
           if (calcs.serviceChargeAmount > 0.009)
             _buildSummaryRow(
                 widget.orderType == 'Delivery'
@@ -588,15 +607,19 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     : 'Service Charge:',
                 '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.serviceChargeAmount)}'),
 
-          // Show round off amount if enabled and non-zero
+          // Round Off
           if (AppSettings.roundOff && calcs.roundOffAmount.abs() > 0.009)
             _buildSummaryRow(
                 'Round Off:',
                 '${calcs.roundOffAmount >= 0 ? '+' : ''}${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.roundOffAmount)}'),
 
+          // Final divider before grand total
           Divider(thickness: 2, height: 20),
+
+          // Grand Total
           _buildSummaryRow(
-              'Grand Total:', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal)}',
+              'Grand Total:',
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal)}',
               isBold: true),
         ],
       ),
@@ -687,9 +710,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
       OrderModel activeModel, CartCalculationService calculations) async {
     print('============this is complete order function=============');
 
-    double preTaxSubtotal = AppSettings.isTaxInclusive
-        ? calculations.subtotal - calculations.totalGST
-        : calculations.subtotal;
+    // Note: calculations.subtotal is already the base price (without tax)
+    // CartCalculationService handles tax extraction for tax-inclusive mode
 
     // Generate daily bill number for completed order
     final int billNumber = await HiveOrders.getNextBillNumber();
@@ -706,7 +728,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       remark:
           SelectedRemark == 'other' ? _remarkController.text : SelectedRemark,
       Discount: calculations.discountAmount,
-      subTotal: preTaxSubtotal,
+      subTotal: calculations.subtotal,
       gstRate: 0,
       gstAmount: calculations.totalGST,
       kotNumbers: activeModel.kotNumbers, // Always present in new orders
@@ -724,9 +746,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
     print('============this is place order function=============');
     print(widget.orderType);
 
-    double preTaxSubtotal = AppSettings.isTaxInclusive
-        ? calculations.subtotal - calculations.totalGST
-        : calculations.subtotal;
+    // Note: calculations.subtotal is already the base price (without tax)
+    // CartCalculationService handles tax extraction for tax-inclusive mode
 
     final int newKotNumber = await HiveOrders.getNextKotNumber();
     final String newId = Uuid().v4();
@@ -749,7 +770,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         paymentmode: SelectedFilter,
         remark: calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
         Discount: calculations.discountAmount,
-        subTotal: preTaxSubtotal,
+        subTotal: calculations.subtotal,
         gstRate: 0,
         gstAmount: calculations.totalGST,
         kotNumbers: [newKotNumber],
@@ -787,7 +808,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       timeStamp: DateTime.now(),
       orderType: widget.orderType ?? 'Take Away',
       tableNo: widget.tableid ?? '',
-      subTotal: preTaxSubtotal,
+      subTotal: calculations.subtotal,
       discount: calculations.discountAmount,
       serviceCharge: calculations.serviceChargeAmount,
       gstRate: 0,

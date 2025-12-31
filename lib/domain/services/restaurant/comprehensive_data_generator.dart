@@ -147,7 +147,7 @@ class ComprehensiveDataGenerator {
 
   // 3. Generate Tax Rates
   static Future<int> generateTaxRates(int count) async {
-    final box = Hive.box<Tax>('TaxBox');
+    final box = Hive.box<Tax>('restaurant_taxes');
     print('📦 Generating $count tax rates...');
 
     final startTime = DateTime.now();
@@ -346,7 +346,7 @@ class ComprehensiveDataGenerator {
 
   // 6. Generate EOD Reports
   static Future<int> generateEODReports(int count) async {
-    final box = Hive.box<EndOfDayReport>('eodBox');
+    final box = Hive.box<EndOfDayReport>('restaurant_eodBox');
     print('📦 Generating $count EOD reports...');
 
     final startTime = DateTime.now();
@@ -789,9 +789,9 @@ class ComprehensiveDataGenerator {
       'pastorderBox',
       'tablesBox',
       'staffBox',
-      'TaxBox',
-      'eodBox',
-      'cart',
+      'restaurant_taxes',
+      'restaurant_eodBox',
+      'cart_box',
     ];
 
     for (final boxName in boxes) {
@@ -819,9 +819,9 @@ class ComprehensiveDataGenerator {
       'pastOrders': Hive.box<pastOrderModel>('pastorderBox').length,
       'tables': Hive.box<TableModel>('tablesBox').length,
       'staff': Hive.box<StaffModel>('staffBox').length,
-      'taxRates': Hive.box<Tax>('TaxBox').length,
-      'eodReports': Hive.box<EndOfDayReport>('eodBox').length,
-      'cart': Hive.box<CartItem>('cart').length,
+      'taxRates': Hive.box<Tax>('restaurant_taxes').length,
+      'eodReports': Hive.box<EndOfDayReport>('restaurant_eodBox').length,
+      'cart': Hive.box<CartItem>('cart_box').length,
     };
   }
 
@@ -831,7 +831,7 @@ class ComprehensiveDataGenerator {
 
     final boxes = [
       'categories', 'itemBoxs', 'variante', 'extra', 'orderBox',
-      'pastorderBox', 'tablesBox', 'staffBox', 'restaurant_taxes', 'eodBox', 'cart',
+      'pastorderBox', 'tablesBox', 'staffBox', 'restaurant_taxes', 'restaurant_eodBox', 'cart_box',
     ];
 
     for (final boxName in boxes) {

@@ -283,7 +283,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting expense categories...");
       try {
-        exportMap["expenseCategories"] = Hive.box<ExpenseCategory>("expenseCategory").values.map((e) => e.toMap()).toList();
+        exportMap["expenseCategories"] = Hive.box<ExpenseCategory>("restaurant_expenseCategory").values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ Expense category box not found: $e");
         exportMap["expenseCategories"] = [];
@@ -292,7 +292,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting expenses...");
       try {
-        exportMap["expenses"] = Hive.box<Expense>("expenseBox").values.map((e) => e.toMap()).toList();
+        exportMap["expenses"] = Hive.box<Expense>("restaurant_expenseBox").values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ Expense box not found: $e");
         exportMap["expenses"] = [];
@@ -310,7 +310,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting end of day reports...");
       try {
-        exportMap["eodReports"] = Hive.box<EndOfDayReport>("eodBox").values.map((e) => e.toMap()).toList();
+        exportMap["eodReports"] = Hive.box<EndOfDayReport>("restaurant_eodBox").values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ EOD box not found: $e");
         exportMap["eodReports"] = [];
@@ -521,7 +521,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting expense categories...");
       try {
-        exportMap["expenseCategories"] = Hive.box<ExpenseCategory>("expenseCategory").values.map((e) => e.toMap()).toList();
+        exportMap["expenseCategories"] = Hive.box<ExpenseCategory>("restaurant_expenseCategory").values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ Expense category box not found: $e");
         exportMap["expenseCategories"] = [];
@@ -529,7 +529,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting expenses...");
       try {
-        exportMap["expenses"] = Hive.box<Expense>("expenseBox").values.map((e) => e.toMap()).toList();
+        exportMap["expenses"] = Hive.box<Expense>("restaurant_expenseBox").values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ Expense box not found: $e");
         exportMap["expenses"] = [];
@@ -545,7 +545,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting end of day reports...");
       try {
-        exportMap["eodReports"] = Hive.box<EndOfDayReport>("eodBox").values.map((e) => e.toMap()).toList();
+        exportMap["eodReports"] = Hive.box<EndOfDayReport>("restaurant_eodBox").values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ EOD box not found: $e");
         exportMap["eodReports"] = [];
@@ -688,11 +688,11 @@ class CategoryImportExport {
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting expense categories...");
-      exportMap["expenseCategories"] = Hive.box<ExpenseCategory>("expenseCategory").values.map((e) => e.toMap()).toList();
+      exportMap["expenseCategories"] = Hive.box<ExpenseCategory>("restaurant_expenseCategory").values.map((e) => e.toMap()).toList();
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting expenses...");
-      exportMap["expenses"] = Hive.box<Expense>("expenseBox").values.map((e) => e.toMap()).toList();
+      exportMap["expenses"] = Hive.box<Expense>("restaurant_expenseBox").values.map((e) => e.toMap()).toList();
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting tables...");
@@ -700,7 +700,7 @@ class CategoryImportExport {
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting end of day reports...");
-      exportMap["eodReports"] = Hive.box<EndOfDayReport>("eodBox").values.map((e) => e.toMap()).toList();
+      exportMap["eodReports"] = Hive.box<EndOfDayReport>("restaurant_eodBox").values.map((e) => e.toMap()).toList();
       await Future.delayed(Duration.zero);
 
       debugPrint("📦 Exporting current orders...");
@@ -962,14 +962,14 @@ class CategoryImportExport {
         debugPrint("✅ Opened restaurant_taxes box");
       }
 
-      if (!Hive.isBoxOpen('expenseCategory')) {
-        await Hive.openBox<ExpenseCategory>('expenseCategory', encryptionCipher: cipher);
-        debugPrint("✅ Opened expenseCategory box");
+      if (!Hive.isBoxOpen('restaurant_expenseCategory')) {
+        await Hive.openBox<ExpenseCategory>('restaurant_expenseCategory', encryptionCipher: cipher);
+        debugPrint("✅ Opened restaurant_expenseCategory box");
       }
 
-      if (!Hive.isBoxOpen('expenseBox')) {
-        await Hive.openBox<Expense>('expenseBox', encryptionCipher: cipher);
-        debugPrint("✅ Opened expenseBox box");
+      if (!Hive.isBoxOpen('restaurant_expenseBox')) {
+        await Hive.openBox<Expense>('restaurant_expenseBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened restaurant_expenseBox box");
       }
 
       if (!Hive.isBoxOpen('tablesBox')) {
@@ -977,9 +977,9 @@ class CategoryImportExport {
         debugPrint("✅ Opened tablesBox box");
       }
 
-      if (!Hive.isBoxOpen('eodBox')) {
-        await Hive.openBox<EndOfDayReport>('eodBox', encryptionCipher: cipher);
-        debugPrint("✅ Opened eodBox box");
+      if (!Hive.isBoxOpen('restaurant_eodBox')) {
+        await Hive.openBox<EndOfDayReport>('restaurant_eodBox', encryptionCipher: cipher);
+        debugPrint("✅ Opened restaurant_eodBox box");
       }
 
       if (!Hive.isBoxOpen('pastorderBox')) {
@@ -1058,10 +1058,10 @@ class CategoryImportExport {
     await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
     await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
     await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
-    await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
-    await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
+    await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("restaurant_expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
+    await _restoreBox("expenses", Hive.box<Expense>("restaurant_expenseBox"), (m) => Expense.fromMap(m), data);
     await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
-    await _restoreBox("eodReports", Hive.box<EndOfDayReport>("eodBox"), (m) => EndOfDayReport.fromMap(m), data);
+    await _restoreBox("eodReports", Hive.box<EndOfDayReport>("restaurant_eodBox"), (m) => EndOfDayReport.fromMap(m), data);
     await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
     await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
 
@@ -1138,10 +1138,10 @@ class CategoryImportExport {
     await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
     await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
     await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
-    await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
-    await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
+    await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("restaurant_expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
+    await _restoreBox("expenses", Hive.box<Expense>("restaurant_expenseBox"), (m) => Expense.fromMap(m), data);
     await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
-    await _restoreBox("eodReports", Hive.box<EndOfDayReport>("eodBox"), (m) => EndOfDayReport.fromMap(m), data);
+    await _restoreBox("eodReports", Hive.box<EndOfDayReport>("restaurant_eodBox"), (m) => EndOfDayReport.fromMap(m), data);
     await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
     await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
 
@@ -1493,10 +1493,10 @@ class CategoryImportExport {
       await _restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m), data);
       await _restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), data);
       await _restoreBox("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), data);
-      await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
-      await _restoreBox("expenses", Hive.box<Expense>("expenseBox"), (m) => Expense.fromMap(m), data);
+      await _restoreBox("expenseCategories", Hive.box<ExpenseCategory>("restaurant_expenseCategory"), (m) => ExpenseCategory.fromMap(m), data);
+      await _restoreBox("expenses", Hive.box<Expense>("restaurant_expenseBox"), (m) => Expense.fromMap(m), data);
       await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
-      await _restoreBox("eodReports", Hive.box<EndOfDayReport>("eodBox"), (m) => EndOfDayReport.fromMap(m), data);
+      await _restoreBox("eodReports", Hive.box<EndOfDayReport>("restaurant_eodBox"), (m) => EndOfDayReport.fromMap(m), data);
       await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
       await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
 

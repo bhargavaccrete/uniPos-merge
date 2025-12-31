@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/cart_model_202.dart';
-import '../../../data/models/retail/hive_model/billing_tab_model.dart';
+import '../../../data/models/retail/hive_model/billing_tab_model_173.dart';
 import '../../services/retail/gst_service.dart';
 
 

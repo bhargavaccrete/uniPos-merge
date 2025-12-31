@@ -12,6 +12,7 @@ import 'package:unipos/domain/services/restaurant/cart_calculation_service.dart'
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
+import 'package:unipos/util/restaurant/staticswitch.dart'; // Import for AppSettings
 
 class RestaurantPrintHelper {
 
@@ -265,6 +266,15 @@ class RestaurantPrintHelper {
         // Calculate tax for this item if possible, otherwise distribute total tax
         final itemTaxRate = (item.taxRate ?? 0) * 100;
 
+        // ✅ FIX: Adjust displayed price based on tax mode
+        // In tax-inclusive mode: item.price already includes tax (show as-is)
+        // In tax-exclusive mode: item.price includes tax, extract base for display
+        double displayPrice = item.price;
+        if (!AppSettings.isTaxInclusive && item.taxRate != null && item.taxRate! > 0) {
+          // Tax Exclusive: Extract base price from gross price for display
+          displayPrice = item.price / (1 + item.taxRate!);
+        }
+
         // Format extras with quantities for display
         String? extrasInfo;
         if (item.extras != null && item.extras!.isNotEmpty) {
@@ -331,7 +341,7 @@ class RestaurantPrintHelper {
           productName: item.title,
           size: item.variantName, // Use size field for variant name
           weight: additionalInfo, // Use weight field to store extras and choices info
-          price: item.price,
+          price: displayPrice, // ✅ Use adjusted price based on tax mode
           qty: item.quantity,
           discountAmount: 0, // Item level discount not typically stored in restaurant cart
           gstRate: itemTaxRate,
@@ -345,13 +355,15 @@ class RestaurantPrintHelper {
           ? 'KOT-${order.kotNumbers.last}'
           : order.id.substring(0, 8).toUpperCase();
 
+      // Note: calculations.subtotal is already the base price (without tax)
+      // CartCalculationService handles tax extraction for tax-inclusive mode
       final saleModel = SaleModel.createWithGst(
         saleId: invoiceId,
         customerId: order.customerName.isNotEmpty ? 'GUEST' : null,
         totalItems: order.items.length,
-        subtotal: calculations.subtotal,
+        subtotal: calculations.subtotal,  // Base price (without tax)
         discountAmount: calculations.discountAmount,
-        totalTaxableAmount: calculations.subtotal, // Approximation for now
+        totalTaxableAmount: calculations.subtotal - calculations.discountAmount, // Discounted base
         totalGstAmount: calculations.totalGST,
         grandTotal: calculations.grandTotal,
         paymentType: order.paymentMethod ?? 'Cash',
@@ -391,6 +403,7 @@ class RestaurantPrintHelper {
         tableNo: order.tableNo,
         kotNumbers: order.kotNumbers, // Pass all KOT numbers for customer bill
         billNumber: billNumber, // Pass bill number for completed orders
+        itemTotal: calculations.itemTotal, // ✅ Pass pre-calculated item total from CartCalculationService
       );
 
       // 6. Show Print Options
@@ -409,6 +422,7 @@ class RestaurantPrintHelper {
         gstNumber: receiptData.gstNumber,
         billNumber: billNumber, // Pass bill number for bill receipts
         kotNumbers: order.kotNumbers, // Pass all KOT numbers to display on bill
+        itemTotal: receiptData.itemTotal, // ✅ Pass pre-calculated item total
       );
       
     } catch (e) {

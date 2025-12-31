@@ -56,6 +56,7 @@ class PrintService {
     DateTime? orderTimestamp,
     String? orderNo,
     bool? isAddonKot,
+    double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -77,6 +78,7 @@ class PrintService {
       orderNo: orderNo,
       isAddonKot: isAddonKot,
       logoBytes: logoBytes,
+      itemTotal: itemTotal,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -110,6 +112,7 @@ class PrintService {
     String? orderNo,
     bool? isAddonKot,
     int? billNumber,
+    double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -132,6 +135,7 @@ class PrintService {
       isAddonKot: isAddonKot,
       billNumber: billNumber,
       logoBytes: logoBytes,
+      itemTotal: itemTotal,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -164,6 +168,8 @@ class PrintService {
                     tableNo: tableNo,
                     kotNumber: kotNumber,
                     orderTimestamp: orderTimestamp,
+                    billNumber: billNumber,
+                    itemTotal: itemTotal, // Pass item total
                   );
                 },
               ),
@@ -197,6 +203,7 @@ class PrintService {
     int? kotNumber,
     DateTime? orderTimestamp,
     int? billNumber,
+    double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -216,6 +223,7 @@ class PrintService {
       orderTimestamp: orderTimestamp,
       billNumber: billNumber,
       logoBytes: logoBytes,
+      itemTotal: itemTotal,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -258,6 +266,7 @@ class PrintService {
     String? storeEmail,
     String? gstNumber,
     int? billNumber,
+    double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -273,6 +282,7 @@ class PrintService {
       gstNumber: gstNumber,
       billNumber: billNumber,
       logoBytes: logoBytes,
+      itemTotal: itemTotal,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -357,6 +367,7 @@ class PrintService {
     String? gstNumber,
     int? billNumber, // Bill number for completed orders
     List<int>? kotNumbers, // KOT numbers for restaurant orders
+    double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -412,8 +423,9 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
-                  billNumber: billNumber, // Pass bill number
-                  kotNumbers: kotNumbers, // Pass KOT numbers
+                  billNumber: billNumber,
+                  kotNumbers: kotNumbers,
+                  itemTotal: itemTotal, // Pass item total
                 );
               },
             ),
@@ -436,8 +448,9 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
-                  billNumber: billNumber, // Pass bill number
-                  kotNumbers: kotNumbers, // Pass KOT numbers
+                  billNumber: billNumber,
+                  kotNumbers: kotNumbers,
+                  itemTotal: itemTotal, // Pass item total
                 );
               },
             ),
@@ -459,7 +472,8 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
-                  billNumber: billNumber, // Pass bill number
+                  billNumber: billNumber,
+                  itemTotal: itemTotal, // Pass item total
                 );
               },
             ),
@@ -481,7 +495,8 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
-                  billNumber: billNumber, // Pass bill number
+                  billNumber: billNumber,
+                  itemTotal: itemTotal, // Pass item total
                 );
                 if (context.mounted && path != null) {
                   ScaffoldMessenger.of(context).showSnackBar(

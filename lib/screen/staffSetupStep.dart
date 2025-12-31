@@ -427,7 +427,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                   child: ElevatedButton.icon(
                     onPressed: _addStaff,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add Staff Member'),
+                    label: const Text('Add Staff Member',style: TextStyle(color: AppColors.white),),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 15),
@@ -582,6 +582,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         : Text(
                             _staffMembers.isEmpty ? 'Skip (Add Later)' : 'Save & Continue',
                             style: const TextStyle(
+                             color:  AppColors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),

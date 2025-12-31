@@ -34,7 +34,7 @@ import 'package:unipos/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:unipos/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:unipos/data/models/retail/hive_model/product_attribute_model_221.dart';
 import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
-import 'package:unipos/data/models/retail/hive_model/billing_tab_model.dart';
+import 'package:unipos/data/models/retail/hive_model/billing_tab_model_173.dart';
 
 // Restaurant Models
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
@@ -287,7 +287,7 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailStaff)) {
       Hive.registerAdapter(RetailStaffModelAdapter());
     }
-    // BillingTab - 220
+    // BillingTab - 173
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailBillingTab)) {
       Hive.registerAdapter(BillingTabModelAdapter());
     }
@@ -530,12 +530,12 @@ class HiveInit {
     // Tax - use unique name to avoid conflict with retail 'taxBox'
     await Hive.openBox<Tax>('restaurant_taxes');
 
-    // Expenses
-    await Hive.openBox<ExpenseCategory>('expenseCategory');
-    await Hive.openBox<Expense>('expenseBox');
+    // Expenses (restaurant-specific)
+    await Hive.openBox<ExpenseCategory>('restaurant_expenseCategory');
+    await Hive.openBox<Expense>('restaurant_expenseBox');
 
-    // EOD
-    await Hive.openBox<EndOfDayReport>('eodBox');
+    // EOD (restaurant-specific)
+    await Hive.openBox<EndOfDayReport>('restaurant_eodBox');
 
     // Day Management (for opening balance tracking)
     await Hive.openBox('dayManagementBox');
@@ -598,10 +598,10 @@ class HiveInit {
              Hive.isBoxOpen('extra') &&
              Hive.isBoxOpen('variante') &&
              Hive.isBoxOpen('choice') &&
-             Hive.isBoxOpen('eodBox') &&
+             Hive.isBoxOpen('restaurant_eodBox') &&
              Hive.isBoxOpen('dayManagementBox') &&
-             Hive.isBoxOpen('expenseCategory') &&
-             Hive.isBoxOpen('expenseBox');
+             Hive.isBoxOpen('restaurant_expenseCategory') &&
+             Hive.isBoxOpen('restaurant_expenseBox');
     } catch (_) {
       return false;
     }

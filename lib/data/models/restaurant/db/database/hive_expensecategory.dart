@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
+import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
 
@@ -12,70 +13,45 @@ import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
 class HiveExpenseCat{
 
   static Box<ExpenseCategory>? _box;
-  static const _boxname = 'expenseCategory';
+
+  /// Get the correct box name based on business mode
+  static String get _boxname => AppConfig.isRetail ? 'expenseCategory' : 'restaurant_expenseCategory';
 
 
-  static Future<Box<ExpenseCategory>>getECategory()async{
+  static Box<ExpenseCategory> getECategory(){
+    final boxName = _boxname;
+
+    // Box is already opened during app startup in HiveInit
     if(_box == null || !_box!.isOpen){
-      try{
-        // Get the same encryption cipher used in main.dart
-        const secureStorage = FlutterSecureStorage();
-        final storedKey = await secureStorage.read(key: 'hive_key');
-        if (storedKey != null) {
-          final encryptionKey = base64Url.decode(storedKey);
-          final cipher = HiveAesCipher(encryptionKey);
-          _box = await Hive.openBox<ExpenseCategory>(_boxname, encryptionCipher: cipher);
-        } else {
-          _box = await Hive.openBox<ExpenseCategory>(_boxname);
-        }
-      }catch(e){
-        print("Error Opening $_boxname Hive box: $e");
-        // If there's a corruption issue, try to delete and recreate the box
-        try {
-          await Hive.deleteBoxFromDisk(_boxname);
-          const secureStorage = FlutterSecureStorage();
-          final storedKey = await secureStorage.read(key: 'hive_key');
-          if (storedKey != null) {
-            final encryptionKey = base64Url.decode(storedKey);
-            final cipher = HiveAesCipher(encryptionKey);
-            _box = await Hive.openBox<ExpenseCategory>(_boxname, encryptionCipher: cipher);
-          } else {
-            _box = await Hive.openBox<ExpenseCategory>(_boxname);
-          }
-          print("Successfully recreated $_boxname box after corruption");
-        } catch (e2) {
-          print("Failed to recreate box: $e2");
-          rethrow;
-        }
+      if (!Hive.isBoxOpen(boxName)) {
+        throw Exception('ExpenseCategory box ($boxName) not initialized. Please ensure Hive boxes were opened during app startup.');
       }
-    }
-    if(_box == null){
-      throw HiveError("Hive box '$_boxname' could not be opened");
+      _box = Hive.box<ExpenseCategory>(boxName);
     }
     return _box!;
   }
 
 
   static Future<void> addECategory(ExpenseCategory eCategory)async{
-    final box = await getECategory();
+    final box = getECategory();
     await box.put(eCategory.id, eCategory );
   }
 
   static Future<void>updateECategory(ExpenseCategory eCategory)async{
-    final box = await getECategory();
+    final box = getECategory();
     await box.put(eCategory.id, eCategory);
   }
 
 
   static Future<void>deleteECategory(String id)async{
-    final box = await getECategory();
+    final box = getECategory();
     await box.delete(id);
   }
 
 
 
   static Future<List<ExpenseCategory>>getAllECategory()async{
-    final box = await getECategory();
+    final box = getECategory();
     return box.values.toList();
   }
 
@@ -88,62 +64,40 @@ class HiveExpenseCat{
 
 class HiveExpenceL{
   static Box<Expense>? _box;
-  static const _boxName = 'expenseBox';
+
+  /// Get the correct box name based on business mode
+  static String get _boxName => AppConfig.isRetail ? 'expenseBox' : 'restaurant_expenseBox';
 
 
-  static Future<Box<Expense>> getexpenseBox()async{
+  static Box<Expense> getexpenseBox(){
+    final boxName = _boxName;
+
+    // Box is already opened during app startup in HiveInit
     if(_box == null || !_box!.isOpen){
-      try{
-        // Get the same encryption cipher used in main.dart
-        const secureStorage = FlutterSecureStorage();
-        final storedKey = await secureStorage.read(key: 'hive_key');
-        if (storedKey != null) {
-          final encryptionKey = base64Url.decode(storedKey);
-          final cipher = HiveAesCipher(encryptionKey);
-          _box = await Hive.openBox<Expense>(_boxName, encryptionCipher: cipher);
-        } else {
-          _box = await Hive.openBox<Expense>(_boxName);
-        }
-      }catch(e){
-        print("Error opening '$_boxName' Hive Box: $e");
-        // If there's a corruption issue, try to delete and recreate the box
-        try {
-          await Hive.deleteBoxFromDisk(_boxName);
-          const secureStorage = FlutterSecureStorage();
-          final storedKey = await secureStorage.read(key: 'hive_key');
-          if (storedKey != null) {
-            final encryptionKey = base64Url.decode(storedKey);
-            final cipher = HiveAesCipher(encryptionKey);
-            _box = await Hive.openBox<Expense>(_boxName, encryptionCipher: cipher);
-          } else {
-            _box = await Hive.openBox<Expense>(_boxName);
-          }
-          print("Successfully recreated $_boxName box after corruption");
-        } catch (e2) {
-          print("Failed to recreate box: $e2");
-          rethrow;
-        }
+      if (!Hive.isBoxOpen(boxName)) {
+        throw Exception('Expense box ($boxName) not initialized. Please ensure Hive boxes were opened during app startup.');
       }
+      _box = Hive.box<Expense>(boxName);
     }
     return _box!;
   }
 
 
   static Future<void> addItem(Expense expense) async{
-    final box = await getexpenseBox();
+    final box = getexpenseBox();
     await box.put(expense.id, expense); /// add without key insert the item
 
   }
   static Future<List<Expense>> getAllItems() async {
-    final box = await getexpenseBox();
+    final box = getexpenseBox();
     return box.values.toList();
   }
   static Future<void> deleteItem(String id) async {
-    final box = await getexpenseBox();
+    final box = getexpenseBox();
     await box.delete(id);
   }
   static Future<void> updateItem(Expense expense) async {
-    final box = await getexpenseBox();
+    final box = getexpenseBox();
     await box.put(expense.id, expense);
   }
 

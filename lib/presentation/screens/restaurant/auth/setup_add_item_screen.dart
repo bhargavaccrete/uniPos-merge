@@ -18,6 +18,7 @@ import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
+import 'package:unipos/util/restaurant/staticswitch.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
@@ -343,16 +344,71 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     return tax.taxperecentage ?? 0.0;
   }
 
-  /// Calculate price with tax
+  /// Calculate base price (price before tax)
+  /// If tax inclusive: extract base from entered price
+  /// If tax exclusive: entered price IS the base
+  double _calculateBasePrice() {
+    final priceText = _priceController.text.trim();
+    if (priceText.isEmpty) return 0.0;
+
+    final enteredPrice = double.tryParse(priceText) ?? 0.0;
+    final taxPercentage = _calculateTotalTaxPercentage();
+
+    // Check if tax is inclusive
+    final isTaxInclusive = AppSettings.isTaxInclusive;
+
+    if (isTaxInclusive && taxPercentage > 0) {
+      // Tax Inclusive: Calculate base price by removing tax
+      // Example: entered=100, tax=18% → base = 100/1.18 = 84.75
+      return enteredPrice / (1 + (taxPercentage / 100));
+    } else {
+      // Tax Exclusive: Entered price IS the base
+      return enteredPrice;
+    }
+  }
+
+  /// Calculate tax amount
+  double _calculateTaxAmount() {
+    final priceText = _priceController.text.trim();
+    if (priceText.isEmpty) return 0.0;
+
+    final enteredPrice = double.tryParse(priceText) ?? 0.0;
+    final taxPercentage = _calculateTotalTaxPercentage();
+
+    if (taxPercentage == 0) return 0.0;
+
+    final isTaxInclusive = AppSettings.isTaxInclusive;
+
+    if (isTaxInclusive) {
+      // Tax Inclusive: Extract tax from entered price
+      // Example: entered=100, tax=18% → tax = 100 - (100/1.18) = 15.25
+      final basePrice = enteredPrice / (1 + (taxPercentage / 100));
+      return enteredPrice - basePrice;
+    } else {
+      // Tax Exclusive: Calculate tax on base price
+      // Example: base=100, tax=18% → tax = 100 * 0.18 = 18
+      return enteredPrice * (taxPercentage / 100);
+    }
+  }
+
+  /// Calculate final price (what customer pays)
   double _calculatePriceWithTax() {
     final priceText = _priceController.text.trim();
     if (priceText.isEmpty) return 0.0;
 
-    final basePrice = double.tryParse(priceText) ?? 0.0;
+    final enteredPrice = double.tryParse(priceText) ?? 0.0;
     final taxPercentage = _calculateTotalTaxPercentage();
-    final taxAmount = basePrice * (taxPercentage / 100);
 
-    return basePrice + taxAmount;
+    final isTaxInclusive = AppSettings.isTaxInclusive;
+
+    if (isTaxInclusive) {
+      // Tax Inclusive: Final price = entered price (tax already included)
+      return enteredPrice;
+    } else {
+      // Tax Exclusive: Final price = base + tax
+      final taxAmount = enteredPrice * (taxPercentage / 100);
+      return enteredPrice + taxAmount;
+    }
   }
 
   // ============ SAVE ITEM ============
@@ -1312,7 +1368,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                             ),
                           ),
                           Text(
-                            '₹${_priceController.text}',
+                            '₹${_calculateBasePrice().toStringAsFixed(2)}',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.grey[700],
@@ -1332,7 +1388,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                             ),
                           ),
                           Text(
-                            '+₹${((double.tryParse(_priceController.text) ?? 0) * _calculateTotalTaxPercentage() / 100).toStringAsFixed(2)}',
+                            '₹${_calculateTaxAmount().toStringAsFixed(2)}',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.grey[700],

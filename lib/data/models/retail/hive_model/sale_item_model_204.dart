@@ -1,6 +1,8 @@
 import 'package:hive/hive.dart';
 import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unipos/core/config/app_config.dart';
+import 'package:unipos/util/restaurant/staticswitch.dart';
 
 part 'sale_item_model_204.g.dart';
 
@@ -107,15 +109,44 @@ class SaleItemModel extends HiveObject {
     String? barcode,
     String? hsnCode,
   }) {
-    // Calculate GST properly
+    // ✅ FIX: Check if tax is inclusive (for restaurant mode)
+    final bool isTaxInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
+
     final grossAmount = price * qty;
     final discount = discountAmount ?? 0;
-    final taxableAmt = grossAmount - discount;
     final rate = gstRate ?? 0;
-    final gstAmt = _roundTo2Decimals(taxableAmt * (rate / 100));
+
+    double taxableAmt;
+    double gstAmt;
+    double finalTotal;
+
+    if (isTaxInclusive && rate > 0) {
+      // Tax Inclusive: Price already includes tax
+      // Example: price=100, rate=18%
+      // Base price = 100 / 1.18 = 84.75
+      // GST = 100 - 84.75 = 15.25
+      // Total = 100 (no addition needed)
+
+      final amountAfterDiscount = grossAmount - discount;
+      final basePrice = amountAfterDiscount / (1 + (rate / 100));
+
+      taxableAmt = _roundTo2Decimals(basePrice); // Base price without tax
+      gstAmt = _roundTo2Decimals(amountAfterDiscount - basePrice); // Tax extracted
+      finalTotal = _roundTo2Decimals(amountAfterDiscount); // Same as price (tax already included)
+    } else {
+      // Tax Exclusive: Tax is added on top of price (default retail behavior)
+      // Example: price=100, rate=18%
+      // Taxable amount = 100
+      // GST = 100 * 0.18 = 18
+      // Total = 100 + 18 = 118
+
+      taxableAmt = grossAmount - discount;
+      gstAmt = _roundTo2Decimals(taxableAmt * (rate / 100));
+      finalTotal = _roundTo2Decimals(taxableAmt + gstAmt);
+    }
+
     final cgst = _roundTo2Decimals(gstAmt / 2);
     final sgst = _roundTo2Decimals(gstAmt / 2);
-    final finalTotal = _roundTo2Decimals(taxableAmt + gstAmt);
 
     return SaleItemModel(
       saleItemId: _uuid.v4(),

@@ -1,9 +1,10 @@
 import 'package:hive/hive.dart';
+import '../../../../core/constants/hive_type_ids.dart';
 import 'cart_model_202.dart';
 
-part 'billing_tab_model.g.dart';
+part 'billing_tab_model_173.g.dart';
 
-@HiveType(typeId: 220)
+@HiveType(typeId:  HiveTypeIds.retailBillingTab)
 class BillingTabModel extends HiveObject {
   @HiveField(0)
   final String id;

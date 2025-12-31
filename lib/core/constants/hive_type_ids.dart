@@ -69,7 +69,7 @@ class HiveTypeIds {
   static const int retailAttributeValue = 170;
   static const int retailProductAttribute = 171;
   static const int retailStaff = 172;
-  static const int retailBillingTab = 220;
+  static const int retailBillingTab = 173;
 
   // ==================== HELPER METHODS ====================
 

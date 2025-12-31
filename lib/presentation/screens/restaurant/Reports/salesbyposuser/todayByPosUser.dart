@@ -88,11 +88,45 @@ class _TodayByposUserState extends State<TodayByposUser> {
 
               SizedBox(height: 25,),
 
-              Text(" Total Void Order Amount Today (Rs.) = 0 ",                          textScaler: TextScaler.linear(1),
-                style: GoogleFonts.poppins(fontSize: 14,fontWeight: FontWeight.w600),),
-              SizedBox(height:25),
-              Text(" Total Void Order Count = 0 ",                          textScaler: TextScaler.linear(1),
-                style: GoogleFonts.poppins(fontSize: 14,fontWeight: FontWeight.w600),),
+              Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  border: Border.all(color: Colors.orange.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 32),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Feature Not Available',
+                            textScaler: TextScaler.linear(1),
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Orders do not currently track which POS user created them. To enable this report, add a user/staff field to the order data model.',
+                            textScaler: TextScaler.linear(1),
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.orange.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
               SizedBox(height: 25,),
 

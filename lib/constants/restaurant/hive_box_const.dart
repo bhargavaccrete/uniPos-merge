@@ -15,9 +15,9 @@ class HiveBox {
   
   // Configuration boxes
   static const String tables = 'tablesBox';
-  static const String tax = 'TaxBox';
+  static const String tax = 'restaurant_taxes';
   static const String appState = 'app_state';
-  static const String eod = 'eodBox';
+  static const String eod = 'restaurant_eodBox';
 
   // List of all available boxes
   static const List<String> allBoxes = [

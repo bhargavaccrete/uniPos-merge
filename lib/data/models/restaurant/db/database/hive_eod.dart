@@ -1,19 +1,24 @@
 
 import 'package:hive/hive.dart';
+import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 
 class HiveEOD {
-  static const String _boxName = 'eodBox';
   static Box<EndOfDayReport>? _box;
 
+  /// Get the correct box name based on business mode
+  static String get _boxName => AppConfig.isRetail ? 'eodBox' : 'restaurant_eodBox';
+
   static Box<EndOfDayReport> _getEODBox() {
+    final boxName = _boxName;
+
     // Box is already opened during app startup in HiveInit
     if (_box == null || !_box!.isOpen) {
       // Check if box is actually open before trying to access it
-      if (!Hive.isBoxOpen(_boxName)) {
-        throw Exception('EOD box not initialized. Please ensure HiveInit.openRestaurantBoxes() was called during app startup.');
+      if (!Hive.isBoxOpen(boxName)) {
+        throw Exception('EOD box ($boxName) not initialized. Please ensure Hive boxes were opened during app startup.');
       }
-      _box = Hive.box<EndOfDayReport>(_boxName);
+      _box = Hive.box<EndOfDayReport>(boxName);
     }
     return _box!;
   }
