@@ -79,6 +79,32 @@ class UnifiedBackupService {
   static const String _backupDirectoryName = 'UniPOS_Backups';
 
   /// ---------------------------
+  /// 🔧 HELPER: Deep clean map for JSON serialization
+  /// ---------------------------
+  /// Recursively cleans a map to ensure all values are JSON serializable
+  /// Handles nested maps, lists, and converts non-serializable objects
+  static dynamic _deepCleanMap(dynamic value) {
+    if (value == null) {
+      return null;
+    } else if (value is Map) {
+      final cleanedMap = <String, dynamic>{};
+      value.forEach((key, val) {
+        cleanedMap[key.toString()] = _deepCleanMap(val);
+      });
+      return cleanedMap;
+    } else if (value is List) {
+      return value.map((item) => _deepCleanMap(item)).toList();
+    } else if (value is String || value is num || value is bool) {
+      return value;
+    } else if (value is DateTime) {
+      return value.toIso8601String();
+    } else {
+      // For any other type, try to convert to string
+      return value.toString();
+    }
+  }
+
+  /// ---------------------------
   /// ✅ EXPORT TO DOWNLOADS (AUTO-SAVE)
   /// ---------------------------
   /// Automatically saves backup to Downloads folder
@@ -286,29 +312,29 @@ class UnifiedBackupService {
       debugPrint("📦 Collecting RESTAURANT data...");
 
       // Categories
-      exportMap["categories"] = Hive.box<Category>("categories").values.map((e) => e.toMap()).toList();
+      exportMap["categories"] = Hive.box<Category>("categories").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Items
-      exportMap["items"] = Hive.box<Items>("itemBoxs").values.map((e) => e.toMap()).toList();
+      exportMap["items"] = Hive.box<Items>("itemBoxs").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Variants
-      exportMap["variants"] = Hive.box<VariantModel>("variante").values.map((e) => e.toMap()).toList();
+      exportMap["variants"] = Hive.box<VariantModel>("variante").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Choices
-      exportMap["choices"] = Hive.box<ChoicesModel>("choice").values.map((e) => e.toMap()).toList();
+      exportMap["choices"] = Hive.box<ChoicesModel>("choice").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Extras
-      exportMap["extras"] = Hive.box<Extramodel>("extra").values.map((e) => e.toMap()).toList();
+      exportMap["extras"] = Hive.box<Extramodel>("extra").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Company
-      exportMap["companyBox"] = Hive.box<Company>("companyBox").values.map((e) => e.toMap()).toList();
+      exportMap["companyBox"] = Hive.box<Company>("companyBox").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Staff
-      exportMap["staffBox"] = Hive.box<StaffModel>("staffBox").values.map((e) => e.toMap()).toList();
+      exportMap["staffBox"] = Hive.box<StaffModel>("staffBox").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Taxes (using helper - mode aware)
       try {
-        exportMap["taxes"] = Hive.box<Tax>("restaurant_taxes").values.map((e) => e.toMap()).toList();
+        exportMap["taxes"] = Hive.box<Tax>("restaurant_taxes").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Tax box not found: $e");
         exportMap["taxes"] = [];
@@ -317,7 +343,7 @@ class UnifiedBackupService {
       // Expense Categories (using helper - mode aware)
       try {
         final expenseCatBox = HiveExpenseCat.getECategory();
-        exportMap["expenseCategories"] = expenseCatBox.values.map((e) => e.toMap()).toList();
+        exportMap["expenseCategories"] = expenseCatBox.values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Expense category box error: $e");
         exportMap["expenseCategories"] = [];
@@ -326,7 +352,7 @@ class UnifiedBackupService {
       // Expenses (using helper - mode aware)
       try {
         final expenseBox = HiveExpenceL.getexpenseBox();
-        exportMap["expenses"] = expenseBox.values.map((e) => e.toMap()).toList();
+        exportMap["expenses"] = expenseBox.values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Expense box error: $e");
         exportMap["expenses"] = [];
@@ -334,7 +360,7 @@ class UnifiedBackupService {
 
       // Tables
       try {
-        exportMap["tables"] = Hive.box<TableModel>("tablesBox").values.map((e) => e.toMap()).toList();
+        exportMap["tables"] = Hive.box<TableModel>("tablesBox").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Tables box not found: $e");
         exportMap["tables"] = [];
@@ -344,7 +370,7 @@ class UnifiedBackupService {
       try {
         final eodBoxName = AppConfig.isRetail ? 'eodBox' : 'restaurant_eodBox';
         final eodBox = Hive.box<EndOfDayReport>(eodBoxName);
-        exportMap["eodReports"] = eodBox.values.map((e) => e.toMap()).toList();
+        exportMap["eodReports"] = eodBox.values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ EOD box error: $e");
         exportMap["eodReports"] = [];
@@ -352,7 +378,7 @@ class UnifiedBackupService {
 
       // Current Orders
       try {
-        exportMap["orders"] = Hive.box<OrderModel>("orderBox").values.map((e) => e.toMap()).toList();
+        exportMap["orders"] = Hive.box<OrderModel>("orderBox").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Orders box not found: $e");
         exportMap["orders"] = [];
@@ -360,7 +386,7 @@ class UnifiedBackupService {
 
       // ✅ Restaurant Cart
       try {
-        exportMap["restaurantCart"] = Hive.box<CartItem>(HiveBoxNames.restaurantCart).values.map((e) => e.toMap()).toList();
+        exportMap["restaurantCart"] = Hive.box<CartItem>(HiveBoxNames.restaurantCart).values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
         debugPrint("📦 Restaurant Cart exported: ${exportMap["restaurantCart"]!.length}");
       } catch (e) {
         debugPrint("⚠️ Restaurant Cart box not found: $e");
@@ -384,14 +410,14 @@ class UnifiedBackupService {
       // ✅ Test Bill Box
       try {
         final box = Hive.box<TestBillModel>(HiveBoxNames.testBillBox);
-        exportMap["testBillBox"] = box.values.map((TestBillModel e) => e.toMap()).toList();
+        exportMap["testBillBox"] = box.values.map((TestBillModel e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
         debugPrint("📦 Test Bill Box exported: ${exportMap["testBillBox"]!.length}");
       } catch (e) {
         debugPrint("⚠️ Test Bill Box error: $e");
         exportMap["testBillBox"] = [];
       }
 
-      // Past Orders (batched processing)
+      // Past Orders (batched processing with safe serialization)
       try {
         final pastOrderBox = Hive.box<pastOrderModel>("pastorderBox");
         final List<Map<String, dynamic>> pastOrdersList = [];
@@ -401,10 +427,23 @@ class UnifiedBackupService {
         for (int i = 0; i < allOrders.length; i += batchSize) {
           final end = (i + batchSize < allOrders.length) ? i + batchSize : allOrders.length;
           final batch = allOrders.sublist(i, end);
-          pastOrdersList.addAll(batch.map((e) => e.toMap()).toList());
+
+          // Convert each order with error handling
+          for (var order in batch) {
+            try {
+              final orderMap = order.toMap();
+              // Deep clean the map to ensure all values are JSON serializable
+              final cleanedMap = _deepCleanMap(orderMap) as Map<String, dynamic>;
+              pastOrdersList.add(cleanedMap);
+            } catch (e) {
+              debugPrint("⚠️ Error converting order ${order.id}: $e");
+              // Skip this order and continue
+            }
+          }
           await Future.delayed(Duration(milliseconds: 10));
         }
         exportMap["pastOrders"] = pastOrdersList;
+        debugPrint("📦 Past Orders exported: ${pastOrdersList.length}");
       } catch (e) {
         debugPrint("❌ Error exporting past orders: $e");
         exportMap["pastOrders"] = [];
