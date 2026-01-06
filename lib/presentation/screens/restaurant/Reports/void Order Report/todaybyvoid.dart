@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:hive/hive.dart';
+import 'package:intl/intl.dart';
+import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
 class TodayByVoid extends StatefulWidget {
@@ -11,10 +13,70 @@ class TodayByVoid extends StatefulWidget {
 }
 
 class _TodayByVoidState extends State<TodayByVoid> {
+  bool _isLoading = true;
+  List<pastOrderModel> _voidOrders = [];
+  double _totalVoidAmount = 0.0;
+  int _totalVoidCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVoidOrders();
+  }
+
+  Future<void> _loadVoidOrders() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final orderBox = Hive.box<pastOrderModel>('pastorderBox');
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayEnd = todayStart.add(Duration(days: 1));
+
+      final List<pastOrderModel> voidOrdersList = [];
+      double totalAmount = 0.0;
+
+      for (final order in orderBox.values) {
+        // Check if order is voided/cancelled
+        if (order.orderStatus != null &&
+            (order.orderStatus!.toUpperCase().contains('VOID') ||
+             order.orderStatus!.toUpperCase().contains('CANCEL'))) {
+
+          // Check if it's today
+          if (order.orderAt != null &&
+              order.orderAt!.isAfter(todayStart) &&
+              order.orderAt!.isBefore(todayEnd)) {
+            voidOrdersList.add(order);
+            totalAmount += order.totalPrice;
+          }
+        }
+      }
+
+      setState(() {
+        _voidOrders = voidOrdersList;
+        _totalVoidAmount = totalAmount;
+        _totalVoidCount = voidOrdersList.length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading void orders: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
+
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Container(
@@ -22,7 +84,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // CommonButton
+              // Export Button
               CommonButton(
                   width: width * 0.5,
                   height: height * 0.07,
@@ -44,41 +106,35 @@ class _TodayByVoidState extends State<TodayByVoid> {
                     ],
                   )),
 
-              SizedBox(
-                height: 25,
-              ),
+              SizedBox(height: 25),
 
+              // Total Amount
               Text(
-                " Total Void Order Amount Today (Rs.) = 0 ",
+                " Total Void Order Amount Today (Rs.) = ${_totalVoidAmount.toStringAsFixed(2)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 25),
+
+              // Total Count
               Text(
-                " Total Void Order Count = 0 ",
+                " Total Void Order Count = $_totalVoidCount ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
               ),
 
-              SizedBox(
-                height: 25,
-              ),
+              SizedBox(height: 25),
+
+              // Data Table
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                     headingRowHeight: 50,
                     columnSpacing: 2,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
-                    border: TableBorder.all(
-                        // borderRadius: BorderRadius.circular(5),
-                        color: Colors.white),
-                    decoration: BoxDecoration(
-                        // borderRadius:BorderRadiusDirectional.only(topStart: Radius.circular(15),bottomStart: Radius.circular(15)),
-                        // color: Colors.green,
-
-                        ),
+                    border: TableBorder.all(color: Colors.white),
                     columns: [
                       DataColumn(
                           columnWidth: FixedColumnWidth(width * 0.25),
@@ -95,8 +151,6 @@ class _TodayByVoidState extends State<TodayByVoid> {
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
                           columnWidth: FixedColumnWidth(width * 0.2),
-
-                          // columnWidth:FlexColumnWidth(width * 0.1),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -194,53 +248,32 @@ class _TodayByVoidState extends State<TodayByVoid> {
                               child:
                                   Text('Status', textScaler: TextScaler.linear(1),
                                       style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.3),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Details',textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
                     ],
-                    rows: [
-                      // DataRow(
-                      //   cells: [
-                      //     DataCell(
-                      //       Center(child: Text('Farm fresh')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('0')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('3')),
-                      //     ), DataCell(
-                      //       Center(child: Text('3')),
-                      //     ),
-                      //   ],
-                      // ),
-                      // DataRow(
-                      //   cells: [
-                      //     DataCell(
-                      //       Center(child: Text('Fruit punch')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('0')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('2')),
-                      //     ),DataCell(
-                      //       Center(child: Text('2')),
-                      //     ),
-                      //   ],
-                      // ),
-                    ]),
+                    rows: _voidOrders.map((order) {
+                      return DataRow(cells: [
+                        DataCell(Center(
+                            child: Text(
+                                order.orderAt != null
+                                    ? DateFormat('dd-MM-yyyy').format(order.orderAt!)
+                                    : '-',
+                                textScaler: TextScaler.linear(1)))),
+                        DataCell(Center(child: Text(order.id ?? '-', textScaler: TextScaler.linear(1)))),
+                        DataCell(Center(
+                            child: Text(order.customerName.isNotEmpty ? order.customerName : 'Guest', textScaler: TextScaler.linear(1)))),
+                        DataCell(Center(child: Text('-', textScaler: TextScaler.linear(1)))),
+                        DataCell(Center(child: Text(order.paymentmode ?? '-', textScaler: TextScaler.linear(1)))),
+                        DataCell(Center(child: Text(order.orderType ?? '-', textScaler: TextScaler.linear(1)))),
+                        DataCell(Center(
+                            child: Text(order.totalPrice.toStringAsFixed(2), textScaler: TextScaler.linear(1)))),
+                        DataCell(Center(
+                            child: Text(
+                          order.orderStatus ?? '-',
+                          textScaler: TextScaler.linear(1),
+                          style: TextStyle(
+                              color: Colors.red, fontWeight: FontWeight.bold),
+                        ))),
+                      ]);
+                    }).toList()),
               )
             ],
           ),

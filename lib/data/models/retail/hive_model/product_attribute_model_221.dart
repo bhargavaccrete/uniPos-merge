@@ -77,6 +77,36 @@ class ProductAttributeModel extends HiveObject {
     );
   }
 
+  /// Convert to map for export/backup
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'productId': productId,
+      'attributeId': attributeId,
+      'selectedValueIds': selectedValueIds,
+      'usedForVariants': usedForVariants,
+      'isVisible': isVisible,
+      'position': position,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+    };
+  }
+
+  /// Create from map for import/restore
+  factory ProductAttributeModel.fromMap(Map<String, dynamic> map) {
+    return ProductAttributeModel(
+      id: map['id'] as String,
+      productId: map['productId'] as String,
+      attributeId: map['attributeId'] as String,
+      selectedValueIds: (map['selectedValueIds'] as List<dynamic>).map((e) => e as String).toList(),
+      usedForVariants: map['usedForVariants'] as bool? ?? true,
+      isVisible: map['isVisible'] as bool? ?? true,
+      position: (map['position'] as num?)?.toInt() ?? 0,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String?,
+    );
+  }
+
   @override
   String toString() =>
       'ProductAttributeModel(productId: $productId, attributeId: $attributeId, values: $selectedValueIds)';

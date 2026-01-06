@@ -144,6 +144,28 @@ class ProductModel extends HiveObject {
     };
   }
 
+  // Create from Map (for backup restore)
+  factory ProductModel.fromMap(Map<String, dynamic> map) {
+    return ProductModel(
+      productId: map['productId'] as String,
+      productName: (map['name'] ?? map['productName']) as String,
+      brandName: map['brandName'] as String?,
+      category: map['category'] as String,
+      subCategory: map['subCategory'] as String?,
+      imagePath: map['imagePath'] as String?,
+      description: map['description'] as String?,
+      hasVariants: map['hasVariants'] as bool,
+      createdAt: map['createdAt'] as String,
+      updateAt: map['updateAt'] as String,
+      gstRate: (map['gstRate'] as num?)?.toDouble(),
+      hsnCode: map['hsnCode'] as String?,
+      productType: (map['productType'] as String?) ?? 'simple',
+      defaultPrice: (map['defaultPrice'] as num?)?.toDouble(),
+      defaultMrp: (map['defaultMrp'] as num?)?.toDouble(),
+      defaultCostPrice: (map['defaultCostPrice'] as num?)?.toDouble(),
+    );
+  }
+
   ProductModel copyWith({
     String? productId,
     String? productName,

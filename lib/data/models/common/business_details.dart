@@ -116,4 +116,52 @@ class BusinessDetails extends HiveObject {
       updatedAt: DateTime.now(),
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'businessTypeId': businessTypeId,
+      'businessTypeName': businessTypeName,
+      'storeName': storeName,
+      'ownerName': ownerName,
+      'phone': phone,
+      'email': email,
+      'address': address,
+      'gstin': gstin,
+      'pan': pan,
+      'city': city,
+      'state': state,
+      'country': country,
+      'pincode': pincode,
+      'logo': logo?.toList(),
+
+      'isSetupComplete': isSetupComplete,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  factory BusinessDetails.fromMap(Map<String, dynamic> map) {
+    return BusinessDetails(
+      businessTypeId: map['businessTypeId'] as String?,
+      businessTypeName: map['businessTypeName'] as String?,
+      storeName: map['storeName'] as String?,
+      ownerName: map['ownerName'] as String?,
+      phone: map['phone'] as String?,
+      email: map['email'] as String?,
+      address: map['address'] as String?,
+      gstin: map['gstin'] as String?,
+      pan: map['pan'] as String?,
+      city: map['city'] as String?,
+      state: map['state'] as String?,
+      country: map['country'] as String?,
+      pincode: map['pincode'] as String?,
+      logo: map['logo'] != null
+          ? Uint8List.fromList(List<int>.from(map['logo']))
+          : null,
+
+      isSetupComplete: map['isSetupComplete'] as bool? ?? false,
+      createdAt: DateTime.tryParse(map['createdAt'] ?? ''),
+      updatedAt: DateTime.tryParse(map['updatedAt'] ?? ''),
+    );
+  }
 }

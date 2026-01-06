@@ -109,4 +109,22 @@ class HoldSaleItemModel extends HiveObject {
       'createdAt': createdAt,
     };
   }
+
+  factory HoldSaleItemModel.fromMap(Map<String, dynamic> map) {
+    return HoldSaleItemModel(
+      holdSaleItemId: map['holdSaleItemId'] as String,
+      holdSaleId: map['holdSaleId'] as String,
+      variantId: map['variantId'] as String,
+      productId: map['productId'] as String,
+      productName: map['productName'] as String,
+      size: map['size'] as String?,
+      color: map['color'] as String?,
+      weight: map['weight'] as String?,
+      price: (map['price'] as num).toDouble(),
+      qty: (map['qty'] as num).toInt(),
+      total: (map['total'] as num).toDouble(),
+      barcode: map['barcode'] as String?,
+      createdAt: map['createdAt'] as String,
+    );
+  }
 }

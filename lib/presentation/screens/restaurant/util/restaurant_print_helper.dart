@@ -357,6 +357,19 @@ class RestaurantPrintHelper {
 
       // Note: calculations.subtotal is already the base price (without tax)
       // CartCalculationService handles tax extraction for tax-inclusive mode
+      // ✅ FIX: Determine payment type based on payment status
+      print('🔍 DEBUG PRINT: order.isPaid = ${order.isPaid}');
+      print('🔍 DEBUG PRINT: order.paymentMethod = ${order.paymentMethod}');
+      String paymentType;
+      if (order.isPaid == true) {
+        // Order is paid - show actual payment method
+        paymentType = order.paymentMethod ?? 'Cash';
+      } else {
+        // Order is unpaid (running order) - show NOT PAID status
+        paymentType = 'NOT PAID';
+      }
+      print('🔍 DEBUG PRINT: Final paymentType = $paymentType');
+
       final saleModel = SaleModel.createWithGst(
         saleId: invoiceId,
         customerId: order.customerName.isNotEmpty ? 'GUEST' : null,
@@ -366,7 +379,7 @@ class RestaurantPrintHelper {
         totalTaxableAmount: calculations.subtotal - calculations.discountAmount, // Discounted base
         totalGstAmount: calculations.totalGST,
         grandTotal: calculations.grandTotal,
-        paymentType: order.paymentMethod ?? 'Cash',
+        paymentType: paymentType,
         isReturn: false,
       );
 

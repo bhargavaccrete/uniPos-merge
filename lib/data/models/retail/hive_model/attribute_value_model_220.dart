@@ -82,6 +82,36 @@ class AttributeValueModel extends HiveObject {
         .replaceAll(RegExp(r'\s+'), '-');
   }
 
+  /// Convert to map for export/backup
+  Map<String, dynamic> toMap() {
+    return {
+      'valueId': valueId,
+      'attributeId': attributeId,
+      'value': value,
+      'slug': slug,
+      'colorCode': colorCode,
+      'sortOrder': sortOrder,
+      'isActive': isActive,
+      'createdAt': createdAt,
+      'updatedAt': updatedAt,
+    };
+  }
+
+  /// Create from map for import/restore
+  factory AttributeValueModel.fromMap(Map<String, dynamic> map) {
+    return AttributeValueModel(
+      valueId: map['valueId'] as String,
+      attributeId: map['attributeId'] as String,
+      value: map['value'] as String,
+      slug: map['slug'] as String,
+      colorCode: map['colorCode'] as String?,
+      sortOrder: (map['sortOrder'] as num?)?.toInt() ?? 0,
+      isActive: map['isActive'] as bool? ?? true,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String?,
+    );
+  }
+
   @override
   String toString() => 'AttributeValueModel(id: $valueId, value: $value)';
 }

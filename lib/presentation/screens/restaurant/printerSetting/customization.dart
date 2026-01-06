@@ -25,7 +25,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
         title: Text(
           'Customize Your Printer',
           textScaler: TextScaler.linear(1),
-          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w500),
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500),
         ),
         centerTitle: true,
         leading: IconButton(

@@ -130,6 +130,22 @@ class PurchaseOrderModel extends HiveObject {
     };
   }
 
+  factory PurchaseOrderModel.fromMap(Map<String, dynamic> map) {
+    return PurchaseOrderModel(
+      poId: map['poId'] as String,
+      poNumber: map['poNumber'] as String,
+      supplierId: map['supplierId'] as String,
+      supplierName: map['supplierName'] as String?,
+      expectedDeliveryDate: map['expectedDeliveryDate'] as String,
+      totalItems: (map['totalItems'] as num).toInt(),
+      estimatedTotal: (map['estimatedTotal'] as num?)?.toDouble() ?? 0.0,
+      status: map['status'] as String,
+      notes: map['notes'] as String?,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String,
+    );
+  }
+
   /// Create a copy with updated fields
   PurchaseOrderModel copyWith({
     String? poId,

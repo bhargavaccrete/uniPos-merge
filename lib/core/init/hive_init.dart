@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:unipos/core/constants/hive_box_names.dart';
 
 // Common Models
 import 'package:unipos/models/payment_method.dart' as pm;
@@ -109,14 +110,14 @@ class HiveInit {
       print('⚠️ Common boxes already open - skipping');
       return;
     }
-    await Hive.openBox('storebox');
-    await Hive.openBox('app_state');
-    await Hive.openBox<TaxDetails>('taxBox');
-    await Hive.openBox<BusinessType>('businessTypeBox');
-    await Hive.openBox<BusinessDetails>('businessDetailsBox');
+    await Hive.openBox(HiveBoxNames.storeBox);
+    await Hive.openBox(HiveBoxNames.appState);
+    await Hive.openBox<TaxDetails>(HiveBoxNames.taxBox);
+    await Hive.openBox<BusinessType>(HiveBoxNames.businessTypeBox);
+    await Hive.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
 
     // Open and initialize payment methods box with defaults
-    final paymentBox = await Hive.openBox<pm.PaymentMethod>('paymentMethodsBox');
+    final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
     print('📦 HiveInit: Opened paymentMethodsBox, has ${paymentBox.length} items');
 
     // Initialize with defaults if empty
@@ -360,40 +361,43 @@ class HiveInit {
     // Clean up old incorrectly-named boxes first (one-time migration)
     await _cleanupOldAttributeBoxes();
 
-    await Hive.openBox<ProductModel>('products');
-    await Hive.openBox<VarianteModel>('variants');
-    await Hive.openBox<CartItemModel>('cartItems');
-    await Hive.openBox<SaleModel>('sales');
-    await Hive.openBox<SaleItemModel>('saleItems');
-    await Hive.openBox<SupplierModel>('suppliers');
-    await Hive.openBox<PurchaseItemModel>('purchaseItems');
-    await Hive.openBox<PurchaseModel>('purchases');
-    await Hive.openBox<CustomerModel>('customers');
-    await Hive.openBox<HoldSaleModel>('holdSales');
-    await Hive.openBox<HoldSaleItemModel>('holdSaleItems');
-    await Hive.openBox<PurchaseOrderModel>('purchaseOrders');
-    await Hive.openBox<PurchaseOrderItemModel>('purchaseOrderItems');
-    await Hive.openBox<GRNModel>('grns');
-    await Hive.openBox<GRNItemModel>('grnItems');
+    await Hive.openBox<ProductModel>(HiveBoxNames.products);
+    await Hive.openBox<VarianteModel>(HiveBoxNames.variants);
+    await Hive.openBox<CartItemModel>(HiveBoxNames.cartItems);
+    await Hive.openBox<SaleModel>(HiveBoxNames.sales);
+    await Hive.openBox<SaleItemModel>(HiveBoxNames.saleItems);
+    await Hive.openBox<SupplierModel>(HiveBoxNames.suppliers);
+    await Hive.openBox<PurchaseItemModel>(HiveBoxNames.purchaseItems);
+    await Hive.openBox<PurchaseModel>(HiveBoxNames.purchases);
+    await Hive.openBox<CustomerModel>(HiveBoxNames.customers);
+    await Hive.openBox<HoldSaleModel>(HiveBoxNames.holdSales);
+    await Hive.openBox<HoldSaleItemModel>(HiveBoxNames.holdSaleItems);
+    await Hive.openBox<PurchaseOrderModel>(HiveBoxNames.purchaseOrders);
+    await Hive.openBox<PurchaseOrderItemModel>(HiveBoxNames.purchaseOrderItems);
+    await Hive.openBox<GRNModel>(HiveBoxNames.grns);
+    await Hive.openBox<GRNItemModel>(HiveBoxNames.grnItems);
     // Note: Retail categories use Box<String> named 'retail_categories' to avoid conflict
-    await Hive.openBox<String>('retail_categories');
+    await Hive.openBox<String>(HiveBoxNames.retailCategories);
     // CategoryModel box for GST support
-    await Hive.openBox<CategoryModel>('category_models');
-    await Hive.openBox<PaymentEntryModel>('paymentEntries');
-    await Hive.openBox<AdminModel>('admin_box');
-    await Hive.openBox<CreditPaymentModel>('credit_payments');
-    await Hive.openBox<AttributeModel>('attributes');
-    await Hive.openBox<AttributeValueModel>('attribute_values');
-    await Hive.openBox<ProductAttributeModel>('product_attributes');
-    await Hive.openBox<RetailStaffModel>('retail_staff');
-    await Hive.openBox<BillingTabModel>('billingTabs');
+    await Hive.openBox<CategoryModel>(HiveBoxNames.categoryModels);
+    await Hive.openBox<PaymentEntryModel>(HiveBoxNames.paymentEntries);
+    await Hive.openBox<AdminModel>(HiveBoxNames.adminBox);
+    await Hive.openBox<CreditPaymentModel>(HiveBoxNames.creditPayments);
+    await Hive.openBox<AttributeModel>(HiveBoxNames.attributes);
+    await Hive.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
+    await Hive.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
+    await Hive.openBox<RetailStaffModel>(HiveBoxNames.retailStaff);
+    await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
 
     // EOD box (shared with restaurant mode)
-    await Hive.openBox<EndOfDayReport>('eodBox');
+    await Hive.openBox<EndOfDayReport>(HiveBoxNames.retailEOD);
+
+    // Day Management box (for opening balance tracking)
+    await Hive.openBox(HiveBoxNames.dayManagementBox);
 
     // Expense boxes (shared with restaurant mode - needed for EOD)
-    await Hive.openBox<ExpenseCategory>('expenseCategory');
-    await Hive.openBox<Expense>('expenseBox');
+    await Hive.openBox<ExpenseCategory>(HiveBoxNames.retailExpenseCategory);
+    await Hive.openBox<Expense>(HiveBoxNames.retailExpense);
 
     _areRetailBoxesOpen = true;
     print('✅ All retail boxes opened successfully and guard flag set');
@@ -507,40 +511,40 @@ class HiveInit {
     }
 
     // Core restaurant boxes - use actual box names from database files
-    await Hive.openBox<Category>('categories');  // ✅ Actual name used in HiveBoxes
-    await Hive.openBox<Company>('companyBox');
-    await Hive.openBox<Items>('itemBoxs');
-    await Hive.openBox<Extramodel>('extra');  // ✅ Changed from 'extras' to 'extra'
-    await Hive.openBox<VariantModel>('variante');  // ✅ Changed from 'variants' to 'variante'
-    await Hive.openBox<ChoicesModel>('choice');  // ✅ Changed from 'choices' to 'choice'
+    await Hive.openBox<Category>(HiveBoxNames.restaurantCategories);
+    await Hive.openBox<Company>(HiveBoxNames.restaurantCompany);
+    await Hive.openBox<Items>(HiveBoxNames.restaurantItems);
+    await Hive.openBox<Extramodel>(HiveBoxNames.restaurantExtras);
+    await Hive.openBox<VariantModel>(HiveBoxNames.restaurantVariants);
+    await Hive.openBox<ChoicesModel>(HiveBoxNames.restaurantChoices);
 
     // Restaurant cart
-    await Hive.openBox<CartItem>('cart_box');  // ✅ Fixed: actual name is 'cart_box'
+    await Hive.openBox<CartItem>(HiveBoxNames.restaurantCart);
 
     // Orders
-    await Hive.openBox<OrderModel>('orderBox');
-    await Hive.openBox('appCounters');  // ✅ Added: order counter box
+    await Hive.openBox<OrderModel>(HiveBoxNames.restaurantOrders);
+    await Hive.openBox(HiveBoxNames.appCounters);
 
-    await Hive.openBox<StaffModel>('staffBox');
-    await Hive.openBox<TableModel>('tablesBox');
+    await Hive.openBox<StaffModel>(HiveBoxNames.restaurantStaff);
+    await Hive.openBox<TableModel>(HiveBoxNames.restaurantTables);
 
     // Past Orders
-    await Hive.openBox<pastOrderModel>('pastorderBox');
+    await Hive.openBox<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
 
     // Tax - use unique name to avoid conflict with retail 'taxBox'
-    await Hive.openBox<Tax>('restaurant_taxes');
+    await Hive.openBox<Tax>(HiveBoxNames.restaurantTaxes);
 
     // Expenses (restaurant-specific)
-    await Hive.openBox<ExpenseCategory>('restaurant_expenseCategory');
-    await Hive.openBox<Expense>('restaurant_expenseBox');
+    await Hive.openBox<ExpenseCategory>(HiveBoxNames.restaurantExpenseCategory);
+    await Hive.openBox<Expense>(HiveBoxNames.restaurantExpense);
 
     // EOD (restaurant-specific)
-    await Hive.openBox<EndOfDayReport>('restaurant_eodBox');
+    await Hive.openBox<EndOfDayReport>(HiveBoxNames.restaurantEOD);
 
     // Day Management (for opening balance tracking)
-    await Hive.openBox('dayManagementBox');
+    await Hive.openBox(HiveBoxNames.dayManagementBox);
 
-    await Hive.openBox<TestBillModel>('testBillBox');
+    await Hive.openBox<TestBillModel>(HiveBoxNames.testBillBox);
 
     _areRestaurantBoxesOpen = true;
     print('✅ All restaurant boxes opened successfully with correct names and guard flag set');
@@ -580,10 +584,14 @@ class HiveInit {
   /// Check if retail boxes are open
   static bool get areRetailBoxesOpen {
     try {
-      return Hive.isBoxOpen('products') &&
-             Hive.isBoxOpen('attributes') &&
-             Hive.isBoxOpen('attribute_values') &&
-             Hive.isBoxOpen('product_attributes');
+      return Hive.isBoxOpen(HiveBoxNames.products) &&
+             Hive.isBoxOpen(HiveBoxNames.attributes) &&
+             Hive.isBoxOpen(HiveBoxNames.attributeValues) &&
+             Hive.isBoxOpen(HiveBoxNames.productAttributes) &&
+             Hive.isBoxOpen(HiveBoxNames.dayManagementBox) &&
+             Hive.isBoxOpen(HiveBoxNames.retailEOD) &&
+             Hive.isBoxOpen(HiveBoxNames.retailExpenseCategory) &&
+             Hive.isBoxOpen(HiveBoxNames.retailExpense);
     } catch (_) {
       return false;
     }
@@ -592,16 +600,16 @@ class HiveInit {
   /// Check if restaurant boxes are open
   static bool get areRestaurantBoxesOpen {
     try {
-      return Hive.isBoxOpen('categories') &&
-             Hive.isBoxOpen('itemBoxs') &&
-             Hive.isBoxOpen('restaurant_taxes') &&
-             Hive.isBoxOpen('extra') &&
-             Hive.isBoxOpen('variante') &&
-             Hive.isBoxOpen('choice') &&
-             Hive.isBoxOpen('restaurant_eodBox') &&
-             Hive.isBoxOpen('dayManagementBox') &&
-             Hive.isBoxOpen('restaurant_expenseCategory') &&
-             Hive.isBoxOpen('restaurant_expenseBox');
+      return Hive.isBoxOpen(HiveBoxNames.restaurantCategories) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantItems) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantTaxes) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantExtras) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantVariants) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantChoices) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantEOD) &&
+             Hive.isBoxOpen(HiveBoxNames.dayManagementBox) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantExpenseCategory) &&
+             Hive.isBoxOpen(HiveBoxNames.restaurantExpense);
     } catch (_) {
       return false;
     }
@@ -640,9 +648,9 @@ class HiveInit {
       await registerRetailAdapters();
 
       // Re-open the correct boxes
-      await Hive.openBox<AttributeModel>('attributes');
-      await Hive.openBox<AttributeValueModel>('attribute_values');
-      await Hive.openBox<ProductAttributeModel>('product_attributes');
+      await Hive.openBox<AttributeModel>(HiveBoxNames.attributes);
+      await Hive.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
+      await Hive.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
 
       print('✅ Attribute boxes reset complete!');
     } catch (e) {

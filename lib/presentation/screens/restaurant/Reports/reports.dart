@@ -384,7 +384,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 height: 15,
               ),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   CustomMenu(
                     onTap: () {
@@ -394,17 +394,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     color: Colors.deepOrangeAccent,
                     title: 'Sale By Category',
                   ),
-                  SizedBox(
-                    width: 5,
-                  ),
-                  CustomMenu(
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> Salesbytrading()));
-
-                      },
-                      icons: Icons.trolley,
-                      color: Colors.deepOrangeAccent,
-                      title: 'Sales By Trading'),
                 ],
               ),
               SizedBox(
@@ -582,14 +571,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
               SizedBox(height: 15,),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  CustomMenu(onTap: (){
-                    Navigator.push(context, MaterialPageRoute(builder: (context)=>SalesByPOsUSer()));
-
-                  },
-                      icons: Icons.shopping_cart_sharp, title: 'Sales By Pos User'),
-                  SizedBox(width: 5),
                   CustomMenu(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context)=> ExpenseReport()));

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/eodmodel_317.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 
 class EODService {
   static const _uuid = Uuid();
@@ -283,11 +284,31 @@ class EODService {
     required double actualCash,
     String? remarks,
   }) async {
+    // Get the day start timestamp - CRITICAL for filtering sales after "Start Day" was clicked
+    final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
+
+    // Determine the start time for filtering:
+    // - If day was started with a timestamp, use that exact time
+    // - Otherwise, fall back to start of day (00:00:00)
+    final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
+    final endTime = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+    print('📊 Filtering sales from $startTime to $endTime');
+
     // Get all sales for the day using SaleStore
-    final allSales = await saleStore.getSalesByDateRange(
-      DateTime(date.year, date.month, date.day),
-      DateTime(date.year, date.month, date.day, 23, 59, 59),
-    );
+    final allSales = await saleStore.getSalesByDateRange(startTime, endTime);
+
+    print('✅ Found ${allSales.length} sales after day start');
+
+    // Debug: Print each sale's timestamp to verify filtering
+    if (allSales.isNotEmpty) {
+      print('🔍 SALE TIMESTAMPS:');
+      for (var sale in allSales) {
+        print('  Sale ID: ${sale.saleId} | Created: ${sale.createdAt} | Amount: Rs.${sale.totalAmount}');
+      }
+      print('🔍 Day Start Time: $startTime');
+      print('🔍 Are these sales AFTER day start? Check timestamps above!');
+    }
 
     // Filter out returns for count-based stats, but include them in financial calculations
     final activeSales = allSales.where((sale) => sale.isReturn != true).toList();
@@ -315,14 +336,15 @@ class EODService {
     final totalSaleCount = activeSales.length;
 
     // Calculate expenses for the day (reuse restaurant expense system)
+    // Use the same start time as sales filtering for consistency
     final allExpenses = await HiveExpenceL.getAllItems();
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
 
     final dayExpenses = allExpenses.where((expense) {
-      return (expense.dateandTime.isAfter(startOfDay) || expense.dateandTime.isAtSameMomentAs(startOfDay)) &&
-          (expense.dateandTime.isBefore(endOfDay) || expense.dateandTime.isAtSameMomentAs(endOfDay));
+      return (expense.dateandTime.isAfter(startTime) || expense.dateandTime.isAtSameMomentAs(startTime)) &&
+          (expense.dateandTime.isBefore(endTime) || expense.dateandTime.isAtSameMomentAs(endTime));
     }).toList();
+
+    print('✅ Found ${dayExpenses.length} expenses after day start');
 
     final totalExpenses = dayExpenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
     final cashExpenses = dayExpenses

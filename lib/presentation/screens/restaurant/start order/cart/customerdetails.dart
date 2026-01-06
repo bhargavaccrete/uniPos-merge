@@ -686,6 +686,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
       completedAt: DateTime.now(),
       status: 'Cooking',
       tableNo: widget.tableid,
+      isPaid: true,
+      paymentStatus: 'Paid',
     );
     try {
       final int billNumber = await completeOrder(completedOrder, calculations);
@@ -760,6 +762,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       print('✅ Bill number generated for settle & print: $billNumber');
 
       // Create completed order directly (skip active orders)
+      print('🔍 DEBUG: Creating pastOrder with payment method: $SelectedFilter');
       final pastOrder = pastOrderModel(
         id: newId,
         customerName: _nameController.text.trim(),
@@ -777,6 +780,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         kotBoundaries: [orderItems.length],
         billNumber: billNumber, // Daily bill number
       );
+      print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
       try {
         await HivePastOrder.addOrder(pastOrder);
@@ -914,6 +918,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
     if (!mounted) return;
 
     // Convert pastOrderModel to OrderModel for printing
+    print('🔍 DEBUG: Converting pastOrder to OrderModel');
+    print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
     final orderForPrint = OrderModel(
       id: pastOrder.id,
       customerName: pastOrder.customerName,
@@ -932,7 +938,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
       gstAmount: pastOrder.gstAmount,
       gstRate: pastOrder.gstRate,
       discount: pastOrder.Discount,
+      paymentMethod: pastOrder.paymentmode,
+      isPaid: true,
+      paymentStatus: 'Paid',
+      completedAt: DateTime.now(),
     );
+    print('🔍 DEBUG: orderForPrint.paymentMethod = ${orderForPrint.paymentMethod}');
+    print('🔍 DEBUG: orderForPrint.isPaid = ${orderForPrint.isPaid}');
 
     await showDialog(
       context: context,

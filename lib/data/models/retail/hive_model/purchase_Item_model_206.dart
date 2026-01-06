@@ -83,4 +83,19 @@ class PurchaseItemModel extends HiveObject {
       'createdAt': createdAt,
     };
   }
+
+  // Create from Map (for backup restore)
+  factory PurchaseItemModel.fromMap(Map<String, dynamic> map) {
+    return PurchaseItemModel(
+      purchaseItemId: map['purchaseItemId'] as String,
+      purchaseId: map['purchaseId'] as String,
+      variantId: map['variantId'] as String,
+      productId: map['productId'] as String,
+      quantity: (map['quantity'] as num).toInt(),
+      costPrice: (map['costPrice'] as num).toDouble(),
+      mrp: (map['mrp'] as num).toDouble(),
+      total: (map['total'] as num).toDouble(),
+      createdAt: map['createdAt'] as String,
+    );
+  }
 }

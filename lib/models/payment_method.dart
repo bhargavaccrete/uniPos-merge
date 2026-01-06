@@ -59,4 +59,15 @@ class PaymentMethod extends HiveObject {
       'sortOrder': sortOrder,
     };
   }
+
+  factory PaymentMethod.fromMap(Map<String, dynamic> map) {
+    return PaymentMethod(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      value: map['value'] as String,
+      iconName: map['iconName'] as String,
+      isEnabled: map['isEnabled'] as bool? ?? true,
+      sortOrder: (map['sortOrder'] as num?)?.toInt() ?? 0,
+    );
+  }
 }

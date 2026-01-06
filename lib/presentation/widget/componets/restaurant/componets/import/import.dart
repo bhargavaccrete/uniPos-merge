@@ -1,152 +1,4 @@
-/*
-import 'dart:convert';
-import 'dart:io';
-import 'package:archive/archive_io.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'package:BillBerry/model/db/choicemodel_6.dart';
-import 'package:BillBerry/model/db/companymodel_1.dart';
-import 'package:BillBerry/model/db/extramodel_3.dart';
-import 'package:BillBerry/model/db/staffModel_10.dart';
-import 'package:BillBerry/model/db/variantmodel_5.dart';
-
-import 'package:hive/hive.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import '../../model/db/categorymodel_0.dart';
-import '../../model/db/itemmodel_2.dart';
-import 'package:encrypt/encrypt.dart' as encrypt;
-*/
-
-/*class CategoryImportExport {
-  static const String boxName = "categories";
-
-  /// Export all categories to JSON file
-  static Future<void> exportAllData() async {
-    final categoriesBox = Hive.box<Category>("categories");
-    final itemsBox = Hive.box<Items>("itemBoxs");
-    final variantsBox = Hive.box<VariantModel>("variante");
-    final choicesBox = Hive.box<ChoicesModel>("choice");
-    final extrasBox = Hive.box<Extramodel>("extra");
-    final companyBox = Hive.box<Company>("companyBox");
-    final staffBox = Hive.box<StaffModel>("staffBox");
-
-    final exportMap = {
-      "categories": categoriesBox.values.map((e) => e.toMap()).toList(),
-      "items": itemsBox.values.map((e) => e.toMap()).toList(),
-      "variants": variantsBox.values.map((e) => e.toMap()).toList(),
-      "choices": choicesBox.values.map((e) => e.toMap()).toList(),
-      "extras": extrasBox.values.map((e) => e.toMap()).toList(),
-      "companyBox": companyBox.values.map((e) => e.toMap()).toList(),
-      "staffBox": staffBox.values.map((e) => e.toMap()).toList(),
-    };
-
-    final jsonString = jsonEncode(exportMap);
-
-    const secureStorage = FlutterSecureStorage();
-    final storedKey = await secureStorage.read(key: 'hive_key');
-    if (storedKey == null) {
-      throw Exception("Encryption key not found.");
-    }
-
-    final key = encrypt.Key.fromBase64(storedKey);
-    final iv = encrypt.IV.fromSecureRandom(16);
-    final encrypter = encrypt.Encrypter(encrypt.AES(key));
-    final encrypted = encrypter.encrypt(jsonString, iv: iv);
-
-    // Save key, iv, and encrypted data in JSON
-    final backupData = jsonEncode({
-      "key": storedKey, // embed the hive_key so it works after reinstall
-      "iv": iv.base64,
-      "data": encrypted.base64
-    });
-
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/BillBerry_backup.json');
-    await file.writeAsString(backupData);
-
-    await Share.shareXFiles([XFile(file.path)], text: "BillBerry Data Backup");
-  }
-
-
-  /// Import categories from JSON file
-  /// Import categories from JSON file
-  static Future<void> importAllData(BuildContext context) async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-
-    if (result != null) {
-      final file = File(result.files.single.path!);
-      final fileContent = await file.readAsString();
-
-      try {
-        final parsed = jsonDecode(fileContent);
-
-        if (parsed is! Map || !parsed.containsKey('key') || !parsed.containsKey('iv') || !parsed.containsKey('data')) {
-          throw Exception("Invalid backup format");
-        }
-
-        // 1. Decrypt backup data in memory
-        final backupKey = parsed['key'];
-        final iv = encrypt.IV.fromBase64(parsed['iv']);
-        final encryptedData = parsed['data'];
-        final key = encrypt.Key.fromBase64(backupKey);
-        final encrypter = encrypt.Encrypter(encrypt.AES(key));
-        final jsonString = encrypter.decrypt64(encryptedData, iv: iv);
-        final decodeData = jsonDecode(jsonString);
-
-        // 2. Clear current data and import new data into OPEN boxes
-        // This will re-encrypt the data with the app's CURRENT key
-        Future<void> restoreBox<T>(String keyName, Box<T> box, T Function(Map<String, dynamic>) fromMap) async {
-          if (decodeData[keyName] != null) {
-            await box.clear();
-            for (var item in decodeData[keyName]) {
-              // Using add() is slow for many items, consider addAll()
-              await box.add(fromMap(item));
-            }
-          }
-        }
-
-        await restoreBox("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m));
-        await restoreBox("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m));
-        await restoreBox("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m));
-        await restoreBox("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m));
-        await restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m));
-        await restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m));
-        await restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m));
-
-        // 3. Update the stored key to match the backup's key
-        // This ensures that on next launch, Hive uses the correct key to read the data we just wrote.
-        const secureStorage = FlutterSecureStorage();
-        await secureStorage.write(key: 'hive_key', value: backupKey);
-
-        // 4. Inform user and advise restart
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Data imported successfully! Please restart the app."),
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
-
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Error importing data: $e")),
-          );
-        }
-      }
-    }
-  }
-
-
-}*/
 
 import 'dart:convert';
 import 'dart:io';
@@ -1568,3 +1420,158 @@ class CategoryImportExport {
     }
   }
 }
+
+
+
+
+
+
+/*
+import 'dart:convert';
+import 'dart:io';
+import 'package:archive/archive_io.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'package:BillBerry/model/db/choicemodel_6.dart';
+import 'package:BillBerry/model/db/companymodel_1.dart';
+import 'package:BillBerry/model/db/extramodel_3.dart';
+import 'package:BillBerry/model/db/staffModel_10.dart';
+import 'package:BillBerry/model/db/variantmodel_5.dart';
+
+import 'package:hive/hive.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../model/db/categorymodel_0.dart';
+import '../../model/db/itemmodel_2.dart';
+import 'package:encrypt/encrypt.dart' as encrypt;
+*/
+
+/*class CategoryImportExport {
+  static const String boxName = "categories";
+
+  /// Export all categories to JSON file
+  static Future<void> exportAllData() async {
+    final categoriesBox = Hive.box<Category>("categories");
+    final itemsBox = Hive.box<Items>("itemBoxs");
+    final variantsBox = Hive.box<VariantModel>("variante");
+    final choicesBox = Hive.box<ChoicesModel>("choice");
+    final extrasBox = Hive.box<Extramodel>("extra");
+    final companyBox = Hive.box<Company>("companyBox");
+    final staffBox = Hive.box<StaffModel>("staffBox");
+
+    final exportMap = {
+      "categories": categoriesBox.values.map((e) => e.toMap()).toList(),
+      "items": itemsBox.values.map((e) => e.toMap()).toList(),
+      "variants": variantsBox.values.map((e) => e.toMap()).toList(),
+      "choices": choicesBox.values.map((e) => e.toMap()).toList(),
+      "extras": extrasBox.values.map((e) => e.toMap()).toList(),
+      "companyBox": companyBox.values.map((e) => e.toMap()).toList(),
+      "staffBox": staffBox.values.map((e) => e.toMap()).toList(),
+    };
+
+    final jsonString = jsonEncode(exportMap);
+
+    const secureStorage = FlutterSecureStorage();
+    final storedKey = await secureStorage.read(key: 'hive_key');
+    if (storedKey == null) {
+      throw Exception("Encryption key not found.");
+    }
+
+    final key = encrypt.Key.fromBase64(storedKey);
+    final iv = encrypt.IV.fromSecureRandom(16);
+    final encrypter = encrypt.Encrypter(encrypt.AES(key));
+    final encrypted = encrypter.encrypt(jsonString, iv: iv);
+
+    // Save key, iv, and encrypted data in JSON
+    final backupData = jsonEncode({
+      "key": storedKey, // embed the hive_key so it works after reinstall
+      "iv": iv.base64,
+      "data": encrypted.base64
+    });
+
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/BillBerry_backup.json');
+    await file.writeAsString(backupData);
+
+    await Share.shareXFiles([XFile(file.path)], text: "BillBerry Data Backup");
+  }
+
+
+  /// Import categories from JSON file
+  /// Import categories from JSON file
+  static Future<void> importAllData(BuildContext context) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+
+    if (result != null) {
+      final file = File(result.files.single.path!);
+      final fileContent = await file.readAsString();
+
+      try {
+        final parsed = jsonDecode(fileContent);
+
+        if (parsed is! Map || !parsed.containsKey('key') || !parsed.containsKey('iv') || !parsed.containsKey('data')) {
+          throw Exception("Invalid backup format");
+        }
+
+        // 1. Decrypt backup data in memory
+        final backupKey = parsed['key'];
+        final iv = encrypt.IV.fromBase64(parsed['iv']);
+        final encryptedData = parsed['data'];
+        final key = encrypt.Key.fromBase64(backupKey);
+        final encrypter = encrypt.Encrypter(encrypt.AES(key));
+        final jsonString = encrypter.decrypt64(encryptedData, iv: iv);
+        final decodeData = jsonDecode(jsonString);
+
+        // 2. Clear current data and import new data into OPEN boxes
+        // This will re-encrypt the data with the app's CURRENT key
+        Future<void> restoreBox<T>(String keyName, Box<T> box, T Function(Map<String, dynamic>) fromMap) async {
+          if (decodeData[keyName] != null) {
+            await box.clear();
+            for (var item in decodeData[keyName]) {
+              // Using add() is slow for many items, consider addAll()
+              await box.add(fromMap(item));
+            }
+          }
+        }
+
+        await restoreBox("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m));
+        await restoreBox("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m));
+        await restoreBox("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m));
+        await restoreBox("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m));
+        await restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m));
+        await restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m));
+        await restoreBox("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m));
+
+        // 3. Update the stored key to match the backup's key
+        // This ensures that on next launch, Hive uses the correct key to read the data we just wrote.
+        const secureStorage = FlutterSecureStorage();
+        await secureStorage.write(key: 'hive_key', value: backupKey);
+
+        // 4. Inform user and advise restart
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Data imported successfully! Please restart the app."),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error importing data: $e")),
+          );
+        }
+      }
+    }
+  }
+
+
+}*/

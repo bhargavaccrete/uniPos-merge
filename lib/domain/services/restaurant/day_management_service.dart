@@ -7,6 +7,7 @@ class DayManagementService {
   static const String _openingBalanceKey = 'openingBalance';
   static const String _dayStartedKey = 'dayStarted';
   static const String _lastDayDateKey = 'lastDayDate';
+  static const String _dayStartTimestampKey = 'dayStartTimestamp'; // NEW: Track exact start time
   static Box? _box;
 
   static Box _getBox() {
@@ -20,10 +21,12 @@ class DayManagementService {
   /// Set the opening balance for the current day
   static Future<void> setOpeningBalance(double balance) async {
     final box = _getBox();
+    final now = DateTime.now();
     await box.put(_openingBalanceKey, balance);
     await box.put(_dayStartedKey, true);
-    await box.put(_lastDayDateKey, DateTime.now().toIso8601String());
-    debugPrint('Opening balance set to: $balance');
+    await box.put(_lastDayDateKey, now.toIso8601String());
+    await box.put(_dayStartTimestampKey, now.toIso8601String()); // Store exact start timestamp
+    debugPrint('Opening balance set to: $balance at $now');
   }
 
   /// Get the current opening balance
@@ -61,6 +64,7 @@ class DayManagementService {
     final box = _getBox();
     await box.put(_openingBalanceKey, 0.0);
     await box.put(_dayStartedKey, false);
+    await box.delete(_dayStartTimestampKey); // Clear the day start timestamp
 
     // Reset daily bill number counter
     await HiveOrders.resetDailyBillNumber();
@@ -74,6 +78,16 @@ class DayManagementService {
     final dateStr = box.get(_lastDayDateKey);
     if (dateStr != null) {
       return DateTime.parse(dateStr);
+    }
+    return null;
+  }
+
+  /// Get the day start timestamp (when "Start Day" was clicked)
+  static Future<DateTime?> getDayStartTimestamp() async {
+    final box = _getBox();
+    final timestampStr = box.get(_dayStartTimestampKey);
+    if (timestampStr != null) {
+      return DateTime.parse(timestampStr);
     }
     return null;
   }

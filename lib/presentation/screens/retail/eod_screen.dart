@@ -20,6 +20,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
 
   bool _isLoading = false;
   bool _isGenerating = false;
+  bool _isCompleted = false; // NEW: Track if EOD has been completed
   EndOfDayReport? _currentReport;
   DateTime selectedDate = DateTime.now();
   double openingBalance = 0.0;
@@ -42,11 +43,21 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
   }
 
   Future<void> _loadEODData() async {
+    // CRITICAL: Don't try to load data if EOD has been completed
+    // This prevents "Box not found" errors when day has been reset
+    if (_isCompleted) {
+      print('⚠️ Skipping _loadEODData: EOD already completed');
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // Get opening balance
+      print('🔄 Loading EOD data...');
+
+      // Get opening balance with detailed error handling
       final currentOpeningBalance = await DayManagementService.getOpeningBalance();
+      print('✅ Opening balance loaded: $currentOpeningBalance');
 
       // Generate EOD report for retail
       final report = await EODService.generateRetailEODReport(
@@ -68,6 +79,21 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
           (report.totalExpenses > 0) ||
           (currentOpeningBalance > 0);
 
+      if (!mounted) return;
+
+      // Debug logging
+      print('=== EOD CALCULATION DEBUG ===');
+      print('Opening Balance: $currentOpeningBalance');
+      print('Expected Cash: $expectedCashAmount');
+      print('Cash Expenses: ${report.cashExpenses}');
+      print('Total Expected: ${currentOpeningBalance + expectedCashAmount - report.cashExpenses}');
+      print('Report Total Sales: ${report.totalSales}');
+      print('Report Order Count: ${report.totalOrderCount}');
+      print('============================');
+
+      // Clear any previous error messages
+      ScaffoldMessenger.of(context).clearSnackBars();
+
       setState(() {
         _currentReport = hasAnyData ? report : null;
         openingBalance = currentOpeningBalance;
@@ -77,8 +103,16 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() => _isLoading = false);
-      _showError('Error loading EOD data: $e');
+
+      // Don't show "Box not found" errors - they're expected after EOD completion
+      if (!e.toString().toLowerCase().contains('box not found')) {
+        _showError('Error loading EOD data: $e');
+      } else {
+        print('⚠️ Suppressed expected "Box not found" error during EOD loading');
+      }
     }
   }
 
@@ -129,7 +163,13 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       // 3. Mark day as completed
       await _markDayCompleted();
 
-      // 4. Reset opening balance for next day
+      // 4. CRITICAL: Set completion flag BEFORE resetting day
+      // This prevents any widget rebuilds from trying to reload data
+      if (mounted) {
+        setState(() => _isCompleted = true);
+      }
+
+      // 5. Reset opening balance for next day
       await DayManagementService.resetDay();
 
       // Show success message
@@ -278,12 +318,17 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(
-                    'Rs. ${openingBalance.toStringAsFixed(2)}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      print('🔍 DISPLAY: Opening Balance = $openingBalance');
+                      return Text(
+                        'Rs. ${openingBalance.toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

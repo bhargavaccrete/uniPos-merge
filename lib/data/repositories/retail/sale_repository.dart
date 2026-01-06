@@ -31,11 +31,12 @@ class SaleRepository {
   }
 
   /// Get sales by date range
+  /// Uses createdAt timestamp for accurate filtering (includes time, not just date)
   Future<List<SaleModel>> getSalesByDateRange(DateTime startDate, DateTime endDate) async {
     return _saleBox.values.where((sale) {
-      final saleDate = DateTime.parse(sale.date);
-      return saleDate.isAfter(startDate.subtract(const Duration(days: 1))) &&
-          saleDate.isBefore(endDate.add(const Duration(days: 1)));
+      final saleCreatedAt = DateTime.parse(sale.createdAt); // Use actual creation timestamp
+      return (saleCreatedAt.isAfter(startDate) || saleCreatedAt.isAtSameMomentAs(startDate)) &&
+             (saleCreatedAt.isBefore(endDate) || saleCreatedAt.isAtSameMomentAs(endDate));
     }).toList();
   }
 

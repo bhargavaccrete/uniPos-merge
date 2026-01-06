@@ -246,4 +246,30 @@ class SaleItemModel extends HiveObject {
       'hsnCode': hsnCode,
     };
   }
+
+  // Create from Map (for backup restore)
+  factory SaleItemModel.fromMap(Map<String, dynamic> map) {
+    return SaleItemModel(
+      saleItemId: map['saleItemId'] as String,
+      saleId: map['saleId'] as String,
+      varianteId: map['varianteId'] as String,
+      productId: map['productId'] as String,
+      productName: map['productName'] as String?,
+      size: map['size'] as String?,
+      color: map['color'] as String?,
+      price: (map['price'] as num).toDouble(),
+      qty: (map['qty'] as num).toInt(),
+      total: (map['total'] as num).toDouble(),
+      discountAmount: (map['discountAmount'] as num?)?.toDouble(),
+      taxAmount: (map['taxAmount'] as num?)?.toDouble(),
+      barcode: map['barcode'] as String?,
+      gstRate: (map['gstRate'] as num?)?.toDouble(),
+      taxableAmount: (map['taxableAmount'] as num?)?.toDouble(),
+      gstAmount: (map['gstAmount'] as num?)?.toDouble(),
+      hsnCode: map['hsnCode'] as String?,
+      cgstAmount: (map['cgstAmount'] as num?)?.toDouble(),
+      sgstAmount: (map['sgstAmount'] as num?)?.toDouble(),
+      weight: map['weight'] as String?,
+    );
+  }
 }

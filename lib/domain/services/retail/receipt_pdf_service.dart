@@ -427,9 +427,13 @@ class ReceiptPdfService {
           // Grand Total
           _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 12),
 
-          // Paid by [Payment Method]
-          if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit')
-            _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 10),
+          // Payment status - Show payment method or NOT PAID
+          if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit') ...[
+            if (data.sale.paymentType == 'NOT PAID')
+              _buildThermalTotalRow('NOT PAID', data.sale.totalAmount, fontSize: 10)
+            else
+              _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 10),
+          ],
 
           // Credit sale info
           if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
@@ -822,9 +826,13 @@ class ReceiptPdfService {
                     if (showGrandTotal)
                       _buildInvoiceTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 14),
 
-                    // Paid by [Payment Method]
-                    if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit')
-                      _buildInvoiceTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 11),
+                    // Payment status - Show payment method or NOT PAID
+                    if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit') ...[
+                      if (data.sale.paymentType == 'NOT PAID')
+                        _buildInvoiceTotalRow('NOT PAID', data.sale.totalAmount, fontSize: 11)
+                      else
+                        _buildInvoiceTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 11),
+                    ],
 
                     // Credit sale payment info
                     if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[

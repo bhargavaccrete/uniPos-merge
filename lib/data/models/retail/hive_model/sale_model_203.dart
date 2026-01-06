@@ -435,4 +435,35 @@ class SaleModel extends HiveObject {
       'status': status,
     };
   }
+
+  // Create from Map (for backup restore)
+  factory SaleModel.fromMap(Map<String, dynamic> map) {
+    return SaleModel(
+      saleId: map['saleId'] as String,
+      customerId: map['customerId'] as String?,
+      totalItems: (map['totalItems'] as num).toInt(),
+      subtotal: (map['subtotal'] as num).toDouble(),
+      discountAmount: (map['discountAmount'] as num).toDouble(),
+      taxAmount: (map['taxAmount'] as num).toDouble(),
+      totalAmount: (map['totalAmount'] as num).toDouble(),
+      paymentType: map['paymentType'] as String,
+      date: map['date'] as String,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String,
+      isReturn: (map['isReturn'] as bool?) ?? false,
+      originalSaleId: map['originalSaleId'] as String?,
+      totalTaxableAmount: (map['totalTaxableAmount'] as num?)?.toDouble(),
+      totalGstAmount: (map['totalGstAmount'] as num?)?.toDouble(),
+      totalCgstAmount: (map['totalCgstAmount'] as num?)?.toDouble(),
+      totalSgstAmount: (map['totalSgstAmount'] as num?)?.toDouble(),
+      grandTotal: (map['grandTotal'] as num?)?.toDouble(),
+      paymentListJson: map['paymentListJson'] as String?,
+      changeReturn: (map['changeReturn'] as num?)?.toDouble(),
+      totalPaid: (map['totalPaid'] as num?)?.toDouble(),
+      isSplitPayment: (map['isSplitPayment'] as bool?) ?? false,
+      paidAmount: (map['paidAmount'] as num?)?.toDouble(),
+      dueAmount: (map['dueAmount'] as num?)?.toDouble(),
+      status: (map['status'] as String?) ?? SaleStatus.paid,
+    );
+  }
 }

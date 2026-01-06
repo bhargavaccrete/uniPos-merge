@@ -36,6 +36,35 @@ class TestBillModel extends HiveObject {
     required this.customerName,
   });
 
+  /// Convert TestBillModel to Map for backup
+  Map<String, dynamic> toMap() {
+    return {
+      'billNo': billNo,
+      'dateTime': dateTime.toIso8601String(),
+      'tableNo': tableNo,
+      'totalAmount': totalAmount,
+      'itemList': itemList.map((e) => e.toMap()).toList(),
+      'paymentType': paymentType,
+      'customerName': customerName,
+    };
+  }
+
+  /// Create TestBillModel from Map for restore
+  factory TestBillModel.fromMap(Map<String, dynamic> map) {
+    return TestBillModel(
+      billNo: map['billNo'] as String? ?? '',
+      dateTime: DateTime.tryParse(map['dateTime'] ?? '') ?? DateTime.now(),
+      tableNo: map['tableNo'] as int? ?? 0,
+      totalAmount: (map['totalAmount'] as num? ?? 0).toDouble(),
+      itemList: (map['itemList'] as List<dynamic>?)
+              ?.map((e) => TestBillItem.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      paymentType: map['paymentType'] as String? ?? '',
+      customerName: map['customerName'] as String? ?? '',
+    );
+  }
+
   @override
   String toString() {
     return 'TestBillModel(billNo: $billNo, dateTime: $dateTime, tableNo: $tableNo, '
@@ -64,6 +93,26 @@ class TestBillItem extends HiveObject {
     required this.price,
     required this.totalPrice,
   });
+
+  /// Convert TestBillItem to Map for backup
+  Map<String, dynamic> toMap() {
+    return {
+      'itemName': itemName,
+      'quantity': quantity,
+      'price': price,
+      'totalPrice': totalPrice,
+    };
+  }
+
+  /// Create TestBillItem from Map for restore
+  factory TestBillItem.fromMap(Map<String, dynamic> map) {
+    return TestBillItem(
+      itemName: map['itemName'] as String? ?? '',
+      quantity: map['quantity'] as int? ?? 0,
+      price: (map['price'] as num? ?? 0).toDouble(),
+      totalPrice: (map['totalPrice'] as num? ?? 0).toDouble(),
+    );
+  }
 
   @override
   String toString() {

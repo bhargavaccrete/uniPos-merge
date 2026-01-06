@@ -86,4 +86,32 @@ class BillingTabModel extends HiveObject {
       customerPhone: customerPhone ?? this.customerPhone,
     );
   }
+
+  /// Convert to map for export/backup
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'items': items.map((item) => item.toMap()).toList(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'customerName': customerName,
+      'customerPhone': customerPhone,
+    };
+  }
+
+  /// Create from map for import/restore
+  factory BillingTabModel.fromMap(Map<String, dynamic> map) {
+    return BillingTabModel(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      items: (map['items'] as List<dynamic>)
+          .map((item) => CartItemModel.fromMap(Map<String, dynamic>.from(item)))
+          .toList(),
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: DateTime.parse(map['updatedAt'] as String),
+      customerName: map['customerName'] as String?,
+      customerPhone: map['customerPhone'] as String?,
+    );
+  }
 }

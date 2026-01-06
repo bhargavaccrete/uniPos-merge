@@ -61,6 +61,34 @@ class TaxDetails extends HiveObject {
       taxRates: taxRates ?? this.taxRates,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'isEnabled': isEnabled,
+      'isInclusive': isInclusive,
+      'defaultRate': defaultRate,
+      'taxName': taxName,
+      'placeOfSupply': placeOfSupply,
+      'applyOnDelivery': applyOnDelivery,
+      'notes': notes,
+      'taxRates': taxRates?.map((e) => e.toMap()).toList(),
+    };
+  }
+
+  factory TaxDetails.fromMap(Map<String, dynamic> map) {
+    return TaxDetails(
+      isEnabled: map['isEnabled'] as bool? ?? true,
+      isInclusive: map['isInclusive'] as bool? ?? true,
+      defaultRate: (map['defaultRate'] as num?)?.toDouble() ?? 0.0,
+      taxName: map['taxName'] as String? ?? 'GST',
+      placeOfSupply: map['placeOfSupply'] as String?,
+      applyOnDelivery: map['applyOnDelivery'] as bool? ?? false,
+      notes: map['notes'] as String?,
+      taxRates: (map['taxRates'] as List<dynamic>?)
+          ?.map((e) => TaxRateItem.fromMap(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
 }
 
 @HiveType(typeId:  HiveTypeIds.taxRateItem) // Unique type ID for TaxRateItem
@@ -89,6 +117,22 @@ class TaxRateItem extends HiveObject {
       name: name ?? this.name,
       rate: rate ?? this.rate,
       isDefault: isDefault ?? this.isDefault,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'rate': rate,
+      'isDefault': isDefault,
+    };
+  }
+
+  factory TaxRateItem.fromMap(Map<String, dynamic> map) {
+    return TaxRateItem(
+      name: map['name'] as String,
+      rate: (map['rate'] as num).toDouble(),
+      isDefault: map['isDefault'] as bool? ?? false,
     );
   }
 }

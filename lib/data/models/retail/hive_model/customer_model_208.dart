@@ -174,4 +174,27 @@ class CustomerModel extends HiveObject {
       'updatedAt': updatedAt,
     };
   }
+
+  // Create from Map (for backup restore)
+  factory CustomerModel.fromMap(Map<String, dynamic> map) {
+    return CustomerModel(
+      customerId: map['customerId'] as String,
+      name: map['name'] as String,
+      phone: map['phone'] as String,
+      email: map['email'] as String?,
+      address: map['address'] as String?,
+      notes: map['notes'] as String?,
+      totalPurchaseAmount: (map['totalPurchaseAmount'] as num?)?.toDouble() ?? 0.0,
+      lastVisited: map['lastVisited'] as String?,
+      visitCount: (map['visitCount'] as num?)?.toInt() ?? 0,
+      pointsBalance: (map['pointsBalance'] as num?)?.toInt() ?? 0,
+      totalPointEarned: (map['totalPointEarned'] as num?)?.toInt() ?? 0,
+      totalPointRedeemed: (map['totalPointRedeemed'] as num?)?.toInt() ?? 0,
+      creditBalance: (map['creditBalance'] as num?)?.toDouble() ?? 0.0,
+      creditLimit: (map['creditLimit'] as num?)?.toDouble() ?? 0.0,
+      gstNumber: map['gstNumber'] as String?,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String?,
+    );
+  }
 }

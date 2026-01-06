@@ -83,4 +83,19 @@ class SupplierModel extends HiveObject {
       'updatedAt': updatedAt,
     };
   }
+
+  // Create from Map (for backup restore)
+  factory SupplierModel.fromMap(Map<String, dynamic> map) {
+    return SupplierModel(
+      supplierId: map['supplierId'] as String,
+      name: map['name'] as String,
+      phone: map['phone'] as String?,
+      address: map['address'] as String?,
+      gstNumber: map['gstNumber'] as String?,
+      openingBalance: (map['openingBalance'] as num?)?.toDouble() ?? 0,
+      currentBalance: (map['currentBalance'] as num?)?.toDouble() ?? 0,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String,
+    );
+  }
 }

@@ -93,6 +93,21 @@ class PurchaseOrderItemModel extends HiveObject {
     };
   }
 
+  factory PurchaseOrderItemModel.fromMap(Map<String, dynamic> map) {
+    return PurchaseOrderItemModel(
+      poItemId: map['poItemId'] as String,
+      poId: map['poId'] as String,
+      variantId: map['variantId'] as String,
+      productId: map['productId'] as String,
+      productName: map['productName'] as String?,
+      variantInfo: map['variantInfo'] as String?,
+      orderedQty: (map['orderedQty'] as num).toInt(),
+      estimatedPrice: (map['estimatedPrice'] as num?)?.toDouble(),
+      estimatedTotal: (map['estimatedTotal'] as num?)?.toDouble(),
+      createdAt: map['createdAt'] as String,
+    );
+  }
+
   PurchaseOrderItemModel copyWith({
     String? poItemId,
     String? poId,

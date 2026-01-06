@@ -129,6 +129,18 @@ class PaymentEntryModel extends HiveObject {
     };
   }
 
+  factory PaymentEntryModel.fromMap(Map<String, dynamic> map) {
+    return PaymentEntryModel(
+      paymentEntryId: map['paymentEntryId'] as String,
+      saleId: map['saleId'] as String,
+      paymentMethod: map['method'] as String,
+      amount: (map['amount'] as num).toDouble(),
+      referenceId: map['referenceId'] as String?,
+      timestamp: map['timestamp'] as String,
+      note: map['note'] as String?,
+    );
+  }
+
   /// Short map for receipt display
   Map<String, dynamic> toShortMap() {
     return {

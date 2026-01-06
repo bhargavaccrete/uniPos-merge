@@ -473,7 +473,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     bordercircular: 2,
                     width: width * 0.3,
                     height: height * 0.04,
-                    onTap: ()=> _loadEODData,
+                    onTap: _loadEODData,
                     child: Text(
                       'Refresh',
                       textScaler: TextScaler.linear(1),

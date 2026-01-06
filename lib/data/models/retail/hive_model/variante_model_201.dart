@@ -229,6 +229,37 @@ class VarianteModel extends HiveObject {
     };
   }
 
+  // Create from Map (for backup restore)
+  factory VarianteModel.fromMap(Map<String, dynamic> map) {
+    return VarianteModel(
+      varianteId: map['varianteId'] as String,
+      productId: map['productId'] as String,
+      size: map['size'] as String?,
+      color: map['color'] as String?,
+      weight: map['weight'] as String?,
+      sku: map['sku'] as String?,
+      barcode: map['barcode'] as String?,
+      mrp: (map['mrp'] as num?)?.toDouble(),
+      costPrice: (map['costPrice'] as num?)?.toDouble(),
+      stockQty: (map['stockQty'] as num?)?.toInt() ?? 0,
+      minStock: (map['minStock'] as num?)?.toInt(),
+      taxRate: (map['taxRate'] as num?)?.toDouble(),
+      createdAt: map['createdAt'] as String,
+      updateAt: map['updateAt'] as String?,
+      customAttributes: map['customAttributes'] != null
+          ? Map<String, String>.from(map['customAttributes'])
+          : null,
+      sellingPrice: (map['sellingPrice'] as num?)?.toDouble(),
+      hsnCode: map['hsnCode'] as String?,
+      attributeValueIds: map['attributeValueIds'] != null
+          ? Map<String, String>.from(map['attributeValueIds'])
+          : null,
+      imagePath: map['imagePath'] as String?,
+      isDefault: (map['isDefault'] as bool?) ?? false,
+      status: (map['status'] as String?) ?? 'active',
+    );
+  }
+
   /// Check if variant is available for sale
   bool get isAvailable => status == 'active' && stockQty > 0;
 

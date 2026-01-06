@@ -86,4 +86,16 @@ class CategoryModel extends HiveObject {
       'updatedAt': updatedAt,
     };
   }
+
+  factory CategoryModel.fromMap(Map<String, dynamic> map) {
+    return CategoryModel(
+      categoryId: map['categoryId'] as String,
+      categoryName: map['categoryName'] as String,
+      gstRate: (map['gstRate'] as num?)?.toDouble(),
+      hsnCode: map['hsnCode'] as String?,
+      description: map['description'] as String?,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String?,
+    );
+  }
 }

@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
 
-import '../../../domain/services/retail/backup_service.dart';
+import '../../../domain/services/common/unified_backup_service.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -15,11 +15,8 @@ class BackupScreen extends StatefulWidget {
 }
 
 class _BackupScreenState extends State<BackupScreen> {
-  final BackupService _backupService = BackupService();
   List<File> _backups = [];
   bool _isLoading = false;
-  bool _autoBackupEnabled = true;
-  DateTime? _lastBackupDate;
   String? _backupDirectory;
 
   @override
@@ -31,18 +28,39 @@ class _BackupScreenState extends State<BackupScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    final backups = await _backupService.getLocalBackups();
-    final autoBackup = await _backupService.isAutoBackupEnabled();
-    final lastBackup = await _backupService.getLastBackupDate();
-    final backupDir = await _backupService.getBackupDirectoryPath();
+    // Get backup files from Downloads folder
+    final backupDir = '/storage/emulated/0/Download';
+    _backupDirectory = backupDir;
 
-    setState(() {
-      _backups = backups;
-      _autoBackupEnabled = autoBackup;
-      _lastBackupDate = lastBackup;
-      _backupDirectory = backupDir;
-      _isLoading = false;
-    });
+    try {
+      final dir = Directory(backupDir);
+      if (await dir.exists()) {
+        final files = dir.listSync()
+            .whereType<File>()
+            .where((file) =>
+                file.path.endsWith('.zip') &&
+                file.path.contains('UniPOS_backup'))
+            .toList();
+
+        // Sort by modified date (newest first)
+        files.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+
+        setState(() {
+          _backups = files;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _backups = [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _backups = [];
+        _isLoading = false;
+      });
+    }
   }
 
   void _showBackupLocation() {
@@ -99,30 +117,29 @@ class _BackupScreenState extends State<BackupScreen> {
     try {
       setState(() => _isLoading = true);
 
-      final backupFile = await _backupService.createBackup();
+      // Use UnifiedBackupService to create ZIP backup
+      final backupFilePath = await UnifiedBackupService.exportToDownloads();
 
       if (mounted) {
         setState(() => _isLoading = false);
 
-        if (backupFile != null) {
-          // Mobile/Desktop - file was saved to disk
+        if (backupFilePath != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Backup created successfully: ${backupFile.path.split('/').last}'),
+              content: Text('Backup created successfully: ${backupFilePath.split('/').last}'),
               backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
             ),
           );
+          _loadData();
         } else {
-          // Web - file was shared via download
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Backup shared successfully! Check your downloads.'),
-              backgroundColor: Colors.green,
+              content: Text('Failed to create backup'),
+              backgroundColor: Colors.red,
             ),
           );
         }
-
-        _loadData();
       }
     } catch (e) {
       if (mounted) {
@@ -153,34 +170,30 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   Future<void> _showBackupInfo(File file) async {
-    final info = await _backupService.getBackupInfo(file);
-
     if (!mounted) return;
 
-    final stats = info['statistics'] as Map<String, dynamic>? ?? {};
+    final fileName = file.path.split(Platform.pathSeparator).last;
+    final fileSize = await file.length();
+    final lastModified = file.lastModifiedSync();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(info['fileName'] ?? 'Backup Info'),
+        title: Text(fileName),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildInfoRow('Version', info['version'] ?? 'Unknown'),
-              _buildInfoRow('Export Date', _formatDate(info['exportDate'])),
-              _buildInfoRow('File Size', _formatFileSize(info['fileSize'] ?? 0)),
-              _buildInfoRow('Last Modified', _formatDate(info['lastModified'])),
-              const Divider(),
-              const Text('Statistics:', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildInfoRow('Products', '${stats['totalProducts'] ?? 0}'),
-              _buildInfoRow('Variants', '${stats['totalVariants'] ?? 0}'),
-              _buildInfoRow('Sales', '${stats['totalSales'] ?? 0}'),
-              _buildInfoRow('Customers', '${stats['totalCustomers'] ?? 0}'),
-              _buildInfoRow('Suppliers', '${stats['totalSuppliers'] ?? 0}'),
-              _buildInfoRow('Purchases', '${stats['totalPurchases'] ?? 0}'),
+              _buildInfoRow('File Name', fileName),
+              _buildInfoRow('File Size', _formatFileSize(fileSize)),
+              _buildInfoRow('Last Modified', _formatDate(lastModified.toIso8601String())),
+              _buildInfoRow('Format', 'ZIP Archive'),
+              const SizedBox(height: 12),
+              const Text(
+                'This is a complete backup including all products, sales, customers, suppliers, purchases, and settings.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+              ),
             ],
           ),
         ),
@@ -199,7 +212,7 @@ class _BackupScreenState extends State<BackupScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Backup'),
-        content: Text('Are you sure you want to delete ${file.path.split('/').last}?'),
+        content: Text('Are you sure you want to delete ${file.path.split(Platform.pathSeparator).last}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -216,7 +229,9 @@ class _BackupScreenState extends State<BackupScreen> {
 
     if (confirm == true) {
       try {
-        await _backupService.deleteBackup(file);
+        if (await file.exists()) {
+          await file.delete();
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -239,25 +254,13 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
-  Future<void> _toggleAutoBackup(bool value) async {
-    await _backupService.setAutoBackupEnabled(value);
-    setState(() => _autoBackupEnabled = value);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Auto backup ${value ? 'enabled' : 'disabled'}'),
-        ),
-      );
-    }
-  }
 
   Future<void> _importBackup() async {
     try {
-      // Open file picker to select backup file
+      // Open file picker to select backup file (ZIP or JSON)
       const XTypeGroup typeGroup = XTypeGroup(
-        label: 'JSON Backup Files',
-        extensions: ['json'],
+        label: 'Backup Files',
+        extensions: ['zip', 'json'],
       );
 
       final XFile? file = await openFile(
@@ -271,28 +274,11 @@ class _BackupScreenState extends State<BackupScreen> {
 
       // Convert XFile to File
       final backupFile = File(file.path);
-
-      // Validate the backup file first
-      final validation = await _backupService.validateBackupFile(backupFile);
-
-      if (validation['valid'] != true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Invalid backup file: ${validation['error']}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
-        return;
-      }
+      final fileName = backupFile.path.split(Platform.pathSeparator).last;
+      final fileSize = await backupFile.length();
 
       // Show file info and confirm restore
-      final info = await _backupService.getBackupInfo(backupFile);
       if (!mounted) return;
-
-      final stats = info['statistics'] as Map<String, dynamic>? ?? {};
 
       final confirm = await showDialog<bool>(
         context: context,
@@ -304,21 +290,13 @@ class _BackupScreenState extends State<BackupScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Found valid backup file:',
+                  'Found backup file:',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
-                _buildInfoRow('File Name', info['fileName'] ?? 'Unknown'),
-                _buildInfoRow('Version', info['version'] ?? 'Unknown'),
-                _buildInfoRow('Export Date', _formatDate(info['exportDate'])),
-                _buildInfoRow('File Size', _formatFileSize(info['fileSize'] ?? 0)),
-                const Divider(),
-                const Text('Contains:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                const SizedBox(height: 8),
-                _buildInfoRow('Products', '${stats['totalProducts'] ?? 0}'),
-                _buildInfoRow('Customers', '${stats['totalCustomers'] ?? 0}'),
-                _buildInfoRow('Suppliers', '${stats['totalSuppliers'] ?? 0}'),
-                _buildInfoRow('Sales', '${stats['totalSales'] ?? 0}'),
+                _buildInfoRow('File Name', fileName),
+                _buildInfoRow('File Size', _formatFileSize(fileSize)),
+                _buildInfoRow('Format', fileName.endsWith('.zip') ? 'ZIP Archive' : 'JSON'),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -333,7 +311,7 @@ class _BackupScreenState extends State<BackupScreen> {
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
-                          'This will add data from the backup to your current data.',
+                          'This will restore all data from the backup file.',
                           style: TextStyle(fontSize: 12),
                         ),
                       ),
@@ -431,13 +409,14 @@ class _BackupScreenState extends State<BackupScreen> {
       try {
         setState(() => _isLoading = true);
 
-        final result = await _backupService.restoreFromBackup(file);
+        // Use UnifiedBackupService to restore
+        final success = await UnifiedBackupService.importFromFilePath(context, file.path);
 
         if (mounted) {
           setState(() => _isLoading = false);
 
-          if (result['success'] == true) {
-            // Show success dialog with details
+          if (success) {
+            // Show success dialog
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
@@ -448,29 +427,14 @@ class _BackupScreenState extends State<BackupScreen> {
                     Text('Restore Successful'),
                   ],
                 ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(result['message'] ?? 'Backup restored successfully'),
-                    if (result['errors'] != null && (result['errors'] as List).isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Some items had errors:',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      ...(result['errors'] as List).take(3).map((error) => Text(
-                        '• $error',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF6B6B6B)),
-                      )),
-                    ],
-                  ],
-                ),
+                content: const Text('Backup restored successfully! All data has been imported.'),
                 actions: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Close'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pop(context); // Go back to main screen
+                    },
+                    child: const Text('OK'),
                   ),
                 ],
               ),
@@ -479,10 +443,10 @@ class _BackupScreenState extends State<BackupScreen> {
             _loadData();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Restore failed: ${result['error']}'),
+              const SnackBar(
+                content: Text('Restore failed. Please check the backup file.'),
                 backgroundColor: Colors.red,
-                duration: const Duration(seconds: 5),
+                duration: Duration(seconds: 5),
               ),
             );
           }
@@ -552,55 +516,6 @@ class _BackupScreenState extends State<BackupScreen> {
           : ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Auto Backup Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE8E8E8)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.backup, color: Colors.blue.shade700, size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Auto Backup',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Automatically backup data once per day',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Switch(
-                      value: _autoBackupEnabled,
-                      onChanged: _toggleAutoBackup,
-                    ),
-                  ],
-                ),
-                if (_lastBackupDate != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Last backup: ${DateFormat('MMM dd, yyyy hh:mm a').format(_lastBackupDate!)}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
 
           // Create Backup Button
           ElevatedButton.icon(

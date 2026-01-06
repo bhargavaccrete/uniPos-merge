@@ -57,7 +57,7 @@ class _ViewExpenseState extends State<ViewExpense> {
   String _getCategoryName(String? categoryId) {
     if (categoryId == null) return 'No Category';
     try {
-      final box = Hive.box<ExpenseCategory>('restaurant_expenseCategory');
+      final box = HiveExpenseCat.getECategory();
       final category = box.get(categoryId);
       return category?.name ?? 'Unknown Category';
     } catch (e) {
@@ -197,7 +197,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     ),
                     SizedBox(height: 8),
                     ValueListenableBuilder(
-                      valueListenable: Hive.box<ExpenseCategory>('restaurant_expenseCategory').listenable(),
+                      valueListenable: HiveExpenseCat.getECategory().listenable(),
                       builder: (context, Box<ExpenseCategory> box, _) {
                         final categories = box.values.where((cat) => cat.isEnabled).toList();
                         return Container(

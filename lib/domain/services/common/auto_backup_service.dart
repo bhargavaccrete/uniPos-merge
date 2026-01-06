@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:unipos/core/config/app_config.dart';
 
-// Import both backup implementations
-import 'package:unipos/domain/services/retail/backup_service.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/import/import.dart';
+// Unified backup service (works for both modes)
+import 'package:unipos/domain/services/common/unified_backup_service.dart';
+
+// Legacy backup implementations (kept for backward compatibility, not actively used)
+// import 'package:unipos/domain/services/retail/backup_service.dart';
+// import 'package:unipos/presentation/widget/componets/restaurant/componets/import/import.dart';
 
 /// Auto Backup Service - Mode-Aware
 /// Works with both Restaurant and Retail modes
@@ -113,26 +116,13 @@ class AutoBackupService {
     try {
       debugPrint('📦 Starting automatic backup for ${AppConfig.businessMode.name} mode...');
 
+      // Use UnifiedBackupService (works for both Restaurant and Retail)
       String? filePath;
-
-      if (AppConfig.isRestaurant) {
-        // Restaurant mode: Use CategoryImportExport
-        try {
-          filePath = await CategoryImportExport.exportToDownloads();
-        } catch (e) {
-          debugPrint('❌ Restaurant backup failed: $e');
-          return;
-        }
-      } else if (AppConfig.isRetail) {
-        // Retail mode: Use BackupService
-        try {
-          final backupService = BackupService();
-          final file = await backupService.createBackup();
-          filePath = file?.path;
-        } catch (e) {
-          debugPrint('❌ Retail backup failed: $e');
-          return;
-        }
+      try {
+        filePath = await UnifiedBackupService.exportToDownloads();
+      } catch (e) {
+        debugPrint('❌ Unified backup failed: $e');
+        return;
       }
 
       if (filePath != null) {

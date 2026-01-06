@@ -74,4 +74,17 @@ class HoldSaleModel extends HiveObject {
       'updatedAt': updatedAt,
     };
   }
+
+  factory HoldSaleModel.fromMap(Map<String, dynamic> map) {
+    return HoldSaleModel(
+      holdSaleId: map['holdSaleId'] as String,
+      customerId: map['customerId'] as String?,
+      customerName: map['customerName'] as String?,
+      note: map['note'] as String?,
+      totalItems: (map['totalItems'] as num).toInt(),
+      subtotal: (map['subtotal'] as num).toDouble(),
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String,
+    );
+  }
 }

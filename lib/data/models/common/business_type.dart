@@ -54,4 +54,28 @@ class BusinessType extends HiveObject {
       updatedAt: DateTime.now(),
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'iconName': iconName,
+      'isSelected': isSelected,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  factory BusinessType.fromMap(Map<String, dynamic> map) {
+    return BusinessType(
+      id: map['id'] as String?,
+      name: map['name'] as String?,
+      description: map['description'] as String?,
+      iconName: map['iconName'] as String?,
+      isSelected: map['isSelected'] as bool? ?? false,
+      createdAt: DateTime.tryParse(map['createdAt'] ?? ''),
+      updatedAt: DateTime.tryParse(map['updatedAt'] ?? ''),
+    );
+  }
 }

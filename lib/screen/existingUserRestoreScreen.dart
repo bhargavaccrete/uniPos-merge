@@ -4,12 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/domain/store/retail/customer_store.dart';
+import 'package:unipos/domain/store/retail/product_store.dart';
+import 'package:unipos/domain/store/retail/purchase_store.dart';
+import 'package:unipos/domain/store/retail/sale_store.dart';
+import 'package:unipos/domain/store/retail/supplier_store.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
-import '../presentation/widget/componets/restaurant/componets/import/import.dart';
+import '../domain/services/common/unified_backup_service.dart';
 import '../core/config/app_config.dart';
 import '../core/init/hive_init.dart';
 import '../core/di/service_locator.dart';
+
+// Retail stores
+
+
 
 class ExistingUserRestoreScreen extends StatefulWidget {
   const ExistingUserRestoreScreen({Key? key}) : super(key: key);
@@ -35,6 +44,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   bool _isLoading = false;
   bool _fileValidated = false;
   Map<String, dynamic>? _fileMetadata;
+  bool _isRestoring = false; // Guard to prevent duplicate restore calls
 
   @override
   void initState() {
@@ -207,13 +217,29 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   Future<void> _restoreData() async {
     if (_selectedFilePath == null) return;
 
-    setState(() => _isLoading = true);
+    // ✅ Guard: Prevent duplicate restore calls
+    if (_isRestoring) {
+      debugPrint("⚠️ Restore already in progress, ignoring duplicate call");
+      return;
+    }
+
+    // Clear any previous error messages
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+    }
+
+    setState(() {
+      _isLoading = true;
+      _isRestoring = true;
+    });
 
     try {
-      // Import directly using the selected file path
-      await CategoryImportExport.importFromFilePath(context, _selectedFilePath!);
+      // Import directly using the selected file path (using UnifiedBackupService)
+      final success = await UnifiedBackupService.importFromFilePath(context, _selectedFilePath!);
 
-      setState(() => _isLoading = false);
+      if (!success) {
+        throw Exception('Import failed - please check the backup file format');
+      }
 
       // Reload AppConfig to get the restored business mode
       await AppConfig.init();
@@ -227,6 +253,21 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       await registerBusinessDependencies(AppConfig.businessMode);
       debugPrint("📦 Business dependencies registered for: ${AppConfig.businessMode.name}");
 
+      // ✅ CRITICAL: Force reload stores from Hive after restore
+      if (AppConfig.isRetail) {
+        debugPrint("📦 Reloading retail stores from Hive...");
+        await _reloadRetailStores();
+      } else if (AppConfig.isRestaurant) {
+        debugPrint("📦 Reloading restaurant stores from Hive...");
+        // Restaurant uses direct Hive access (HiveBoxes, etc.), so no manual Store reload is needed.
+        // The UI will automatically fetch fresh data from the updated boxes.
+      }
+
+      setState(() {
+        _isLoading = false;
+        _isRestoring = false;
+      });
+
       // Show success dialog
       if (mounted) {
         _showSuccessDialog(
@@ -235,7 +276,10 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         );
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isRestoring = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -245,6 +289,52 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
           ),
         );
       }
+    }
+  }
+
+  /// Reload retail stores from Hive after restore
+  Future<void> _reloadRetailStores() async {
+    try {
+      // Force reload ProductStore
+      if (locator.isRegistered<ProductStore>()) {
+        final productStore = locator<ProductStore>();
+        await productStore.loadProducts();
+        debugPrint("📦 ProductStore reloaded: ${productStore.products.length} products");
+      }
+
+      // Force reload SaleStore
+      if (locator.isRegistered<SaleStore>()) {
+        final saleStore = locator<SaleStore>();
+        await saleStore.loadSales();
+        debugPrint("📦 SaleStore reloaded");
+      }
+
+      // Force reload CustomerStore
+      if (locator.isRegistered<CustomerStore>()) {
+        final customerStore = locator<CustomerStore>();
+        await customerStore.loadCustomers();
+        debugPrint("📦 CustomerStore reloaded: ${customerStore.customers.length} customers");
+      }
+
+      // Force reload SupplierStore
+      if (locator.isRegistered<SupplierStore>()) {
+        final supplierStore = locator<SupplierStore>();
+        await supplierStore.loadSuppliers();
+        debugPrint("📦 SupplierStore reloaded: ${supplierStore.suppliers.length} suppliers");
+      }
+
+      // Force reload PurchaseStore
+      if (locator.isRegistered<PurchaseStore>()) {
+        final purchaseStore = locator<PurchaseStore>();
+        await purchaseStore.loadPurchases();
+        debugPrint("📦 PurchaseStore reloaded: ${purchaseStore.purchases.length} purchases");
+      }
+
+      debugPrint("✅ All retail stores reloaded successfully");
+    } catch (e, stackTrace) {
+      debugPrint("⚠️ Error reloading stores: $e");
+      debugPrint("Stack trace: $stackTrace");
+      // Don't throw - the data is in Hive, stores will reload on next app start
     }
   }
 
@@ -911,7 +1001,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : _restoreData,
+                      onPressed: (_isLoading || _isRestoring) ? null : _restoreData,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.success,
                         padding: const EdgeInsets.symmetric(vertical: 15),

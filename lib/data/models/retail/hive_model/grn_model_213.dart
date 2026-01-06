@@ -163,6 +163,26 @@ class GRNModel extends HiveObject {
     };
   }
 
+  factory GRNModel.fromMap(Map<String, dynamic> map) {
+    return GRNModel(
+      grnId: map['grnId'] as String,
+      grnNumber: map['grnNumber'] as String,
+      poId: map['poId'] as String,
+      poNumber: map['poNumber'] as String,
+      supplierId: map['supplierId'] as String,
+      supplierName: map['supplierName'] as String?,
+      receivedDate: map['receivedDate'] as String,
+      totalOrderedQty: (map['totalOrderedQty'] as num).toInt(),
+      totalReceivedQty: (map['totalReceivedQty'] as num).toInt(),
+      totalAmount: (map['totalAmount'] as num?)?.toDouble(),
+      status: map['status'] as String,
+      notes: map['notes'] as String?,
+      invoiceNumber: map['invoiceNumber'] as String?,
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String,
+    );
+  }
+
   GRNModel copyWith({
     String? grnId,
     String? grnNumber,

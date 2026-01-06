@@ -191,4 +191,31 @@ class CartItemModel extends HiveObject {
       'categoryName': categoryName,
     };
   }
+
+
+  factory CartItemModel.fromMap(Map<String, dynamic> map) {
+    return CartItemModel(
+      cartItemId: map['cartItemId'] as String,
+      variantId: map['variantId'] as String,
+      productId: map['productId'] as String,
+      productName: map['productName'] as String,
+      size: map['size'] as String?,
+      color: map['color'] as String?,
+      weight: map['weight'] as String?,
+      price: (map['price'] as num).toDouble(),
+      qty: (map['qty'] as num).toInt(),
+      total: (map['total'] as num).toDouble(),
+      barcode: map['barcode'] as String?,
+      addedAt: map['addedAt'] as String,
+      gstRate: (map['gstRate'] as num?)?.toDouble(),
+      taxableAmount: (map['taxableAmount'] as num?)?.toDouble(),
+      gstAmount: (map['gstAmount'] as num?)?.toDouble(),
+      cgstAmount: (map['cgstAmount'] as num?)?.toDouble(),
+      sgstAmount: (map['sgstAmount'] as num?)?.toDouble(),
+      hsnCode: map['hsnCode'] as String?,
+      discountAmount: (map['discountAmount'] as num?)?.toDouble(),
+      categoryName: map['categoryName'] as String?,
+      tabIndex: (map['tabIndex'] as num?)?.toInt(),
+    );
+  }
 }

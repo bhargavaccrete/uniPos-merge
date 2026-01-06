@@ -152,4 +152,21 @@ class CreditPaymentModel extends HiveObject {
       'isWriteOff': isWriteOff ?? false,
     };
   }
+
+  factory CreditPaymentModel.fromMap(Map<String, dynamic> map) {
+    return CreditPaymentModel(
+      paymentId: map['paymentId'] as String,
+      customerId: map['customerId'] as String,
+      saleId: map['saleId'] as String,
+      amount: (map['amount'] as num).toDouble(),
+      paymentMode: map['paymentMode'] as String,
+      date: map['date'] as String,
+      referenceId: map['referenceId'] as String?,
+      note: map['note'] as String?,
+      createdAt: map['createdAt'] as String,
+      balanceBefore: (map['balanceBefore'] as num).toDouble(),
+      balanceAfter: (map['balanceAfter'] as num).toDouble(),
+      isWriteOff: map['isWriteOff'] as bool?,
+    );
+  }
 }

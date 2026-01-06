@@ -1373,6 +1373,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           return const SizedBox.shrink();
         }
 
+        final totalPrice = cartStore.totalPrice;
+
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: const BoxDecoration(
@@ -1441,7 +1443,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                             valueListenable: DecimalSettings.precisionNotifier,
                             builder: (context, precision, child) {
                               final symbol = CurrencyHelper.currentSymbol;
-                              final formattedTotal = cartStore.totalPrice.toStringAsFixed(precision);
+                              final formattedTotal = totalPrice.toStringAsFixed(precision);
                               return Text(
                                 '$symbol$formattedTotal',
                                 style: const TextStyle(

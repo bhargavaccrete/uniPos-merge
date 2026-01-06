@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
+import 'package:unipos/domain/services/common/unified_backup_service.dart';
 
 import 'package:unipos/presentation/screens/restaurant/Expense/Expense.dart';
 import 'package:unipos/presentation/screens/restaurant/customiztion/customization_drawer.dart';
@@ -18,13 +19,14 @@ import 'package:unipos/presentation/screens/restaurant/printerSetting/printerset
 import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/import/import.dart';
+// Legacy import (kept for backward compatibility, not actively used)
+// import 'package:unipos/presentation/widget/componets/restaurant/componets/import/import.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/listmenu.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/main.dart' as main_app;
 
-import '../../../../screens/retail/reports_screen.dart';
+import 'package:unipos/presentation/screens/restaurant/Reports/reports.dart';
 
 
 class Drawerr extends StatefulWidget {
@@ -548,7 +550,7 @@ class _DrawerrState extends State<Drawerr> {
 
                                   String? filePath;
                                   try {
-                                    filePath = await CategoryImportExport.exportToDownloads();
+                                    filePath = await UnifiedBackupService.exportToDownloads();
                                   } catch (e) {
                                     debugPrint('❌ Backup error: $e');
                                   } finally {
@@ -686,25 +688,9 @@ class _DrawerrState extends State<Drawerr> {
                                   );
 
                                   String? filePath;
-                                  bool copiedSuccessfully = false;
                                   try {
-                                    // Create backup in temp location
-                                    filePath = await CategoryImportExport.exportAllData();
-
-                                    if (filePath != null) {
-                                      // Try to copy to selected folder
-                                      try {
-                                        final backupFile = File(filePath);
-                                        final fileName = filePath.split('/').last;
-                                        final newPath = '$selectedDirectory/$fileName';
-                                        await backupFile.copy(newPath);
-                                        debugPrint('✅ Backup copied to: $newPath');
-                                        copiedSuccessfully = true;
-                                      } catch (copyError) {
-                                        debugPrint('⚠️ Copy failed: $copyError');
-                                        copiedSuccessfully = false;
-                                      }
-                                    }
+                                    // Create backup directly in selected folder
+                                    filePath = await UnifiedBackupService.exportToCustomFolder(selectedDirectory);
                                   } catch (e) {
                                     debugPrint('❌ Backup error: $e');
                                   } finally {
@@ -735,45 +721,7 @@ class _DrawerrState extends State<Drawerr> {
                                     return;
                                   }
 
-                                  if (!copiedSuccessfully) {
-                                    // Copy failed due to permissions, offer to share the file instead
-                                    final fileName = filePath.split('/').last;
-                                    ScaffoldMessenger.of(finalContext).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          '⚠️ Cannot save to selected folder due to permissions.\nSharing file instead...',
-                                          style: TextStyle(fontSize: 14),
-                                        ),
-                                        duration: Duration(seconds: 3),
-                                        backgroundColor: Colors.orange,
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-
-                                    // Share the file so user can save it manually
-                                    await Future.delayed(Duration(milliseconds: 500));
-                                    try {
-                                      await Share.shareXFiles(
-                                        [XFile(filePath)],
-                                        subject: 'UniPOS Backup',
-                                        text: 'Backup file: $fileName',
-                                      );
-                                    } catch (shareError) {
-                                      debugPrint('❌ Share failed: $shareError');
-                                      if (finalContext.mounted) {
-                                        ScaffoldMessenger.of(finalContext).showSnackBar(
-                                          SnackBar(
-                                            content: Text('❌ Failed to share backup file'),
-                                            duration: Duration(seconds: 3),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                    return;
-                                  }
-
-                                  final fileName = filePath.split('/').last;
+                                  // Success - show confirmation
                                   ScaffoldMessenger.of(finalContext).showSnackBar(
                                     SnackBar(
                                       content: Row(
@@ -844,7 +792,7 @@ class _DrawerrState extends State<Drawerr> {
 
                                           bool importSuccess = false;
                                           try {
-                                            importSuccess = await CategoryImportExport.importAllData(context);
+                                            importSuccess = await UnifiedBackupService.importData(context);
                                           } catch (e) {
                                             debugPrint('Import error in drawer: $e');
                                           } finally {

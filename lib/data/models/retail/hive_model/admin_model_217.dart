@@ -106,6 +106,16 @@ class AdminModel extends HiveObject {
     };
   }
 
+  factory AdminModel.fromMap(Map<String, dynamic> map) {
+    return AdminModel(
+      adminId: map['adminId'] as String,
+      username: map['username'] as String,
+      passwordHash: map['passwordHash'] as String? ?? '',
+      createdAt: map['createdAt'] as String,
+      updatedAt: map['updatedAt'] as String,
+    );
+  }
+
   @override
   String toString() {
     return 'AdminModel(adminId: $adminId, username: $username)';
