@@ -9,6 +9,8 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingses
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/yearwisebytrading.dart';
 
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
@@ -115,7 +117,7 @@ class _ThisWeekbytradingState extends State<ThisWeekbytrading> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total (Rs)',textScaler: TextScaler.linear(1),
+                              child: Text('Total (${CurrencyHelper.currentSymbol})',textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],

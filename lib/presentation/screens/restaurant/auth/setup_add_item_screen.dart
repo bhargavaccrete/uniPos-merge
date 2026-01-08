@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -50,6 +51,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   // Optional Fields
   final _descriptionController = TextEditingController();
   File? _selectedImage;
+  Uint8List? _selectedImageBytes; // Store image bytes for web compatibility
   String? _savedImagePath;
 
   // Veg/Non-Veg
@@ -141,8 +143,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     );
 
     if (pickedFile != null) {
+      // Read image as bytes for web compatibility
+      final bytes = await pickedFile.readAsBytes();
       setState(() {
         _selectedImage = File(pickedFile.path);
+        _selectedImageBytes = bytes;
       });
     }
   }
@@ -170,6 +175,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   void _removeImage() {
     setState(() {
       _selectedImage = null;
+      _selectedImageBytes = null;
       _savedImagePath = null;
     });
   }
@@ -431,9 +437,16 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         ),
       );
 
-      // Save image if selected
+      // Save image if selected and convert to bytes
+      Uint8List? imageBytes = _selectedImageBytes;
+      
+      // Try to save to local storage for persistence/caching (legacy support)
       if (_selectedImage != null) {
-        _savedImagePath = await _saveImageToLocalStorage(_selectedImage!);
+        try {
+           _savedImagePath = await _saveImageToLocalStorage(_selectedImage!);
+        } catch (e) {
+           print('Warning: Failed to save local image copy: $e');
+        }
       }
 
       // Calculate tax rate from selected taxes
@@ -446,7 +459,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         categoryOfItem: _selectedCategoryId!,
         description: _descriptionController.text.trim(),
         price: double.parse(_priceController.text.trim()),
-        imagePath: _savedImagePath ?? '',
+        imageBytes: imageBytes,
         isVeg: _itemType == 'Veg' ? 'Veg' : 'Non-Veg',
         isSoldByWeight: _isSoldByWeight,
         unit: _isSoldByWeight ? _selectedUnit : null,
@@ -521,6 +534,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _selectedCategoryId = null;
       _selectedCategoryName = null;
       _selectedImage = null;
+      _selectedImageBytes = null;
       _savedImagePath = null;
       _itemType = 'Veg';
       _isSoldByWeight = false;
@@ -892,13 +906,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        if (_selectedImage != null)
+        if (_selectedImageBytes != null)
           Stack(
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _selectedImage!,
+                child: Image.memory(
+                  _selectedImageBytes!,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,

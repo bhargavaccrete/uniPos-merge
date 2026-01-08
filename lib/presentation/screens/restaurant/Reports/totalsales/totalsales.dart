@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 
@@ -347,7 +349,7 @@ class _SalesDataViewState extends State<SalesDataView> {
             Expanded(
               child: _SummaryCard(
                 title: 'Total Sales',
-                value: '₹${NumberFormat.compactCurrency(locale: 'en_IN', symbol: '', decimalDigits: 2).format(_totalSales)}',
+                value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalSales)}',
                 icon: Icons.currency_rupee,
                 color: Colors.green,
               ),
@@ -404,7 +406,7 @@ class _SalesDataViewState extends State<SalesDataView> {
                       DataCell(Text('#${order.id.substring(0, 6)}')),
                       DataCell(Text(kotNumbersText)),
                       DataCell(Text(order.customerName)),
-                      DataCell(Text('₹${netAmount.toStringAsFixed(2)}')),
+                      DataCell(Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(netAmount)}')),
                     ],
                   );
                 }).toList(),

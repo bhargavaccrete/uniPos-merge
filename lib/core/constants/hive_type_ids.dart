@@ -38,12 +38,16 @@ class HiveTypeIds {
   static const int restaurantExpense = 115;
   static const int restaurantExpense1 = 116;
   static const int restaurantEod = 117;
-  static const int orderTypeSummary = 118;
+
+
+
+  static const int OrderTypeSummary = 118;
   static const int CategorySales = 119;
   static const int PaymentSummary = 120;
   static const int CashReconciliation = 121;
-  static const int restaurantTestBill = 122;
-  static const int restaurantTestBillItem = 123;
+  static const int TestBill = 122;
+  static const int TestBillItem = 123;
+  static const int TaxSummary = 124;
 
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
@@ -113,6 +117,7 @@ class HiveTypeIds {
     retailAttributeValue,
     retailProductAttribute,
     retailStaff,
+    retailBillingTab
   ];
 
   /// Get all restaurant model IDs
@@ -135,6 +140,12 @@ class HiveTypeIds {
     restaurantExpense,
     restaurantExpense1,
     restaurantEod,
-    restaurantTestBill,
+    OrderTypeSummary,
+    CategorySales,
+    PaymentSummary,
+    CashReconciliation,
+    TestBill,
+    TestBillItem,
+    TaxSummary,
   ];
 }

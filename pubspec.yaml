@@ -134,6 +134,7 @@ flutter:
     - assets/images/
     - assets/animation/
     - assets/icons/
+    - assets/fonts/
   #   - images/a_dot_ham.jpe
 
   # An image asset can refer to one or more resolution-specific "variants", see

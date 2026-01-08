@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
+import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
 
-import '../../../../../constants/restaurant/color.dart';
-import '../../../../widget/componets/restaurant/componets/Button.dart';
+import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 
 class CustomByDiscount extends StatefulWidget {
   const CustomByDiscount({super.key});
@@ -15,20 +22,69 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
   DateTime? _fromDate;
   DateTime? _toDate;
 
-  // // Function to show the Date Picker
-  // Future<void> _pickDate(BuildContext context) async {
-  //   DateTime? pickedDate = await showDatePicker(
-  //       context: context,
-  //       initialDate: DateTime.now(),
-  //       firstDate: DateTime(2000),
-  //       lastDate: DateTime(2100));
-  //
-  //   if (pickedDate != null) {
-  //     setState(() {
-  //       _fromDate = pickedDate;
-  //     });
-  //   }
-  // }
+  List<pastOrderModel> _discountedOrders = [];
+  double _totalDiscountAmount = 0.0;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Future<void> _loadData() async {
+    if (_fromDate == null || _toDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Please select both Start and End dates")));
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final box = Hive.box<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
+      
+      // Normalize dates to include full days
+      final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+      final end = DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(Duration(days: 1));
+
+      final allOrders = box.values.toList();
+      final rangeOrders = allOrders.where((order) {
+        if (order.orderAt == null) return false;
+        // Exclude refunded and voided orders
+        final status = order.orderStatus?.toUpperCase() ?? '';
+        if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
+
+        return order.orderAt!.isAfter(start) &&
+            order.orderAt!.isBefore(end);
+      }).toList();
+
+      final discountedOrders = rangeOrders.where((order) {
+        return (order.Discount ?? 0) > 0;
+      }).toList();
+
+      // Sort by date descending (newest first)
+      discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
+
+      double totalDiscount = 0.0;
+      for (var order in discountedOrders) {
+        totalDiscount += (order.Discount ?? 0.0);
+      }
+
+      setState(() {
+        _discountedOrders = discountedOrders;
+        _totalDiscountAmount = totalDiscount;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      print("Error loading discount data: $e");
+    }
+  }
+
   // Function to  pick "From Date"
   Future<void> _pickFromDate(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
@@ -85,48 +141,9 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                         fontSize: 16, fontWeight: FontWeight.w500),
                     textAlign: TextAlign.start,
                   ),
-                  // Container(
-                  //   width: width * 0.6,
-                  //   height: height * 0.04,
-                  //   child: CommonTextForm(
-                  //     hintText: 'DD/MM/YYYY',
-                  //     HintColor: Colors.grey,
-                  //     gesture: Icon(Icons.date_range, color: primarycolor,),
-                  //
-                  //     BorderColor: primarycolor,
-                  //     obsecureText: false,
-                  //   ),
-                  // ),
-
-                  // date picker
-                  // InkWell(
-                  //   onTap: () {
-                  //     _pickDate(context);
-                  //   },
-                  //   child: Container(
-                  //       padding: EdgeInsets.symmetric(horizontal: 10),
-                  //       width: width * 0.6,
-                  //       height: height * 0.04,
-                  //       decoration: BoxDecoration(
-                  //         border: Border.all(color: primarycolor),
-                  //         // color: Colors.red,
-                  //         borderRadius: BorderRadius.circular(15)
-                  //       ),
-                  //       child: Row(
-                  //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  //         children: [
-                  //           Text(
-                  //             _fromDate == null
-                  //                 ? ' DD/MM/yyyy'
-                  //                 : '${_fromDate!.day}/${_fromDate!.month}/${_fromDate!.year}',
-                  //           ),
-                  //           Icon(Icons.date_range)
-                  //         ],
-                  //       )),
-                  // ),
                   InkWell(
                     onTap: () {
-                      _pickToDate(context);
+                      _pickFromDate(context); // Fixed to use _pickFromDate
                     },
                     child: Container(
                         padding: EdgeInsets.symmetric(horizontal: 10),
@@ -152,24 +169,12 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                         )),
                   ),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                            color: primarycolor,
-                            borderRadius: BorderRadius.circular(50)
-                        ),
-                        child: Icon(
-                          Icons.search,
-                          size: 25,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // SizedBox(height: 25,),
+                  // Search Button Row
+                  // Adjusted layout to be next to To Date or separate line?
+                  // Original layout had search button below From Date which was weird.
+                  // I'll put it in a nicer place, maybe after To Date.
+
+                  SizedBox(height: 10,),
                   Text(
                     'To Date:',
                     textScaler: TextScaler.linear(1),
@@ -178,31 +183,51 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                         fontSize: 16, fontWeight: FontWeight.w500),
                     textAlign: TextAlign.start,
                   ),
-                  InkWell(
-                    onTap: _fromDate ==null ? null: ()=> _pickToDate(context),
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: _fromDate ==null ? null: ()=> _pickToDate(context),
 
-                    child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10),
-                        width: width * 0.6,
-                        height: height * 0.05,
-                        decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
-                            // color: Colors.red,
-                            borderRadius: BorderRadius.circular(5)
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _toDate == null
-                                  ? ' DD/MM/YYYY'
-                                  : '${_toDate!.day}/${_toDate!.month}/${_toDate!.year}',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 14),
+                        child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            width: width * 0.6,
+                            height: height * 0.05,
+                            decoration: BoxDecoration(
+                                border: Border.all(color: primarycolor),
+                                // color: Colors.red,
+                                borderRadius: BorderRadius.circular(5)
                             ),
-                            Icon(Icons.date_range,color: primarycolor,)
-                          ],
-                        )),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _toDate == null
+                                      ? ' DD/MM/YYYY'
+                                      : '${_toDate!.day}/${_toDate!.month}/${_toDate!.year}',
+                                  textScaler: TextScaler.linear(1),
+                                  style: GoogleFonts.poppins(fontSize: 14),
+                                ),
+                                Icon(Icons.date_range,color: primarycolor,)
+                              ],
+                            )),
+                      ),
+                      SizedBox(width: 10),
+                      InkWell(
+                        onTap: _loadData,
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                              color: primarycolor,
+                              borderRadius: BorderRadius.circular(50)
+                          ),
+                          child: Icon(
+                            Icons.search,
+                            size: 25,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -214,7 +239,10 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                   width: width * 0.5,
                   height: height * 0.07,
                   bordercircular: 5,
-                  onTap: () {},
+                  onTap: () {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Export coming soon")));
+                  },
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -223,7 +251,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                         color: Colors.white,
                       ),
                       Text(
-                        'Export TO Excel',
+                        'Export To Excel',
                         textScaler: TextScaler.linear(1),
                         style: GoogleFonts.poppins(
                             color: Colors.white, fontWeight: FontWeight.w500),
@@ -235,13 +263,31 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                 height: 25,
               ),
 
+              Text(
+                " Total Discount Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalDiscountAmount)} ",
+                textScaler: TextScaler.linear(1),
+                style: GoogleFonts.poppins(
+                    fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 10),
+              Text(
+                " Total Discount Order Count = ${_discountedOrders.length} ",
+                textScaler: TextScaler.linear(1),
+                style: GoogleFonts.poppins(
+                    fontSize: 14, fontWeight: FontWeight.w600),
+              ),
 
+              SizedBox(
+                height: 25,
+              ),
 
-              SingleChildScrollView(
+              _isLoading 
+              ? Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                     headingRowHeight: 50,
-                    columnSpacing: 2,
+                    columnSpacing: 20,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
                     border: TableBorder.all(
                       // borderRadius: BorderRadius.circular(5),
@@ -253,7 +299,6 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                     ),
                     columns: [
                       DataColumn(
-                          columnWidth: FixedColumnWidth(width * 0.25),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -262,13 +307,13 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   bottomLeft: Radius.circular(50),
                                 ),
                               ),
-                              child: Text('Date',textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),))),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text('Date',textScaler: TextScaler.linear(1),
+                                  style: GoogleFonts.poppins(fontSize: 14),),
+                              ))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.2),
-
-                          // columnWidth:FlexColumnWidth(width * 0.1),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -284,7 +329,6 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                               ))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -298,21 +342,6 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.3),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Mobile No',textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.35),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -326,7 +355,6 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.3),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -340,21 +368,6 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Coupon Code',textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -368,7 +381,6 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -377,58 +389,65 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total Amount(Rs.)',textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.3),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Details',textScaler: TextScaler.linear(1),
+                              child: Text('Total Amount(${CurrencyHelper.currentSymbol})',textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],
-                    rows: [
-                      // DataRow(
-                      //   cells: [
-                      //     DataCell(
-                      //       Center(child: Text('Farm fresh')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('0')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('3')),
-                      //     ), DataCell(
-                      //       Center(child: Text('3')),
-                      //     ),
-                      //   ],
-                      // ),
-                      // DataRow(
-                      //   cells: [
-                      //     DataCell(
-                      //       Center(child: Text('Fruit punch')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('0')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('2')),
-                      //     ),DataCell(
-                      //       Center(child: Text('2')),
-                      //     ),
-                      //   ],
-                      // ),
-                    ]),
+                    rows: _discountedOrders.map((order) {
+                            return DataRow(cells: [
+                              DataCell(Text(
+                                order.orderAt != null
+                                    ? DateFormat('dd/MM/yyyy')
+                                        .format(order.orderAt!)
+                                    : '-',
+                                style: GoogleFonts.poppins(fontSize: 13),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.billNumber != null
+                                      ? order.billNumber.toString()
+                                      : order.id.substring(0, 8),
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.customerName,
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.paymentmode ?? '-',
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.orderType ?? '-',
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  DecimalSettings.formatAmount(
+                                      order.Discount ?? 0.0),
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 13, color: Colors.green),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  DecimalSettings.formatAmount(
+                                      order.totalPrice),
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              )),
+                            ]);
+                          }).toList()),
               )
-
             ],
           ),
         ),

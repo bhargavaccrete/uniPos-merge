@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/reports.dart';
 import '../../../constants/restaurant/color.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
@@ -281,76 +282,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                         onTap: () {
-                          showDialog(
-                              context: context,
-                              builder: (BuildContext context) => AlertDialog(
-                                title: Text(
-                                  'Are you sure you want to logout?',
-                                  style: TextStyle(
-                                    fontSize:
-                                    ResponsiveHelper.responsiveTextSize(
-                                        context, 15),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                actions: <Widget>[
-                                  Row(
-                                    mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      CommonButton(
-                                        bordercolor: Colors.red,
-                                        bordercircular: 2,
-                                        width: ResponsiveHelper.responsiveWidth(
-                                            context, 0.2),
-                                        height:
-                                        ResponsiveHelper.responsiveHeight(
-                                            context, 0.05),
-                                        bgcolor: Colors.red,
-                                        onTap: () {
-                                          Navigator.of(context).pop();
-                                        },
-                                        child: Text("Cancle"),
-                                      ),
-                                      SizedBox(
-                                        width: 10,
-                                      ),
-                                      CommonButton(
-                                        bordercircular: 2,
-                                        width: ResponsiveHelper.responsiveWidth(
-                                            context, 0.2),
-                                        height:
-                                        ResponsiveHelper.responsiveHeight(
-                                            context, 0.05),
-                                        bgcolor: primarycolor,
-                                        onTap: () {
-                                          // Navigate to restaurant login screen
-                                          Navigator.pushReplacement(
-                                              context,
-                                              MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      const RestaurantLogin()));
-
-                                          // Old navigation - commented out
-                                          // Navigator.push(
-                                          //     context,
-                                          //     MaterialPageRoute(
-                                          //         builder: (context) =>
-                                          //             AdminLogin()));
-                                        },
-                                        child: Text(
-                                          "Yes",
-                                          style: GoogleFonts.poppins(
-                                            fontSize: ResponsiveHelper
-                                                .responsiveTextSize(
-                                                context, 12),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ));
+                          _showLogoutDialog(context);
                         },
                         title: 'Logout',
                         icons: (Icons.logout),
@@ -932,5 +864,106 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         );
       }
     });*/
+  }
+
+  /// Improved logout dialog with better UI and proper navigation
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.logout,
+              color: Colors.red,
+              size: 28,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Logout',
+                style: GoogleFonts.poppins(
+                  fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to logout?',
+          style: GoogleFonts.poppins(
+            fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+          ),
+        ),
+        actions: <Widget>[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                child: Text(
+                  "Cancel",
+                  style: GoogleFonts.poppins(
+                    fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  // Close dialog first
+                  Navigator.of(dialogContext).pop();
+
+                  // Clear login state from SharedPreferences
+                  await _clearLoginState();
+
+                  // Clear entire navigation stack and go to login screen
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RestaurantLogin(),
+                    ),
+                    (route) => false, // Remove all previous routes
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  "Logout",
+                  style: GoogleFonts.poppins(
+                    fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Clear login state from SharedPreferences
+  Future<void> _clearLoginState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('restaurant_is_logged_in', false);
   }
 }

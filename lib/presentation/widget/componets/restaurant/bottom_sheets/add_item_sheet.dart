@@ -107,7 +107,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
       return;
     }
 
-    final item = _formState.toItem();
+    final item = await _formState.toItem();
     await itemsBoxes.addItem(item);
 
     widget.onItemAdded?.call();
@@ -319,7 +319,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   Widget _buildImageUploader() {
     return ImageUploader(
-      selectedImage: _formState.selectedImage,
+      imageBytes: _formState.selectedImage,
       onTap: _pickImage,
     );
   }

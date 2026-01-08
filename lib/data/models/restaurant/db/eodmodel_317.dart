@@ -125,7 +125,7 @@ class EndOfDayReport extends HiveObject{
 }
 
 
-@HiveType(typeId:18)
+@HiveType(typeId: HiveTypeIds.OrderTypeSummary)
 class OrderTypeSummary extends HiveObject{
 
   @HiveField(0)
@@ -167,7 +167,7 @@ class OrderTypeSummary extends HiveObject{
 }
 
 
-@HiveType(typeId:19)
+@HiveType(typeId: HiveTypeIds.CategorySales)
 class CategorySales extends HiveObject{
   @HiveField(0)
   final String categoryName;
@@ -209,7 +209,7 @@ class CategorySales extends HiveObject{
 
 
 
-@HiveType(typeId:20)
+@HiveType(typeId: HiveTypeIds.PaymentSummary)
 class PaymentSummary extends HiveObject{
 
   @HiveField(0)
@@ -251,7 +251,7 @@ class PaymentSummary extends HiveObject{
 }
 
 
-@HiveType(typeId:22)
+@HiveType(typeId: HiveTypeIds.CashReconciliation)
 class CashReconciliation extends HiveObject{
   @HiveField(0)
   final double systemExpectedCash;
@@ -339,7 +339,7 @@ class EndOfDayReport extends HiveObject {
   });
 }*/
 
-@HiveType(typeId:21)
+@HiveType(typeId: HiveTypeIds.TaxSummary)
 class TaxSummary extends HiveObject{
   @HiveField(0)
   final String taxName;

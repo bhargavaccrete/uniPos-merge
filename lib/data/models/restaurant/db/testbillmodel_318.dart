@@ -3,7 +3,7 @@ import 'package:unipos/core/constants/hive_type_ids.dart';
 
 part 'testbillmodel_318.g.dart';
 
-@HiveType(typeId: HiveTypeIds.restaurantTestBill)
+@HiveType(typeId: HiveTypeIds.TestBill)
 class TestBillModel extends HiveObject {
   @HiveField(0)
   String billNo;
@@ -73,7 +73,7 @@ class TestBillModel extends HiveObject {
   }
 }
 
-@HiveType(typeId: HiveTypeIds.restaurantTestBillItem)
+@HiveType(typeId: HiveTypeIds.TestBillItem)
 class TestBillItem extends HiveObject {
   @HiveField(0)
   String itemName;

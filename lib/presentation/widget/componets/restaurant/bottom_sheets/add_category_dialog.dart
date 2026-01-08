@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/database/hive_db.dart';
@@ -42,7 +44,7 @@ class AddCategoryDialog extends StatefulWidget {
 
 class _AddCategoryDialogState extends State<AddCategoryDialog> {
   final _categoryNameController = TextEditingController();
-  File? _selectedImage;
+  Uint8List? _selectedImageBytes;
 
   @override
   void dispose() {
@@ -51,10 +53,10 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   }
 
   Future<void> _pickImage() async {
-    final image = await ImagePickerSheet.show(context, isForCategory: true);
-    if (image != null) {
+    final bytes = await ImagePickerSheet.show(context, isForCategory: true);
+    if (bytes != null) {
       setState(() {
-        _selectedImage = image;
+        _selectedImageBytes = bytes;
       });
     }
   }
@@ -67,8 +69,24 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       return;
     }
 
+    String? imagePath;
+    if (_selectedImageBytes != null) {
+      try {
+        final appDir = await getApplicationDocumentsDirectory();
+        final imageDir = Directory('${appDir.path}/category_images');
+        if (!imageDir.existsSync()) await imageDir.create(recursive: true);
+        
+        final fileName = 'cat_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final file = File('${imageDir.path}/$fileName');
+        await file.writeAsBytes(_selectedImageBytes!);
+        imagePath = file.path;
+      } catch (e) {
+        debugPrint('Error saving category image: $e');
+      }
+    }
+
     final newCategory = Category(
-      imagePath: _selectedImage?.path,
+      imagePath: imagePath,
       id: const Uuid().v4(),
       name: _categoryNameController.text.trim(),
       createdTime: DateTime.now(),
@@ -78,7 +96,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     await HiveBoxes.addCategory(newCategory);
 
     widget.onCategoryAdded?.call();
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -164,11 +182,11 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
           border: Border.all(color: Colors.grey),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: _selectedImage != null
+        child: _selectedImageBytes != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.file(
-                  _selectedImage!,
+                child: Image.memory(
+                  _selectedImageBytes!,
                   fit: BoxFit.cover,
                   width: double.infinity,
                 ),

@@ -5,6 +5,8 @@ import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart' show HivePastOrder;
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 class DayWisebyTop extends StatefulWidget {
   const DayWisebyTop({super.key});
@@ -260,7 +262,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                                       bottomLeft: Radius.circular(10),
                                     ),
                                   ),
-                                  child: Text('Total (Rs)',
+                                  child: Text('Total (${CurrencyHelper.currentSymbol})',
                                       textScaler: TextScaler.linear(1),
                                       style: GoogleFonts.poppins(fontSize: 14),
                                       textAlign: TextAlign.center))),
@@ -285,7 +287,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                               ),
                               DataCell(
                                 Center(
-                                    child: Text('Rs. ${item['totalAmount'].toStringAsFixed(2)}',
+                                    child: Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item['totalAmount'])}',
                                         style: GoogleFonts.poppins(
                                             fontSize: 12, fontWeight: FontWeight.w600))),
                               ),

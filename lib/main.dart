@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/init/hive_init.dart';
+import 'package:unipos/presentation/screens/restaurant/auth/restaurant_login.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
 import 'package:unipos/presentation/screens/retail/home_screen.dart';
@@ -150,7 +151,8 @@ class UniPOSApp extends StatelessWidget {
         '/existingUserRestoreScreen': (context) => const ExistingUserRestoreScreen(),
         '/setup-wizard': (context) => const SetupWizardScreen(),
 
-        // Restaurant Route
+        // Restaurant Routes
+        '/restaurant-login': (context) => const RestaurantLogin(),
         '/restaurant-home': (context) => const AdminWelcome(),
 
         // Retail Routes

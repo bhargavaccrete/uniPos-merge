@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 
@@ -39,6 +42,9 @@ abstract class _AddProductFormStore with Store {
 
   @observable
   String? imagePath;
+
+  @observable
+  Uint8List? imageBytes;
 
   @observable
   String? selectedCategoryId;
@@ -217,6 +223,9 @@ abstract class _AddProductFormStore with Store {
 
   @action
   void setImagePath(String? value) => imagePath = value;
+
+  @action
+  void setImageBytes(Uint8List? value) => imageBytes = value;
 
   @action
   void setSelectedCategoryId(String? value) => selectedCategoryId = value;
@@ -592,12 +601,26 @@ abstract class _AddProductFormStore with Store {
       }
     }
 
+    // Use stored bytes or convert imagePath to imageBytes if available
+    Uint8List? finalImageBytes = imageBytes;
+
+    if (finalImageBytes == null && imagePath != null && imagePath!.isNotEmpty) {
+      try {
+        final file = File(imagePath!);
+        if (file.existsSync()) {
+          finalImageBytes = await file.readAsBytes();
+        }
+      } catch (e) {
+        print('Warning: Could not read image file: $e');
+      }
+    }
+
     final item = Items(
       id: itemId,
       name: name.trim(),
       price: hasPortionSizes ? null : price,
       description: description.isNotEmpty ? description : null,
-      imagePath: imagePath,
+      imageBytes: finalImageBytes,
       categoryOfItem: selectedCategoryId,
       isVeg: isVeg,
       unit: unit,
@@ -625,6 +648,7 @@ abstract class _AddProductFormStore with Store {
     name = '';
     description = '';
     imagePath = null;
+    imageBytes = null;
     selectedCategoryId = null;
     price = 0.0;
     taxRate = 0.0;

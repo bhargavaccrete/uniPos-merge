@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/core/config/app_config.dart';
 import '../util/color.dart';
@@ -108,8 +109,17 @@ class _SplashScreenState extends State<SplashScreen>
         if (AppConfig.isRetail) {
           Navigator.pushReplacementNamed(context, '/retail-billing');
         } else if (AppConfig.isRestaurant) {
-          // Navigate to restaurant home (you can add this route later)
-          Navigator.pushReplacementNamed(context, '/restaurant-home'); // Temporary
+          // Check restaurant login state
+          final prefs = await SharedPreferences.getInstance();
+          final isLoggedIn = prefs.getBool('restaurant_is_logged_in') ?? false;
+
+          if (isLoggedIn) {
+            // User is logged in - go to admin welcome screen
+            Navigator.pushReplacementNamed(context, '/restaurant-home');
+          } else {
+            // User is not logged in - go to login screen
+            Navigator.pushReplacementNamed(context, '/restaurant-login');
+          }
         } else {
           // Setup complete but no business mode - navigate to walkthrough
           Navigator.pushReplacementNamed(context, '/walkthrough');

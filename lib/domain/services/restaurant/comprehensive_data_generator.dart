@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -203,7 +204,7 @@ class ComprehensiveDataGenerator {
         cartItems.add(CartItem(
           id: _generateId(),
           title: item.name,
-          imagePath: item.imagePath ?? '',
+          imagePath: '', // Items now use imageBytes instead of imagePath
           price: price,
           quantity: qty,
           categoryName: 'Food',
@@ -291,7 +292,7 @@ class ComprehensiveDataGenerator {
         cartItems.add(CartItem(
           id: _generateId(),
           title: item.name,
-          imagePath: item.imagePath ?? '',
+          imagePath: '', // Items now use imageBytes instead of imagePath
           price: price,
           quantity: qty,
           categoryName: 'Food',
@@ -614,12 +615,20 @@ class ComprehensiveDataGenerator {
       final menuItem = _menuItems[_random.nextInt(_menuItems.length)];
       final itemName = '$menuItem #${i + 1}';
 
-      // Generate image if requested
-      String? imagePath;
+      // Generate image if requested and convert to bytes
+      Uint8List? imageBytes;
       if (withImages) {
-        imagePath = await _generatePlaceholderImage(itemName, i);
+        final imagePath = await _generatePlaceholderImage(itemName, i);
         if (imagePath != null && imagePath.isNotEmpty) {
-          imageCount++;
+          try {
+            final file = File(imagePath);
+            if (file.existsSync()) {
+              imageBytes = await file.readAsBytes();
+              imageCount++;
+            }
+          } catch (e) {
+            print('⚠️ Failed to read image for item #${i + 1}: $e');
+          }
         }
       }
 
@@ -629,7 +638,7 @@ class ComprehensiveDataGenerator {
         price: _randomPrice(),
         categoryOfItem: category.id,
         description: 'Delicious $menuItem made with finest ingredients',
-        imagePath: imagePath,
+        imageBytes: imageBytes,
         isVeg: _random.nextBool() ? 'veg' : 'non-veg',
         unit: 'plate',
         variant: null,

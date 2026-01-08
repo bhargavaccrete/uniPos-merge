@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 // Import your local files
 import '../../../../../constants/restaurant/color.dart';
@@ -85,14 +87,14 @@ class _CategoryReportViewState extends State<CategoryReportView> {
                     columns: [
                       DataColumn(label: Text('Category', style: GoogleFonts.poppins(fontWeight: FontWeight.bold))),
                       DataColumn(label: Text('Items Sold', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), numeric: true),
-                      DataColumn(label: Text('Total (₹)', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), numeric: true),
+                      DataColumn(label: Text('Total (${CurrencyHelper.currentSymbol})', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)), numeric: true),
                     ],
                     rows: _filteredData.map((category) {
                       return DataRow(
                         cells: [
                           DataCell(Text(category.categoryName)),
                           DataCell(Center(child: Text(category.totalItemsSold.toString()))),
-                          DataCell(Center(child: Text('₹${category.totalRevenue.toStringAsFixed(2)}'))),
+                          DataCell(Center(child: Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(category.totalRevenue)}'))),
                         ],
                       );
                     }).toList(),

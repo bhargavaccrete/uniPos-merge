@@ -13,6 +13,8 @@ import '../../../../../constants/restaurant/color.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 
 class ThisWeekbyTop extends StatefulWidget {
@@ -52,23 +54,42 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
             orderDate.isBefore(now.add(Duration(days: 1)));
       }).toList();
 
-      // Calculate item sales
+      // Calculate item sales with refund handling
       Map<String, Map<String, dynamic>> itemSales = {};
 
       for (var order in thisWeekOrders) {
+        // Skip fully refunded orders
+        if (order.orderStatus == 'FULLY_REFUNDED') continue;
+
+        // Calculate order-level refund ratio
+        final orderTotal = order.totalPrice ?? 0.0;
+        final refundAmount = order.refundAmount ?? 0.0;
+        final orderRefundRatio = orderTotal > 0 ? ((orderTotal - refundAmount) / orderTotal) : 1.0;
+
         for (var item in order.items) {
           final itemName = item.title;
-          final quantity = item.quantity;
+
+          // Calculate effective quantity (after refunds)
+          final originalQuantity = item.quantity ?? 0;
+          final refundedQuantity = item.refundedQuantity ?? 0;
+          final effectiveQuantity = originalQuantity - refundedQuantity;
+
+          // Skip fully refunded items
+          if (effectiveQuantity <= 0) continue;
+
           final price = item.price;
-          final totalAmount = price * quantity;
+          final baseTotal = price * effectiveQuantity;
+
+          // Apply order-level refund ratio for accurate revenue
+          final totalAmount = baseTotal * orderRefundRatio;
 
           if (itemSales.containsKey(itemName)) {
-            itemSales[itemName]!['quantity'] += quantity;
+            itemSales[itemName]!['quantity'] += effectiveQuantity;
             itemSales[itemName]!['totalAmount'] += totalAmount;
           } else {
             itemSales[itemName] = {
               'itemName': itemName,
-              'quantity': quantity,
+              'quantity': effectiveQuantity,
               'totalAmount': totalAmount,
             };
           }
@@ -212,7 +233,7 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
                                     bottomLeft: Radius.circular(10),
                                   ),
                                 ),
-                                child: Text('Total (Rs)',
+                                child: Text('Total (${CurrencyHelper.currentSymbol})',
                                     textScaler: TextScaler.linear(1),
                                     style: GoogleFonts.poppins(fontSize: 14),
                                     textAlign: TextAlign.center))),
@@ -237,7 +258,7 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
                             ),
                             DataCell(
                               Center(
-                                  child: Text('Rs. ${item['totalAmount'].toStringAsFixed(2)}',
+                                  child: Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item['totalAmount'])}',
                                       style: GoogleFonts.poppins(
                                           fontSize: 12, fontWeight: FontWeight.w600))),
                             ),

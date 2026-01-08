@@ -19,7 +19,7 @@ class AppSettings {
     "Round Off": false,
 
     // Input & Interaction
-    "Visual Keyboard": true,
+    "Visual Keyboard": false,
     "Addresss Suggestion": true,
     // "Separate Quantity": false, // ❌ NOT IMPLEMENTED - Commented out
 
@@ -150,7 +150,7 @@ class AppSettings {
   static bool get allItemsCategory => values["All Items Category"] ?? false;
   static bool get roundOff => values["Round Off"] ?? true;
 
-  static bool get visualKeyboard => values["Visual Keyboard"] ?? true;
+  static bool get visualKeyboard => values["Visual Keyboard"] ?? false;
   static bool get addressSuggestion => values["Addresss Suggestion"] ?? true;
 
   // static bool get  sepratedQuantity => values["Separate Quantity"] ?? false;

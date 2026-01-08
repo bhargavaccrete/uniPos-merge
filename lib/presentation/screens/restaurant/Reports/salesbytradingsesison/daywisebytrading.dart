@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
@@ -199,7 +201,7 @@ class _DayWisebytradingState extends State<DayWisebytrading> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total (Rs)',
+                              child: Text('Total (${CurrencyHelper.currentSymbol})',
                                   textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),

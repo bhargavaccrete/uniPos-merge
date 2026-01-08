@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+
+import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 
 class YearWisebyDiscount extends StatefulWidget {
   const YearWisebyDiscount({super.key});
@@ -11,7 +18,8 @@ class YearWisebyDiscount extends StatefulWidget {
 }
 
 class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
-  List<dynamic> yearitem = [
+  List<int> yearitem = [
+    2026,
     2025,
     2024,
     2023,
@@ -23,7 +31,70 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
     2017,
     2016
   ];
-  dynamic dropdownvalue2 = 2025;
+  int dropdownvalue2 = 2026;
+
+  List<pastOrderModel> _discountedOrders = [];
+  double _totalDiscountAmount = 0.0;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    dropdownvalue2 = now.year;
+    if (!yearitem.contains(dropdownvalue2)) {
+      yearitem.insert(0, dropdownvalue2);
+    }
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final box = Hive.box<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
+      
+      int year = dropdownvalue2;
+      final startOfYear = DateTime(year, 1, 1);
+      final endOfYear = DateTime(year + 1, 1, 1);
+
+      final allOrders = box.values.toList();
+      final yearOrders = allOrders.where((order) {
+        if (order.orderAt == null) return false;
+        // Exclude refunded and voided orders
+        final status = order.orderStatus?.toUpperCase() ?? '';
+        if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
+
+        return order.orderAt!.isAfter(startOfYear.subtract(Duration(seconds: 1))) &&
+            order.orderAt!.isBefore(endOfYear);
+      }).toList();
+
+      final discountedOrders = yearOrders.where((order) {
+        return (order.Discount ?? 0) > 0;
+      }).toList();
+
+      // Sort by date descending (newest first)
+      discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
+
+      double totalDiscount = 0.0;
+      for (var order in discountedOrders) {
+        totalDiscount += (order.Discount ?? 0.0);
+      }
+
+      setState(() {
+        _discountedOrders = discountedOrders;
+        _totalDiscountAmount = totalDiscount;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      print("Error loading discount data: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +128,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                           value: dropdownvalue2,
                           isExpanded: true,
                           items: yearitem.map((
-                              dynamic items,
+                              int items,
                               ) {
                             return DropdownMenuItem(
                                 value: items,
@@ -67,7 +138,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   style: GoogleFonts.poppins(fontSize: 14),
                                 ));
                           }).toList(),
-                          onChanged: (dynamic? newValue) {
+                          onChanged: (int? newValue) {
                             setState(() {
                               dropdownvalue2 = newValue!;
                             });
@@ -77,18 +148,18 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                   SizedBox(
                     width: 10,
                   ),
-                  Container(
-                    // width: width ,
-                      padding: EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                          color: primarycolor, shape: BoxShape.circle),
-                      // alignment: Alignment.bottomCenter,
-                      // height: height * 0.06,'
-                      child: Icon(
-                        Icons.search,
-                        size: 25,
-                        color: Colors.white,
-                      )),
+                  InkWell(
+                    onTap: _loadData,
+                    child: Container(
+                        padding: EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                            color: primarycolor, shape: BoxShape.circle),
+                        child: Icon(
+                          Icons.search,
+                          size: 25,
+                          color: Colors.white,
+                        )),
+                  ),
                 ],
               ),
               // SizedBox(height: 20,width: 20,),
@@ -99,7 +170,10 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                   width: width * 0.6,
                   height: height * 0.06,
                   bordercircular: 5,
-                  onTap: () {},
+                  onTap: () {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Export coming soon")));
+                  },
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -119,11 +193,32 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
               SizedBox(
                 height: 25,
               ),
-              SingleChildScrollView(
+
+              Text(
+                " Total Discount Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalDiscountAmount)} ",
+                textScaler: TextScaler.linear(1),
+                style: GoogleFonts.poppins(
+                    fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 10),
+              Text(
+                " Total Discount Order Count = ${_discountedOrders.length} ",
+                textScaler: TextScaler.linear(1),
+                style: GoogleFonts.poppins(
+                    fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+
+              SizedBox(
+                height: 25,
+              ),
+
+              _isLoading 
+              ? Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                     headingRowHeight: 50,
-                    columnSpacing: 2,
+                    columnSpacing: 20,
                     headingRowColor: WidgetStateProperty.all(Colors.grey[300]),
                     border: TableBorder.all(
                       // borderRadius: BorderRadius.circular(5),
@@ -135,7 +230,6 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                     ),
                     columns: [
                       DataColumn(
-                          columnWidth: FixedColumnWidth(width * 0.25),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -144,16 +238,16 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   bottomLeft: Radius.circular(50),
                                 ),
                               ),
-                              child: Text(
-                                'Date',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text(
+                                  'Date',
+                                  textScaler: TextScaler.linear(1),
+                                  style: GoogleFonts.poppins(fontSize: 14),
+                                ),
                               ))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.2),
-
-                          // columnWidth:FlexColumnWidth(width * 0.1),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -170,7 +264,6 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                               ))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -185,22 +278,6 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.3),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Mobile No',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.35),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -215,7 +292,6 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.3),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -230,22 +306,6 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Coupon Code',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -260,7 +320,6 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   textAlign: TextAlign.center))),
                       DataColumn(
                           headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.4),
                           label: Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
@@ -269,58 +328,65 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total Amount(Rs.)',
-                                  textScaler: TextScaler.linear(1),
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                  textAlign: TextAlign.center))),
-                      DataColumn(
-                          headingRowAlignment: MainAxisAlignment.center,
-                          columnWidth: FixedColumnWidth(width * 0.3),
-                          label: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomLeft: Radius.circular(10),
-                                ),
-                              ),
-                              child: Text('Details',
+                              child: Text('Total Amount(${CurrencyHelper.currentSymbol})',
                                   textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],
-                    rows: [
-                      // DataRow(
-                      //   cells: [
-                      //     DataCell(
-                      //       Center(child: Text('Farm fresh')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('0')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('3')),
-                      //     ), DataCell(
-                      //       Center(child: Text('3')),
-                      //     ),
-                      //   ],
-                      // ),
-                      // DataRow(
-                      //   cells: [
-                      //     DataCell(
-                      //       Center(child: Text('Fruit punch')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('0')),
-                      //     ),
-                      //     DataCell(
-                      //       Center(child: Text('2')),
-                      //     ),DataCell(
-                      //       Center(child: Text('2')),
-                      //     ),
-                      //   ],
-                      // ),
-                    ]),
+                    rows: _discountedOrders.map((order) {
+                            return DataRow(cells: [
+                              DataCell(Text(
+                                order.orderAt != null
+                                    ? DateFormat('dd/MM/yyyy')
+                                        .format(order.orderAt!)
+                                    : '-',
+                                style: GoogleFonts.poppins(fontSize: 13),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.billNumber != null
+                                      ? order.billNumber.toString()
+                                      : order.id.substring(0, 8),
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.customerName,
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.paymentmode ?? '-',
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  order.orderType ?? '-',
+                                  style: GoogleFonts.poppins(fontSize: 13),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  DecimalSettings.formatAmount(
+                                      order.Discount ?? 0.0),
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 13, color: Colors.green),
+                                ),
+                              )),
+                              DataCell(Center(
+                                child: Text(
+                                  DecimalSettings.formatAmount(
+                                      order.totalPrice),
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              )),
+                            ]);
+                          }).toList()),
               )
             ],
           ),

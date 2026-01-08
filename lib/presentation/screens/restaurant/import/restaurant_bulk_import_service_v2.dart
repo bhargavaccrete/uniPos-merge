@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -644,7 +645,18 @@ class RestaurantBulkImportServiceV2 {
         List<String> extraIds = extraIdsStr.isEmpty
             ? []
             : extraIdsStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-
+        // Convert image path to bytes if present
+        Uint8List? imageBytes;
+        if (imagePath.isNotEmpty) {
+          try {
+            final file = File(imagePath);
+            if (file.existsSync()) {
+              imageBytes = await file.readAsBytes();
+            }
+          } catch (e) {
+            print('⚠️ Failed to read image for item $id: $e');
+          }
+        }
         Items item = Items(
           id: id,
           name: name,
@@ -662,7 +674,7 @@ class RestaurantBulkImportServiceV2 {
           variant: [], // Will be populated by ItemVariants sheet
           choiceIds: choiceIds,
           extraId: extraIds,
-          imagePath: imagePath.isEmpty ? null : imagePath,
+          imageBytes: imageBytes,
           createdTime: DateTime.now(),
           lastEditedTime: DateTime.now(),
         );

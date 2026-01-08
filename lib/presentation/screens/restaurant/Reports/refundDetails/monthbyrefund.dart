@@ -12,6 +12,8 @@ import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 class Monthbyrefund extends StatefulWidget {
   const Monthbyrefund({super.key});
 
@@ -329,7 +331,7 @@ class _MonthbyrefundState extends State<Monthbyrefund> {
                                 bottomLeft: Radius.circular(10),
                               ),
                             ),
-                            child: Text('Refund(Rs.)',
+                            child: Text('Refund(${CurrencyHelper.currentSymbol})',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(fontSize: 14),
                                 textAlign: TextAlign.center))), DataColumn(
@@ -422,9 +424,7 @@ class _MonthbyrefundState extends State<Monthbyrefund> {
                         DataCell(
                           Center(
                             child: Text(
-                              order.refundAmount != null
-                                  ? '₹${order.refundAmount!.toStringAsFixed(2)}'
-                                  : '₹0.00',
+                              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(order.refundAmount ?? 0.0)}',
                               textScaler: TextScaler.linear(1),
                               style: GoogleFonts.poppins(fontSize: 12),
                             ),

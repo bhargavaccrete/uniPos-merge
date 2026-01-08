@@ -383,8 +383,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               SizedBox(
                 height: 15,
               ),
+
               Row(
-                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   CustomMenu(
                     onTap: () {
@@ -394,14 +395,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     color: Colors.deepOrangeAccent,
                     title: 'Sale By Category',
                   ),
-                ],
-              ),
-              SizedBox(
-                height: 15,
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                  SizedBox(
+                    width: 5,
+                  ),
                   CustomMenu(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context)=> DailyClosingReport()));
@@ -411,17 +407,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     color: Colors.deepOrangeAccent,
                     title: 'Daily Closing Reports',
                   ),
-                  SizedBox(
-                    width: 5,
-                  ),
-                  CustomMenu(
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> SalesbyTop()));
 
-                      },
-                      icons: Icons.graphic_eq_outlined,
-                      color: Colors.deepOrangeAccent,
-                      title: 'Sales By Top Selling'),
                 ],
               ),
               SizedBox(
@@ -430,6 +416,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+
+
+                  CustomMenu(
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context)=> SalesbyTop()));
+
+                      },
+                      icons: Icons.graphic_eq_outlined,
+                      color: Colors.deepOrangeAccent,
+                      title: 'Sales By Top Selling'),
+                  SizedBox(
+                    width: 5,
+                  ),
                   CustomMenu(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomerListReport()));
@@ -439,18 +438,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     color: primarycolor,
                     title: 'Customer List',
                   ),
-                  SizedBox(
-                    width: 5,
-                  ),
-                  CustomMenu(
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomerListByRevenue()));
-                      },
-                      icons: Icons.monetization_on_outlined,
-                      color: Colors.deepOrangeAccent,
-                      title: 'Customer List BY \n      Revenue'),
+
                 ],
               ),
+
 
               SizedBox(
                 height: 15,
@@ -570,9 +561,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ],
               ),
               SizedBox(height: 15,),
+
+
+
+
               Row(
-                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+
+                  CustomMenu(
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomerListByRevenue()));
+                      },
+                      icons: Icons.monetization_on_outlined,
+                      color: Colors.deepOrangeAccent,
+                      title: 'Customer List BY \n      Revenue'),
+                  SizedBox(
+                    width: 5,
+                  ),
+
                   CustomMenu(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context)=> ExpenseReport()));

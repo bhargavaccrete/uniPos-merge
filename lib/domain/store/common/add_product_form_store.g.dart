@@ -120,6 +120,22 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
     });
   }
 
+  late final _$imageBytesAtom =
+      Atom(name: '_AddProductFormStore.imageBytes', context: context);
+
+  @override
+  Uint8List? get imageBytes {
+    _$imageBytesAtom.reportRead();
+    return super.imageBytes;
+  }
+
+  @override
+  set imageBytes(Uint8List? value) {
+    _$imageBytesAtom.reportWrite(value, super.imageBytes, () {
+      super.imageBytes = value;
+    });
+  }
+
   late final _$selectedCategoryIdAtom =
       Atom(name: '_AddProductFormStore.selectedCategoryId', context: context);
 
@@ -665,6 +681,17 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   }
 
   @override
+  void setImageBytes(Uint8List? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setImageBytes');
+    try {
+      return super.setImageBytes(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void setSelectedCategoryId(String? value) {
     final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
         name: '_AddProductFormStore.setSelectedCategoryId');
@@ -1045,6 +1072,7 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
 name: ${name},
 description: ${description},
 imagePath: ${imagePath},
+imageBytes: ${imageBytes},
 selectedCategoryId: ${selectedCategoryId},
 price: ${price},
 taxRate: ${taxRate},

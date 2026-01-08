@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../constants/restaurant/color.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
@@ -32,7 +34,7 @@ class _PastorderState extends State<Pastorder> {
     super.dispose();
   }
 
-  String _money(num? v) => '₹${(v ?? 0).toStringAsFixed(2)}';
+  String _money(num? v) => '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((v ?? 0).toDouble())}';
 
   String _fmtDateTime(DateTime? d) {
     if (d == null) return '—';

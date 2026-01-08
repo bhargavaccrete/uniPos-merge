@@ -7,6 +7,8 @@ import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 
 class CustomByRefund extends StatefulWidget {
@@ -393,118 +395,115 @@ class _CustomByRefundState extends State<CustomByRefund> {
                                 bottomLeft: Radius.circular(10),
                               ),
                             ),
-                            child: Text('Refund(Rs.)',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-
-                        columnWidth:FixedColumnWidth(width *0.3),
-
-                        label: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(10),
-                                bottomLeft: Radius.circular(10),
-                              ),
-                            ),
-                            child: Text('Reason',
-                                textScaler: TextScaler.linear(1),
-                                style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
-                  ],
-
-                  rows: _isLoading
-                      ? []
-                      : _refundedOrders.isEmpty
-                      ? []
-                      : _refundedOrders.map((order) {
-                    String reason = '';
-                    if (order.refundReason != null && order.refundReason!.isNotEmpty) {
-                      final lines = order.refundReason!.split('\n');
-                      reason = lines.isNotEmpty ? lines.last.trim() : '';
-                    }
-
-                    return DataRow(
-                      onSelectChanged: (selected) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => Orderdetails(Order: order),
-                          ),
-                        );
-                      },
-                      cells: [
-                        DataCell(
-                          Center(
-                            child: Text(
-                              order.refundedAt != null
-                                  ? DateFormat('dd/MM/yyyy').format(order.refundedAt!)
-                                  : '',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              order.id,
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              order.customerName,
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              order.paymentmode ?? '',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              order.orderType ?? '',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              order.refundAmount != null
-                                  ? '₹${order.refundAmount!.toStringAsFixed(2)}'
-                                  : '₹0.00',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Center(
-                            child: Text(
-                              reason,
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-
+                                                        child: Text('Refund(${CurrencyHelper.currentSymbol})',
+                                                            textScaler: TextScaler.linear(1),
+                                                            style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),DataColumn(
+                                                    headingRowAlignment: MainAxisAlignment.center,
+                            
+                                                    columnWidth:FixedColumnWidth(width *0.3),
+                            
+                                                    label: Container(
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.grey.shade300,
+                                                          borderRadius: BorderRadius.only(
+                                                            topLeft: Radius.circular(10),
+                                                            bottomLeft: Radius.circular(10),
+                                                          ),
+                                                        ),
+                                                        child: Text('Reason',
+                                                            textScaler: TextScaler.linear(1),
+                                                            style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
+                                              ],
+                            
+                                              rows: _isLoading
+                                                  ? []
+                                                  : _refundedOrders.isEmpty
+                                                  ? []
+                                                  : _refundedOrders.map((order) {
+                                                String reason = '';
+                                                if (order.refundReason != null && order.refundReason!.isNotEmpty) {
+                                                  final lines = order.refundReason!.split('\n');
+                                                  reason = lines.isNotEmpty ? lines.last.trim() : '';
+                                                }
+                            
+                                                return DataRow(
+                                                  onSelectChanged: (selected) {
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (context) => Orderdetails(Order: order),
+                                                      ),
+                                                    );
+                                                  },
+                                                  cells: [
+                                                    DataCell(
+                                                      Center(
+                                                        child: Text(
+                                                          order.refundedAt != null
+                                                              ? DateFormat('dd/MM/yyyy').format(order.refundedAt!)
+                                                              : '',
+                                                          textScaler: TextScaler.linear(1),
+                                                          style: GoogleFonts.poppins(fontSize: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DataCell(
+                                                      Center(
+                                                        child: Text(
+                                                          order.id,
+                                                          textScaler: TextScaler.linear(1),
+                                                          style: GoogleFonts.poppins(fontSize: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DataCell(
+                                                      Center(
+                                                        child: Text(
+                                                          order.customerName,
+                                                          textScaler: TextScaler.linear(1),
+                                                          style: GoogleFonts.poppins(fontSize: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DataCell(
+                                                      Center(
+                                                        child: Text(
+                                                          order.paymentmode ?? '',
+                                                          textScaler: TextScaler.linear(1),
+                                                          style: GoogleFonts.poppins(fontSize: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DataCell(
+                                                      Center(
+                                                        child: Text(
+                                                          order.orderType ?? '',
+                                                          textScaler: TextScaler.linear(1),
+                                                          style: GoogleFonts.poppins(fontSize: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DataCell(
+                                                      Center(
+                                                        child: Text(
+                                                          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(order.refundAmount ?? 0.0)}',
+                                                          textScaler: TextScaler.linear(1),
+                                                          style: GoogleFonts.poppins(fontSize: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    DataCell(
+                                                      Center(
+                                                        child: Text(
+                                                          reason,
+                                                          textScaler: TextScaler.linear(1),
+                                                          style: GoogleFonts.poppins(fontSize: 12),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              }).toList(),
                 ),
               ),
 

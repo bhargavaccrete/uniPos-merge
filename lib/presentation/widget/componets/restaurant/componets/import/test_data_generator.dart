@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -40,9 +41,9 @@ class TestDataGenerator {
   ];
 
   static final List<String> _itemTypes = [
-    'Chicken', 'Beef', 'Fish', 'Pasta', 'Rice',
-    'Burger', 'Pizza', 'Sandwich', 'Wrap', 'Curry',
-    'Steak', 'Shrimp', 'Salad', 'Soup', 'Noodles'
+    'Pasta', 'Rice', 'Burger', 'Pizza', 'Sandwich',
+    'Wrap', 'Curry', 'Salad', 'Soup', 'Noodles',
+    'Paneer', 'Vegetable', 'Dal', 'Biryani', 'Pulao'
   ];
 
   /// Generate random price
@@ -69,9 +70,8 @@ class TestDataGenerator {
 
   /// Topping names
   static final List<String> _toppingNames = [
-    'Extra Cheese', 'Bacon', 'Mushrooms', 'Onions', 'Tomatoes',
-    'Peppers', 'Olives', 'Jalapeños', 'Pineapple', 'Chicken',
-    'Beef', 'Sausage', 'Ham', 'Spinach', 'Garlic'
+    'Extra Cheese', 'Mushrooms', 'Onions', 'Tomatoes',
+    'Peppers', 'Olives', 'Jalapeños', 'Pineapple', 'Sausage', 'Spinach', 'Garlic'
   ];
 
   /// Generate a placeholder image for items with more variety
@@ -215,7 +215,6 @@ class TestDataGenerator {
     // Generate 3-5 extra groups
     final extraGroups = [
       'Cheese Options',
-      'Meat Toppings',
       'Vegetable Toppings',
       'Premium Toppings',
       'Special Add-ons'
@@ -338,11 +337,19 @@ class TestDataGenerator {
       }
 
       // Generate image for ALL items if withImages is true (100% coverage for better testing)
-      String? imagePath;
+      Uint8List? imageBytes;
       if (withImages) {
-        imagePath = await _generatePlaceholderImage(itemName, i);
+        final imagePath = await _generatePlaceholderImage(itemName, i);
         if (imagePath.isNotEmpty) {
-          imageCount++;
+          try {
+            final file = File(imagePath);
+            if (file.existsSync()) {
+              imageBytes = await file.readAsBytes();
+              imageCount++;
+            }
+          } catch (e) {
+            debugPrint('⚠️ Failed to read image bytes: $e');
+          }
         }
       }
 
@@ -352,8 +359,8 @@ class TestDataGenerator {
         price: itemVariants != null ? null : basePrice, // null if has variants
         categoryOfItem: randomCategory.id,
         description: 'Test item #${i + 1} - This is a delicious dish made with the finest ingredients.',
-        imagePath: imagePath,
-        isVeg: _random.nextBool() ? 'veg' : 'non-veg',
+        imageBytes: imageBytes,
+        isVeg: 'veg', // Always generate vegetarian items
         unit: 'plate',
         variant: itemVariants,
         choiceIds: [],

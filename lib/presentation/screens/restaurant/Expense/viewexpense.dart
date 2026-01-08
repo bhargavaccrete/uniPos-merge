@@ -10,6 +10,8 @@ import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/expensel_316.dart';
 import '../../../../data/models/restaurant/db/expensemodel_315.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/restaurant/currency_helper.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 
 class ViewExpense extends StatefulWidget {
@@ -177,7 +179,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     ),
                     SizedBox(height: 16),
                     Text(
-                      'Amount',
+                      'Amount (${CurrencyHelper.currentSymbol})',
                       style: GoogleFonts.poppins(fontSize: 16),
                     ),
                     SizedBox(height: 8),
@@ -526,7 +528,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                             ),
                           ),
                           Text(
-                            '\u20b9${expense.amount.toStringAsFixed(2)}',
+                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
                               fontSize: 16,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:hive/hive.dart';
 import 'package:unipos/core/constants/hive_type_ids.dart';
@@ -15,7 +16,7 @@ class Items extends HiveObject {
   final String name;
 
   @HiveField(2)
-  final String? imagePath; // CHANGED from imagePath
+  final Uint8List? imageBytes; // Image stored as bytes for web+mobile compatibility
 
   @HiveField(3)
   final double? price;
@@ -89,7 +90,7 @@ class Items extends HiveObject {
     this.price,
     this.description,
     this.categoryOfItem,
-    this.imagePath, // CHANGED from imagePath
+    this.imageBytes, // Image bytes for cross-platform compatibility
     this.isVeg,
     this.unit,
     this.isSoldByWeight = false,
@@ -154,7 +155,7 @@ class Items extends HiveObject {
     double? price,
     String? categoryOfItem,
     String? description,
-    String? imagePath, // CHANGED from imagePath
+    Uint8List? imageBytes,
     String? isVeg,
     String? unit,
     bool? isSoldByWeight,
@@ -162,8 +163,8 @@ class Items extends HiveObject {
     List<String>? choiceIds,
     List<String>? extraId,
     bool? isEnabled,
-    double? taxRate, // F
-    bool? trackInventory, // RENAMED
+    double? taxRate,
+    bool? trackInventory,
     double? stockQuantity,
     bool? allowOrderWhenOutOfStock,
     DateTime? createdTime,
@@ -178,8 +179,7 @@ class Items extends HiveObject {
       name: name ?? this.name,
       price: price ?? this.price,
       categoryOfItem: categoryOfItem ?? this.categoryOfItem,
-      imagePath: imagePath ?? this.imagePath,
-      // CHANGED from imagePath
+      imageBytes: imageBytes ?? this.imageBytes,
       description: description ?? this.description,
       isVeg: isVeg ?? this.isVeg,
       unit: unit ?? this.unit,
@@ -189,7 +189,7 @@ class Items extends HiveObject {
       extraId: extraId ?? this.extraId,
       isEnabled: isEnabled ?? this.isEnabled,
       taxRate: taxRate ?? this.taxRate,
-      trackInventory: trackInventory ?? this.trackInventory, // RENAMED
+      trackInventory: trackInventory ?? this.trackInventory,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock ?? this.allowOrderWhenOutOfStock,
       createdTime: createdTime ?? this.createdTime,
@@ -206,7 +206,7 @@ class Items extends HiveObject {
     return {
       'id': id,
       'name': name,
-      'imagePath': imagePath, // CHANGED from imagePath
+      'imageBytes': imageBytes?.toList(), // Convert Uint8List to List<int> for JSON serialization
       'price': price,
       'description': description,
       'categoryOfItem': categoryOfItem,
@@ -218,7 +218,7 @@ class Items extends HiveObject {
       'extraId': extraId,
       'taxRate': taxRate,
       'isEnabled': isEnabled,
-      'trackInventory': trackInventory, // RENAMED
+      'trackInventory': trackInventory,
       'stockQuantity': stockQuantity,
       'allowOrderWhenOutOfStock': allowOrderWhenOutOfStock,
       'createdTime': createdTime?.toIso8601String(),
@@ -254,42 +254,47 @@ class Items extends HiveObject {
       return defaultValue;
     }
 
-    // 🖼️ Fix image path for imported files
-    String? fixedImagePath;
-    if (map['imagePath'] != null && map['imagePath'].toString().isNotEmpty) {
+    // 🖼️ Handle image bytes
+    Uint8List? parsedImageBytes;
+
+    // First, try to get imageBytes from map (new format)
+    if (map['imageBytes'] != null) {
+      if (map['imageBytes'] is Uint8List) {
+        parsedImageBytes = map['imageBytes'] as Uint8List;
+      } else if (map['imageBytes'] is List) {
+        // Convert List<int> back to Uint8List
+        parsedImageBytes = Uint8List.fromList(List<int>.from(map['imageBytes']));
+      }
+    }
+    // Backward compatibility: if no imageBytes but imagePath exists, try to load from file
+    else if (map['imagePath'] != null && map['imagePath'].toString().isNotEmpty) {
       try {
-        // get only filename (like "123.png")
-        final fileName = map['imagePath'].toString().split(Platform.pathSeparator).last;
-        // rebuild full path to new app directory
-        final dir = Hive.box<Items>("itemBoxs").path; // local trick to get Hive's storage folder
-        if (dir != null) {
-          final baseDir = Directory(dir).parent.path; // go one level up to app_flutter/
-          fixedImagePath = "$baseDir/product_images/$fileName";
+        final imagePath = map['imagePath'].toString();
+        final file = File(imagePath);
+        if (file.existsSync()) {
+          parsedImageBytes = file.readAsBytesSync();
         }
       } catch (e) {
-        fixedImagePath = map['imagePath']; // fallback
+        print('Warning: Could not load image from path: $e');
       }
     }
 
     return Items(
       id: map['id'] ?? '',
-      // : S.tryParse(map['id'].toString()) ?? 0,
       name: map['name'] ?? '',
-      imagePath: fixedImagePath,
-      // CHANGED from imagePath
+      imageBytes: parsedImageBytes,
       price: parsedPrice,
-      // FIXED price parsing
       description: map['description'],
       categoryOfItem: map['categoryOfItem'],
       isVeg: map['isVeg'],
-      isSoldByWeight: _parseBool(map['isSoldByWeight'], false), // ADDED
+      isSoldByWeight: _parseBool(map['isSoldByWeight'], false),
       unit: map['unit'],
       variant: (map['variant'] as List?)?.map((v) => ItemVariante.fromMap(v as Map<String, dynamic>)).toList(),
       choiceIds: (map['choiceIds'] as List?)?.map((e) => e.toString()).toList(),
       extraId: (map['extraId'] as List?)?.map((e) => e.toString()).toList(),
       taxRate: map['taxRate']?.toDouble(),
       isEnabled: _parseBool(map['isEnabled'], true),
-      trackInventory: _parseBool(map['trackInventory'], false), // RENAMED
+      trackInventory: _parseBool(map['trackInventory'], false),
       stockQuantity: (map['stockQuantity'] as num?)?.toDouble() ?? 0.0,
       allowOrderWhenOutOfStock: _parseBool(map['allowOrderWhenOutOfStock'], true),
       createdTime: map['createdTime'] != null ? DateTime.parse(map['createdTime']) : null,

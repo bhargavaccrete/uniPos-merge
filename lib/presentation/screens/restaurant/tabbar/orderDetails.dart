@@ -11,6 +11,8 @@ import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/cart_calculation_service.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/restaurant/currency_helper.dart';
 import '../util/restaurant_print_helper.dart';
 import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
@@ -33,7 +35,7 @@ class _OrderdetailsState extends State<Orderdetails> {
     currentOrder = widget.Order!;
   }
 
-  String _money(num? v) => 'Rs ${(v ?? 0).toStringAsFixed(2)}';
+  String _money(num? v) => '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((v ?? 0).toDouble())}';
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +62,7 @@ class _OrderdetailsState extends State<Orderdetails> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
+        centerTitle: true,
         automaticallyImplyLeading: false,
         leading:
         IconButton(onPressed: (){
@@ -398,9 +401,9 @@ class _OrderdetailsState extends State<Orderdetails> {
                                                   final double price = data['price'] as double;
 
                                                   if (qty > 1) {
-                                                    return '${qty}x $name(Rs ${price.toStringAsFixed(2)})';
+                                                    return '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
                                                   } else {
-                                                    return '$name(Rs ${price.toStringAsFixed(2)})';
+                                                    return '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
                                                   }
                                                 }).join(', ');
 
@@ -471,7 +474,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                                                 Icon(Icons.receipt, size: 12, color: Colors.grey.shade600),
                                                 SizedBox(width: 4),
                                                 Text(
-                                                  'Tax: ${(it.taxRate! * 100).toStringAsFixed(0)}% (₹${(priceAfterItemDiscount * it.taxRate!).toStringAsFixed(2)})',
+                                                  'Tax: ${(it.taxRate! * 100).toStringAsFixed(0)}% (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(priceAfterItemDiscount * it.taxRate!)})',
                                                   style: GoogleFonts.poppins(
                                                     fontSize: 11,
                                                     color: Colors.grey.shade600,
@@ -590,6 +593,11 @@ class _OrderdetailsState extends State<Orderdetails> {
         discount: currentOrder.Discount,
         serviceCharge: 0, // pastOrderModel doesn't store service charge separately
         paymentMethod: currentOrder.paymentmode,
+        paymentStatus: 'PAID', // Mark as paid since it's in past orders
+        isPaid: true, // Mark as paid since it's in past orders
+        completedAt: currentOrder.orderAt, // Use order time as completion time
+        subTotal: currentOrder.subTotal,
+        gstAmount: currentOrder.gstAmount,
         kotNumbers: currentOrder.kotNumbers,
         itemCountAtLastKot: currentOrder.items?.length ?? 0,
         kotBoundaries: currentOrder.kotBoundaries,
@@ -797,22 +805,90 @@ class _OrderdetailsState extends State<Orderdetails> {
   }
 
   Future<void> _deleteOrder(BuildContext context) async {
+    // Show dialog to get void reason
+    final TextEditingController reasonController = TextEditingController();
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Delete Order"),
-        content: const Text("Are you sure you want to delete this order?"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Icon(Icons.cancel, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text(
+              "Void Order",
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Are you sure you want to void this order?",
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            SizedBox(height: 16),
+            Text(
+              "Reason for voiding:",
+              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+            SizedBox(height: 8),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: "Enter reason (optional)",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: EdgeInsets.all(12),
+              ),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text("Cancel", style: GoogleFonts.poppins()),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text("Void Order", style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
-    if (confirm != true) return;
 
-    await HivePastOrder.deleteOrder(widget.Order!.id);
-    NotificationService.instance.showSuccess('Order deleted successfully');
-    if (mounted) Navigator.pop(context);
+    if (confirm != true) {
+      reasonController.dispose();
+      return;
+    }
+
+    try {
+      // Update order status to VOIDED instead of deleting
+      final voidedOrder = currentOrder.copyWith(
+        orderStatus: 'VOIDED',
+        refundReason: reasonController.text.isNotEmpty
+            ? 'VOIDED: ${reasonController.text}'
+            : 'VOIDED: No reason provided',
+        refundedAt: DateTime.now(),
+      );
+
+      await HivePastOrder.updateOrder(voidedOrder);
+
+      reasonController.dispose();
+
+      NotificationService.instance.showSuccess('Order voided successfully');
+      if (mounted) Navigator.pop(context, true); // Return true to refresh parent
+    } catch (e) {
+      reasonController.dispose();
+      NotificationService.instance.showError('Failed to void order: $e');
+    }
   }
 }
 

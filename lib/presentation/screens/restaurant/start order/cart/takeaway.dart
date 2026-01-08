@@ -470,9 +470,9 @@ class _TakeawayState extends State<Takeaway> {
                       final double price = data['price'] as double;
 
                       if (qty > 1) {
-                        return '${qty}x $name(Rs. ${price.toStringAsFixed(2)})';
+                        return '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
                       } else {
-                        return '$name(Rs. ${price.toStringAsFixed(2)})';
+                        return '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
                       }
                     }).join(', ');
 
@@ -975,7 +975,7 @@ class _TakeawayState extends State<Takeaway> {
                     ),
                   ),
                   Text(
-                    'Rs ${calculations.grandTotal.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1031,7 +1031,7 @@ class _TakeawayState extends State<Takeaway> {
               },
               child: Center(
                 child: Text(
-                  'Settlee \n (Rs. ${calculations.grandTotal.toStringAsFixed(2)})',
+                  'Settle \n (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)})',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 12),
                 ),
@@ -1221,7 +1221,7 @@ class _TakeawayState extends State<Takeaway> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text('To Be Paid', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-                                  Text('Rs.${calculations.grandTotal.toStringAsFixed(2)}',
+                                  Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
                                       style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
                                 ],
                               ),

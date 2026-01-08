@@ -4,6 +4,8 @@ import 'package:hive/hive.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
 
 class ComparisonByMonth extends StatefulWidget {
   const ComparisonByMonth({super.key});
@@ -319,7 +321,7 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
                                   cells: [
                                     DataCell(
                                       Text(
-                                        'Total Amount (₹)',
+                                        'Total Amount (${CurrencyHelper.currentSymbol})',
                                         style:
                                             GoogleFonts.poppins(fontSize: 13),
                                       ),
@@ -327,8 +329,7 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
                                     DataCell(
                                       Center(
                                           child: Text(
-                                        _data!.previousAmount
-                                            .toStringAsFixed(2),
+                                        DecimalSettings.formatAmount(_data!.previousAmount),
                                         style:
                                             GoogleFonts.poppins(fontSize: 13),
                                       )),
@@ -336,8 +337,7 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
                                     DataCell(
                                       Center(
                                           child: Text(
-                                        _data!.currentAmount
-                                            .toStringAsFixed(2),
+                                        DecimalSettings.formatAmount(_data!.currentAmount),
                                         style: GoogleFonts.poppins(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w600,

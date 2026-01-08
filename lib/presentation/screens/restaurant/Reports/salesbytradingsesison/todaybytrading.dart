@@ -11,6 +11,8 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingses
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 class Todaybytrading extends StatefulWidget {
   const Todaybytrading({super.key});
@@ -139,7 +141,7 @@ class _TodaybytradingState extends State<Todaybytrading> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total (Rs)',textScaler: TextScaler.linear(1),
+                              child: Text('Total (${CurrencyHelper.currentSymbol})',textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],

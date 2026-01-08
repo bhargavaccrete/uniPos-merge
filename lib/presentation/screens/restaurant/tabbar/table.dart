@@ -10,6 +10,8 @@ import '../../../../data/models/restaurant/db/database/hive_Table.dart';
 import '../../../../data/models/restaurant/db/database/hive_order.dart';
 import '../../../../data/models/restaurant/db/table_Model_311.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/restaurant/currency_helper.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../start order/cart/cart.dart';
 import '../start order/startorder.dart';
@@ -504,7 +506,7 @@ class TableCard extends StatelessWidget {
                   if (table.status != 'Available') ...[
                     SizedBox(height: 8),
                     Text(
-                      'Rs. ${table.currentOrderTotal?.toStringAsFixed(2) ?? '0.00'}',
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(table.currentOrderTotal ?? 0.0)}',
                       style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     SizedBox(height: 4),

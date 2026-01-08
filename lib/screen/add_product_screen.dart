@@ -8,6 +8,7 @@ import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../core/config/app_config.dart';
 import '../core/di/service_locator.dart';
@@ -157,6 +158,8 @@ class _AddProductScreenState extends State<AddProductScreen>
     final image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       _formStore.setImagePath(image.path);
+      final bytes = await image.readAsBytes();
+      _formStore.setImageBytes(bytes);
     }
   }
 
@@ -342,12 +345,28 @@ class _AddProductScreenState extends State<AddProductScreen>
             (item) => item.id == _editingRestaurantItemId,
       );
 
+      // Convert image path to bytes if a new image was selected
+      Uint8List? imageBytes = existingItem.imageBytes; // Keep existing bytes by default
+      
+      if (_formStore.imageBytes != null) {
+        imageBytes = _formStore.imageBytes;
+      } else if (_formStore.imagePath != null && _formStore.imagePath!.isNotEmpty) {
+        try {
+          final file = File(_formStore.imagePath!);
+          if (file.existsSync()) {
+            imageBytes = await file.readAsBytes();
+          }
+        } catch (e) {
+          print('Error reading image bytes: $e');
+        }
+      }
+
       // Create updated item
       final updatedItem = existingItem.copyWith(
         name: _formStore.name.trim(),
         description: _formStore.description.isNotEmpty ? _formStore.description : null,
         categoryOfItem: _formStore.selectedCategoryId,
-        imagePath: _formStore.imagePath,
+        imageBytes: imageBytes,
         price: _formStore.hasPortionSizes ? null : _formStore.price,
         taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
         unit: _formStore.unit,
@@ -723,16 +742,25 @@ class _AddProductScreenState extends State<AddProductScreen>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[300]!),
           ),
-          child: _formStore.imagePath != null
+          child: _formStore.imageBytes != null
               ? ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.file(
-              File(_formStore.imagePath!),
-              fit: BoxFit.cover,
-              width: double.infinity,
-            ),
-          )
-              : Column(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(
+                    _formStore.imageBytes!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                  ),
+                )
+              : _formStore.imagePath != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(_formStore.imagePath!),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      ),
+                    )
+                  : Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey[400]),
@@ -2963,11 +2991,11 @@ class _AddProductScreenState extends State<AddProductScreen>
                                 : AppColors.danger.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: item.imagePath != null
+                          child: item.imageBytes != null
                               ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(item.imagePath!),
+                            child: Image.memory(
+                              item.imageBytes!,
                               fit: BoxFit.cover,
                             ),
                           )

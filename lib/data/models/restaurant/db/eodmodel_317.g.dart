@@ -90,7 +90,7 @@ class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
 
 class OrderTypeSummaryAdapter extends TypeAdapter<OrderTypeSummary> {
   @override
-  final int typeId = 18;
+  final int typeId = 118;
 
   @override
   OrderTypeSummary read(BinaryReader reader) {
@@ -133,7 +133,7 @@ class OrderTypeSummaryAdapter extends TypeAdapter<OrderTypeSummary> {
 
 class CategorySalesAdapter extends TypeAdapter<CategorySales> {
   @override
-  final int typeId = 19;
+  final int typeId = 119;
 
   @override
   CategorySales read(BinaryReader reader) {
@@ -176,7 +176,7 @@ class CategorySalesAdapter extends TypeAdapter<CategorySales> {
 
 class PaymentSummaryAdapter extends TypeAdapter<PaymentSummary> {
   @override
-  final int typeId = 20;
+  final int typeId = 120;
 
   @override
   PaymentSummary read(BinaryReader reader) {
@@ -219,7 +219,7 @@ class PaymentSummaryAdapter extends TypeAdapter<PaymentSummary> {
 
 class CashReconciliationAdapter extends TypeAdapter<CashReconciliation> {
   @override
-  final int typeId = 22;
+  final int typeId = 121;
 
   @override
   CashReconciliation read(BinaryReader reader) {
@@ -265,7 +265,7 @@ class CashReconciliationAdapter extends TypeAdapter<CashReconciliation> {
 
 class TaxSummaryAdapter extends TypeAdapter<TaxSummary> {
   @override
-  final int typeId = 21;
+  final int typeId = 124;
 
   @override
   TaxSummary read(BinaryReader reader) {

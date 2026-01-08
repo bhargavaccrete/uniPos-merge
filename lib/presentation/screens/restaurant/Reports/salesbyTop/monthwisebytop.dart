@@ -5,6 +5,8 @@ import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 class MonthWisebyTop extends StatefulWidget {
   const MonthWisebyTop({super.key});
@@ -73,23 +75,42 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
             orderDate.isBefore(monthEnd.add(Duration(seconds: 1)));
       }).toList();
 
-      // Calculate item sales
+      // Calculate item sales with refund handling
       Map<String, Map<String, dynamic>> itemSales = {};
 
       for (var order in monthOrders) {
+        // Skip fully refunded orders
+        if (order.orderStatus == 'FULLY_REFUNDED') continue;
+
+        // Calculate order-level refund ratio
+        final orderTotal = order.totalPrice ?? 0.0;
+        final refundAmount = order.refundAmount ?? 0.0;
+        final orderRefundRatio = orderTotal > 0 ? ((orderTotal - refundAmount) / orderTotal) : 1.0;
+
         for (var item in order.items) {
           final itemName = item.title;
-          final quantity = item.quantity;
+
+          // Calculate effective quantity (after refunds)
+          final originalQuantity = item.quantity ?? 0;
+          final refundedQuantity = item.refundedQuantity ?? 0;
+          final effectiveQuantity = originalQuantity - refundedQuantity;
+
+          // Skip fully refunded items
+          if (effectiveQuantity <= 0) continue;
+
           final price = item.price;
-          final totalAmount = price * quantity;
+          final baseTotal = price * effectiveQuantity;
+
+          // Apply order-level refund ratio for accurate revenue
+          final totalAmount = baseTotal * orderRefundRatio;
 
           if (itemSales.containsKey(itemName)) {
-            itemSales[itemName]!['quantity'] += quantity;
+            itemSales[itemName]!['quantity'] += effectiveQuantity;
             itemSales[itemName]!['totalAmount'] += totalAmount;
           } else {
             itemSales[itemName] = {
               'itemName': itemName,
-              'quantity': quantity,
+              'quantity': effectiveQuantity,
               'totalAmount': totalAmount,
             };
           }
@@ -302,7 +323,7 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
                             ),
                           ),
                           child: Text(
-                            'Total (Rs)',
+                            'Total (${CurrencyHelper.currentSymbol})',
                             textScaler: TextScaler.linear(1),
                             style: GoogleFonts.poppins(fontSize: 14),
                             textAlign: TextAlign.center,
@@ -343,7 +364,7 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
                           DataCell(
                             Center(
                               child: Text(
-                                'Rs. ${item['totalAmount'].toStringAsFixed(2)}',
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item['totalAmount'])}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
@@ -124,11 +126,12 @@ class _MenuScreenState extends State<MenuScreen> {
     // --- END: LOGIC FOR WEIGHT ITEMS ---
 
     final bool hasVariants = item.variant != null && item.variant!.isNotEmpty;
-
+    final bool hasExtra = item.extraId != null && item.extraId!.isNotEmpty;
+    final bool hasChoice = item.choiceIds != null && item.choiceIds!.isNotEmpty;
     // --- 1. Find the category name for the tapped item ---
     String? categoryName;
     try {
-      final categoryBox = Hive.box<Category>('categories');
+      final categoryBox = Hive.box<Category>(HiveBoxNames.restaurantCategories);
       final category = categoryBox.values.firstWhere((cat) => cat.id == item.categoryOfItem);
       categoryName = category.name;
     } catch (e) {
@@ -136,7 +139,7 @@ class _MenuScreenState extends State<MenuScreen> {
       categoryName = 'Uncategorized';
     }
 
-    if (hasVariants) {
+    if (hasVariants||hasExtra||hasChoice) {
       // If variants exist, show the options dialog
       final result = await showModalBottomSheet<CartItem>(
         context: context,
@@ -172,7 +175,7 @@ class _MenuScreenState extends State<MenuScreen> {
         isStockManaged: item.trackInventory,
         id: const Uuid().v4(),
         title: item.name,
-        imagePath: item.imagePath ?? '',
+        imagePath: '', // CartItem uses path as identifier, not actual image data
         price: item.price ?? 0,
         quantity: 1,
         taxRate: item.taxRate,
@@ -770,15 +773,16 @@ class _MenuScreenState extends State<MenuScreen> {
 
 
                                                               AppSettings.showItemImage
-                                                                  ? (item.imagePath != null && item.imagePath!.isNotEmpty
-                                                                  ? (File(item.imagePath!).existsSync()
-                                                                  ? Image.file(
-                                                                File(item.imagePath!),
-                                                                fit: BoxFit.cover,
-                                                                width: 80,
-                                                                height: 80,
-                                                              )
-                                                                  : Icon(Icons.broken_image, size: 80, color: Colors.grey))
+                                                                  ? (item.imageBytes != null && item.imageBytes!.isNotEmpty
+                                                                  ? Image.memory(
+                                                                      item.imageBytes!,
+                                                                      fit: BoxFit.cover,
+                                                                      width: 80,
+                                                                      height: 80,
+                                                                      errorBuilder: (context, error, stackTrace) {
+                                                                        return Icon(Icons.broken_image, size: 80, color: Colors.grey);
+                                                                      },
+                                                                    )
                                                                   : Icon(Icons.image, size: 80, color: Colors.grey))
                                                                   : SizedBox(),
 
@@ -894,7 +898,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      'Total price: $totalPrice',
+                                      'Total: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalPrice)}',
                                       textScaler: TextScaler.linear(1),
                                       style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                                     ),

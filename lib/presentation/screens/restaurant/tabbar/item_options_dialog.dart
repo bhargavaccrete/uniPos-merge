@@ -14,6 +14,8 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../../data/models/restaurant/db/toppingmodel_304.dart';
 import '../../../../data/models/restaurant/db/variantmodel_305.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/restaurant/currency_helper.dart';
 
 class DisplayVariant {
   final String id;
@@ -254,7 +256,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         // 1. The title is now clean.
         title: finalTitle,
         price: _totalPrice,
-        imagePath: widget.item.imagePath ?? '',
+        imagePath: '', // CartItem uses path as identifier, not actual image data
         quantity: 1,
         // 2. The variant info is stored separately.
         categoryName: widget.categoryName,
@@ -337,7 +339,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
               decoration: BoxDecoration(color: primarycolor, borderRadius: BorderRadius.circular(8)),
               child: Row(
                 children: [
-                  Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16.0), child: Text('Total: Rs. ${_totalPrice.toStringAsFixed(2)}', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)))),
+                  Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16.0), child: Text('Total: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalPrice)}', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)))),
                   TextButton(
                     style: TextButton.styleFrom(backgroundColor: Colors.white, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8))), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
                     onPressed: _confirmAndAddItem,
@@ -359,7 +361,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Select Size', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600))),
         ..._displayVariants.map((variant) => RadioListTile<DisplayVariant>(
           title: Text(variant.name),
-          secondary: Text('Rs. ${variant.price.toStringAsFixed(2)}'),
+          secondary: Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}'),
           value: variant,
           groupValue: _selectedVariant,
           onChanged: (newValue) {
@@ -501,7 +503,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(topping.name, style: GoogleFonts.poppins(fontSize: 14)),
-                            Text('Rs. ${displayPrice.toStringAsFixed(2)}',
+                            Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(displayPrice)}',
                                 style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
                           ],
                         ),

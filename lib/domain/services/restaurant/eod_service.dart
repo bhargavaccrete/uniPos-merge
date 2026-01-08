@@ -30,9 +30,10 @@ class EODService {
           order.orderAt!.isBefore(endOfDay);
     }).toList();
 
-    // Separate fully refunded orders from active orders for reporting
+    // Separate fully refunded and voided orders from active orders for reporting
     final activeDayOrders = allDayOrders.where((order) {
-      return order.orderStatus != 'FULLY_REFUNDED';
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      return status != 'FULLY_REFUNDED' && status != 'VOIDED';
     }).toList();
 
     // Use activeDayOrders for count-based statistics (excludes fully refunded orders)
@@ -45,9 +46,10 @@ class EODService {
     final totalSales = allDayOrders.fold<double>(0.0, (sum, order) => sum + (order.totalPrice - (order.refundAmount ?? 0.0)));
     final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) => sum + (order.Discount ?? 0.0));
 
-    // Calculate proportional tax amount (subtract tax on refunded amount)
+    // Calculate proportional tax amount (subtract tax on refunded and voided amounts)
     final totalTax = allDayOrders.fold<double>(0.0, (sum, order) {
-      if (order.orderStatus == 'FULLY_REFUNDED') return sum;
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return sum;
 
       final orderRefundRatio = order.totalPrice > 0
           ? ((order.totalPrice - (order.refundAmount ?? 0.0)) / order.totalPrice)
@@ -153,6 +155,10 @@ class EODService {
     double grandTotal = 0.0;
 
     for (final order in orders) {
+      // Skip voided orders completely
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'VOIDED') continue;
+
       final netOrderAmount = order.totalPrice - (order.refundAmount ?? 0.0);
       grandTotal += netOrderAmount;
 
@@ -193,6 +199,10 @@ class EODService {
     double grandTotal = 0.0;
 
     for (final order in orders) {
+      // Skip voided orders
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'VOIDED') continue;
+
       final paymentType = order.paymentmode ?? 'Unknown';
       final amount = order.totalPrice - (order.refundAmount ?? 0.0); // Net amount after refunds
 
@@ -220,8 +230,9 @@ class EODService {
     final Map<String, TaxInfo> taxData = {};
 
     for (final order in orders) {
-      // Skip fully refunded orders
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      // Skip fully refunded and voided orders
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') continue;
 
       if (order.gstRate != null && order.gstAmount != null && order.gstRate! > 0) {
         final taxKey = 'GST ${(order.gstRate! * 100).toStringAsFixed(1)}%';

@@ -1,14 +1,13 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../util/restaurant/responsive_helper.dart';
 
 /// Bottom sheet for selecting image source (Gallery/Search)
 class ImagePickerSheet extends StatelessWidget {
-  final Function(File) onImageSelected;
+  final Function(Uint8List) onImageSelected;
   final bool isForCategory;
 
   const ImagePickerSheet({
@@ -17,8 +16,8 @@ class ImagePickerSheet extends StatelessWidget {
     this.isForCategory = false,
   });
 
-  static Future<File?> show(BuildContext context, {bool isForCategory = false}) async {
-    File? selectedFile;
+  static Future<Uint8List?> show(BuildContext context, {bool isForCategory = false}) async {
+    Uint8List? selectedBytes;
 
     await showModalBottomSheet(
       context: context,
@@ -28,36 +27,42 @@ class ImagePickerSheet extends StatelessWidget {
       builder: (BuildContext context) {
         return ImagePickerSheet(
           isForCategory: isForCategory,
-          onImageSelected: (file) {
-            selectedFile = file;
+          onImageSelected: (bytes) {
+            selectedBytes = bytes;
           },
         );
       },
     );
 
-    return selectedFile;
+    return selectedBytes;
   }
 
   Future<void> _pickImage(BuildContext context, ImageSource source) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source);
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
 
-    if (pickedFile == null) {
-      Navigator.pop(context);
-      return;
+      if (pickedFile == null) {
+        if (context.mounted) Navigator.pop(context);
+        return;
+      }
+
+      final Uint8List bytes = await pickedFile.readAsBytes();
+
+      onImageSelected(bytes);
+      if (context.mounted) Navigator.pop(context);
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (context.mounted) {
+         Navigator.pop(context);
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Failed to add image: $e')),
+         );
+      }
     }
-
-    final appDir = await getApplicationDocumentsDirectory();
-    final imageDir = Directory('${appDir.path}/product_images');
-    if (!imageDir.existsSync()) imageDir.createSync(recursive: true);
-
-    final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final newPath = '${imageDir.path}/$fileName';
-
-    final savedImage = await File(pickedFile.path).copy(newPath);
-
-    onImageSelected(savedImage);
-    Navigator.pop(context);
   }
 
   @override
@@ -120,14 +125,14 @@ class ImagePickerSheet extends StatelessWidget {
 
 /// Reusable image upload widget with preview
 class ImageUploader extends StatelessWidget {
-  final File? selectedImage;
+  final Uint8List? imageBytes;
   final VoidCallback onTap;
   final String uploadLabel;
   final String sizeHint;
 
   const ImageUploader({
     super.key,
-    this.selectedImage,
+    this.imageBytes,
     required this.onTap,
     this.uploadLabel = 'Upload Image',
     this.sizeHint = '600X400',
@@ -146,11 +151,11 @@ class ImageUploader extends StatelessWidget {
               border: Border.all(color: Colors.grey),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: selectedImage != null
+            child: imageBytes != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.file(
-                      selectedImage!,
+                    child: Image.memory(
+                      imageBytes!,
                       fit: BoxFit.cover,
                       width: double.infinity,
                     ),

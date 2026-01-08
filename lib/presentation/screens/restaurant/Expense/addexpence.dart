@@ -9,6 +9,7 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/managecategory.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../data/models/restaurant/db/expensemodel_315.dart';
@@ -177,7 +178,7 @@ class _AddexpenceState extends State<Addexpence> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Amount (Rs.)',
+                          'Amount (${CurrencyHelper.currentSymbol})',
                           textScaler: TextScaler.linear(1),
                           style: GoogleFonts.poppins(
                             fontSize: 16,

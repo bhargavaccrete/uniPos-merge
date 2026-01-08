@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/restaurant/currency_helper.dart';
 
 
 // A helper class to hold the result from the dialog
@@ -206,7 +208,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
                             style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                           ),
                           Text(
-                            'Ordered: $maxQty | Price: ₹${_calculateItemPriceWithTax(item).toStringAsFixed(2)}/item',
+                            'Ordered: $maxQty | Price: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_calculateItemPriceWithTax(item))}/item',
                             style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
                           ),
                           const SizedBox(height: 8),
@@ -274,7 +276,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Total Refund: ₹${_totalRefundAmount.toStringAsFixed(2)}',
+                'Total Refund: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRefundAmount)}',
                 style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],

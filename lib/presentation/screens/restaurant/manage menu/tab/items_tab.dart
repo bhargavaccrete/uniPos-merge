@@ -10,9 +10,10 @@ import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart' show EdititemScreen;
 import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
-import 'package:unipos/util/restaurant/audit_trail_helper.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-import 'package:unipos/util/restaurant/images.dart';
+import '../../../../../util/restaurant/audit_trail_helper.dart';
+import '../../../../../util/restaurant/currency_helper.dart';
+import '../../../../../util/restaurant/decimal_settings.dart';
+import '../../../../../util/restaurant/images.dart';
 
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 
@@ -42,20 +43,9 @@ class _AllTabState extends State<ItemsTab> {
   // List<Map<String, String>> items = [];
   // List<Items> itemsList = [];
 
-  String currencySymbol = '\$'; // Default currency symbol
-
   @override
   void initState() {
     super.initState();
-    _loadCurrencySymbol();
-  }
-
-  // Load currency symbol from preferences
-  Future<void> _loadCurrencySymbol() async {
-    final symbol = await CurrencyHelper.getCurrencySymbol();
-    setState(() {
-      currencySymbol = symbol;
-    });
   }
 
   void _deleteItem(String id) async {
@@ -222,7 +212,7 @@ class _AllTabState extends State<ItemsTab> {
                                         children: [
                                           // 💰 CURRENCY: Display price with selected currency symbol
                                           Text(
-                                              CurrencyHelper.formatAmountWithSymbol(item.price ?? 0, currencySymbol),
+                                              "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}",
                                               style: GoogleFonts.poppins(fontSize: 16, color: primarycolor, fontWeight: FontWeight.bold)),
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,

@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/restaurant/currency_helper.dart';
 
 
 // Enum to manage which mode is currently active
@@ -180,7 +182,7 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
                   productId: widget.item.id,
                   id: widget.item.id, // Use item ID for proper stock deduction
                   title: widget.item.name,
-                  imagePath: widget.item.imagePath ?? '',
+                  imagePath: '', // CartItem uses path as identifier, not actual image data
                   price: _displayAmount, // The price for the specified weight
 
                   // Weight items are always 1 line item, actual weight is stored in weightDisplay
@@ -211,7 +213,7 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
         children: [
           _buildDisplayItem('Item', widget.item.name),
           _buildDisplayItem('Weight', _formatWeightDisplay(_displayWeight, widget.item.unit)),
-          _buildDisplayItem('Amount', 'Rs.${_displayAmount.toStringAsFixed(2)}'),
+          _buildDisplayItem('Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_displayAmount)}'),
         ],
       ),
     );

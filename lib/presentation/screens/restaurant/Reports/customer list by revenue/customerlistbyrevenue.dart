@@ -4,6 +4,8 @@ import 'package:hive/hive.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
 
 class CustomerListByRevenue extends StatefulWidget {
   const CustomerListByRevenue({super.key});
@@ -130,7 +132,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Total Revenue: ₹${_totalRevenue.toStringAsFixed(2)}',
+                                'Total Revenue: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(
                                     fontWeight: FontWeight.w600,
@@ -271,7 +273,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                               alignment: Alignment.center,
                               width: width * 0.3,
                               child: Text(
-                                "Revenue (₹)",
+                                "Revenue (${CurrencyHelper.currentSymbol})",
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(fontSize: 14),
                               ),
@@ -299,7 +301,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                                     ))),
                                     DataCell(Center(
                                         child: Text(
-                                      customer.revenue.toStringAsFixed(2),
+                                      DecimalSettings.formatAmount(customer.revenue),
                                       textAlign: TextAlign.center,
                                       style: GoogleFonts.poppins(
                                           fontSize: 13,

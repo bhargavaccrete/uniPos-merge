@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -15,7 +15,7 @@ class AddItemFormState extends ChangeNotifier {
   final descriptionController = TextEditingController();
 
   // Image
-  File? selectedImage;
+  Uint8List? selectedImage;
 
   // Selling method
   SellingMethod sellingMethod = SellingMethod.byUnit;
@@ -84,7 +84,7 @@ class AddItemFormState extends ChangeNotifier {
   }
 
   /// Convert form state to Items model
-  Items toItem() {
+  Future<Items> toItem() async {
     final itemVariants = selectedVariants
         .map((v) => ItemVariante(
               variantId: v['variantId'],
@@ -97,7 +97,7 @@ class AddItemFormState extends ChangeNotifier {
       name: itemNameController.text.trim(),
       price: double.tryParse(priceController.text.trim()),
       categoryOfItem: selectedCategoryId ?? "",
-      imagePath: selectedImage?.path,
+      imageBytes: selectedImage,
       isVeg: vegCategory,
       isSoldByWeight: sellingMethod == SellingMethod.byWeight,
       unit: sellingMethod == SellingMethod.byWeight ? selectedUnit : null,
@@ -172,7 +172,7 @@ class AddItemFormState extends ChangeNotifier {
   }
 
   /// Set selected image
-  void setImage(File? image) {
+  void setImage(Uint8List? image) {
     selectedImage = image;
     notifyListeners();
   }

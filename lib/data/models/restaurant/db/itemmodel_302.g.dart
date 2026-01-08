@@ -22,7 +22,7 @@ class ItemsAdapter extends TypeAdapter<Items> {
       price: fields[3] as double?,
       description: fields[4] as String?,
       categoryOfItem: fields[5] as String?,
-      imagePath: fields[2] as String?,
+      imageBytes: fields[2] as Uint8List?,
       isVeg: fields[6] as String?,
       unit: fields[7] as String?,
       isSoldByWeight: fields[16] as bool,
@@ -53,7 +53,7 @@ class ItemsAdapter extends TypeAdapter<Items> {
       ..writeByte(1)
       ..write(obj.name)
       ..writeByte(2)
-      ..write(obj.imagePath)
+      ..write(obj.imageBytes)
       ..writeByte(3)
       ..write(obj.price)
       ..writeByte(4)

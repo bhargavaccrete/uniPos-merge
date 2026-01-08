@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../../core/di/service_locator.dart';
 enum TimePeriod { Today, Month, Year, Custom }
@@ -307,7 +309,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '₹${_totalExpenses.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
                       style: GoogleFonts.poppins(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -443,7 +445,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                           Expanded(
                             flex: 2,
                             child: Text(
-                              '₹${expense.amount.toStringAsFixed(2)}',
+                              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
                               textAlign: TextAlign.right,
                               style: GoogleFonts.poppins(
                                 fontSize: 14,

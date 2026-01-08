@@ -13,6 +13,7 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
 import 'package:unipos/util/restaurant/staticswitch.dart'; // Import for AppSettings
+import 'package:unipos/util/common/currency_helper.dart';
 
 class RestaurantPrintHelper {
 
@@ -307,9 +308,9 @@ class RestaurantPrintHelper {
             final double price = data['price'] as double;
 
             if (qty > 1) {
-              return '${qty}x $name(Rs ${price.toStringAsFixed(2)})';
+              return '${qty}x $name(${CurrencyHelper.currentSymbol}${price.toStringAsFixed(2)})';
             } else {
-              return '$name(₹${price.toStringAsFixed(2)})';
+              return '$name(${CurrencyHelper.currentSymbol}${price.toStringAsFixed(2)})';
             }
           }).join(', ');
 
@@ -334,12 +335,19 @@ class RestaurantPrintHelper {
           additionalInfo = choicesInfo;
         }
 
+        // Format variant name with price if variant exists
+        String? variantDisplayName;
+        if (item.variantName != null && item.variantName!.isNotEmpty) {
+          final double vPrice = item.variantPrice ?? 0.0;
+          variantDisplayName = '${item.variantName}-${vPrice.toStringAsFixed(0)}rs';
+        }
+
         return SaleItemModel.create(
           saleId: order.id,
           varianteId: item.id, // Use item.id as variant ID since CartItem doesn't have explicit variantId field
           productId: item.productId,
           productName: item.title,
-          size: item.variantName, // Use size field for variant name
+          size: variantDisplayName, // Use formatted variant name with price
           weight: additionalInfo, // Use weight field to store extras and choices info
           price: displayPrice, // ✅ Use adjusted price based on tax mode
           qty: item.quantity,

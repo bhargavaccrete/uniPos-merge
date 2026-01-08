@@ -4,6 +4,8 @@ import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
@@ -21,7 +23,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
   ];
 
   List<int> yearitem = [
-    2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016
+    2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016
   ];
 
   String dropDownValue1 = 'January';
@@ -262,7 +264,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
               SizedBox(height: 25),
               if (_reports.isNotEmpty) ...[
                 Text(
-                  'Total Sales: Rs. ${_totalSales.toStringAsFixed(1)}',
+                  'Total Sales: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalSales)}',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(
                     fontSize: 18,
@@ -344,7 +346,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
               Expanded(
                 flex: 2,
                 child: Text(
-                  'Amount(Rs.)',
+                  'Amount(${CurrencyHelper.currentSymbol})',
                   textScaler: TextScaler.linear(1),
                   textAlign: TextAlign.right,
                   style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
@@ -382,7 +384,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    entry.value.toStringAsFixed(1),
+                    DecimalSettings.formatAmount(entry.value),
                     textScaler: TextScaler.linear(1),
                     textAlign: TextAlign.right,
                     style: GoogleFonts.poppins(fontSize: 14),
@@ -425,7 +427,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
               Expanded(
                 flex: 1,
                 child: Text(
-                  'Amount(Rs.)',
+                  'Amount(${CurrencyHelper.currentSymbol})',
                   textScaler: TextScaler.linear(1),
                   textAlign: TextAlign.right,
                   style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
@@ -454,7 +456,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                 Expanded(
                   flex: 1,
                   child: Text(
-                    entry.value.toStringAsFixed(1),
+                    DecimalSettings.formatAmount(entry.value),
                     textScaler: TextScaler.linear(1),
                     textAlign: TextAlign.right,
                     style: GoogleFonts.poppins(fontSize: 14),
@@ -493,7 +495,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                 ),
               ),
               Text(
-                'Rs. ${_totalExpenses.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_totalExpenses)}',
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                   fontSize: 16,
@@ -524,7 +526,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13),
                   ),
                   Text(
-                    'Rs. ${_totalSales.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_totalSales)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
@@ -540,7 +542,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13, color: Colors.red[700]),
                   ),
                   Text(
-                    '- Rs. ${_totalExpenses.toStringAsFixed(2)}',
+                    '- ${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_totalExpenses)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.red[700]),
                   ),
@@ -556,7 +558,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   Text(
-                    'Rs. ${(_totalSales - _totalExpenses).toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_totalSales - _totalExpenses)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blue[800]),
                   ),

@@ -27,6 +27,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
   // SharedPreferences keys
   static const String _usernameKey = 'restaurant_admin_username';
   static const String _passwordKey = 'restaurant_admin_password';
+  static const String _isLoggedInKey = 'restaurant_is_logged_in';
 
   // Default credentials
   static const String _defaultUsername = 'admin';
@@ -83,7 +84,9 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
       await Future.delayed(const Duration(milliseconds: 500));
 
       if (enteredUsername == storedUsername && enteredPassword == storedPassword) {
-        // Login successful
+        // Login successful - Save login state
+        await prefs.setBool(_isLoggedInKey, true);
+
         if (mounted) {
           Navigator.pushReplacement(
             context,

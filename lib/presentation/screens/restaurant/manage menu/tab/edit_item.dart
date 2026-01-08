@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -63,6 +64,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // ✅ ADDED: State for the new image picker
   File? _selectedImage;
+  Uint8List? _selectedImageBytes; // Store image bytes for web compatibility
 
   // ✅ ADDED: New selling method state
   SellingMethod _sellingMethod = SellingMethod.byUnit;
@@ -197,10 +199,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
   }
 
   void _saveChanges(EditScreenData data) async {
-    String? finalImagePath = widget.items.imagePath;
+    // Handle image: keep existing imageBytes or use newly selected imageBytes
+    Uint8List? finalImageBytes = widget.items.imageBytes;
 
-    if (_selectedImage != null) {
-      finalImagePath = await _saveImageAndGetPath(_selectedImage!);
+    // Use the bytes that were already read when picking the image
+    if (_selectedImageBytes != null) {
+      finalImageBytes = _selectedImageBytes;
     }
 
     List<ItemVariante> selectedVariants = [];
@@ -254,7 +258,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
       description: _descController.text,
       isVeg: selectedIMGCategory,
       categoryOfItem: selectedCategoryId,
-      imagePath: finalImagePath,
+      imageBytes: finalImageBytes,
       variant: selectedVariants,
       choiceIds: selectedChoiceIds,
       extraId: selectedExtraId,
@@ -586,7 +590,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
             onTap: () async {
               final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
               if (pickedFile != null) {
-                setState(() { _selectedImage = File(pickedFile.path); });
+                final bytes = await pickedFile.readAsBytes();
+                setState(() {
+                  _selectedImage = File(pickedFile.path);
+                  _selectedImageBytes = bytes;
+                });
               }
             },
             child: Column(
@@ -620,21 +628,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
   }
   // ✅ ADDED: Helper method to decide what image to show
   Widget _buildImage() {
-    // If a new image has been selected, show it.
-    if (_selectedImage != null) {
-      return Image.file(_selectedImage!, fit: BoxFit.cover);
+    // If a new image has been selected, show it from bytes (web-compatible)
+    if (_selectedImageBytes != null) {
+      return Image.memory(_selectedImageBytes!, fit: BoxFit.cover);
     }
-    // If there's an existing image path from the original item, show it.
-    if (widget.items.imagePath != null && widget.items.imagePath!.isNotEmpty) {
-      final imageFile = File(widget.items.imagePath!);
-      if (imageFile.existsSync()) {
-        return Image.file(
-          imageFile,
-          fit: BoxFit.fill,
-          width: 80,
-          height: 80,
-        );
-      }
+    // If there's an existing image bytes from the original item, show it.
+    if (widget.items.imageBytes != null && widget.items.imageBytes!.isNotEmpty) {
+      return Image.memory(
+        widget.items.imageBytes!,
+        fit: BoxFit.fill,
+        width: 80,
+        height: 80,
+      );
     }
     // Otherwise, show the placeholder.
     return Column(

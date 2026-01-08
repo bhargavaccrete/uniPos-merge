@@ -301,6 +301,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'ItemsReportData.dart';
@@ -423,7 +425,7 @@ class _TodayByItemState extends State<TodayByItem> {
                                     style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.bold))),
                             DataColumn(
-                                label: Text('Total (Rs)',
+                                label: Text('Total (${CurrencyHelper.currentSymbol})',
                                     style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.bold))),
                           ],
@@ -437,7 +439,7 @@ class _TodayByItemState extends State<TodayByItem> {
                                     Text(item.totalQuantity.toString()))),
                                 DataCell(Center(
                                     child: Text(
-                                        '₹${item.totalRevenue.toStringAsFixed(2)}'))),
+                                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.totalRevenue)}'))),
                               ],
                             );
                           }).toList()),

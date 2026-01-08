@@ -253,6 +253,14 @@ class OrderModel extends HiveObject {
   }
 
   static OrderModel fromMap(Map<String, dynamic> map) {
+    // Helper to safely convert dynamic values to int
+    int _toInt(dynamic value) {
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      if (value is num) return value.toInt();
+      return 0;
+    }
+
     return OrderModel(
       id: map['id'] as String,
       customerName: map['customerName'] as String,
@@ -266,7 +274,7 @@ class OrderModel extends HiveObject {
       orderType: map['orderType'] as String,
       tableNo: map['tableNo'] as String?,
       totalPrice: (map['totalPrice'] as num).toDouble(),
-      kotNumber: map['kotNumber'] as int?,
+      kotNumber: map['kotNumber'] != null ? _toInt(map['kotNumber']) : null,
       discount: map['discount'] != null ? (map['discount'] as num).toDouble() : null,
       serviceCharge: map['serviceCharge'] != null ? (map['serviceCharge'] as num).toDouble() : null,
       paymentMethod: map['paymentMethod'] as String?,
@@ -277,13 +285,19 @@ class OrderModel extends HiveObject {
       gstRate: map['gstRate'] != null ? (map['gstRate'] as num).toDouble() : null,
       gstAmount: map['gstAmount'] != null ? (map['gstAmount'] as num).toDouble() : null,
       remark: map['remark'] as String?,
-      kotNumbers: (map['kotNumbers'] as List<dynamic>).map((e) => e as int).toList(),
-      itemCountAtLastKot: map['itemCountAtLastKot'] as int,
-      kotBoundaries: (map['kotBoundaries'] as List<dynamic>).map((e) => e as int).toList(),
+
+      // SAFE LIST PARSING
+      kotNumbers: (map['kotNumbers'] as List<dynamic>).map((e) => _toInt(e)).toList(),
+      itemCountAtLastKot: _toInt(map['itemCountAtLastKot']),
+      kotBoundaries: (map['kotBoundaries'] as List<dynamic>).map((e) => _toInt(e)).toList(),
+
+      // SAFE MAP PARSING (The most likely culprit)
       kotStatuses: map['kotStatuses'] != null
-          ? Map<int, String>.from(map['kotStatuses'] as Map)
+          ? (map['kotStatuses'] as Map).map(
+            (key, value) => MapEntry(_toInt(key), value.toString()),
+      )
           : null,
-      orderNumber: map['orderNumber'] as int?,
+      orderNumber: map['orderNumber'] != null ? _toInt(map['orderNumber']) : null,
     );
   }
 }

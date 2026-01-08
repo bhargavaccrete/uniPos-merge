@@ -835,12 +835,22 @@ class RestaurantBulkImportServiceV3 {
         final categoryName = rowData['CategoryName']?.toString().trim() ?? '';
         final categoryId = await _getOrCreateCategory(categoryName, result);
 
-        // Step 3: Download image if URL provided
-        String? imagePath;
+        // Step 3: Download image if URL provided and convert to bytes
+        Uint8List? imageBytes;
         final imageUrl = rowData['ImageURL']?.toString().trim() ?? '';
         if (imageUrl.isNotEmpty && imageUrl.startsWith('http')) {
           final itemId = const Uuid().v4();
-          imagePath = await _downloadImage(imageUrl, itemId, result);
+          final imagePath = await _downloadImage(imageUrl, itemId, result);
+          if (imagePath != null && imagePath.isNotEmpty) {
+            try {
+              final file = File(imagePath);
+              if (file.existsSync()) {
+                imageBytes = await file.readAsBytes();
+              }
+            } catch (e) {
+              print('⚠️ Failed to read downloaded image: $e');
+            }
+          }
         }
 
         // Step 4: Parse comma-separated IDs and validate
@@ -888,7 +898,7 @@ class RestaurantBulkImportServiceV3 {
           variant: [],
           choiceIds: choiceIds,
           extraId: extraIds,
-          imagePath: imagePath,
+          imageBytes: imageBytes,
           createdTime: DateTime.now(),
           lastEditedTime: DateTime.now(),
           editedBy: 'BulkImport',

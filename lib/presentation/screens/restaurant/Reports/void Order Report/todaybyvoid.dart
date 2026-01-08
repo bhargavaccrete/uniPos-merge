@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
 class TodayByVoid extends StatefulWidget {
@@ -47,7 +49,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
               order.orderAt!.isAfter(todayStart) &&
               order.orderAt!.isBefore(todayEnd)) {
             voidOrdersList.add(order);
-            totalAmount += order.totalPrice;
+            totalAmount += (order.totalPrice ?? 0.0);
           }
         }
       }
@@ -110,7 +112,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
 
               // Total Amount
               Text(
-                " Total Void Order Amount Today (Rs.) = ${_totalVoidAmount.toStringAsFixed(2)} ",
+                " Total Void Order Amount Today (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalVoidAmount)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -231,7 +233,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total Amount(Rs.)',textScaler: TextScaler.linear(1),
+                              child: Text('Total Amount(${CurrencyHelper.currentSymbol})',textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                       DataColumn(
@@ -264,7 +266,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
                         DataCell(Center(child: Text(order.paymentmode ?? '-', textScaler: TextScaler.linear(1)))),
                         DataCell(Center(child: Text(order.orderType ?? '-', textScaler: TextScaler.linear(1)))),
                         DataCell(Center(
-                            child: Text(order.totalPrice.toStringAsFixed(2), textScaler: TextScaler.linear(1)))),
+                            child: Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(order.totalPrice)}', textScaler: TextScaler.linear(1)))),
                         DataCell(Center(
                             child: Text(
                           order.orderStatus ?? '-',

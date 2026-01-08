@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
@@ -155,7 +157,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
               SizedBox(height: 25),
               if (_report != null) ...[
                 Text(
-                  'Total Sales : ${_report!.totalSales.toStringAsFixed(1)}',
+                  'Total Sales : ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_report!.totalSales)}',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(
                     fontSize: 18,
@@ -229,7 +231,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
               Expanded(
                 flex: 2,
                 child: Text(
-                  'Total Amount(Rs.)',
+                  'Total Amount(${CurrencyHelper.currentSymbol})',
                   textScaler: TextScaler.linear(1),
                   textAlign: TextAlign.right,
                   style: GoogleFonts.poppins(
@@ -270,7 +272,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    order.totalAmount.toStringAsFixed(1),
+                    DecimalSettings.formatAmount(order.totalAmount),
                     textScaler: TextScaler.linear(1),
                     textAlign: TextAlign.right,
                     style: GoogleFonts.poppins(fontSize: 14),
@@ -311,7 +313,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
               Expanded(
                 flex: 1,
                 child: Text(
-                  'Total Amount(Rs.)',
+                  'Total Amount(${CurrencyHelper.currentSymbol})',
                   textScaler: TextScaler.linear(1),
                   textAlign: TextAlign.right,
                   style: GoogleFonts.poppins(
@@ -343,7 +345,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                 Expanded(
                   flex: 1,
                   child: Text(
-                    payment.totalAmount.toStringAsFixed(1),
+                    DecimalSettings.formatAmount(payment.totalAmount),
                     textScaler: TextScaler.linear(1),
                     textAlign: TextAlign.right,
                     style: GoogleFonts.poppins(fontSize: 14),
@@ -382,7 +384,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                 ),
               ),
               Text(
-                'Rs. ${_report!.totalExpenses.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.totalExpenses)}',
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                   fontSize: 16,
@@ -413,7 +415,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13),
                   ),
                   Text(
-                    'Rs. ${_report!.openingBalance.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.openingBalance)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
@@ -429,7 +431,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13),
                   ),
                   Text(
-                    'Rs. ${_report!.totalSales.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.totalSales)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
@@ -445,7 +447,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13, color: Colors.red[700]),
                   ),
                   Text(
-                    '- Rs. ${_report!.totalExpenses.toStringAsFixed(2)}',
+                    '- ${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.totalExpenses)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.red[700]),
                   ),
@@ -461,7 +463,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   Text(
-                    'Rs. ${_report!.closingBalance.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.closingBalance)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blue[800]),
                   ),

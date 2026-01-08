@@ -14,6 +14,8 @@ import '../../../../../constants/restaurant/color.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/util/restaurant/decimal_settings.dart';
+import 'package:unipos/util/restaurant/currency_helper.dart';
 
 class YearWisebyTop extends StatefulWidget {
   const YearWisebyTop({super.key});
@@ -82,23 +84,42 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
             orderDate.isBefore(yearEnd.add(Duration(seconds: 1)));
       }).toList();
 
-      // Calculate item sales
+      // Calculate item sales with refund handling
       Map<String, Map<String, dynamic>> itemSales = {};
 
       for (var order in yearOrders) {
+        // Skip fully refunded orders
+        if (order.orderStatus == 'FULLY_REFUNDED') continue;
+
+        // Calculate order-level refund ratio
+        final orderTotal = order.totalPrice ?? 0.0;
+        final refundAmount = order.refundAmount ?? 0.0;
+        final orderRefundRatio = orderTotal > 0 ? ((orderTotal - refundAmount) / orderTotal) : 1.0;
+
         for (var item in order.items) {
           final itemName = item.title;
-          final quantity = item.quantity;
+
+          // Calculate effective quantity (after refunds)
+          final originalQuantity = item.quantity ?? 0;
+          final refundedQuantity = item.refundedQuantity ?? 0;
+          final effectiveQuantity = originalQuantity - refundedQuantity;
+
+          // Skip fully refunded items
+          if (effectiveQuantity <= 0) continue;
+
           final price = item.price;
-          final totalAmount = price * quantity;
+          final baseTotal = price * effectiveQuantity;
+
+          // Apply order-level refund ratio for accurate revenue
+          final totalAmount = baseTotal * orderRefundRatio;
 
           if (itemSales.containsKey(itemName)) {
-            itemSales[itemName]!['quantity'] += quantity;
+            itemSales[itemName]!['quantity'] += effectiveQuantity;
             itemSales[itemName]!['totalAmount'] += totalAmount;
           } else {
             itemSales[itemName] = {
               'itemName': itemName,
-              'quantity': quantity,
+              'quantity': effectiveQuantity,
               'totalAmount': totalAmount,
             };
           }
@@ -311,7 +332,7 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
                             ),
                           ),
                           child: Text(
-                            'Total (Rs)',
+                            'Total (${CurrencyHelper.currentSymbol})',
                             textScaler: TextScaler.linear(1),
                             style: GoogleFonts.poppins(fontSize: 14),
                             textAlign: TextAlign.center,
@@ -352,7 +373,7 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
                           DataCell(
                             Center(
                               child: Text(
-                                'Rs. ${item['totalAmount'].toStringAsFixed(2)}',
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item['totalAmount'])}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

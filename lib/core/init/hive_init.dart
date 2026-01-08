@@ -293,29 +293,32 @@ class HiveInit {
       Hive.registerAdapter(BillingTabModelAdapter());
     }
 
+
     // EOD adapters (shared with restaurant mode)
     // EOD - 117
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantEod)) {
       Hive.registerAdapter(EndOfDayReportAdapter());
     }
+
+
     // OrderTypeSummary - 18
-    if (!Hive.isAdapterRegistered(18)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.OrderTypeSummary)) {
       Hive.registerAdapter(OrderTypeSummaryAdapter());
     }
     // CategorySales - 19
-    if (!Hive.isAdapterRegistered(19)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.CategorySales)) {
       Hive.registerAdapter(CategorySalesAdapter());
     }
     // PaymentSummary - 20
-    if (!Hive.isAdapterRegistered(20)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.PaymentSummary)) {
       Hive.registerAdapter(PaymentSummaryAdapter());
     }
     // TaxSummary - 21
-    if (!Hive.isAdapterRegistered(21)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.TaxSummary)) {
       Hive.registerAdapter(TaxSummaryAdapter());
     }
     // CashReconciliation - 22
-    if (!Hive.isAdapterRegistered(22)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.CashReconciliation)) {
       Hive.registerAdapter(CashReconciliationAdapter());
     }
 
@@ -387,7 +390,32 @@ class HiveInit {
     await Hive.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
     await Hive.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
     await Hive.openBox<RetailStaffModel>(HiveBoxNames.retailStaff);
-    await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
+
+    // Fix for typeId 252 corruption - delete and recreate billingTabs box
+    try {
+      await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
+    } catch (e) {
+      print('⚠️ billingTabs box corrupted (typeId 252 error), fixing...');
+      try {
+        // Close the box if it's somehow open
+        if (Hive.isBoxOpen(HiveBoxNames.billingTabs)) {
+          await Hive.box(HiveBoxNames.billingTabs).close();
+          print('✅ Closed corrupted billingTabs box');
+        }
+
+        // Delete the corrupted box from disk
+        await Hive.deleteBoxFromDisk(HiveBoxNames.billingTabs);
+        print('✅ Deleted corrupted billingTabs box');
+
+        // Create a fresh box
+        await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
+        print('✅ Recreated billingTabs box');
+      } catch (deleteError) {
+        print('❌ Failed to fix billingTabs: $deleteError');
+        print('💡 Please manually delete: C:\\Users\\Hp\\OneDrive - Accrete Infosolution Technologies llp\\Documents\\billingtabs.hive');
+        rethrow;
+      }
+    }
 
     // EOD box (shared with restaurant mode)
     await Hive.openBox<EndOfDayReport>(HiveBoxNames.retailEOD);
@@ -478,27 +506,27 @@ class HiveInit {
       Hive.registerAdapter(EndOfDayReportAdapter());
     }
     // OrderTypeSummary - 18
-    if (!Hive.isAdapterRegistered(18)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.OrderTypeSummary)) {
       Hive.registerAdapter(OrderTypeSummaryAdapter());
     }
     // CategorySales - 19
-    if (!Hive.isAdapterRegistered(19)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.CategorySales)) {
       Hive.registerAdapter(CategorySalesAdapter());
     }
     // PaymentSummary - 20
-    if (!Hive.isAdapterRegistered(20)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.PaymentSummary)) {
       Hive.registerAdapter(PaymentSummaryAdapter());
     }
     // TaxSummary - 21
-    if (!Hive.isAdapterRegistered(21)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.TaxSummary)) {
       Hive.registerAdapter(TaxSummaryAdapter());
     }
     // CashReconciliation - 22
-    if (!Hive.isAdapterRegistered(22)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.CashReconciliation)) {
       Hive.registerAdapter(CashReconciliationAdapter());
     }
     // TestBill - 118
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantTestBill)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.TestBill)) {
       Hive.registerAdapter(TestBillModelAdapter());
     }
   }

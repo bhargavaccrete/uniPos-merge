@@ -5,6 +5,8 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
+import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/restaurant/currency_helper.dart';
 
 class ApplyTaxScreen extends StatefulWidget {
   final Tax taxToApply;
@@ -188,12 +190,12 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                             Text(
                               // Show appropriate price based on tax setting
                               item.price == null
-                                  ? '₹0.00'
+                                  ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
                                   : AppSettings.isTaxInclusive
                                       ? item.taxRate != null
-                                          ? item.basePrice.toStringAsFixed(2)  // Show base price if tax applied
-                                          : item.price!.toStringAsFixed(2)     // Show original price if no tax
-                                      : item.price!.toStringAsFixed(2),        // Show base price for exclusive
+                                          ? DecimalSettings.formatAmount(item.basePrice)  // Show base price if tax applied
+                                          : DecimalSettings.formatAmount(item.price!)     // Show original price if no tax
+                                      : DecimalSettings.formatAmount(item.price!),        // Show base price for exclusive
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -212,7 +214,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                             children: [
                               // Show tax percentage applied
                               Text(
-                                "Tax Applied: ${item.taxRate! > 1 ? item.taxRate!.toStringAsFixed(2) : (item.taxRate! * 100).toStringAsFixed(2)}%",
+                                "Tax Applied: ${item.taxRate! > 1 ? DecimalSettings.formatAmount(item.taxRate!) : DecimalSettings.formatAmount(item.taxRate! * 100)}%",
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
@@ -232,10 +234,10 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                 children: [
                                   Text(
                                     item.price == null
-                                        ? "₹0.00"
+                                        ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
                                         : AppSettings.isTaxInclusive
-                                            ? "₹${item.taxAmount.toStringAsFixed(2)}"  // Show calculated tax from inclusive price
-                                            : "₹${(item.price! * item.taxRate!).toStringAsFixed(2)}", // Show tax on base price
+                                            ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.taxAmount)}'  // Show calculated tax from inclusive price
+                                            : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * item.taxRate!)}', // Show tax on base price
                                     style: const TextStyle(
                                       fontSize: 13,
                                       color: Colors.green,
@@ -243,10 +245,10 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                   ),
                                   Text(
                                     item.price == null
-                                        ? "₹0.00"
+                                        ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
                                         : AppSettings.isTaxInclusive
-                                            ? "₹${item.price!.toStringAsFixed(2)}"     // Show inclusive price as net amount
-                                            : "₹${(item.price! * (1 + item.taxRate!)).toStringAsFixed(2)}", // Show base + tax as net amount
+                                            ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}'     // Show inclusive price as net amount
+                                            : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * (1 + item.taxRate!))}', // Show base + tax as net amount
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,

@@ -4,6 +4,8 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 
 import '../../../../../constants/restaurant/color.dart';
+import '../../../../../util/restaurant/currency_helper.dart';
+import '../../../../../util/restaurant/decimal_settings.dart';
 import 'ItemsReportData.dart';
 
 class ThisWeekItems extends StatefulWidget {
@@ -124,7 +126,7 @@ class _ThisWeekItemsState extends State<ThisWeekItems> {
                                     style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.bold, color: Colors.white))),
                             DataColumn(
-                                label: Text('Total (Rs)',
+                                label: Text('Total (${CurrencyHelper.currentSymbol})',
                                     style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.bold, color: Colors.white))),
                           ],
@@ -147,7 +149,7 @@ class _ThisWeekItemsState extends State<ThisWeekItems> {
                                     Text(item.totalQuantity.toString()))),
                                 DataCell(Center(
                                     child: Text(
-                                        '₹${item.totalRevenue.toStringAsFixed(2)}'))),
+                                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.totalRevenue)}'))),
                               ],
                             );
                           }).toList()),

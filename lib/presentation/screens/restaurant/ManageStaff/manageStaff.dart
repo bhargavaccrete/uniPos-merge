@@ -700,7 +700,7 @@ class _manageStaffState extends State<manageStaff> {
                                                                   borderRadius: BorderRadius.circular(5),
                                                                 ),
                                                                 child: DropdownButton<String>(
-                                                                  value: editSelectedRole.isEmpty || editSelectedRole == 'Select Role' ? 'Cashier' : editSelectedRole,
+                                                                  value: ['Cashier', 'Waiter', 'Manager', 'Kitchen Staff'].contains(editSelectedRole) ? editSelectedRole : 'Cashier',
                                                                   isExpanded: true,
                                                                   underline: SizedBox(),
                                                                   items: ['Cashier', 'Waiter', 'Manager', 'Kitchen Staff'].map((String value) {

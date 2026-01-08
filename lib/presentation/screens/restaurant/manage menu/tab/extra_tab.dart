@@ -7,9 +7,11 @@ import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
-import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
+import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../util/restaurant/decimal_settings.dart';
+import '../../../../../util/restaurant/currency_helper.dart';
+import '../../../../../presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 
@@ -194,7 +196,7 @@ class _ExtraTabState extends State<ExtraTab> {
                   children: [
                     Text(topping.name, style: const TextStyle(fontSize: 16)),
                     Text(
-                      '₹${topping.price}',
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         color: Colors.green,
@@ -621,7 +623,7 @@ class _ExtraTabState extends State<ExtraTab> {
                       border: const OutlineInputBorder(),
                       labelText: 'Price',
                       labelStyle: GoogleFonts.poppins(fontSize: 12),
-                      prefixText: '₹',
+                      prefixText: CurrencyHelper.currentSymbol,
                       filled: !isSelected,
                       fillColor: !isSelected ? Colors.grey.shade100 : null,
                     ),
