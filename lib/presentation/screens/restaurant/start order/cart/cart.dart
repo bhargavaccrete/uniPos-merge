@@ -342,46 +342,157 @@ class _CartScreenState extends State<CartScreen>
   /// ------------------- MAIN BUILD ------------------- ///
   @override
   Widget build(BuildContext context) {
+    final Color deepBlue = Color(0xFF0D47A1);
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
-        title: Text(
-          isExistingOrder ? 'Update Order' : 'Cart',
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: 20,
+        elevation: 8,
+        shadowColor: deepBlue.withOpacity(0.5),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [deepBlue, Color(0xFF1565C0), deepBlue.withOpacity(0.8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
         ),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                isExistingOrder ? Icons.edit_note : Icons.shopping_cart_rounded,
+                color: deepBlue,
+                size: 26,
+              ),
+            ),
+            SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isExistingOrder ? 'Update Order' : 'Shopping Cart',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  '${_combinedList.length} ${_combinedList.length == 1 ? 'item' : 'items'}',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+            ),
+            child: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Clear Cart'),
-                  content: const Text('Are you sure you want to clear the cart?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        clearCart();
-                      },
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('Clear'),
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: IconButton(
+              icon: Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade400,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),
-              );
-            },
+                child: Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 22),
+              ),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    title: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.delete_forever_rounded, color: Colors.red.shade600, size: 28),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Clear Cart',
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20),
+                        ),
+                      ],
+                    ),
+                    content: Text(
+                      'Are you sure you want to clear the cart? This action cannot be undone.',
+                      style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          clearCart();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade500,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          elevation: 2,
+                        ),
+                        child: Text(
+                          'Clear',
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -397,33 +508,45 @@ class _CartScreenState extends State<CartScreen>
 
             Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
+                Container(
+                  margin: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Take Away button - only show if enabled
                       if (OrderSettings.enableTakeAway)
-                        Filterbutton(
-                          title: 'Take Away',
-                          selectedFilter: selectedFilter,
-                          onpressed: () =>
-                              setState(() => selectedFilter = "Take Away"),
+                        Expanded(
+                          child: _buildModernFilterButton(
+                            icon: Icons.shopping_bag_outlined,
+                            title: 'Take Away',
+                            isSelected: selectedFilter == "Take Away",
+                            onTap: () => setState(() => selectedFilter = "Take Away"),
+                          ),
                         ),
                       // Dine In button - only show if enabled
                       if (OrderSettings.enableDineIn)
-                        Padding(
-                          padding: const EdgeInsets.all(2.0),
-                          child: Filterbutton(
+                        Expanded(
+                          child: _buildModernFilterButton(
+                            icon: Icons.restaurant,
                             title: 'Dine In',
-                            selectedFilter: selectedFilter,
-                            onpressed: () async {
-
-
+                            isSelected: selectedFilter == "Dine In",
+                            onTap: () async {
                               final result = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const TableScreen(isfromcart: true,)),
+                                  builder: (_) => const TableScreen(isfromcart: true),
+                                ),
                               );
                               if (result is String) {
                                 setState(() {
@@ -436,12 +559,13 @@ class _CartScreenState extends State<CartScreen>
                         ),
                       // Delivery button - only show if enabled
                       if (OrderSettings.enableDelivery)
-                        Filterbutton(
-
-                          title: 'Delivery',
-                          selectedFilter: selectedFilter,
-                          onpressed: () =>
-                              setState(() => selectedFilter = "Delivery"),
+                        Expanded(
+                          child: _buildModernFilterButton(
+                            icon: Icons.delivery_dining,
+                            title: 'Delivery',
+                            isSelected: selectedFilter == "Delivery",
+                            onTap: () => setState(() => selectedFilter = "Delivery"),
+                          ),
                         ),
                     ],
                   ),
@@ -617,17 +741,112 @@ class _CartScreenState extends State<CartScreen>
     );
   }
 
+  // Add this method for modern filter buttons
+  Widget _buildModernFilterButton({
+    required IconData icon,
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final Color deepBlue = Color(0xFF0D47A1);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        margin: EdgeInsets.symmetric(horizontal: 4),
+        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [deepBlue, Color(0xFF1565C0)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isSelected ? null : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? deepBlue : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: deepBlue.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                    spreadRadius: 1,
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : deepBlue.withOpacity(0.7),
+              size: 22,
+            ),
+            SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                title,
+                style: GoogleFonts.poppins(
+                  color: isSelected ? Colors.white : deepBlue.withOpacity(0.8),
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyCart() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.shopping_cart_outlined,
-              size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
+          Container(
+            padding: EdgeInsets.all(40),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.shopping_cart_outlined,
+              size: 80,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 24),
           Text(
             'Your cart is empty',
-            style: GoogleFonts.poppins(fontSize: 18, color: Colors.grey),
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add items to get started',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
           ),
         ],
       ),

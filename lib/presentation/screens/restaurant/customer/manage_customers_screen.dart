@@ -168,6 +168,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
   Widget _buildCustomerCard(BuildContext context, CustomerModel customer) {
     final width = MediaQuery.of(context).size.width;
+
     final height = MediaQuery.of(context).size.height;
 
     return Card(

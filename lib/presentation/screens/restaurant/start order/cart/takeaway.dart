@@ -297,125 +297,238 @@ class _TakeawayState extends State<Takeaway> {
 
   Widget buildCartItemRow(CartItemStatus wrapped) {
     final item = wrapped.item;
+    final Color deepBlue = Color(0xFF0D47A1);
     print(item.title);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: Container(
-        padding: EdgeInsets.all(5),
-        decoration: BoxDecoration(
-
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 10.0),
+      padding: EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: deepBlue.withOpacity(0.15),
+          width: 1,
         ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // The updated code
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Always show the item name
-                      Text(
-                        item.title,
-                        style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Item Name and Weight
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                        letterSpacing: 0.1,
+                        height: 1.2,
                       ),
-
-                      // Conditionally show the weight display string if it's not null
-                      if (item.weightDisplay != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2.0),
-                          child: Text(
-                            item.weightDisplay!, // e.g., "1.000 KG"
-                            style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 14),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (item.weightDisplay != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3.0),
+                        child: Text(
+                          item.weightDisplay!,
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey.shade600,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
-                Row(
+              ),
+              SizedBox(width: 6),
+              // Quantity Controls
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                decoration: BoxDecoration(
+                  color: deepBlue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.remove_circle_outline),
-                      color: primarycolor,
-                      onPressed: () => widget.onDecreseQty(item),
+                    InkWell(
+                      onTap: () => widget.onDecreseQty(item),
+                      child: Container(
+                        padding: EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: deepBlue.withOpacity(0.3), width: 1),
+                        ),
+                        child: Icon(
+                          Icons.remove,
+                          color: deepBlue,
+                          size: 16,
+                        ),
+                      ),
                     ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        // color: wrapped.isActive ? Colors.green : Colors.blue,
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       child: Text(
                         item.quantity.toString(),
-                        style: GoogleFonts.poppins(fontSize: 16),
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: deepBlue,
+                        ),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.add_circle_outline),
-                      color: primarycolor,
-                      onPressed: () => widget.onIncreseQty(item),
+                    InkWell(
+                      onTap: () => widget.onIncreseQty(item),
+                      child: Container(
+                        padding: EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: deepBlue,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: deepBlue.withOpacity(0.3),
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                Expanded(
+              ),
+              SizedBox(width: 6),
+              // Price
+              Expanded(
+                flex: 2,
+                child: Container(
+                  padding: EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: deepBlue.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: deepBlue.withOpacity(0.2), width: 1),
+                  ),
                   child: Text(
-                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(item.totalPrice)}',
+                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.totalPrice)}',
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: deepBlue,
+                      letterSpacing: 0.2,
                     ),
-                    textAlign: TextAlign.end,
+                    textAlign: TextAlign.center,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
 
             if (item.variantName != null)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade50, Colors.blue.shade100.withOpacity(0.5)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.shade200, width: 1),
                 ),
-                child: Text(
-                  'Size: ${item.variantName} (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variantPrice ?? 0)})',
+                child: Row(
+                  children: [
+                    Icon(Icons.straighten, size: 14, color: Colors.blue.shade700),
+                    SizedBox(width: 6),
+                    Text(
+                      'Size: ${item.variantName}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue.shade900,
+                      ),
+                    ),
+                    Spacer(),
+                    Text(
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variantPrice ?? 0)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-            // Add a small space between the boxes
-
-            // 3. (NEW) Display Choices in a similar styled box
             if (item.choiceNames != null && item.choiceNames!.isNotEmpty)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(top: 5),
-                // Added margin for spacing
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(4),
+                  gradient: LinearGradient(
+                    colors: [Colors.orange.shade50, Colors.orange.shade100.withOpacity(0.5)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.shade200, width: 1),
                 ),
-                child: Text(
-                  'Add-ons: ${item.choiceNames!.join(', ')}', // This is now safe
-                  style: GoogleFonts.poppins(fontSize: 13, color: Colors.black54),
+                child: Row(
+                  children: [
+                    Icon(Icons.add_circle_outline, size: 14, color: Colors.orange.shade700),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Add-ons: ${item.choiceNames!.join(', ')}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-
-            // const SizedBox(height: 8),
 
             if (item.extras != null && item.extras!.isNotEmpty)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade50, Colors.green.shade100.withOpacity(0.5)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.green.shade200, width: 1),
                 ),
                 child: Builder(
                   builder: (context) {
@@ -480,13 +593,9 @@ class _TakeawayState extends State<Takeaway> {
                   },
                 ),
               ),
-
-            const SizedBox(height: 8),
-
           ],
-        ),
-      ),
-    );
+        )
+      );
   }
 
   Future<void> clearCart() async {
@@ -881,34 +990,77 @@ class _TakeawayState extends State<Takeaway> {
     final width = MediaQuery.of(context).size.width;
     return Column(
       children: [
-        // Header
+        // Header - Compact Design
         Container(
-          padding: EdgeInsets.all(16),
-          color: Colors.grey.shade100,
-          // item , quantity , price
+          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0D47A1).withOpacity(0.15), Color(0xFF1565C0).withOpacity(0.08)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Color(0xFF0D47A1).withOpacity(0.3), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0xFF0D47A1).withOpacity(0.1),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Item',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                flex: 2,
+                child: Row(
+                  children: [
+                    Icon(Icons.restaurant_menu, color: Color(0xFF0D47A1), size: 16),
+                    SizedBox(width: 6),
+                    Text(
+                      'Item',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0D47A1),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                'Quantity',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.shopping_cart_outlined, color: Color(0xFF0D47A1), size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Qty',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0D47A1),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                'Price',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              SizedBox(width: 40),
+              Row(
+                children: [
+                  Icon(Icons.currency_rupee, color: Color(0xFF0D47A1), size: 16),
+                  SizedBox(width: 2),
+                  Text(
+                    'Price',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0D47A1),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

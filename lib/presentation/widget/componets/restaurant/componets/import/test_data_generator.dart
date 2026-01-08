@@ -70,9 +70,18 @@ class TestDataGenerator {
 
   /// Topping names
   static final List<String> _toppingNames = [
-    'Extra Cheese', 'Mushrooms', 'Onions', 'Tomatoes',
-    'Peppers', 'Olives', 'Jalapeños', 'Pineapple', 'Sausage', 'Spinach', 'Garlic'
+    'Extra Cheese',
+    'Mushrooms',
+    'Onions',
+    'Tomatoes',
+    'Peppers',
+    'Olives',
+    'Jalapeños',
+    'Pineapple',
+    'Spinach',
+    'Garlic',
   ];
+
 
   /// Generate a placeholder image for items with more variety
   static Future<String> _generatePlaceholderImage(String itemName, int index) async {
@@ -194,13 +203,15 @@ class TestDataGenerator {
     debugPrint('📦 Generating size variants...');
 
     for (final sizeName in _sizeNames) {
+      final variantId = _generateId();
       final variant = VariantModel(
-        id: _generateId(),
+        id: variantId,
         name: sizeName,
         createdTime: DateTime.now(),
         editCount: 0,
       );
-      await variantBox.add(variant);
+      // Store with variant.id as the key so it can be retrieved later
+      await variantBox.put(variantId, variant);
     }
 
     debugPrint('✅ Generated ${_sizeNames.length} size variants!');
@@ -230,7 +241,8 @@ class TestDataGenerator {
         final toppingName = _toppingNames[_random.nextInt(_toppingNames.length)];
         final topping = Topping(
           name: '$toppingName ${j + 1}',
-          isveg: _random.nextBool(),
+          // isveg: _random.nextBool(),
+          isveg:true,
           price: double.parse((10 + _random.nextDouble() * 40).toStringAsFixed(2)),
           isContainSize: false,
           createdTime: DateTime.now(),
@@ -238,9 +250,13 @@ class TestDataGenerator {
         );
         toppings.add(topping);
       }
-
+      if (toppings.isEmpty) {
+        debugPrint('⚠️ Skipping extra "$groupName" because it has no toppings');
+        continue;
+      }
+      final extraId = _generateId();
       final extra = Extramodel(
-        Id: _generateId(),
+        Id: extraId,
         Ename: groupName,
         isEnabled: true,
         topping: toppings,
@@ -248,7 +264,8 @@ class TestDataGenerator {
         editCount: 0,
       );
 
-      await extraBox.add(extra);
+      // Store with extra.Id as the key so it can be retrieved later
+      await extraBox.put(extraId, extra);
     }
 
     debugPrint('✅ Generated ${extraGroups.take(3).length} extra groups with toppings!');
@@ -284,7 +301,7 @@ class TestDataGenerator {
   }
 
   /// Generate test items with variants, extras, and images
-  static Future<void> generateTestItems(int count, {bool withImages = false}) async {
+  static Future<void> generateTestItems(int count, {bool withImages = true}) async {
     final itemBox = Hive.box<Items>('itemBoxs');
     final categoryBox = Hive.box<Category>('categories');
     final variantBox = Hive.box<VariantModel>('variante');
@@ -299,44 +316,73 @@ class TestDataGenerator {
 
     final categories = categoryBox.values.toList();
     final variants = variantBox.values.toList();
-    final extras = extraBox.values.toList();
+    final extras = extraBox.values
+        .where((e) => e.topping != null && e.topping!.isNotEmpty)
+        .toList();
+
     final items = <Items>[];
     int imageCount = 0;
+    int skippedCount = 0;
 
     for (int i = 0; i < count; i++) {
       final randomCategory = categories[_random.nextInt(categories.length)];
+      final allowVariants = !['Soups', 'Salads'].contains(randomCategory.name);
+      final allowExtras = !['Beverages'].contains(randomCategory.name);
+
       final basePrice = _randomPrice();
       final itemName = _randomItemName();
 
-      // 30% chance to have size variants
+      // 50% chance to have size variants (increased from 30%)
       List<ItemVariante>? itemVariants;
-      if (_random.nextDouble() < 0.3 && variants.isNotEmpty) {
+      double displayPrice = basePrice;
+
+      if (allowVariants && _random.nextDouble() < 0.5 && variants.isNotEmpty) {
         itemVariants = [];
-        for (int j = 0; j < variants.length; j++) {
-          final variant = variants[j];
-          // Price increases by 20-30% for each larger size
+
+        final shuffledVariants = List<VariantModel>.from(variants)..shuffle(_random);
+        final variantCount = 2 + _random.nextInt(
+          shuffledVariants.length > 2 ? shuffledVariants.length - 1 : 1,
+        );
+
+        for (int j = 0; j < variantCount; j++) {
+          final variant = shuffledVariants[j];
           final priceMultiplier = 1.0 + (j * 0.25);
+          final variantPrice = double.parse((basePrice * priceMultiplier).toStringAsFixed(2));
+
           itemVariants.add(ItemVariante(
             variantId: variant.id,
-            price: double.parse((basePrice * priceMultiplier).toStringAsFixed(2)),
+            price: variantPrice,
             trackInventory: false,
             stockQuantity: 100,
           ));
         }
-      }
 
-      // 40% chance to have extras
-      List<String>? extraIds;
-      if (_random.nextDouble() < 0.4 && extras.isNotEmpty) {
-        extraIds = [];
-        // Add 1-2 random extra groups
-        final extraCount = 1 + _random.nextInt(2);
-        for (int j = 0; j < extraCount && j < extras.length; j++) {
-          extraIds.add(extras[j].Id);
+        // Set display price to the minimum variant price (first variant)
+        if (itemVariants.isNotEmpty) {
+          displayPrice = itemVariants.first.price;
         }
       }
 
-      // Generate image for ALL items if withImages is true (100% coverage for better testing)
+      // 60% chance to have extras (increased from 40%)
+      List<String>? extraIds;
+      if (allowExtras && extras.isNotEmpty && _random.nextDouble() < 0.6) {
+        final shuffledExtras = List<Extramodel>.from(extras)..shuffle(_random);
+        final selectedExtras = shuffledExtras.take(1 + _random.nextInt(2)).toList();
+
+        if (selectedExtras.isNotEmpty) {
+          extraIds = selectedExtras.map((e) => e.Id).toList();
+        }
+      }
+
+      // Validate price before creating item
+      if (displayPrice <= 0) {
+        debugPrint('⚠️ Skipping invalid item: $itemName (price: $displayPrice)');
+        skippedCount++;
+        i--; // Retry this iteration
+        continue;
+      }
+
+      // Generate image for ALL items if withImages is true (100% coverage)
       Uint8List? imageBytes;
       if (withImages) {
         final imagePath = await _generatePlaceholderImage(itemName, i);
@@ -356,14 +402,14 @@ class TestDataGenerator {
       final item = Items(
         id: _generateId(),
         name: itemName,
-        price: itemVariants != null ? null : basePrice, // null if has variants
+        price: displayPrice, // Always set a valid price (base price or minimum variant price)
         categoryOfItem: randomCategory.id,
         description: 'Test item #${i + 1} - This is a delicious dish made with the finest ingredients.',
         imageBytes: imageBytes,
         isVeg: 'veg', // Always generate vegetarian items
         unit: 'plate',
         variant: itemVariants,
-        choiceIds: [],
+        choiceIds: null, // Not using choices in test data
         extraId: extraIds,
         taxRate: 0.0,
         isEnabled: true,
@@ -391,6 +437,9 @@ class TestDataGenerator {
     }
 
     debugPrint('✅ All $count items generated!${withImages ? " ($imageCount items have images)" : ""}');
+    if (skippedCount > 0) {
+      debugPrint('⚠️ Skipped $skippedCount invalid items during generation');
+    }
   }
 
   /// Generate complete test dataset with variants, extras, and optional images

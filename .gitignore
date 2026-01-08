@@ -7,3 +7,6 @@ build/
 ios/Flutter/
 android/.gradle/
 nul
+
+# Ignore markdown files
+*.md
