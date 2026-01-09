@@ -87,7 +87,7 @@ class _CartScreenState extends State<CartScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => Startorder(isForAddingItem: true), // Assuming MenuScreen exists
+        builder: (context) => POSMainScreen(), // Assuming MenuScreen exists
       ),
     );
 

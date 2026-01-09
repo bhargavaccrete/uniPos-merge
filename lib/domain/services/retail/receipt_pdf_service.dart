@@ -261,7 +261,7 @@ class ReceiptPdfService {
           // KOT Format (simplified for kitchen)
           pw.Text(
             'KOT #: ${data.kotNumber.toString().padLeft(3, '0')}',
-            style: const pw.TextStyle(fontSize: 10),
+            style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
           ),
           if (data.tableNo != null && data.tableNo!.isNotEmpty) ...[
             pw.Text(
@@ -272,19 +272,19 @@ class ReceiptPdfService {
           if (data.orderNo != null && data.orderNo!.isNotEmpty) ...[
             pw.Text(
               'Order No: ${data.orderNo}',
-              style: const pw.TextStyle(fontSize: 10),
+              style: pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
           if (data.orderType != null) ...[
             pw.Text(
               'Type: ${data.orderType!.toUpperCase()}${data.isAddonKot == true ? ' (ADD-ON)' : ''}',
-              style: const pw.TextStyle(fontSize: 10),
+              style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
           if (data.orderTimestamp != null) ...[
             pw.Text(
               _formatDateTime(data.orderTimestamp!.toIso8601String()),
-              style: const pw.TextStyle(fontSize: 10),
+              style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
         ] else ...[
@@ -995,7 +995,7 @@ class ReceiptPdfService {
               padding: const pw.EdgeInsets.only(left: 4, top: 1),
               child: pw.Text(
                 '  ${item.weight!}',
-                style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700,fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
               ),
             ),
         ],

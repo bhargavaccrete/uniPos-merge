@@ -335,7 +335,7 @@ class _TableScreenState extends State<TableScreen> {
                               Navigator.pop(context ,table.id);
 
                             }else{
-                              Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder(newOrderForTableId: table.id,)));
+                              Navigator.push(context, MaterialPageRoute(builder: (context)=> POSMainScreen()));
                             }
 
                           }

@@ -48,7 +48,7 @@ class Customerdetails extends StatefulWidget {
   State<Customerdetails> createState() => _CustomerdetailsState();
 }
 
-class _CustomerdetailsState extends State<Customerdetails> {
+class _CustomerdetailsState extends State<Customerdetails> with TickerProviderStateMixin {
   late TextEditingController _mobileController = TextEditingController();
   late TextEditingController _nameController = TextEditingController();
   late TextEditingController _emailController = TextEditingController();
@@ -85,12 +85,22 @@ class _CustomerdetailsState extends State<Customerdetails> {
     'other'
   ];
 
-  // Currency symbol
-  // Currency symbol is now loaded from CurrencyHelper.currentSymbol (reactive)
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    );
+    _fadeController.forward();
+
     _amountController.addListener(() => setState(() {}));
     _amountpercentageContorller.addListener(() => setState(() {}));
     _serviceChargeController.addListener(() => setState(() {}));
@@ -101,12 +111,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
         text: widget.existingModel?.customerEmail ?? '');
     _mobileController = TextEditingController(
         text: widget.existingModel?.customerNumber ?? '');
-
-    // Currency is loaded in main.dart via CurrencyHelper.load()
   }
 
   @override
   void dispose() {
+    _fadeController.dispose();
     _mobileController.dispose();
     _nameController.dispose();
     _emailController.dispose();
@@ -123,20 +132,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   @override
   Widget build(BuildContext context) {
-    // This build method is now much cleaner.
-
-    // ✅ Step 1: Gather all inputs from the UI.
     final double discountInputValue = discountApply
         ? (_selectedDiscountType == DiscountType.amount
-            ? _toDouble(_amountController)
-            : _toDouble(_amountpercentageContorller))
+        ? _toDouble(_amountController)
+        : _toDouble(_amountpercentageContorller))
         : 0.0;
 
     final double serviceChargeValue =
-        servicechargeapply ? _toDouble(_serviceChargeController) : 0.0;
+    servicechargeapply ? _toDouble(_serviceChargeController) : 0.0;
     final bool isDelivery = widget.orderType == 'Delivery';
 
-    // ✅ Step 2: Create the service to do all the math.
     final calculations = CartCalculationService(
       items: widget.cartitems ?? widget.existingModel?.items ?? [],
       discountType: _selectedDiscountType,
@@ -146,395 +151,235 @@ class _CustomerdetailsState extends State<Customerdetails> {
       isDeliveryOrder: isDelivery,
     );
 
-    // ✅ Step 3: Build the UI using the final, calculated values.
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
+
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text('Customer Details'),
+        elevation: 0,
+        backgroundColor: primarycolor,
+        title: Text(
+          'Customer Details',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: SingleChildScrollView(
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
           child: Column(
             children: [
-              CommonTextForm(
-                controller: _nameController,
-                borderc: 5,
-                obsecureText: false,
-                BorderColor: primarycolor,
-                labelText: 'Name',
-                LabelColor: primarycolor,
-                focusNode: namenode,
-                onfieldsumbitted: (v) {
-                  FocusScope.of(context).requestFocus(emailnode);
-                },
-              ),
-              SizedBox(height: 10),
-              CommonTextForm(
-                  focusNode: emailnode,
-                  controller: _emailController,
-                  borderc: 5,
-                  BorderColor: primarycolor,
-                  labelText: 'Email Id (optional)',
-                  LabelColor: primarycolor,
-                  obsecureText: false),
-              SizedBox(height: 10),
-              CommonTextForm(
-                controller: _mobileController,
-                keyboardType: TextInputType.phone,
-                borderc: 5,
-                BorderColor: primarycolor,
-                labelText: 'Mobile No',
-                LabelColor: primarycolor,
-                obsecureText: false,
-                icon: CountryCodePicker(
-                  padding: EdgeInsets.all(10),
-                  initialSelection: 'IN',
-                  favorite: ['+91', 'IN'],
-                  showCountryOnly: false,
-                  showFlag: false,
-                ),
-                focusNode: mobilenode,
-                onfieldsumbitted: (v) {
-                  FocusScope.of(context).requestFocus(namenode);
-                },
-              ),
-              SizedBox(height: 10),
-
-              widget.orderType == 'Delivery'
-                  ? Column(
-                      children: [
-                        Divider(),
-                        Text(
-                          'Address',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        SizedBox(
-                          height: 5,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          controller: _houseController,
-                          borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
-                          // hintText: 'Name',
-                          labelText: 'House NO',
-                          LabelColor: primarycolor,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          controller: _stateController,
-                          borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
-                          // hintText: 'Name',
-                          labelText: 'State',
-                          LabelColor: primarycolor,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
-                          // hintText: 'Name',
-                          controller: _cityController,
-                          labelText: 'City',
-                          LabelColor: primarycolor,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
-                          // hintText: 'Name',
-                          controller: _areaController,
-                          labelText: 'Area',
-                          LabelColor: primarycolor,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
-                          // hintText: 'Name',
-                          controller: _postCodeController,
-                          labelText: 'Post Code',
-                          LabelColor: primarycolor,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        Divider(),
-                      ],
-                    )
-                  : SizedBox(),
-
-              Row(
-                children: [
-                  Expanded(
-                      flex: 2,
-                      child: CommonTextForm(
-                          controller: _serviceChargeController,
-                          borderc: 5,
-                          BorderColor: Colors.grey,
-                          labelText: widget.orderType == 'Delivery'
-                              ? 'Delivery Charge'
-                              : 'Service Charges(%)',
-                          LabelColor: Colors.grey,
-                          obsecureText: false)),
-                  SizedBox(width: 5),
-                  Expanded(
-                    child: CommonButton(
-                        bordercircular: 5,
-                        height: height * 0.05,
-                        bgcolor: servicechargeapply
-                            ? Colors.red.shade300
-                            : primarycolor,
-                        bordercolor: servicechargeapply
-                            ? Colors.red.shade300
-                            : primarycolor,
-                        onTap: () {
-                          servicechargeapply == false
-                              ? setState(() {
-                                  servicechargeapply = true;
-                                })
-                              : setState(() {
-                                  servicechargeapply = false;
-                                  _serviceChargeController.clear();
-                                });
-                        },
-                        child: Text(servicechargeapply ? 'Cancel' : 'Apply',
-                            style: TextStyle(
-                                color: servicechargeapply
-                                    ? Colors.black
-                                    : Colors.white)))
-                  )
-                ],
-              ),
-              SizedBox(height: 10),
-
-              ExpansionTile(
-                title: Text('Discount'),
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ListTile(
-                          title: Text('Amount',
-                              style: GoogleFonts.poppins(fontSize: 12)),
-                          leading: Radio<DiscountType>(
-                              value: DiscountType.amount,
-                              groupValue: _selectedDiscountType,
-                              onChanged: (value) => setState(() {
-                                    _selectedDiscountType = value!;
-                                  })),
-                        ),
-                      ),
-                      Expanded(
-                        child: ListTile(
-                          title: Text('Percentage',
-                              style: GoogleFonts.poppins(fontSize: 12)),
-                          leading: Radio<DiscountType>(
-                              value: DiscountType.percentage,
-                              groupValue: _selectedDiscountType,
-                              onChanged: (value) => setState(() {
-                                    _selectedDiscountType = value!;
-                                  })),
-                        ),
-                      ),
-                    ],
+              // Header gradient section
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primarycolor, primarycolor.withOpacity(0.8)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
-
-                  if (_selectedDiscountType == DiscountType.percentage)
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                child: Column(
+                  children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildPercentageButton('05%', 5),
-                        SizedBox(width: 5),
-                        _buildPercentageButton('10%', 10),
-                        SizedBox(width: 5),
-                        _buildPercentageButton('15%', 15),
-                        SizedBox(width: 5),
-                        _buildPercentageButton('20%', 20),
-                        SizedBox(width: 5),
-                        _buildPercentageButton('25%', 25),
-                        SizedBox(width: 5),
+                        _buildOrderTypeChip(),
+                        if (widget.tableid != null && widget.tableid!.isNotEmpty) ...[
+                          const SizedBox(width: 12),
+                          _buildTableChip(),
+                        ],
                       ],
                     ),
+                  ],
+                ),
+              ),
 
-                  SizedBox(height: 10),
-                  Column(
-                    children: [
-                      Row(
+              // Main content
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Customer Information Section
+                    _buildSectionCard(
+                      title: 'Customer Information',
+                      icon: Icons.person_outline,
+                      iconColor: Colors.blue,
+                      child: Column(
+                        children: [
+                          _buildEnhancedTextField(
+                            controller: _nameController,
+                            label: 'Full Name',
+                            icon: Icons.person,
+                            focusNode: namenode,
+                            onFieldSubmitted: (v) {
+                              FocusScope.of(context).requestFocus(emailnode);
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          _buildEnhancedTextField(
+                            controller: _emailController,
+                            label: 'Email Address (Optional)',
+                            icon: Icons.email_outlined,
+                            focusNode: emailnode,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildEnhancedTextField(
+                            controller: _mobileController,
+                            label: 'Mobile Number',
+                            icon: Icons.phone_outlined,
+                            focusNode: mobilenode,
+                            keyboardType: TextInputType.phone,
+                            prefix: CountryCodePicker(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              initialSelection: 'IN',
+                              favorite: const ['+91', 'IN'],
+                              showCountryOnly: false,
+                              showFlag: false,
+                              textStyle: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: primarycolor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            onFieldSubmitted: (v) {
+                              FocusScope.of(context).requestFocus(namenode);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Delivery Address Section
+                    if (widget.orderType == 'Delivery')
+                      _buildSectionCard(
+                        title: 'Delivery Address',
+                        icon: Icons.location_on_outlined,
+                        iconColor: Colors.green,
+                        child: Column(
+                          children: [
+                            _buildEnhancedTextField(
+                              controller: _houseController,
+                              label: 'House/Building No.',
+                              icon: Icons.home_outlined,
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildEnhancedTextField(
+                                    controller: _stateController,
+                                    label: 'State',
+                                    icon: Icons.map_outlined,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildEnhancedTextField(
+                                    controller: _cityController,
+                                    label: 'City',
+                                    icon: Icons.location_city_outlined,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            _buildEnhancedTextField(
+                              controller: _areaController,
+                              label: 'Area/Locality',
+                              icon: Icons.place_outlined,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildEnhancedTextField(
+                              controller: _postCodeController,
+                              label: 'Postal Code',
+                              icon: Icons.pin_drop_outlined,
+                              keyboardType: TextInputType.number,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Service/Delivery Charge Section
+                    _buildSectionCard(
+                      title: widget.orderType == 'Delivery'
+                          ? 'Delivery Charge'
+                          : 'Service Charge',
+                      icon: widget.orderType == 'Delivery'
+                          ? Icons.delivery_dining
+                          : Icons.room_service,
+                      iconColor: Colors.orange,
+                      child: Row(
                         children: [
                           Expanded(
-                              flex: 2,
-                              child: CommonTextForm(
-                                  controller:
-                                      _selectedDiscountType == DiscountType.amount
-                                          ? _amountController
-                                          : _amountpercentageContorller,
-                                  borderc: 10,
-                                  BorderColor: Colors.grey,
-                                  labelText:
-                                      _selectedDiscountType == DiscountType.amount
-                                          ? 'Enter Amount'
-                                          : "Enter Percentage",
-                                  LabelColor: Colors.grey,
-                                  obsecureText: false)),
-                          SizedBox(width: 5),
+                            flex: 3,
+                            child: _buildEnhancedTextField(
+                              controller: _serviceChargeController,
+                              label: widget.orderType == 'Delivery'
+                                  ? 'Charge Amount'
+                                  : 'Percentage (%)',
+                              icon: Icons.attach_money,
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           Expanded(
-                            child: CommonButton(
-                              bordercircular: 5,
-                              height: height * 0.05,
-                              bgcolor: discountApply
-                                  ? Colors.red.shade300
-                                  : primarycolor,
-                              bordercolor: discountApply
-                                  ? Colors.red.shade300
-                                  : primarycolor,
+                            child: _buildToggleButton(
+                              isActive: servicechargeapply,
                               onTap: () {
                                 setState(() {
-                                  if (discountApply) {
-                                    // Cancel
-                                    discountApply = false;
-                                    _amountController.clear();
-                                    _amountpercentageContorller.clear();
-                                    DiscountPercentage = 0;
+                                  if (servicechargeapply) {
+                                    servicechargeapply = false;
+                                    _serviceChargeController.clear();
                                   } else {
-                                    // Apply
-                                    discountApply = true;
+                                    servicechargeapply = true;
                                   }
                                 });
                               },
-                              child: Text(
-                                discountApply ? 'Cancel' : 'Apply',
-                                style: TextStyle(
-                                  color: discountApply
-                                      ? Colors.black
-                                      : Colors.white,
-                                ),
-                              ),
                             ),
                           ),
                         ],
                       ),
+                    ),
 
-                      SizedBox(height: 5),
+                    const SizedBox(height: 16),
 
-                      if (discountApply && calculations.discountAmount > 0)
-                        Container(
-                          width: width,
-                          height: height * 0.07,
-                          padding: EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey)),
-                          child: DropdownButtonHideUnderline(
-                              child: DropdownButton(
-                                  value: SelectedRemark,
-                                  items: remarkList.map((String dropdownValue) {
-                                    return DropdownMenuItem(
-                                      child: Text(dropdownValue),
-                                      value: dropdownValue,
-                                    );
-                                  }).toList(),
-                                  onChanged: (String? newValue) {
-                                    setState(() {
-                                      SelectedRemark = newValue!;
-                                    });
-                                  })),
-                        ),
-                      SizedBox(height: 5),
+                    // Discount Section
+                    _buildDiscountSection(calculations),
 
-                      if (calculations.discountAmount != null &&
-                          calculations.discountAmount! > 0 &&
-                          SelectedRemark == 'other')
-                        CommonTextForm(
-                          controller: _remarkController,
-                          borderc: 5,
-                          obsecureText: false,
-                          labelText: 'Remark',
-                        ),
-                      SizedBox(height: 5),
+                    const SizedBox(height: 16),
 
-                      // Bill Summary
-                      _buildBillSummary(calculations)
-                    ],
-                  )
-                ],
+                    // Payment Method Section
+                    _buildPaymentMethodSection(),
+
+                    const SizedBox(height: 24),
+
+                    // Proceed Button
+                    _buildProceedButton(height, calculations),
+
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
-              ExpansionTile(
-                title: Text('Payment Method'),
-                children: [
-                  // ✅ Dynamic payment methods - only shows enabled methods from setup wizard
-                  Observer(
-                    builder: (_) {
-                      final paymentStore = locator<PaymentMethodStore>();
-
-                      // Get only enabled payment methods
-                      final enabledMethods = paymentStore.paymentMethods
-                          .where((method) => method.isEnabled)
-                          .toList();
-
-                      // If no payment methods enabled, show fallback
-                      if (enabledMethods.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            'No payment methods enabled. Please enable payment methods in Settings.',
-                            style: TextStyle(
-                                color: Colors.grey[600], fontSize: 14),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.spaceAround,
-                        children: enabledMethods.map((method) {
-                          return Filterbutton(
-                            title: method.name,
-                            selectedFilter: SelectedFilter,
-                            onpressed: () {
-                              setState(() {
-                                SelectedFilter = method.name!;
-                              });
-                            },
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-              SizedBox(height: 15),
-              CommonButton(
-                child: Text('Procced ',
-                    style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-                height: height * 0.06,
-                onTap: () => _submitOrder(calculations),
-              )
             ],
           ),
         ),
@@ -542,103 +387,776 @@ class _CustomerdetailsState extends State<Customerdetails> {
     );
   }
 
-  Widget _buildPercentageButton(String text, double percentage) {
-    return InkWell(
+  Widget _buildOrderTypeChip() {
+    IconData icon;
+    Color color;
+
+    switch (widget.orderType) {
+      case 'Delivery':
+        icon = Icons.delivery_dining;
+        color = Colors.orange;
+        break;
+      case 'Take Away':
+        icon = Icons.shopping_bag_outlined;
+        color = Colors.green;
+        break;
+      case 'Dine In':
+        icon = Icons.restaurant;
+        color = Colors.blue;
+        break;
+      default:
+        icon = Icons.receipt;
+        color = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            widget.orderType ?? 'Order',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableChip() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.table_restaurant, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Table ${widget.tableid}',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required Widget child,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: primarycolor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    FocusNode? focusNode,
+    TextInputType? keyboardType,
+    Widget? prefix,
+    Function(String)? onFieldSubmitted,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        keyboardType: keyboardType,
+        onSubmitted: onFieldSubmitted,
+        style: GoogleFonts.poppins(fontSize: 14),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: GoogleFonts.poppins(
+            color: Colors.grey[600],
+            fontSize: 14,
+          ),
+          prefixIcon: prefix ?? Icon(icon, color: primarycolor, size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          floatingLabelBehavior: FloatingLabelBehavior.auto,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleButton({
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: isActive
+                ? LinearGradient(
+              colors: [Colors.red.shade400, Colors.red.shade300],
+            )
+                : LinearGradient(
+              colors: [primarycolor, primarycolor.withOpacity(0.8)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: (isActive ? Colors.red : primarycolor).withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              isActive ? 'Cancel' : 'Apply',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiscountSection(CartCalculationService calculations) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.purple.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.local_offer, color: Colors.purple, size: 22),
+          ),
+          title: Text(
+            'Discount',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: primarycolor,
+            ),
+          ),
+          children: [
+            // Discount Type Selection
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildDiscountTypeOption(
+                      'Amount',
+                      DiscountType.amount,
+                      Icons.attach_money,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildDiscountTypeOption(
+                      'Percentage',
+                      DiscountType.percentage,
+                      Icons.percent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Percentage Quick Buttons
+            if (_selectedDiscountType == DiscountType.percentage)
+              Column(
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [5, 10, 15, 20, 25].map((percent) {
+                      return _buildPercentageChip(percent);
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+
+            // Discount Input
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _buildEnhancedTextField(
+                    controller: _selectedDiscountType == DiscountType.amount
+                        ? _amountController
+                        : _amountpercentageContorller,
+                    label: _selectedDiscountType == DiscountType.amount
+                        ? 'Enter Amount'
+                        : 'Enter Percentage',
+                    icon: _selectedDiscountType == DiscountType.amount
+                        ? Icons.money_off
+                        : Icons.percent,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildToggleButton(
+                    isActive: discountApply,
+                    onTap: () {
+                      setState(() {
+                        if (discountApply) {
+                          discountApply = false;
+                          _amountController.clear();
+                          _amountpercentageContorller.clear();
+                          DiscountPercentage = 0;
+                        } else {
+                          discountApply = true;
+                        }
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            // Remark Dropdown
+            if (discountApply && calculations.discountAmount > 0) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: SelectedRemark,
+                    isExpanded: true,
+                    icon: Icon(Icons.keyboard_arrow_down, color: primarycolor),
+                    style: GoogleFonts.poppins(color: Colors.black87, fontSize: 14),
+                    items: remarkList.map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        SelectedRemark = newValue!;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ],
+
+            // Custom Remark
+            if (calculations.discountAmount > 0 && SelectedRemark == 'other') ...[
+              const SizedBox(height: 16),
+              _buildEnhancedTextField(
+                controller: _remarkController,
+                label: 'Custom Remark',
+                icon: Icons.edit_note,
+              ),
+            ],
+
+            // Bill Summary
+            if (discountApply || calculations.discountAmount > 0) ...[
+              const SizedBox(height: 20),
+              _buildBillSummary(calculations),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiscountTypeOption(String label, DiscountType type, IconData icon) {
+    final isSelected = _selectedDiscountType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedDiscountType = type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? primarycolor : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? primarycolor : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: primarycolor.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ]
+              : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey[600],
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? Colors.white : Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPercentageChip(int percent) {
+    return GestureDetector(
       onTap: () {
         setState(() {
-          _amountpercentageContorller.text = percentage.toString();
+          _amountpercentageContorller.text = percent.toString();
           discountApply = false;
-          // DiscountPercentage = percentage;
         });
       },
       child: Container(
-        child: Text(text, style: GoogleFonts.poppins(fontSize: 16)),
-        padding: EdgeInsets.all(5),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-            border: Border.all(width: 1, color: Colors.grey),
-            shape: BoxShape.rectangle),
+          gradient: LinearGradient(
+            colors: [primarycolor.withOpacity(0.8), primarycolor],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: primarycolor.withOpacity(0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          '$percent%',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
 
-// ✅ Mode-aware labels matching PetPooja/Billberry standard
+  Widget _buildPaymentMethodSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.payment, color: Colors.green, size: 22),
+          ),
+          title: Text(
+            'Payment Method',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: primarycolor,
+            ),
+          ),
+          children: [
+            Observer(
+              builder: (_) {
+                final paymentStore = locator<PaymentMethodStore>();
+                final enabledMethods = paymentStore.paymentMethods
+                    .where((method) => method.isEnabled)
+                    .toList();
+
+                if (enabledMethods.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.orange.shade700),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'No payment methods enabled. Please enable payment methods in Settings.',
+                            style: GoogleFonts.poppins(
+                              color: Colors.orange.shade900,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: enabledMethods.map((method) {
+                    final isSelected = SelectedFilter == method.name;
+                    IconData methodIcon;
+
+                    switch (method.name?.toLowerCase()) {
+                      case 'cash':
+                        methodIcon = Icons.money;
+                        break;
+                      case 'card':
+                        methodIcon = Icons.credit_card;
+                        break;
+                      case 'upi':
+                        methodIcon = Icons.qr_code_scanner;
+                        break;
+                      case 'online':
+                        methodIcon = Icons.phone_android;
+                        break;
+                      default:
+                        methodIcon = Icons.payment;
+                    }
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          SelectedFilter = method.name!;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: isSelected ? primarycolor : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? primarycolor : Colors.grey[300]!,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                            BoxShadow(
+                              color: primarycolor.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                              : [],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              methodIcon,
+                              size: 20,
+                              color: isSelected ? Colors.white : primarycolor,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              method.name!,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                color: isSelected ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBillSummary(CartCalculationService calcs) {
     final isInclusive = AppSettings.isTaxInclusive;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            primarycolor.withOpacity(0.05),
+            primarycolor.withOpacity(0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primarycolor.withOpacity(0.2)),
+      ),
       child: Column(
         children: [
-          // Item Total (with mode-aware label)
-          _buildSummaryRow(
-            isInclusive ? 'Item Total (Incl GST):' : 'Item Total:',
-            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.itemTotal)}'
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primarycolor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.receipt_long, color: primarycolor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Bill Summary',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: primarycolor,
+                ),
+              ),
+            ],
           ),
-
-          // Discount
-          if (calcs.discountAmount > 0.009)
-            _buildSummaryRow(
-              'Discount:',
-              '-${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.discountAmount)}'
-            ),
-
-          // Divider after discount
+          const SizedBox(height: 16),
+          _buildSummaryRow(
+            isInclusive ? 'Item Total (Incl GST)' : 'Item Total',
+            calcs.itemTotal,
+          ),
+          if (calcs.discountAmount > 0.009) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow('Discount', -calcs.discountAmount, isDiscount: true),
+          ],
           if (calcs.discountAmount > 0.009 || calcs.totalGST > 0.009)
-            Divider(thickness: 1, height: 16),
-
-          // Taxable Amount / Sub Total (mode-aware label)
-          _buildSummaryRow(
-            isInclusive ? 'Taxable Amount:' : 'Sub Total (Before Tax):',
-            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.subtotal)}'
-          ),
-
-          // GST (mode-aware label)
-          if (calcs.totalGST > 0.009)
-            _buildSummaryRow(
-              isInclusive ? 'GST (Included):' : 'GST:',
-              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}'
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Divider(color: primarycolor.withOpacity(0.2), height: 1),
             ),
-
-          // Service/Delivery Charge
-          if (calcs.serviceChargeAmount > 0.009)
-            _buildSummaryRow(
-                widget.orderType == 'Delivery'
-                    ? 'Delivery Charge:'
-                    : 'Service Charge:',
-                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.serviceChargeAmount)}'),
-
-          // Round Off
-          if (AppSettings.roundOff && calcs.roundOffAmount.abs() > 0.009)
-            _buildSummaryRow(
-                'Round Off:',
-                '${calcs.roundOffAmount >= 0 ? '+' : ''}${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.roundOffAmount)}'),
-
-          // Final divider before grand total
-          Divider(thickness: 2, height: 20),
-
-          // Grand Total
           _buildSummaryRow(
-              'Grand Total:',
-              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal)}',
-              isBold: true),
+            isInclusive ? 'Taxable Amount' : 'Sub Total (Before Tax)',
+            calcs.subtotal,
+          ),
+          if (calcs.totalGST > 0.009) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow(
+              isInclusive ? 'GST (Included)' : 'GST',
+              calcs.totalGST,
+              isTax: true,
+            ),
+          ],
+          if (calcs.serviceChargeAmount > 0.009) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow(
+              widget.orderType == 'Delivery' ? 'Delivery Charge' : 'Service Charge',
+              calcs.serviceChargeAmount,
+            ),
+          ],
+          if (AppSettings.roundOff && calcs.roundOffAmount.abs() > 0.009) ...[
+            const SizedBox(height: 8),
+            _buildSummaryRow('Round Off', calcs.roundOffAmount, isRoundOff: true),
+          ],
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(color: primarycolor.withOpacity(0.3), thickness: 2, height: 1),
+          ),
+          _buildSummaryRow('Grand Total', calcs.grandTotal, isGrandTotal: true),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-          Text(value,
-              style: TextStyle(
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+  Widget _buildSummaryRow(
+      String label,
+      double value, {
+        bool isDiscount = false,
+        bool isTax = false,
+        bool isRoundOff = false,
+        bool isGrandTotal = false,
+      }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: isGrandTotal ? 16 : 13,
+            fontWeight: isGrandTotal ? FontWeight.w700 : FontWeight.w500,
+            color: isGrandTotal ? primarycolor : Colors.black87,
+          ),
+        ),
+        Text(
+          '${isDiscount ? '-' : isRoundOff && value >= 0 ? '+' : ''}${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(value.abs())}',
+          style: GoogleFonts.poppins(
+            fontSize: isGrandTotal ? 18 : 14,
+            fontWeight: isGrandTotal ? FontWeight.w700 : FontWeight.w600,
+            color: isGrandTotal
+                ? primarycolor
+                : isDiscount
+                ? Colors.red.shade600
+                : isTax
+                ? Colors.orange.shade700
+                : Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProceedButton(double height, CartCalculationService calculations) {
+    return Container(
+      width: double.infinity,
+      height: 60,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primarycolor, primarycolor.withOpacity(0.8)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: primarycolor.withOpacity(0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
         ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _submitOrder(calculations),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.check_circle_outline, color: Colors.white, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Proceed to ${widget.isSettle == true ? 'Settle' : 'Confirm'}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -650,28 +1168,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
     return v ?? fallback;
   }
 
-  void _clear() {
-    setState(() {
-      if (discountApply) {
-        discountApply = false;
-        _amountpercentageContorller.clear();
-        _amountController.clear();
-        DiscountPercentage = 0;
-      } else {
-        discountApply = true;
-      }
-      // calculations.discountAmount = 0;
-    });
-  }
+  // [All remaining methods remain exactly the same - proceed, completeOrder, _placeOrder, etc.]
 
   Future<void> proceed(CartCalculationService calculations) async {
     print('============THis is PRocced Function=============');
     if (widget.existingModel == null || widget.tableid == null) {
-      // _showSnackBar('Error: No active order or table found.', isError: true);
       NotificationService.instance.showError(
         'Error: No active order or table found.to cart',
       );
-
       return;
     }
     final OrderModel completedOrder = widget.existingModel!.copyWith(
@@ -679,7 +1183,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
       customerNumber: _mobileController.text.trim(),
       customerEmail: _emailController.text.trim(),
       discount: calculations.discountAmount,
-      // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
       serviceCharge: calculations.serviceChargeAmount,
       totalPrice: calculations.grandTotal,
       paymentMethod: SelectedFilter,
@@ -692,16 +1195,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
     try {
       final int billNumber = await completeOrder(completedOrder, calculations);
       await HiveTables.updateTableStatus(widget.tableid!, 'Available');
-      // _showSnackBar('Order Completed Successfully!');
-
       NotificationService.instance.showSuccess(
         'Order Completed Successfully!',
       );
-
-      // Show success dialog with print option
       await _showOrderSuccessDialog(completedOrder, calculations, billNumber: billNumber);
     } catch (e) {
-      // _showSnackBar('Failed to proceed with the order: $e', isError: true);
       NotificationService.instance.showError(
         'Failed to proceed with the order: $e',
       );
@@ -711,11 +1209,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
   Future<int> completeOrder(
       OrderModel activeModel, CartCalculationService calculations) async {
     print('============this is complete order function=============');
-
-    // Note: calculations.subtotal is already the base price (without tax)
-    // CartCalculationService handles tax extraction for tax-inclusive mode
-
-    // Generate daily bill number for completed order
     final int billNumber = await HiveOrders.getNextBillNumber();
     print('✅ Bill number generated: $billNumber');
 
@@ -728,40 +1221,32 @@ class _CustomerdetailsState extends State<Customerdetails> {
       orderType: activeModel.orderType,
       paymentmode: SelectedFilter,
       remark:
-          SelectedRemark == 'other' ? _remarkController.text : SelectedRemark,
+      SelectedRemark == 'other' ? _remarkController.text : SelectedRemark,
       Discount: calculations.discountAmount,
       subTotal: calculations.subtotal,
       gstRate: 0,
       gstAmount: calculations.totalGST,
-      kotNumbers: activeModel.kotNumbers, // Always present in new orders
-      kotBoundaries:
-          activeModel.kotBoundaries, // KOT boundaries for grouping items
-      billNumber: billNumber, // Daily bill number (resets every day)
+      kotNumbers: activeModel.kotNumbers,
+      kotBoundaries: activeModel.kotBoundaries,
+      billNumber: billNumber,
     );
     await HivePastOrder.addOrder(pastOrder);
     await HiveOrders.deleteOrder(activeModel.id);
-
-    return billNumber; // Return the generated bill number
+    return billNumber;
   }
 
   Future<void> _placeOrder(CartCalculationService calculations) async {
     print('============this is place order function=============');
     print(widget.orderType);
 
-    // Note: calculations.subtotal is already the base price (without tax)
-    // CartCalculationService handles tax extraction for tax-inclusive mode
-
     final int newKotNumber = await HiveOrders.getNextKotNumber();
     final String newId = Uuid().v4();
     final List<CartItem> orderItems = widget.cartitems ?? [];
 
-    // Check if this is a "Settle & Print" operation (immediate completion)
     if (widget.isSettle == true) {
-      // Generate bill number for immediate settlement
       final int billNumber = await HiveOrders.getNextBillNumber();
       print('✅ Bill number generated for settle & print: $billNumber');
 
-      // Create completed order directly (skip active orders)
       print('🔍 DEBUG: Creating pastOrder with payment method: $SelectedFilter');
       final pastOrder = pastOrderModel(
         id: newId,
@@ -778,7 +1263,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         gstAmount: calculations.totalGST,
         kotNumbers: [newKotNumber],
         kotBoundaries: [orderItems.length],
-        billNumber: billNumber, // Daily bill number
+        billNumber: billNumber,
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
@@ -789,8 +1274,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
         NotificationService.instance.showSuccess(
           'Order Settled Successfully',
         );
-
-        // Show success dialog with bill number for printing
         await _showOrderSuccessDialogWithBillNumber(pastOrder, calculations, billNumber);
       } catch (e) {
         NotificationService.instance.showError(
@@ -800,10 +1283,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
       return;
     }
 
-    // Regular order placement (for kitchen - active order)
     final newOrder = OrderModel(
       id: newId,
-      // kotNumber removed - using kotNumbers only
       customerName: _nameController.text.trim(),
       customerNumber: _mobileController.text.trim(),
       customerEmail: _emailController.text.trim(),
@@ -816,19 +1297,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
       discount: calculations.discountAmount,
       serviceCharge: calculations.serviceChargeAmount,
       gstRate: 0,
-      gstAmount: calculations.totalGST
-      ,
+      gstAmount: calculations.totalGST,
       totalPrice: calculations.grandTotal,
       paymentMethod: SelectedFilter,
       completedAt: null,
       paymentStatus: "Unpaid",
       isPaid: false,
       remark:
-          calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
-      // Initialize KOT tracking fields - single source of truth
+      calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
       kotNumbers: [newKotNumber],
       itemCountAtLastKot: orderItems.length,
-      kotBoundaries: [orderItems.length], // First KOT boundary at item count
+      kotBoundaries: [orderItems.length],
     );
     try {
       await HiveOrders.addOrder(newOrder);
@@ -840,24 +1319,19 @@ class _CustomerdetailsState extends State<Customerdetails> {
           orderTime: newOrder.timeStamp,
         );
       }
-      // _showSnackBar('New order placed successfully!');
       NotificationService.instance.showSuccess(
         'New Order Placed Successfully',
       );
 
       await HiveCart.clearCart();
-
-      // Show success dialog with print option
       await _showOrderSuccessDialog(newOrder, calculations);
     } catch (e) {
-      // _showSnackBar('Failed to create new order: $e', isError: true);
       NotificationService.instance.showError(
         'Failed to create new order: $e',
       );
     }
   }
 
-  // Success dialog with print option
   Future<void> _showOrderSuccessDialog(
       OrderModel order, CartCalculationService calculations, {int? billNumber}) async {
     if (!mounted) return;
@@ -866,28 +1340,41 @@ class _CustomerdetailsState extends State<Customerdetails> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Column(
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle, color: Colors.green.shade600, size: 50),
+            ),
+            const SizedBox(height: 16),
             Text(
               'Order Successful',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20),
             ),
           ],
         ),
         content: Text(
           'Order has been placed successfully.\nDo you want to print the receipt?',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(),
+          style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
         ),
         actions: [
           OutlinedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              _navigateToHome(); // Go to home
+              Navigator.pop(context);
+              _navigateToHome();
             },
-            child: const Text('Close'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              side: BorderSide(color: Colors.grey.shade400),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Close', style: GoogleFonts.poppins()),
           ),
           ElevatedButton.icon(
             onPressed: () async {
@@ -895,16 +1382,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 context: context,
                 order: order,
                 calculations: calculations,
-                billNumber: billNumber, // Pass the bill number if available
+                billNumber: billNumber,
               );
-              // We don't close the dialog automatically after print,
-              // allowing user to print again or close manually
             },
             icon: const Icon(Icons.print, size: 18),
-            label: const Text('Print Receipt'),
+            label: Text('Print Receipt', style: GoogleFonts.poppins()),
             style: ElevatedButton.styleFrom(
               backgroundColor: primarycolor,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
@@ -912,12 +1399,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
     );
   }
 
-  // Success dialog for settled orders (with bill number)
   Future<void> _showOrderSuccessDialogWithBillNumber(
       pastOrderModel pastOrder, CartCalculationService calculations, int billNumber) async {
     if (!mounted) return;
 
-    // Convert pastOrderModel to OrderModel for printing
     print('🔍 DEBUG: Converting pastOrder to OrderModel');
     print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
     final orderForPrint = OrderModel(
@@ -950,28 +1435,41 @@ class _CustomerdetailsState extends State<Customerdetails> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Column(
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle, color: Colors.green.shade600, size: 50),
+            ),
+            const SizedBox(height: 16),
             Text(
               'Order Settled',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20),
             ),
           ],
         ),
         content: Text(
           'Bill #${billNumber.toString().padLeft(3, '0')} generated successfully.\nDo you want to print the bill?',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(),
+          style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
         ),
         actions: [
           OutlinedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              _navigateToHome(); // Go to home
+              Navigator.pop(context);
+              _navigateToHome();
             },
-            child: const Text('Close'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              side: BorderSide(color: Colors.grey.shade400),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Close', style: GoogleFonts.poppins()),
           ),
           ElevatedButton.icon(
             onPressed: () async {
@@ -979,16 +1477,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 context: context,
                 order: orderForPrint,
                 calculations: calculations,
-                billNumber: billNumber, // Pass the bill number
+                billNumber: billNumber,
               );
-              // We don't close the dialog automatically after print,
-              // allowing user to print again or close manually
             },
             icon: const Icon(Icons.print, size: 18),
-            label: const Text('Print Bill'),
+            label: Text('Print Bill', style: GoogleFonts.poppins()),
             style: ElevatedButton.styleFrom(
               backgroundColor: primarycolor,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
@@ -1000,8 +1498,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const Startorder()),
-      (Route<dynamic> route) => false,
+      MaterialPageRoute(builder: (context) => const POSMainScreen()),
+          (Route<dynamic> route) => false,
     );
   }
 

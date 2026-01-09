@@ -135,7 +135,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                           onTap: () {
 
 
-                            Navigator.push(context,MaterialPageRoute(builder: (context)=> Startorder()));
+                            Navigator.push(context,MaterialPageRoute(builder: (context)=> POSMainScreen()));
                             //
                             // ResponsiveHelper.isDesktop(context)?
                             // Navigator.push(

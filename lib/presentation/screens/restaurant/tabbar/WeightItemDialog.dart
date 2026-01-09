@@ -1,5 +1,7 @@
 // lib/screens/tabbar/weight_item_dialog.dart
 
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';   // Make sure this path is correct
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
@@ -182,7 +184,7 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
                   productId: widget.item.id,
                   id: widget.item.id, // Use item ID for proper stock deduction
                   title: widget.item.name,
-                  imagePath: '', // CartItem uses path as identifier, not actual image data
+                  imagePath: Uint8List(0), // CartItem uses path as identifier, not actual image data
                   price: _displayAmount, // The price for the specified weight
 
                   // Weight items are always 1 line item, actual weight is stored in weightDisplay

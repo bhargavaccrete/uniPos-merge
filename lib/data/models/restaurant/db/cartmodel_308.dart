@@ -12,7 +12,7 @@ class CartItem extends HiveObject {
   final String title;
 
   @HiveField(2)
-  final String imagePath;
+  final Uint8List? imagePath;
 
   @HiveField(3)
   final double price;
@@ -61,7 +61,7 @@ class CartItem extends HiveObject {
   CartItem({
     required this.id,
     required this.title,
-    required this.imagePath,
+    this.imagePath,
     required this.price,
     required this.productId,
     this.isStockManaged,
@@ -120,7 +120,7 @@ class CartItem extends HiveObject {
     String? id,
     String? title,
     String? productId,
-    String? imagePath,
+    Uint8List? imagePath,
     double? price,
 
     bool? isStockManaged,

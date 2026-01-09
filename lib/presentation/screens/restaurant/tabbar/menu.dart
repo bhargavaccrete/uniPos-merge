@@ -1,27 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/adapters.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../util/color.dart';
 import '../../../../util/restaurant/staticswitch.dart';
-import '../../../../util/restaurant/currency_helper.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
-import '../../../widget/componets/restaurant/componets/Button.dart';
-import '../../../widget/componets/restaurant/componets/visual_keyboard.dart';
-import '../Desktop/online_Order_desktop/online.dart';
 import 'WeightItemDialog.dart';
 import 'item_options_dialog.dart';
 
@@ -30,30 +24,39 @@ class MenuScreen extends StatefulWidget {
   final OrderModel? existingOrder;
   final bool isForAddingItem;
 
-  const MenuScreen({super.key, this.existingOrder, this.isForAddingItem = false, this.tableIdForNewOrder});
+  const MenuScreen({
+    super.key,
+    this.existingOrder,
+    this.isForAddingItem = false,
+    this.tableIdForNewOrder,
+  });
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
-
+class _MenuScreenState extends State<MenuScreen> with TickerProviderStateMixin {
+  // State variables
   bool isCartShow = false;
   double totalPrice = 0.0;
+  int totalItems = 0;
   List<CartItem> cartItemsList = [];
-  List<Items> itemsList = [];
-  String? activeCategory;
+  Set<String> expandedCategories = {};
   String query = '';
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _codeController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
-  // final FocusNode _searchFocusNode = FocusNode();
-  final FocusNode _codehereFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
 
+  // Animation controllers
+  late AnimationController _fabAnimationController;
+  late AnimationController _cartSlideController;
+  late Animation<double> _fabScaleAnimation;
+  late Animation<Offset> _cartSlideAnimation;
+
+  // Category scroll keys for navigation
+  final Map<String, GlobalKey> _categoryKeys = {};
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     loadCartItems();
 
@@ -61,45 +64,44 @@ class _MenuScreenState extends State<MenuScreen> {
       _storeSelectedTable(widget.tableIdForNewOrder!);
     }
 
-    _searchController.addListener((){
+    _searchController.addListener(() {
       setState(() {
         query = _searchController.text;
       });
     });
 
-    // Listen for search field focus - show visual keyboard if enabled
-    _searchFocusNode.addListener(() {
-      if (_searchFocusNode.hasFocus && AppSettings.visualKeyboard) {
-        // Hide system keyboard
-        FocusScope.of(context).requestFocus(FocusNode());
-        // Show visual keyboard
-        VisualKeyboardHelper.show(
-          context: context,
-          controller: _searchController,
-          keyboardType: KeyboardType.text,
-        );
-      }
-    });
+    // Initialize animations
+    _fabAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
 
+    _cartSlideController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
 
-    _codehereFocusNode.addListener(() {
-      if (_codehereFocusNode.hasFocus && AppSettings.visualKeyboard) {
-        // Hide system keyboard
-        FocusScope.of(context).requestFocus(FocusNode());
-        // Show visual keyboard
-        VisualKeyboardHelper.show(
-          context: context,
-          controller: _codeController,
-          keyboardType: KeyboardType.text,
-        );
-      }
-    });
+    _fabScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fabAnimationController, curve: Curves.elasticOut),
+    );
+
+    _cartSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _cartSlideController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _fabAnimationController.forward();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
-    _searchFocusNode.dispose();
+    _scrollController.dispose();
+    _fabAnimationController.dispose();
+    _cartSlideController.dispose();
     super.dispose();
   }
 
@@ -108,90 +110,99 @@ class _MenuScreenState extends State<MenuScreen> {
     await appBox.put('selected_table_for_new_order', tableId);
   }
 
-
-// REPLACE your old _handleItemTap function with this new one
-// In MenuScreen.dart
-
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ITEM TAP HANDLER
+  // ═══════════════════════════════════════════════════════════════════════════
   Future<void> _handleItemTap(Items item) async {
-    // --- START: LOGIC FOR WEIGHT ITEMS ---
+    // Haptic feedback
+    HapticFeedback.lightImpact();
+
+    // Weight items
     if (item.isSoldByWeight) {
       final CartItem? weightCartItem = await showWeightItemDialog(context, item);
       if (weightCartItem != null) {
-
-
         await _addItemToCart(weightCartItem);
       }
       return;
     }
-    // --- END: LOGIC FOR WEIGHT ITEMS ---
 
     final bool hasVariants = item.variant != null && item.variant!.isNotEmpty;
-    final bool hasExtra = item.extraId != null && item.extraId!.isNotEmpty;
-    final bool hasChoice = item.choiceIds != null && item.choiceIds!.isNotEmpty;
-    // --- 1. Find the category name for the tapped item ---
+
+    // Find category name
     String? categoryName;
     try {
-      final categoryBox = Hive.box<Category>(HiveBoxNames.restaurantCategories);
+      final categoryBox = Hive.box<Category>('categories');
       final category = categoryBox.values.firstWhere((cat) => cat.id == item.categoryOfItem);
       categoryName = category.name;
     } catch (e) {
-      print("Could not find category for item: ${item.name}. Defaulting to 'Uncategorized'");
       categoryName = 'Uncategorized';
     }
 
-    if (hasVariants||hasExtra||hasChoice) {
-      // If variants exist, show the options dialog
+    if (hasVariants) {
       final result = await showModalBottomSheet<CartItem>(
         context: context,
         isScrollControlled: true,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        builder: (context) {
-          return DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.4,
-            minChildSize: 0.3,
-            maxChildSize: 0.5,
-            builder: (_, controller) {
-              return SingleChildScrollView(
-                controller: controller,
-                // --- 2. Pass the categoryName to the dialog ---
-                child: ItemOptionsDialog(item: item, categoryName: categoryName),
-              );
-            },
-          );
-        },
+        backgroundColor: Colors.transparent,
+        builder: (context) => _buildVariantBottomSheet(item, categoryName),
       );
 
-      // If the dialog returns a CartItem, add it
       if (result != null) {
         await _addItemToCart(result);
       }
     } else {
-      // If no variants, create a simple CartItem and add it directly
       final simpleCartItem = CartItem(
         productId: item.id,
         isStockManaged: item.trackInventory,
         id: const Uuid().v4(),
         title: item.name,
-        imagePath: '', // CartItem uses path as identifier, not actual image data
+        imagePath: Uint8List(0), // CartItem uses path as identifier, not actual image data
         price: item.price ?? 0,
         quantity: 1,
         taxRate: item.taxRate,
         weightDisplay: null,
-        // --- 3. Add the categoryName here for simple items ---
         categoryName: categoryName,
       );
-
-      // --- ADD THIS PRINT STATEMENT ---
-      print('--- ADD TO CART --- Product ID: "${simpleCartItem.productId}", Stock Managed: ${simpleCartItem.isStockManaged}');
-
       await _addItemToCart(simpleCartItem);
     }
   }
 
-  /// This is the single, final function to add a prepared CartItem to the database.
+  Widget _buildVariantBottomSheet(Items item, String? categoryName) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.45,
+        minChildSize: 0.3,
+        maxChildSize: 0.7,
+        builder: (_, controller) {
+          return Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: ItemOptionsDialog(item: item, categoryName: categoryName),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _addItemToCart(CartItem cartItem) async {
     try {
       final result = await HiveCart.addToCart(cartItem);
@@ -199,38 +210,19 @@ class _MenuScreenState extends State<MenuScreen> {
       if (result['success'] == true) {
         await loadCartItems();
 
-        setState(() {
-          isCartShow = true;
-        });
-
         if (mounted) {
-          // TopSnack.show(context,
-          //     content:  Text('${cartItem.title} added toO cart'),);
-
-
-          // Show success notification
           NotificationService.instance.showSuccess(
             '${cartItem.title} added to cart',
           );
-
-          // ScaffoldMessenger.of(context).showSnackBar(
-          //   SnackBar(
-          //     content: Text('${cartItem.title} added to cart'),
-          //     duration: const Duration(seconds: 2),
-          //   ),
-          // );
         }
       } else {
-        // Show stock limitation error
         if (mounted) {
-
           NotificationService.instance.showError(
             result['message'] ?? 'Cannot add item to cart',
           );
         }
       }
     } catch (e) {
-      print('Error adding to cart: $e');
       if (mounted) {
         NotificationService.instance.showError(
           'Error adding item to cart',
@@ -245,15 +237,23 @@ class _MenuScreenState extends State<MenuScreen> {
       setState(() {
         cartItemsList = items;
         totalPrice = items.fold(0.0, (sum, item) => sum + item.totalPrice);
+        totalItems = items.fold(0, (sum, item) => sum + item.quantity);
         isCartShow = items.isNotEmpty;
+
+        if (isCartShow) {
+          _cartSlideController.forward();
+        } else {
+          _cartSlideController.reverse();
+        }
       });
     } catch (e) {
       print('Error loading cart items: $e');
     }
   }
 
-
-
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STOCK DISPLAY HELPERS
+  // ═══════════════════════════════════════════════════════════════════════════
   String _formatStockDisplay(Items item) {
     if (!item.trackInventory) return '';
 
@@ -262,14 +262,9 @@ class _MenuScreenState extends State<MenuScreen> {
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
 
     if (stock <= 0) {
-      if (allowOrderWhenOutOfStock) {
-        return 'Order Available'; // Still orderable when out of stock
-      } else {
-        return 'Out of Stock'; // Not orderable when out of stock
-      }
+      return allowOrderWhenOutOfStock ? 'Order Available' : 'Out of Stock';
     }
 
-    // For weight-based items, show appropriate decimal places
     if (item.isSoldByWeight) {
       if (unit.toUpperCase().contains('GM') || unit.toUpperCase().contains('GRAM')) {
         return '${stock.toStringAsFixed(stock == stock.toInt() ? 0 : 1)}${unit}';
@@ -283,696 +278,1363 @@ class _MenuScreenState extends State<MenuScreen> {
       }
       return '${stock.toStringAsFixed(2)}${unit}';
     } else {
-      // For unit-based items, always show whole numbers
       return '${stock.toStringAsFixed(0)} ${unit}';
     }
   }
 
-  Color _getStockColor(Items item, bool isBackground) {
-    if (!item.trackInventory) return Colors.grey;
+  StockStatus _getStockStatus(Items item) {
+    if (!item.trackInventory) return StockStatus.notTracked;
 
     final stock = item.stockQuantity;
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
 
     if (stock <= 0) {
-      if (allowOrderWhenOutOfStock) {
-        // Orange for out of stock but orderable
-        return isBackground ? Colors.orange[50]! : Colors.orange[700]!;
-      } else {
-        // Red for out of stock and not orderable
-        return isBackground ? Colors.red[50]! : Colors.red[700]!;
-      }
+      return allowOrderWhenOutOfStock ? StockStatus.orderAvailable : StockStatus.outOfStock;
+    }
+    return StockStatus.inStock;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CATEGORY NAVIGATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  void _scrollToCategory(String categoryId) {
+    final key = _categoryKeys[categoryId];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+    Navigator.pop(context); // Close the navigation menu
+  }
+
+  void _showCategoryNavigator(List<Category> categories) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _CategoryNavigator(
+        categories: categories,
+        onCategoryTap: _scrollToCategory,
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BUILD METHOD
+  // ═══════════════════════════════════════════════════════════════════════════
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
+    return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Main content
+            Column(
+              children: [
+                // Header with search
+                _buildHeader(size),
+
+                // Menu content
+                Expanded(
+                  child: isTablet
+                      ? _buildTabletLayout(size)
+                      : _buildMobileLayout(size),
+                ),
+              ],
+            ),
+
+            // Floating cart bar
+            if (isCartShow)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: SlideTransition(
+                  position: _cartSlideAnimation,
+                  child: _buildCartBar(size),
+                ),
+              ),
+
+            // Floating action button for category navigation (mobile only)
+            if (!isTablet)
+              Positioned(
+                bottom: isCartShow ? 100 : 24,
+                right: 20,
+                child: ScaleTransition(
+                  scale: _fabScaleAnimation,
+                  child: _buildCategoryFAB(),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HEADER
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildHeader(Size size) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.restaurant_menu_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Menu',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        widget.tableIdForNewOrder != null
+                            ? 'Table ${widget.tableIdForNewOrder}'
+                            : 'Quick Order',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              // Cart indicator
+              if (isCartShow)
+                GestureDetector(
+                  onTap: () => _navigateToCart(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.shopping_bag_rounded,
+                          color: AppColors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$totalItems',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Search bar
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMedium,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                color: AppColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search items...',
+                hintStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  color: AppColors.textSecondary,
+                ),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                suffixIcon: query.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                  onPressed: () {
+                    _searchController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
+                )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MOBILE LAYOUT - Collapsible Categories
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildMobileLayout(Size size) {
+    return ValueListenableBuilder(
+      valueListenable: Hive.box<Category>('categories').listenable(),
+      builder: (context, categoryBox, _) {
+        final categories = categoryBox.values.toList();
+
+        if (categories.isEmpty) {
+          return _buildEmptyState('No categories found');
+        }
+
+        return ValueListenableBuilder(
+          valueListenable: Hive.box<Items>('itemBoxs').listenable(),
+          builder: (context, itemBox, _) {
+            final allItems = itemBox.values.where((item) => item.isEnabled).toList();
+
+            // Filter items based on search
+            final filteredItems = query.isEmpty
+                ? allItems
+                : allItems.where((item) {
+              return item.name.toLowerCase().contains(query.toLowerCase());
+            }).toList();
+
+            return ListView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.only(
+                top: 12,
+                bottom: isCartShow ? 120 : 80,
+                left: 16,
+                right: 16,
+              ),
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                final category = categories[index];
+                final categoryItems = filteredItems
+                    .where((item) => item.categoryOfItem == category.id)
+                    .toList();
+
+                if (categoryItems.isEmpty && query.isNotEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                // Register category key for navigation
+                _categoryKeys[category.id] = GlobalKey();
+
+                return _CollapsibleCategorySection(
+                  key: _categoryKeys[category.id],
+                  category: category,
+                  items: categoryItems,
+                  isExpanded: expandedCategories.contains(category.id) || query.isNotEmpty,
+                  onToggle: () {
+                    setState(() {
+                      if (expandedCategories.contains(category.id)) {
+                        expandedCategories.remove(category.id);
+                      } else {
+                        expandedCategories.add(category.id);
+                      }
+                    });
+                  },
+                  onItemTap: _handleItemTap,
+                  formatStock: _formatStockDisplay,
+                  getStockStatus: _getStockStatus,
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TABLET LAYOUT - Side Categories
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildTabletLayout(Size size) {
+    String? selectedCategory;
+
+    return Row(
+      children: [
+        // Category sidebar
+        Container(
+          width: 200,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            border: Border(
+              right: BorderSide(color: AppColors.divider),
+            ),
+          ),
+          child: ValueListenableBuilder(
+            valueListenable: Hive.box<Category>('categories').listenable(),
+            builder: (context, categoryBox, _) {
+              final categories = categoryBox.values.toList();
+
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                itemCount: categories.length + 1, // +1 for "All" option
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return _buildCategorySidebarItem(
+                      'All Items',
+                      Icons.grid_view_rounded,
+                      selectedCategory == null,
+                          () => setState(() => selectedCategory = null),
+                    );
+                  }
+
+                  final category = categories[index - 1];
+                  return _buildCategorySidebarItem(
+                    category.name,
+                    Icons.folder_rounded,
+                    selectedCategory == category.id,
+                        () => setState(() => selectedCategory = category.id),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+
+        // Items grid
+        Expanded(
+          child: ValueListenableBuilder(
+            valueListenable: Hive.box<Items>('itemBoxs').listenable(),
+            builder: (context, itemBox, _) {
+              var items = itemBox.values.where((item) => item.isEnabled).toList();
+
+              // Filter by category
+              if (selectedCategory != null) {
+                items = items.where((item) => item.categoryOfItem == selectedCategory).toList();
+              }
+
+              // Filter by search
+              if (query.isNotEmpty) {
+                items = items.where((item) {
+                  return item.name.toLowerCase().contains(query.toLowerCase());
+                }).toList();
+              }
+
+              if (items.isEmpty) {
+                return _buildEmptyState('No items found');
+              }
+
+              return GridView.builder(
+                padding: EdgeInsets.only(
+                  top: 16,
+                  bottom: isCartShow ? 120 : 24,
+                  left: 16,
+                  right: 16,
+                ),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: size.width > 900 ? 4 : 3,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.85,
+                ),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  return _ItemCard(
+                    item: items[index],
+                    onTap: () => _handleItemTap(items[index]),
+                    formatStock: _formatStockDisplay,
+                    getStockStatus: _getStockStatus,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategorySidebarItem(String name, IconData icon, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected ? AppColors.white : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                name,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? AppColors.white : AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CART BAR
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildCartBar(Size size) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 8, 16),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Cart info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$totalItems items',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.white.withOpacity(0.8),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '₹${totalPrice.toStringAsFixed(2)}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // View cart button
+          GestureDetector(
+            onTap: _navigateToCart,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'View Cart',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToCart() async {
+    HapticFeedback.mediumImpact();
+
+    if (widget.isForAddingItem == true) {
+      Navigator.pop(context);
     } else {
-      // Green for in stock
-      return isBackground ? Colors.green[50]! : Colors.green[700]!;
+      final appBox = Hive.box('app_state');
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CartScreen(
+            selectedTableNo: widget.tableIdForNewOrder,
+          ),
+        ),
+      );
+      appBox.delete('selected_table_for_new_order');
+      await loadCartItems();
     }
   }
 
-  Color _getStockBorderColor(Items item) {
-    if (!item.trackInventory) return Colors.grey[300]!;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CATEGORY FAB
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildCategoryFAB() {
+    return ValueListenableBuilder(
+      valueListenable: Hive.box<Category>('categories').listenable(),
+      builder: (context, categoryBox, _) {
+        final categories = categoryBox.values.toList();
 
-    final stock = item.stockQuantity;
-    final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
-
-    if (stock <= 0) {
-      if (allowOrderWhenOutOfStock) {
-        return Colors.orange[300]!; // Orange border for orderable out of stock
-      } else {
-        return Colors.red[300]!; // Red border for non-orderable out of stock
-      }
-    } else {
-      return Colors.green[300]!; // Green border for in stock
-    }
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _showCategoryNavigator(categories);
+          },
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: AppColors.secondary,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.secondary.withOpacity(0.4),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.menu_rounded,
+              color: AppColors.white,
+              size: 28,
+            ),
+          ),
+        );
+      },
+    );
   }
 
-  IconData _getStockIcon(Items item) {
-    if (!item.trackInventory) return Icons.inventory;
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inventory_2_outlined,
+            size: 64,
+            color: AppColors.textSecondary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    final stock = item.stockQuantity;
-    final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
+// ═══════════════════════════════════════════════════════════════════════════
+// COLLAPSIBLE CATEGORY SECTION
+// ═══════════════════════════════════════════════════════════════════════════
+class _CollapsibleCategorySection extends StatefulWidget {
+  final Category category;
+  final List<Items> items;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+  final Function(Items) onItemTap;
+  final String Function(Items) formatStock;
+  final StockStatus Function(Items) getStockStatus;
 
-    if (stock <= 0) {
-      if (allowOrderWhenOutOfStock) {
-        return Icons.shopping_cart; // Shopping cart for orderable out of stock
-      } else {
-        return Icons.block; // Block icon for non-orderable out of stock
-      }
-    } else {
-      return Icons.inventory; // Inventory icon for in stock
+  const _CollapsibleCategorySection({
+    super.key,
+    required this.category,
+    required this.items,
+    required this.isExpanded,
+    required this.onToggle,
+    required this.onItemTap,
+    required this.formatStock,
+    required this.getStockStatus,
+  });
+
+  @override
+  State<_CollapsibleCategorySection> createState() => _CollapsibleCategorySectionState();
+}
+
+class _CollapsibleCategorySectionState extends State<_CollapsibleCategorySection>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _expandAnimation;
+  late Animation<double> _rotateAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _expandAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
+
+    _rotateAnimation = Tween<double>(begin: 0, end: 0.5).animate(_expandAnimation);
+
+    if (widget.isExpanded) {
+      _controller.value = 1.0;
     }
   }
 
   @override
+  void didUpdateWidget(_CollapsibleCategorySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded != oldWidget.isExpanded) {
+      if (widget.isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding:  EdgeInsets.only(top: 10),
-          child: Container(
-            child: Column(
-              // mainAxisAlignment: MainAxisAlignment.center,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Category header
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              widget.onToggle();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: widget.isExpanded
+                    ? AppColors.primary.withOpacity(0.05)
+                    : AppColors.white,
+                borderRadius: widget.isExpanded
+                    ? const BorderRadius.vertical(top: Radius.circular(16))
+                    : BorderRadius.circular(16),
+              ),
+              child: Row(
                 children: [
-                  Stack(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppSettings.useGridViewCategory
-                              ? SizedBox()
-                              : Container(
-                            width: width * 0.3,
-                            height: height,
-                            color: Colors.blue.shade50,
-                            // color: Colors.blue,
-                            child: Column(
-                              children: [
-                                Container(
-                                  alignment: Alignment.center,
-                                  width: width * 0.3,
-                                  height: height * 0.04,
-                                  decoration: BoxDecoration(color: primarycolor, borderRadius: BorderRadius.circular(12)),
-                                  child: Text(
-                                    'Categories',
-                                    textScaler: TextScaler.linear(1),
-                                    style: GoogleFonts.poppins(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                                SizedBox(
-                                  height: 20,
-                                ),
-
-
-
-
-
-                                /*------------------------------------Categories-------------------------------------*/
-
-                                ValueListenableBuilder(valueListenable:Hive.box<Category>('categories').listenable(),
-                                    builder: (context , categorys , _)
-                                    {
-                                      final  allcat = categorys.values.toList();
-
-
-                                      if(allcat.isEmpty){
-                                        return Container(
-                                          padding: EdgeInsets.all(5),
-                                          child: Text(
-                                            'No Category Found',
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        );
-                                      }
-                                      return Container(
-                                        // color: Colors.red,
-                                        height: height * 0.5,
-                                        width: 100,
-                                        child: Column(
-                                          children: [
-                                            if (AppSettings.allItemsCategory)
-                                              InkWell(
-                                                onTap: () {
-                                                  setState(() {
-                                                    activeCategory = null;
-                                                    // loadhive();
-                                                  });
-                                                },
-                                                child: Container(
-                                                  alignment: Alignment.center,
-                                                  width: width * 0.25,
-                                                  height: height * 0.03,
-                                                  decoration: BoxDecoration(
-                                                      color: Colors.teal[100],
-                                                      borderRadius: BorderRadius.circular(2),
-                                                      border: Border.all(
-                                                        color: primarycolor,
-                                                      )),
-                                                  child: Text(
-                                                    'All Items',
-                                                    textScaler: TextScaler.linear(1),
-                                                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
-                                                  ),
-                                                ),
-                                              ),
-                                            Expanded(
-                                              // flex: 1,
-                                              child: ListView.builder(
-                                                  itemCount: allcat.length,
-                                                  itemBuilder: (context, index) {
-                                                    var category = allcat[index];
-                                                    final isSelected = category.name == activeCategory;
-                                                    return Padding(
-                                                      padding: const EdgeInsets.all(8.0),
-                                                      child: InkWell(
-                                                        // onTap: (){
-                                                        //   setState(() {
-                                                        //     activeCategory = isSelected ? null : category.name;
-                                                        //   });
-                                                        //   loadhive();
-                                                        // },
-
-                                                        onTap: () {
-                                                          setState(() {
-                                                            if (isSelected) {
-                                                              activeCategory = null;
-                                                            } else {
-                                                              activeCategory = isSelected? null : category.id;
-                                                            }
-                                                          }
-                                                          );
-
-                                                          // loadhive();
-                                                        },
-                                                        child: Container(
-                                                          alignment: Alignment.center,
-                                                          width: width * 0.25,
-                                                          height: height * 0.04,
-                                                          decoration: BoxDecoration(
-                                                              color: primarycolor,
-                                                              borderRadius: BorderRadius.circular(2),
-                                                              border: Border.all(
-                                                                color: primarycolor,
-                                                              )),
-                                                          child: Text(
-                                                            category.name,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            textScaler: TextScaler.linear(1),
-                                                            style: GoogleFonts.poppins(
-                                                                fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    })
-                              ],
-                            ),
-                          ),
-
-                     /* -------------------------Online Order Column-----------------------*/
-                          Expanded(
-                            child: Column(
-                              children: [
-
-               /*------------------------Online Order  Button----------------------*/
-                              /*
-                                Container(
-                                  // color: Colors.red,
-                                  child: CommonButton(
-                                      borderwidth: 1,
-                                      bgcolor: screenBGColor,
-                                      bordercolor: Colors.black,
-                                      bordercircular: 12,
-                                      width: width * 0.65,
-                                      height: height * 0.045,
-                                      onTap: () {
-                                        Navigator.push(context, MaterialPageRoute(builder: (context) => OnlineDesktop()));
-                                      },
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.shopping_cart_outlined),
-                                          Text(
-                                            'Online Order',
-                                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                          ),
-                                        ],
-                                      )),
-                                ),
-
-                                SizedBox(height: 15),*/
-
-                                // Search text field
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Container(
-                                            // width: width * 0.32,
-                                            height: height * 0.04,
-                                            // color: Colors.red,
-                                            child: TextField(
-                                              textAlign: TextAlign.center,
-                                              controller: _codeController,
-                                              focusNode: _codehereFocusNode,
-                                              readOnly: AppSettings.visualKeyboard,
-                                              onTap: AppSettings.visualKeyboard? (){
-                                                VisualKeyboardHelper.show(
-                                                  context: context,
-                                                  controller: _codeController,
-                                                  keyboardType: KeyboardType.text,
-                                                );
-                                              } : null,
-                                              decoration: InputDecoration(
-                                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                                  hintText: 'Code Here',
-                                                  suffixIcon: AppSettings.visualKeyboard
-                                                      ? Icon(Icons.keyboard, size: 18, color: primarycolor)
-                                                      : null,
-                                                  hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                  border: OutlineInputBorder()),
-                                            )),
-                                      ),
-                                      SizedBox(
-                                        width: 2,
-                                      ),
-                                      Expanded(
-                                        child: Container(
-                                            // width: width * 0.32,
-                                            height: height * 0.04,
-
-                                            // color: Colors.red,
-                                            child: TextField(
-                                              textAlign: TextAlign.center,
-                                              controller: _searchController,
-                                              focusNode: _searchFocusNode,
-                                              readOnly: AppSettings.visualKeyboard, // Prevent system keyboard when visual keyboard is enabled
-                                              onTap: AppSettings.visualKeyboard ? () {
-                                                // Show visual keyboard on tap
-                                                VisualKeyboardHelper.show(
-                                                  context: context,
-                                                  controller: _searchController,
-                                                  keyboardType: KeyboardType.text,
-                                                );
-                                              } : null,
-                                              decoration: InputDecoration(
-                                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                                  hintText: 'Search Items',
-                                                  suffixIcon: AppSettings.visualKeyboard
-                                                      ? Icon(Icons.keyboard, size: 18, color: primarycolor)
-                                                      : null,
-                                                  hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-                                                  border: OutlineInputBorder()),
-                                            )),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-
-                           /* -----------category if gridview---------------*/
-                                if (AppSettings.useGridViewCategory)
-                                  Container(
-                                      width: width * 0.9,
-                                      height: height * 0.06,
-                                      color: Colors.blue.shade50,
-                                      // color: Colors.blue,
-                                      child:
-
-                                      ValueListenableBuilder(valueListenable: Hive.box<Category>('categories').listenable(),
-                                          builder: (context , categorys , _){
-
-
-
-
-
-                                            final allCat = categorys.values.toList();
-
-
-
-                                            print('Active Category: $activeCategory');
-                                            print('Filtered Items Count: ${itemsList.length}');
-                                            if(allCat.isEmpty){
-                                              return Container(
-                                                padding: EdgeInsets.all(5),
-                                                child: Text(
-                                                  'No Category Found',
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              );
-
-                                            }
-                                            return ListView.builder(
-                                                physics: BouncingScrollPhysics(),
-                                                scrollDirection: Axis.horizontal,
-                                                itemCount: allCat.length,
-                                                itemBuilder: (context, index) {
-                                                  var category = allCat[index];
-                                                  final isSelected = category.name == activeCategory;
-                                                  return Padding(
-                                                    padding: const EdgeInsets.all(8.0),
-                                                    child: InkWell(
-                                                      // onTap: (){
-                                                      //   setState(() {
-                                                      //     activeCategory = isSelected ? null : category.name;
-                                                      //   });
-                                                      //   loadhive();
-                                                      // },
-
-                                                      onTap: () {
-                                                        setState(() {
-                                                          activeCategory = isSelected ? null : category.id; // Uses id
-                                                        });
-                                                        // loadhive(); // reload based on updated activeCategory
-                                                        print('Active Category: $activeCategory');
-                                                        print('Filtered Items Count: ${itemsList.length}');
-                                                      },
-
-                                                      child: Container(
-                                                        alignment: Alignment.center,
-                                                        width: width * 0.25,
-                                                        height: height * 0.04,
-                                                        decoration: BoxDecoration(
-                                                            color: Colors.teal[100],
-                                                            borderRadius: BorderRadius.circular(2),
-                                                            border: Border.all(
-                                                              color: primarycolor,
-                                                            )),
-                                                        child: Text(
-                                                          category.name,
-                                                          textScaler: TextScaler.linear(1),
-                                                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                });
-
-                                          })
-                                  ),
-
-
-                                /*----------item card -------------*/
-                                //change the aspect ration for card height
-                                Container(
-                                  // color: Colors.red,
-                                  width: width,
-                                  height: height,
-                                  child:
-                                  ValueListenableBuilder(
-                                      valueListenable: AppSettings.settingsNotifier,
-                                      builder: (context, value, _){
-                                        double aspectRatio =
-                                        AppSettings.useGridViewCategory ?
-                                        // Grid view category - shorter cards
-                                        (AppSettings.fixItemCard ?
-                                        (AppSettings.showItemImage ? 1.4 : 2.5)
-                                            :
-                                        (AppSettings.showItemImage ? 1.0 : 2.0))
-                                            :
-                                        // Side category - normal cards
-                                        (AppSettings.fixItemCard ?
-                                        (AppSettings.showItemImage ? 1.2 : 2.2)
-                                            :
-                                        (AppSettings.showItemImage ? 0.65 : 1.5));
-
-                                        return ValueListenableBuilder(valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-                                            builder:(context, item, _){
-                                              final items = item.values.toList();
-
-                                              final visibleItems = items.where((item)=> item.isEnabled).toList();
-
-
-                                              final filteredItems = (activeCategory != null && activeCategory!.isNotEmpty)
-                                                  ? visibleItems.where((item)=> item.categoryOfItem == activeCategory).toList()
-                                                  : visibleItems;
-
-
-                                              final filterdsearch = query.isEmpty
-                                                  ? filteredItems
-                                                  : filteredItems.where((item){
-                                                final name = item.name.toLowerCase();
-                                                final querylower = query.toLowerCase();
-                                                return name.contains(querylower);
-                                              }).toList();
-
-
-                                              print('Active Category: $activeCategory');
-                                              print('Filtered Items Count: ${itemsList.length}');
-
-
-                                              if(filteredItems.isEmpty){
-                                                return Container(
-                                                  // alignment: Alignment.center,
-                                                  width: width * 0.5,
-                                                  height: height * 0.01,
-                                                  padding: EdgeInsets.all(20),
-                                                  // color: Colors.red,
-                                                  child: Center(child: Text('No Items')
-                                                  ),);
-                                              }
-                                              return    GridView.builder(
-                                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                                    crossAxisCount: 2,
-                                                    // Two items per row
-                                                    crossAxisSpacing: 20,
-                                                    // Space between columns
-                                                    mainAxisSpacing: 10,
-                                                    // Space between rows
-                                                    childAspectRatio: aspectRatio, // Adjust item size
-                                                  ),
-                                                  itemCount: filterdsearch.length,
-                                                  itemBuilder: (context, index) {
-                                                    final item = filterdsearch[index];
-                                                    // final categoryOfItem = items[index].categoryOfItem;
-                                                    return Card(
-                                                      child:
-                                                      // ontap item
-                                                      InkWell(
-                                                        // onTap: () => addToCart(item),
-                                                        onTap: () => _handleItemTap(item),
-                                                        child: Container(
-                                                          // color: Colors.red,
-                                                          width: width * 0.3,
-                                                          height: AppSettings.showItemImage ? height * 0.1 : height * 0.1,
-                                                          child: Column(
-                                                            children: [
-
-
-                                                              AppSettings.showItemImage
-                                                                  ? (item.imageBytes != null && item.imageBytes!.isNotEmpty
-                                                                  ? Image.memory(
-                                                                      item.imageBytes!,
-                                                                      fit: BoxFit.cover,
-                                                                      width: 80,
-                                                                      height: 80,
-                                                                      errorBuilder: (context, error, stackTrace) {
-                                                                        return Icon(Icons.broken_image, size: 80, color: Colors.grey);
-                                                                      },
-                                                                    )
-                                                                  : Icon(Icons.image, size: 80, color: Colors.grey))
-                                                                  : SizedBox(),
-
-
-
-                                                              /*AppSettings.showItemImage
-                                                          ? (item.imagePath != null && item.imagePath!.isNotEmpty
-
-                                                          ?Image.memory(
-                                                        base64Decode(item.imagePath!),
-                                                        fit: BoxFit.fill,
-                                                        width: 80,
-                                                        height: 80,
-                                                      )
-
-                                                          : (Icon(
-                                                        Icons.image,
-                                                        size: 80,
-                                                      )))
-                                                          : SizedBox(),*/
-                                                              SizedBox(height: 5,),
-                                                              Center(
-                                                                child: Text(
-                                                                  item.name,
-                                                                  textAlign: TextAlign.center,
-                                                                  style: GoogleFonts.poppins(fontSize: 12,color: Colors.indigo.shade900, fontWeight: FontWeight.w600),
-                                                                ),
-                                                              ),
-                                                              SizedBox(
-                                                                height: 5,
-                                                              ),
-                                                              AppSettings.showItemPrice
-                                                                  ? Text(
-                                                                  item.price != null
-                                                                      ? "Price: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}"
-                                                                      : (item.variant != null && item.variant!.isNotEmpty)
-                                                                      ? "Price: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variant!.first.price)}+"
-                                                                      : "Price: N/A",
-                                                                  textAlign: TextAlign.center,
-                                                                  style: GoogleFonts.poppins(color: Colors.indigo.shade900, fontWeight: FontWeight.w600))
-                                                                  : SizedBox(),
-
-                                                              // Stock quantity display
-                                                              if (item.trackInventory) ...[
-                                                                SizedBox(height: 3),
-                                                                Container(
-                                                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                                  decoration: BoxDecoration(
-                                                                    color: _getStockColor(item, true),
-                                                                    borderRadius: BorderRadius.circular(8),
-                                                                    border: Border.all(
-                                                                      color: _getStockBorderColor(item),
-                                                                      width: 1,
-                                                                    ),
-                                                                  ),
-                                                                  child: Row(
-                                                                    mainAxisSize: MainAxisSize.min,
-                                                                    children: [
-                                                                      Icon(
-                                                                        _getStockIcon(item),
-                                                                        size: 12,
-                                                                        color: _getStockColor(item, false),
-                                                                      ),
-                                                                      SizedBox(width: 3),
-                                                                      Text(
-                                                                        _formatStockDisplay(item),
-                                                                        style: GoogleFonts.poppins(
-                                                                          fontSize: 9,
-                                                                          color: _getStockColor(item, false),
-                                                                          fontWeight: FontWeight.w600,
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  });
-                                            });
-
-                                      }
-                                  ),
-                                )
-
-
-
-
-
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (isCartShow)
-                      // isCartShow?
-                        Positioned(
-                            top: height * 0.65,
-                            width: width * 0.8,
-                            left: width * 0.1,
-                            // right: 20,
-                            child: Container(
-                                width: width,
-                                padding: EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: primarycolor,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Total: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalPrice)}',
-                                      textScaler: TextScaler.linear(1),
-                                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                                    ),
-                                    SizedBox(
-                                      width: 5,
-                                    ),
-                                    CommonButton(
-                                        bordercircular: 25,
-                                        bgcolor: Colors.white,
-                                        width: width * 0.3,
-                                        height: height * 0.05,
-                                        onTap: () async {
-                                          if (widget.isForAddingItem == true) {
-                                            // For an existing order, we just go back. No other logic is needed.
-                                            Navigator.pop(context);
-                                          } else {
-                                            // For a new order, we navigate to the cart and then refresh when we return.
-                                            final appBox = Hive.box('app_state');
-                                            await Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                    builder: (context) => CartScreen(selectedTableNo: widget.tableIdForNewOrder,)));
-                                            appBox.delete('selected_table_for_new_order');
-                                            await loadCartItems();
-                                          }
-                                        },
-                                        //     () async {
-                                        //   final appBox = Hive.box('app_state');
-                                        //   // final selectedTable = appBox.get('selected_table_for_new_order');
-                                        //
-                                        //
-                                        //   widget.isForAddingItem ==true?
-                                        //       Navigator.pop(context):
-                                        //   await Navigator.push(
-                                        //       context,
-                                        //       MaterialPageRoute(
-                                        //           builder: (context) => CartScreen(
-                                        //
-                                        //             // isActiveCart: true,
-                                        //               // cartItems: cartItems,
-                                        //               // selectedTableNo: selectedTable,
-                                        //               )));
-                                        //   appBox.delete('selected_table_for_new_order');
-                                        //   // await loadCartItems();
-                                        //
-                                        //   await loadCartItems();
-                                        // },
-                                        child: Container(
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                'View Cart',
-                                                style: GoogleFonts.poppins(fontSize: 14),
-                                                textScaler: TextScaler.linear(1),
-                                              ),
-                                              Icon(
-                                                Icons.arrow_forward_ios,
-                                                size: 20,
-                                              )
-                                            ],
-                                          ),
-                                        ))
-                                  ],
-                                )))
-                      // : SizedBox()
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.category_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
                   ),
-                ]
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.category.name,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.items.length} items',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  RotationTransition(
+                    turns: _rotateAnimation,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMedium,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
 
+          // Items list
+          SizeTransition(
+            sizeFactor: _expandAnimation,
+            child: widget.items.isEmpty
+                ? Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'No items in this category',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            )
+                : ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              itemCount: widget.items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                return _ItemListTile(
+                  item: widget.items[index],
+                  onTap: () => widget.onItemTap(widget.items[index]),
+                  formatStock: widget.formatStock,
+                  getStockStatus: widget.getStockStatus,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ITEM LIST TILE (Mobile)
+// ═══════════════════════════════════════════════════════════════════════════
+class _ItemListTile extends StatelessWidget {
+  final Items item;
+  final VoidCallback onTap;
+  final String Function(Items) formatStock;
+  final StockStatus Function(Items) getStockStatus;
+
+  const _ItemListTile({
+    required this.item,
+    required this.onTap,
+    required this.formatStock,
+    required this.getStockStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final stockStatus = getStockStatus(item);
+    final isDisabled = stockStatus == StockStatus.outOfStock;
+
+    return GestureDetector(
+      onTap: isDisabled ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDisabled
+              ? AppColors.surfaceMedium.withOpacity(0.5)
+              : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDisabled ? AppColors.divider : AppColors.divider.withOpacity(0.5),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Item image
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMedium,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: _buildItemImage(),
+              ),
+            ),
+            const SizedBox(width: 14),
+
+            // Item info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDisabled
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        _getPriceDisplay(),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      if (item.trackInventory) ...[
+                        const SizedBox(width: 10),
+                        _buildStockBadge(stockStatus),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Add button
+            if (!isDisabled)
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: AppColors.white,
+                  size: 20,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemImage() {
+    if (item.imageBytes != null && item.imageBytes!.isNotEmpty) {
+      final file = item.imageBytes;
+      if (file!=null) {
+        return Image.memory(
+          file,
+          fit: BoxFit.cover,
+          width: 56,
+          height: 56,
+        );
+      }
+    }
+    return Icon(
+      Icons.fastfood_rounded,
+      size: 24,
+      color: AppColors.textSecondary,
+    );
+  }
+
+  String _getPriceDisplay() {
+    if (item.price != null) {
+      return '₹${item.price!.toStringAsFixed(2)}';
+    } else if (item.variant != null && item.variant!.isNotEmpty) {
+      return '₹${item.variant!.first.price.toStringAsFixed(2)}+';
+    }
+    return 'Price N/A';
+  }
+
+  Widget _buildStockBadge(StockStatus status) {
+    Color bgColor;
+    Color textColor;
+    String text = formatStock(item);
+
+    switch (status) {
+      case StockStatus.inStock:
+        bgColor = AppColors.success.withOpacity(0.1);
+        textColor = AppColors.success;
+        break;
+      case StockStatus.orderAvailable:
+        bgColor = AppColors.warning.withOpacity(0.1);
+        textColor = AppColors.warning;
+        break;
+      case StockStatus.outOfStock:
+        bgColor = AppColors.danger.withOpacity(0.1);
+        textColor = AppColors.danger;
+        break;
+      case StockStatus.notTracked:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ITEM CARD (Tablet/Desktop)
+// ═══════════════════════════════════════════════════════════════════════════
+class _ItemCard extends StatefulWidget {
+  final Items item;
+  final VoidCallback onTap;
+  final String Function(Items) formatStock;
+  final StockStatus Function(Items) getStockStatus;
+
+  const _ItemCard({
+    required this.item,
+    required this.onTap,
+    required this.formatStock,
+    required this.getStockStatus,
+  });
+
+  @override
+  State<_ItemCard> createState() => _ItemCardState();
+}
+
+class _ItemCardState extends State<_ItemCard> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final stockStatus = widget.getStockStatus(widget.item);
+    final isDisabled = stockStatus == StockStatus.outOfStock;
+
+    return GestureDetector(
+      onTapDown: isDisabled ? null : (_) => setState(() => _isPressed = true),
+      onTapUp: isDisabled ? null : (_) => setState(() => _isPressed = false),
+      onTapCancel: isDisabled ? null : () => setState(() => _isPressed = false),
+      onTap: isDisabled ? null : widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        transform: Matrix4.identity()..scale(_isPressed ? 0.96 : 1.0),
+        decoration: BoxDecoration(
+          color: isDisabled ? AppColors.surfaceMedium : AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: _isPressed
+                  ? AppColors.primary.withOpacity(0.2)
+                  : AppColors.cardShadow,
+              blurRadius: _isPressed ? 16 : 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image section
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMedium,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Center(child: _buildItemImage()),
+
+                    // Stock badge
+                    if (widget.item.trackInventory)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: _buildStockBadge(stockStatus),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Info section
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      widget.item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDisabled
+                            ? AppColors.textSecondary
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _getPriceDisplay(),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        if (!isDisabled)
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.add_rounded,
+                              color: AppColors.white,
+                              size: 18,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemImage() {
+    if (widget.item.imageBytes != null && widget.item.imageBytes!.isNotEmpty) {
+      final file = widget.item.imageBytes!;
+      if (file!= '') {
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: Image.memory(
+            file,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ),
+        );
+      }
+    }
+    return Icon(
+      Icons.fastfood_rounded,
+      size: 48,
+      color: AppColors.textSecondary.withOpacity(0.5),
+    );
+  }
+
+  String _getPriceDisplay() {
+    if (widget.item.price != null) {
+      return '₹${widget.item.price!.toStringAsFixed(2)}';
+    } else if (widget.item.variant != null && widget.item.variant!.isNotEmpty) {
+      return '₹${widget.item.variant!.first.price.toStringAsFixed(2)}+';
+    }
+    return 'N/A';
+  }
+
+  Widget _buildStockBadge(StockStatus status) {
+    Color bgColor;
+    Color textColor;
+    IconData icon;
+
+    switch (status) {
+      case StockStatus.inStock:
+        bgColor = AppColors.success;
+        textColor = AppColors.white;
+        icon = Icons.check_circle_rounded;
+        break;
+      case StockStatus.orderAvailable:
+        bgColor = AppColors.warning;
+        textColor = AppColors.white;
+        icon = Icons.access_time_rounded;
+        break;
+      case StockStatus.outOfStock:
+        bgColor = AppColors.danger;
+        textColor = AppColors.white;
+        icon = Icons.remove_circle_rounded;
+        break;
+      case StockStatus.notTracked:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            widget.formatStock(widget.item),
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CATEGORY NAVIGATOR (Bottom Sheet)
+// ═══════════════════════════════════════════════════════════════════════════
+class _CategoryNavigator extends StatelessWidget {
+  final List<Category> categories;
+  final Function(String) onCategoryTap;
+
+  const _CategoryNavigator({
+    required this.categories,
+    required this.onCategoryTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.divider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Title
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.category_rounded,
+                    color: AppColors.secondary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  'Jump to Category',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Category list
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                final category = categories[index];
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    onCategoryTap(category.id);
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppColors.primary.withOpacity(0.8),
+                                AppColors.secondary.withOpacity(0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              category.name.isNotEmpty
+                                  ? category.name[0].toUpperCase()
+                                  : '?',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            category.name,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STOCK STATUS ENUM
+// ═══════════════════════════════════════════════════════════════════════════
+enum StockStatus {
+  inStock,
+  orderAvailable,
+  outOfStock,
+  notTracked,
 }

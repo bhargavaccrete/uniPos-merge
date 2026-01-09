@@ -790,7 +790,7 @@ class _TakeawayState extends State<Takeaway> {
     if (mounted) {
       Navigator.of(context).pop(); // Pop the dialog first
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => Startorder()),
+        MaterialPageRoute(builder: (context) => POSMainScreen()),
             (Route<dynamic> route) => false,
       );
       NotificationService.instance.showSuccess(
@@ -1681,7 +1681,7 @@ class _TakeawayState extends State<Takeaway> {
     // 4. Navigate and show success message
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const Startorder()),
+        MaterialPageRoute(builder: (context) => const POSMainScreen()),
             (Route<dynamic> route) => false,
       );
       // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quick Settle Successful')));

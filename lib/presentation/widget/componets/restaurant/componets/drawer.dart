@@ -129,7 +129,7 @@ class _DrawerrState extends State<Drawerr> {
                               height: height * 0.04,
                               onTap: ()async{
                               await clearCart();
-                                Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
+                                Navigator.push(context, MaterialPageRoute(builder: (context)=> POSMainScreen()));
 
                                 // Navigator.pop(context);
                               }, child: Text('Yes',

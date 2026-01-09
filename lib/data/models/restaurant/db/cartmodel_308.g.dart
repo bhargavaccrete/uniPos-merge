@@ -19,7 +19,7 @@ class CartItemAdapter extends TypeAdapter<CartItem> {
     return CartItem(
       id: fields[0] as String,
       title: fields[1] as String,
-      imagePath: fields[2] as String,
+      imagePath: fields[2]==null?Uint8List(0):fields[2] as Uint8List ,
       price: fields[3] as double,
       productId: fields[15] as String,
       isStockManaged: fields[16] as bool?,

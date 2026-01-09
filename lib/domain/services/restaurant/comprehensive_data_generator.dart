@@ -204,7 +204,7 @@ class ComprehensiveDataGenerator {
         cartItems.add(CartItem(
           id: _generateId(),
           title: item.name,
-          imagePath: '', // Items now use imageBytes instead of imagePath
+          imagePath: Uint8List(1), // Items now use imageBytes instead of imagePath
           price: price,
           quantity: qty,
           categoryName: 'Food',
@@ -292,7 +292,7 @@ class ComprehensiveDataGenerator {
         cartItems.add(CartItem(
           id: _generateId(),
           title: item.name,
-          imagePath: '', // Items now use imageBytes instead of imagePath
+          imagePath: Uint8List(0), // Items now use imageBytes instead of imagePath
           price: price,
           quantity: qty,
           categoryName: 'Food',

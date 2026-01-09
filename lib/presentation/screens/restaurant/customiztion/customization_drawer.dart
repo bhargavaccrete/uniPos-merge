@@ -58,7 +58,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
         automaticallyImplyLeading: false,
         leading: InkWell(
             onTap: (){
-              Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
+              Navigator.push(context, MaterialPageRoute(builder: (context)=> POSMainScreen()));
             },
             child: Icon(Icons.arrow_back,color: Colors.white,)),
         title:  Text('Setting & Customization',style: GoogleFonts.poppins(color: Colors.white,fontSize:  16, fontWeight: FontWeight.w600),),

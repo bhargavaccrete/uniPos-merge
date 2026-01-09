@@ -15,6 +15,15 @@ class AppColors {
   static const Color info = Color(0xFF2D9CDB);
   static const Color warning = Color(0xFFF57F17);
   static const Color white =  Color(0xffFFFFFF);
+
+
+  // Extended palette for beautiful UI
+  static const Color surfaceLight = Color(0xFFF8FAFC);
+  static const Color surfaceMedium = Color(0xFFEEF2F6);
+  static const Color cardShadow = Color(0x1A0D47A1);
+  static const Color textPrimary = Color(0xFF1A1F36);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color divider = Color(0xFFE5E7EB);
 }
 
 
