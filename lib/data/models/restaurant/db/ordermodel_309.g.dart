@@ -43,13 +43,14 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       kotBoundaries: (fields[23] as List).cast<int>(),
       kotStatuses: (fields[24] as Map?)?.cast<int, String>(),
       orderNumber: fields[25] as int?,
+      customerId: fields[26] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, OrderModel obj) {
     writer
-      ..writeByte(26)
+      ..writeByte(27)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -101,7 +102,9 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       ..writeByte(24)
       ..write(obj.kotStatuses)
       ..writeByte(25)
-      ..write(obj.orderNumber);
+      ..write(obj.orderNumber)
+      ..writeByte(26)
+      ..write(obj.customerId);
   }
 
   @override

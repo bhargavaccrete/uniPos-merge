@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/init/hive_init.dart';
+import 'package:unipos/core/routes/app_routes.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/restaurant_login.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
@@ -51,16 +53,27 @@ void main() async{
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Hive with Flutter and register common adapters
-  await HiveInit.init();
+  // await HiveInit.init();
 
-  // Initialize AppConfig (stores business mode selection)
-  await AppConfig.init();
 
-  // Open common boxes (needed regardless of business mode)
-  await HiveInit.openCommonBoxes();
+  // // Initialize AppConfig (stores business mode selection)
+  // await AppConfig.init();
+
+
+// Open common boxes (needed regardless of business mode)
+
+
+
+  await Future.wait([
+    HiveInit.init(),
+    AppConfig.init(),
+  ]);
+
 
   // Initialize business-specific boxes if business mode is already set
   // (This handles the case where app is restarted after initial setup)
+
+  await HiveInit.openCommonBoxes();
   await HiveInit.initializeBusinessBoxes();
 
   // Setup GetIt dependency injection
@@ -70,40 +83,61 @@ void main() async{
 
     // Load restaurant customization settings from SharedPreferences
   if (AppConfig.isRestaurant) {
-    await AppSettings.load();
-    print('⚙️  Restaurant settings loaded');
+    // await AppSettings.load();
+    // print('⚙️  Restaurant settings loaded');
+    //
+    // // Load print customization settings
+    // await PrintSettings.load();
+    // print('🖨️  Print settings loaded');
+    //
+    // // Load decimal precision settings
+    // await DecimalSettings.load();
+    // print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
+    //
+    // // Load order settings
+    // await OrderSettings.load();
+    // print('📋 Order settings loaded');
+    //
+    // // Load currency settings
+    // await CurrencyHelper.load();
+    // print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
 
-    // Load print customization settings
-    await PrintSettings.load();
-    print('🖨️  Print settings loaded');
 
-    // Load decimal precision settings
-    await DecimalSettings.load();
-    print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
+   await  Future.wait([
+      AppSettings.load(),
+      PrintSettings.load(),
+      DecimalSettings.load(),
+      OrderSettings.load(),
+      CurrencyHelper.load()
+    ]);
 
-    // Load order settings
-    await OrderSettings.load();
-    print('📋 Order settings loaded');
 
-    // Load currency settings
-    await CurrencyHelper.load();
-    print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
 
-    await startServer();
+
+
+     startServer();
     print('🚀 UniPOS Local Server Started');
 
   } else if (AppConfig.isRetail) {
     // Load retail printer settings from SharedPreferences
-    await RetailPrinterSettingsService().initialize();
-    print('🖨️  Retail printer settings loaded');
+    // await RetailPrinterSettingsService().initialize();
+    // print('🖨️  Retail printer settings loaded');
+    //
+    // // Load decimal precision settings (shared with restaurant)
+    // await DecimalSettings.load();
+    // print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
+    //
+    // // Load currency settings (shared with restaurant)
+    // await CurrencyHelper.load();
+    // print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
 
-    // Load decimal precision settings (shared with restaurant)
-    await DecimalSettings.load();
-    print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
+  await Future.wait([
+    RetailPrinterSettingsService().initialize(),
+    DecimalSettings.load(),
+    CurrencyHelper.load()
+  ]);
 
-    // Load currency settings (shared with restaurant)
-    await CurrencyHelper.load();
-    print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
+
   }
 
   // Debug: Print initialization status
@@ -143,7 +177,7 @@ class UniPOSApp extends StatelessWidget {
       //   ),
       // ),
       // Define all your routes here
-      routes: {
+   /*   routes: {
         // Core Routes
         '/': (context) => const SplashScreen(),
         '/walkthrough': (context) => const WalkthroughScreen(),
@@ -194,7 +228,7 @@ class UniPOSApp extends StatelessWidget {
         '/payment-setup': (context) => const PaymentSetupScreen(),
         '/staff-setup': (context) => const StaffSetupScreen(),
         '/backup': (context) => const BackupScreen(),
-      },
+      },*/
 
       // Handle unknown routes
       onUnknownRoute: (settings) {
@@ -234,7 +268,9 @@ class UniPOSApp extends StatelessWidget {
       },
 
       // Set initial route
-      initialRoute: '/',
+      initialRoute: RouteNames.splash,
+      routes: AppRoutes.routes,
+
     );
   }
 }

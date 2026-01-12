@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.dart';
 
 import '../../../../util/restaurant/currency_helper.dart';
@@ -14,6 +15,7 @@ import 'orderNotificationSetting.dart';
 import 'orderSettings.dart';
 
 class Settingsscreen extends StatefulWidget {
+  const Settingsscreen({super.key});
   @override
   _settingsScreenState createState() => _settingsScreenState();
 }
@@ -101,7 +103,9 @@ class _settingsScreenState extends State<Settingsscreen> {
                     displayTitle: "Password Change",
                     displayicon: Icons.keyboard_arrow_right,
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => Changepassword()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context) => Changepassword()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantChangePassword);
                     },
                   ),
 
@@ -109,7 +113,9 @@ class _settingsScreenState extends State<Settingsscreen> {
                     displayTitle: "Order Settings",
                     displayicon: Icons.keyboard_arrow_right,
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => Ordersettings()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context) => Ordersettings()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantOrderSettings);
                     },
                   ),
 
@@ -117,8 +123,10 @@ class _settingsScreenState extends State<Settingsscreen> {
                     displayTitle: "Payment Methods",
                     displayicon: Icons.keyboard_arrow_right,
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => Paymentsmethods()));
-                    },
+                      // Navigator.push(context, MaterialPageRoute(builder: (context) => Paymentsmethods()));
+                      Navigator.pushNamed(context, RouteNames.restaurantPaymentMethods);
+
+                      },
                   ),
 
                   // MultipleListViewWithNavigation(
@@ -132,7 +140,10 @@ class _settingsScreenState extends State<Settingsscreen> {
                     displayTitle: 'Performance Test Data Generator',
                     displayicon: Icons.keyboard_arrow_right,
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => DataGeneratorScreen()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context) => DataGeneratorScreen()));
+                      Navigator.pushNamed(context, RouteNames.restaurantDataGenratorScreen);
+
+
                     },
                   ),
                   // 💰 Decimal Precision Section

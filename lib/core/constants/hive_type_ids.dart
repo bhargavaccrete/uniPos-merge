@@ -48,6 +48,8 @@ class HiveTypeIds {
   static const int TestBill = 122;
   static const int TestBillItem = 123;
   static const int TaxSummary = 124;
+  static const int RestaurantCustomer = 125;
+
 
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
@@ -147,5 +149,6 @@ class HiveTypeIds {
     TestBill,
     TestBillItem,
     TaxSummary,
+    RestaurantCustomer,
   ];
 }

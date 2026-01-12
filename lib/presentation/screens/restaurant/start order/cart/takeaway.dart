@@ -20,6 +20,8 @@ import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/decimal_settings.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../util/restaurant/currency_helper.dart';
+import '../../../../../data/models/restaurant/db/customer_model_125.dart';
+import '../../../../../data/models/restaurant/db/database/hive_customer.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../tabbar/table.dart';
@@ -636,10 +638,52 @@ class _TakeawayState extends State<Takeaway> {
     Navigator.push(context, MaterialPageRoute(builder: (context) => TableScreen()));
   }
 
+  // Handle customer selection from autocomplete
+  void _onCustomerSelected(RestaurantCustomer customer) {
+    setState(() {
+      selectedCustomer = customer;
+      nameController.text = customer.name ?? '';
+      emailController.text = ''; // Email not stored in customer model
+      mobileController.text = customer.phone ?? '';
+    });
+  }
+
+  // Update customer statistics (visits, loyalty points, last visit, etc.)
+  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType) async {
+    try {
+      print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
+      print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
+
+      await HiveCustomer.updateCustomerVisit(
+        customerId: customer.customerId,
+        orderType: orderType,
+        pointsToAdd: 10, // Award 10 points per order
+      );
+
+      // Verify the update
+      final updatedCustomer = HiveCustomer.getCustomerById(customer.customerId);
+      if (updatedCustomer != null) {
+        print('✅ Customer stats updated successfully!');
+        print('✅ New visits: ${updatedCustomer.totalVisites}, New points: ${updatedCustomer.loyaltyPoints}');
+      } else {
+        print('❌ Failed to verify customer update');
+      }
+    } catch (e) {
+      print('❌ Error updating customer stats: $e');
+    }
+  }
+
   TextEditingController nameController = TextEditingController();
   TextEditingController mobileController = TextEditingController();
   TextEditingController emailController = TextEditingController();
   TextEditingController remarkController = TextEditingController();
+
+  // Customer selection
+  RestaurantCustomer? selectedCustomer;
+  List<RestaurantCustomer> nameSuggestions = [];
+  List<RestaurantCustomer> phoneSuggestions = [];
+  bool showNameSuggestions = false;
+  bool showPhoneSuggestions = false;
 
 /*
   Future<void> _placeOrder() async {
@@ -746,9 +790,16 @@ class _TakeawayState extends State<Takeaway> {
       kotBoundaries: [plainItems.length], // First KOT boundary at item count
       kotStatuses: {newKotNumber: 'Processing'}, // Initialize first KOT status
       orderNumber: orderNumber, // Daily order number
+      customerId: selectedCustomer?.customerId, // Link to customer
     );
 
     await HiveOrders.addOrder(neworder);
+
+    // Update customer stats if customer is linked
+    if (selectedCustomer != null) {
+      await _updateCustomerStats(selectedCustomer!, widget.isDineIn ? 'Dine In' : 'Take Away');
+    }
+
     print("✅ New active order saved with Total: ${neworder.totalPrice}");
 
     // Auto-print KOT directly to printer (only if Generate KOT setting is enabled)
@@ -1316,44 +1367,328 @@ class _TakeawayState extends State<Takeaway> {
                   return;
                 }
 
+                // Clear suggestions before showing dialog
+                nameSuggestions = [];
+                phoneSuggestions = [];
+                showNameSuggestions = false;
+                showPhoneSuggestions = false;
+
                 // Show dialog for customer details
                 showDialog(
                   context: context,
                   builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: Center(
-                        child: Text(
-                          'Place Order',
-                          textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                    return StatefulBuilder(
+                      builder: (context, setDialogState) {
+                        return AlertDialog(
+                          title: Center(
+                            child: Text(
+                              'Place Order',
+                              textScaler: TextScaler.linear(1),
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      content: SingleChildScrollView(
-                        child: Container(
-                          width: width,
-                          height: height * 0.6,
-                          child: Column(
-                            children: [
+                          content: Container(
+                            width: width * 0.9,
+                            height: height * 0.7,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
                               Text('Customer Details',
                                   style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500), textAlign: TextAlign.start),
                               const SizedBox(height: 10),
+
+                              // Show selected customer info
+                              if (selectedCustomer != null)
+                                Container(
+                                  width: width,
+                                  padding: EdgeInsets.all(8),
+                                  margin: EdgeInsets.only(bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.green.shade200),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 18,
+                                        backgroundColor: Colors.green.shade200,
+                                        child: Text(
+                                          selectedCustomer!.name?.isNotEmpty == true
+                                              ? selectedCustomer!.name![0].toUpperCase()
+                                              : '?',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              selectedCustomer!.name ?? 'Unknown',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${selectedCustomer!.totalVisites} visits • ${selectedCustomer!.loyaltyPoints} pts',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 10,
+                                                color: Colors.grey[700],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.clear, color: Colors.red, size: 18),
+                                        padding: EdgeInsets.zero,
+                                        constraints: BoxConstraints(),
+                                        onPressed: () {
+                                          setDialogState(() {
+                                            selectedCustomer = null;
+                                            nameController.clear();
+                                            emailController.clear();
+                                            mobileController.clear();
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                              // Name Field with inline suggestions
                               CommonTextForm(
-                                  hintText: 'Name',
-                                  controller: nameController,
-                                  BorderColor: primarycolor,
-                                  HintColor: primarycolor,
-                                  obsecureText: false),
-                              const SizedBox(height: 10),
+                                hintText: 'Name (type to search customers)',
+                                controller: nameController,
+                                BorderColor: primarycolor,
+                                HintColor: primarycolor,
+                                obsecureText: false,
+                                onChanged: (value) {
+                                  setDialogState(() {
+                                    if (value.isEmpty) {
+                                      showNameSuggestions = false;
+                                      nameSuggestions = [];
+                                    } else {
+                                      nameSuggestions = HiveCustomer.searchCustomers(value);
+                                      showNameSuggestions = nameSuggestions.isNotEmpty;
+                                    }
+                                  });
+                                },
+                              ),
+
+                              // Name suggestions list
+                              if (showNameSuggestions && nameSuggestions.isNotEmpty)
+                                Container(
+                                  constraints: BoxConstraints(maxHeight: 150),
+                                  margin: EdgeInsets.only(top: 5, bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    border: Border.all(color: primarycolor.withOpacity(0.3)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: nameSuggestions.length,
+                                    itemBuilder: (context, index) {
+                                      final customer = nameSuggestions[index];
+                                      return InkWell(
+                                        onTap: () {
+                                          setDialogState(() {
+                                            selectedCustomer = customer;
+                                            nameController.text = customer.name ?? '';
+                                            emailController.text = '';
+                                            mobileController.text = customer.phone ?? '';
+                                            showNameSuggestions = false;
+                                            nameSuggestions = [];
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: Colors.grey.shade200,
+                                                width: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 16,
+                                                backgroundColor: primarycolor.withOpacity(0.2),
+                                                child: Text(
+                                                  customer.name?.isNotEmpty == true
+                                                      ? customer.name![0].toUpperCase()
+                                                      : '?',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: primarycolor,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      customer.name ?? 'Unknown',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${customer.phone ?? ''} • ${customer.totalVisites} visits',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 10,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+
+                              if (!showNameSuggestions)
+                                const SizedBox(height: 10),
+
+                              // Phone Field with inline suggestions
                               CommonTextForm(
-                                  hintText: 'Mobile No',
-                                  controller: mobileController,
-                                  BorderColor: primarycolor,
-                                  HintColor: primarycolor,
-                                  obsecureText: false),
-                              const SizedBox(height: 25),
+                                hintText: 'Mobile No (type to search customers)',
+                                controller: mobileController,
+                                BorderColor: primarycolor,
+                                HintColor: primarycolor,
+                                obsecureText: false,
+                                onChanged: (value) {
+                                  setDialogState(() {
+                                    if (value.isEmpty) {
+                                      showPhoneSuggestions = false;
+                                      phoneSuggestions = [];
+                                    } else {
+                                      phoneSuggestions = HiveCustomer.searchCustomers(value);
+                                      showPhoneSuggestions = phoneSuggestions.isNotEmpty;
+                                    }
+                                  });
+                                },
+                              ),
+
+                              // Phone suggestions list
+                              if (showPhoneSuggestions && phoneSuggestions.isNotEmpty)
+                                Container(
+                                  constraints: BoxConstraints(maxHeight: 150),
+                                  margin: EdgeInsets.only(top: 5, bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    border: Border.all(color: primarycolor.withOpacity(0.3)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: phoneSuggestions.length,
+                                    itemBuilder: (context, index) {
+                                      final customer = phoneSuggestions[index];
+                                      return InkWell(
+                                        onTap: () {
+                                          setDialogState(() {
+                                            selectedCustomer = customer;
+                                            nameController.text = customer.name ?? '';
+                                            emailController.text = '';
+                                            mobileController.text = customer.phone ?? '';
+                                            showPhoneSuggestions = false;
+                                            phoneSuggestions = [];
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: Colors.grey.shade200,
+                                                width: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 16,
+                                                backgroundColor: primarycolor.withOpacity(0.2),
+                                                child: Text(
+                                                  customer.name?.isNotEmpty == true
+                                                      ? customer.name![0].toUpperCase()
+                                                      : '?',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: primarycolor,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      customer.name ?? 'Unknown',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${customer.phone ?? ''} • ${customer.totalVisites} visits',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 10,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+
+                              if (!showPhoneSuggestions)
+                                const SizedBox(height: 25),
                               CommonTextForm(
                                   hintText: 'Email ID (Optional)',
                                   controller: emailController,
@@ -1422,13 +1757,15 @@ class _TakeawayState extends State<Takeaway> {
                                 ],
                               ),
                               // SizedBox(height: 10,)
-                            ],
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      titlePadding: const EdgeInsets.all(20),
-                      alignment: Alignment.center,
-                      actions: [],
+                          titlePadding: const EdgeInsets.all(20),
+                          alignment: Alignment.center,
+                          actions: [],
+                        );
+                      },
                     );
                   },
                 );

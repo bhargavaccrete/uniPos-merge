@@ -10,6 +10,7 @@ class CommonTextForm extends StatelessWidget {
   final FocusNode? focusNode;
   final String? Function(String?)? validator;
   final void Function(String)? onfieldsumbitted;
+  final void Function(String)? onChanged;
   final Widget? icon;
   final Widget? gesture;
   final String? hintText;
@@ -32,6 +33,7 @@ class CommonTextForm extends StatelessWidget {
       this.hintText,
       required this.obsecureText,
       this.validator, this.icon,  this.gesture, this.maxline,this.focusNode, this.onfieldsumbitted,
+        this.onChanged,
         this.enabled,
         this.BorderColor, this.HintColor, this.borderc,
       this.height, this.width, this.labelText, this.LabelColor
@@ -46,6 +48,7 @@ class CommonTextForm extends StatelessWidget {
       maxLines: maxline?? 1,
       keyboardType: keyboardType??TextInputType.text,
       onFieldSubmitted:onfieldsumbitted ,
+      onChanged: onChanged,
       validator: validator,
       obscureText: obsecureText,
       controller: controller,

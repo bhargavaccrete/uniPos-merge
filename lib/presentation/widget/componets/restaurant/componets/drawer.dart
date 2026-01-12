@@ -7,6 +7,7 @@ import 'package:lottie/lottie.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
 import 'package:unipos/domain/services/common/unified_backup_service.dart';
 
@@ -81,8 +82,10 @@ class _DrawerrState extends State<Drawerr> {
               children: [
                 Listmenu(
                   onTap: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => AdminWelcome()));
+                    // Navigator.push(context,
+                    //     MaterialPageRoute(builder: (context) => AdminWelcome()));
+                    //
+                    Navigator.pushNamed(context,RouteNames.restaurantAdminWelcome);
                   },
                   title: 'Home',
                   icons: Icons.home,
@@ -129,7 +132,9 @@ class _DrawerrState extends State<Drawerr> {
                               height: height * 0.04,
                               onTap: ()async{
                               await clearCart();
-                                Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
+                                // Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
+
+                                Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
 
                                 // Navigator.pop(context);
                               }, child: Text('Yes',
@@ -193,7 +198,8 @@ class _DrawerrState extends State<Drawerr> {
                                 colorb: primarycolor,
                                 borderradius: 5,
                                 onTap: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context)=> Printersetting()));
+                                  // Navigator.push(context, MaterialPageRoute(builder: (context)=> Printersetting()));
+                                  Navigator.pushNamed(context, RouteNames.restaurantPrinterSettings);
                                   // Handle tap
                                 },
                               ),
@@ -246,7 +252,10 @@ class _DrawerrState extends State<Drawerr> {
                                 colorb: primarycolor,
                                 borderradius: 5,
                                 onTap: () {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomizationPrinter()));
+                                  // Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomizationPrinter()));
+
+                                  Navigator.pushNamed(context, RouteNames.restaurantPrinterCustomization);
+
                                   // Handle tap
                                 },
                               ),
@@ -271,7 +280,9 @@ class _DrawerrState extends State<Drawerr> {
                     //     return CustomizationDrawer();
                     //   },);
 
-                    Navigator.push(context,MaterialPageRoute(builder: (context)=>CustomizationDrawer() ));
+                    // Navigator.push(context,MaterialPageRoute(builder: (context)=>CustomizationDrawer() ));
+
+                    Navigator.pushNamed(context, RouteNames.restaurantCustomizationDrawer);
 
                   },
                   title: 'Customization',
@@ -287,7 +298,11 @@ class _DrawerrState extends State<Drawerr> {
                 ),
                 Listmenu(
                   onTap: (){
-                    Navigator.push(context, MaterialPageRoute(builder: (context)=> ReportsScreen()));
+                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> ReportsScreen()));
+
+
+                    Navigator.pushNamed(context, RouteNames.restaurantReports);
+
                   },
                   title: 'Reports',
                   icons: Icons.auto_graph,
@@ -302,7 +317,9 @@ class _DrawerrState extends State<Drawerr> {
                 ),
                 Listmenu(
                   onTap: (){
-                    Navigator.push(context, MaterialPageRoute(builder: (context)=> ExpenseScreen()));
+                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> ExpenseScreen()));
+                    Navigator.pushNamed(context, RouteNames.restaurantExpenseCategory);
+
                   },
                   title: 'Expenses',
                   icons: Icons.wallet,
@@ -393,9 +410,12 @@ class _DrawerrState extends State<Drawerr> {
                 ),
                 Listmenu(
                   onTap: (){
-                    Navigator.push(context, MaterialPageRoute(builder: (context)=>
+            /*        Navigator.push(context, MaterialPageRoute(builder: (context)=>
                         EndDayDrawer()
-                    ));
+                    ));*/
+
+                    Navigator.pushNamed(context, RouteNames.restaurantEndDay);
+
                   },
                   title: 'End Day',
                   icons: Icons.sunny_snowing,
@@ -863,7 +883,9 @@ class _DrawerrState extends State<Drawerr> {
                 // Test Data Generator (for testing backup)
                 Listmenu(
                   onTap: (){
-                    Navigator.push(context, MaterialPageRoute(builder: (context)=> TestDataScreen()));
+                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> TestDataScreen()));
+                    Navigator.pushNamed(context, RouteNames.restaurantTestData);
+
                   },
                   title: 'Test Data Generator',
                   icons: Icons.data_object,
@@ -879,7 +901,9 @@ class _DrawerrState extends State<Drawerr> {
 
                 Listmenu(
                   onTap:(){
-                    Navigator.push(context, MaterialPageRoute(builder: (context)=> NeedhelpDrawer()));
+                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> NeedhelpDrawer()));
+                    Navigator.pushNamed(context, RouteNames.restaurantNeedHelp);
+
                   },
                   title: 'Need Help?',
                   icons: Icons.person,

@@ -1,24 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/reports.dart';
 import '../../../constants/restaurant/color.dart';
+import '../../../core/routes/routes_name.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
 import '../../../util/restaurant/responsive_helper.dart';
 import '../../widget/componets/restaurant/componets/Button.dart';
 import '../../widget/componets/restaurant/componets/listmenu.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
-
-import 'Expense/Expense.dart';
-import 'ManageStaff/manageStaff.dart';
-import 'Settings/settingsScreen.dart';
-import 'TaxSetting/taxSettings.dart';
-import 'auth/admin_login.dart';
-import 'auth/restaurant_login.dart';
-import 'inventory/manage_Inventory.dart';
-import 'language.dart';
-import 'manage menu/managemenu.dart';
-import 'start order/startorder.dart';
+import 'customer/manage_customers_screen.dart';
 
 class AdminWelcome extends StatefulWidget {
   const AdminWelcome({super.key});
@@ -135,7 +125,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                           onTap: () {
 
 
-                            Navigator.push(context,MaterialPageRoute(builder: (context)=> Startorder()));
+                            Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
                             //
                             // ResponsiveHelper.isDesktop(context)?
                             // Navigator.push(
@@ -156,10 +146,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => Managemenu()));
+                            Navigator.pushNamed(context, RouteNames.restaurantManageMenu);
                           },
                           title: 'Manage Menu',
                           icons: (Icons.manage_accounts)
@@ -174,10 +161,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => manageStaff()));
+                            Navigator.pushNamed(context, RouteNames.restaurantStaff);
                           },
                           title: 'Manage Staff',
                           icons: (Icons.manage_accounts_sharp))),
@@ -187,13 +171,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => ManageInventory()));
+                            Navigator.pushNamed(context, RouteNames.restaurantCustomers);
                           },
-                          title: 'Invatory',
-                          icons: (Icons.inventory)
+                          title: 'Customer',
+                          icons: (Icons.people)
                       )
                   )
                 ],
@@ -206,10 +187,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => ReportsScreen()));
+                            Navigator.pushNamed(context, RouteNames.restaurantReports);
                           },
                           title: 'Reports',
                           icons: (Icons.auto_graph_outlined)
@@ -220,11 +198,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => taxSetting(),
-                                ));
+                            Navigator.pushNamed(context, RouteNames.restaurantTaxSettings);
                           },
                           title: 'Tax Setting',
                           icons: (Icons.settings)
@@ -239,10 +213,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => Settingsscreen()));
+                            Navigator.pushNamed(context, RouteNames.restaurantSettings);
                           },
                           title: 'Setting',
                           icons: (Icons.settings))),
@@ -252,10 +223,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => ExpenseScreen()));
+                            Navigator.pushNamed(context, RouteNames.restaurantExpenses);
                           },
                           title: 'Expense',
                           icons: (Icons.wallet)))
@@ -269,13 +237,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Expanded(
                       child: Listmenu(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => CompanyListScreen()));
+                            Navigator.pushNamed(context, RouteNames.restaurantInventory);
                           },
-                          title: 'Language',
-                          icons: (Icons.language))),
+                          title: 'Inventory',
+                          icons: (Icons.inventory))),
                   SizedBox(
                     width: ResponsiveHelper.responsiveWidth(context, 0.015),
                   ),
@@ -387,7 +352,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                               onTap: () {
 
 
-                                Navigator.push(context,MaterialPageRoute(builder: (context)=> Startorder()));
+                                Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
                                 //
                                 // ResponsiveHelper.isDesktop(context)?
                                 // Navigator.push(
@@ -521,10 +486,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       Expanded(
                           child: Listmenu(
                               onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => CompanyListScreen()));
+                                Navigator.pushNamed(context, RouteNames.restaurantManageCustomers);
                               },
                               title: 'Language',
                               icons: (Icons.language))),
@@ -577,11 +539,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                                                 context, 0.05),
                                             bgcolor: primarycolor,
                                             onTap: () {
-                                              Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          AdminLogin()));
+                                              Navigator.pushNamed(context, RouteNames.restaurantAdminLogin);
                                             },
                                             child: Text(
                                               "Yes",
@@ -729,7 +687,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                           onTap: () {
 
 
-                            Navigator.push(context,MaterialPageRoute(builder: (context)=> Startorder()));
+                            Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
                             //
                             // ResponsiveHelper.isDesktop(context)?
                             // Navigator.push(
@@ -930,11 +888,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   await _clearLoginState();
 
                   // Clear entire navigation stack and go to login screen
-                  Navigator.pushAndRemoveUntil(
+                  Navigator.pushNamedAndRemoveUntil(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const RestaurantLogin(),
-                    ),
+                    RouteNames.restaurantLogin,
                     (route) => false, // Remove all previous routes
                   );
                 },

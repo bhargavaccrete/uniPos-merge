@@ -86,6 +86,9 @@ class OrderModel extends HiveObject {
   @HiveField(25)
   final int? orderNumber; // Daily order number (resets every day, starts from 1)
 
+  @HiveField(26)
+  final String? customerId; // Customer ID linking to RestaurantCustomer
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -115,6 +118,7 @@ class OrderModel extends HiveObject {
     required this.kotBoundaries,
     this.kotStatuses,
     this.orderNumber, // Optional - assigned when order is placed
+    this.customerId, // Optional - customer ID
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -147,6 +151,7 @@ class OrderModel extends HiveObject {
     List<int>? kotBoundaries,
     Map<int, String>? kotStatuses,
     int? orderNumber,
+    String? customerId,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -175,6 +180,7 @@ class OrderModel extends HiveObject {
       kotBoundaries: kotBoundaries ?? this.kotBoundaries,
       kotStatuses: kotStatuses ?? this.kotStatuses,
       orderNumber: orderNumber ?? this.orderNumber,
+      customerId: customerId ?? this.customerId,
     );
   }
 
@@ -249,6 +255,7 @@ class OrderModel extends HiveObject {
       'kotBoundaries': kotBoundaries,
       'kotStatuses': kotStatuses,
       if (orderNumber != null) 'orderNumber': orderNumber,
+      'customerId': customerId,
     };
   }
 
@@ -298,6 +305,7 @@ class OrderModel extends HiveObject {
       )
           : null,
       orderNumber: map['orderNumber'] != null ? _toInt(map['orderNumber']) : null,
+      customerId: map['customerId'] as String?,
     );
   }
 }

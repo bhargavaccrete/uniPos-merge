@@ -179,6 +179,7 @@ class HiveBoxNames {
 
   /// Restaurant test bill box
   static const String testBillBox = 'testBillBox';
+  static const String restaurantCustomer = 'restaurantCustomers';
 
   // ==================== HELPER METHODS ====================
 
@@ -259,6 +260,7 @@ class HiveBoxNames {
     restaurantExpense,
     appCounters,
     testBillBox,
+    restaurantCustomer
   ];
 
   /// All common box names (shared between retail and restaurant)

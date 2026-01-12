@@ -19,6 +19,8 @@ import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/decimal_settings.dart';
 import '../../../../../util/restaurant/currency_helper.dart';
 import '../../../../../stores/payment_method_store.dart';
+import '../../../../../data/models/restaurant/db/customer_model_125.dart';
+import '../../../../../data/models/restaurant/db/database/hive_customer.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -52,6 +54,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
   late TextEditingController _mobileController = TextEditingController();
   late TextEditingController _nameController = TextEditingController();
   late TextEditingController _emailController = TextEditingController();
+
+  // Customer selection
+  RestaurantCustomer? selectedCustomer;
   final _serviceChargeController = TextEditingController();
   final _deliveryChargeController = TextEditingController();
   final _discountController = TextEditingController();
@@ -103,6 +108,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
         text: widget.existingModel?.customerNumber ?? '');
 
     // Currency is loaded in main.dart via CurrencyHelper.load()
+  }
+
+  // Handle customer selection from autocomplete
+  void _onCustomerSelected(RestaurantCustomer customer) {
+    setState(() {
+      selectedCustomer = customer;
+      _nameController.text = customer.name ?? '';
+      _emailController.text = ''; // Email not stored in customer model
+      _mobileController.text = customer.phone ?? '';
+    });
   }
 
   @override
@@ -159,16 +174,165 @@ class _CustomerdetailsState extends State<Customerdetails> {
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
             children: [
-              CommonTextForm(
-                controller: _nameController,
-                borderc: 5,
-                obsecureText: false,
-                BorderColor: primarycolor,
-                labelText: 'Name',
-                LabelColor: primarycolor,
-                focusNode: namenode,
-                onfieldsumbitted: (v) {
-                  FocusScope.of(context).requestFocus(emailnode);
+              // Show selected customer info
+              if (selectedCustomer != null)
+                Container(
+                  width: width,
+                  padding: EdgeInsets.all(12),
+                  margin: EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.green.shade200,
+                        child: Text(
+                          selectedCustomer!.name?.isNotEmpty == true
+                              ? selectedCustomer!.name![0].toUpperCase()
+                              : '?',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              selectedCustomer!.name ?? 'Unknown',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (selectedCustomer!.phone != null)
+                              Text(
+                                selectedCustomer!.phone!,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            Row(
+                              children: [
+                                _buildInfoChip(
+                                  Icons.restaurant,
+                                  '${selectedCustomer!.totalVisites} visits',
+                                  Colors.blue,
+                                ),
+                                SizedBox(width: 8),
+                                _buildInfoChip(
+                                  Icons.stars,
+                                  '${selectedCustomer!.loyaltyPoints} pts',
+                                  Colors.orange,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.clear, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            selectedCustomer = null;
+                            _nameController.clear();
+                            _emailController.clear();
+                            _mobileController.clear();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Autocomplete Name Field
+              Autocomplete<RestaurantCustomer>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<RestaurantCustomer>.empty();
+                  }
+                  return HiveCustomer.searchCustomers(textEditingValue.text);
+                },
+                displayStringForOption: (RestaurantCustomer customer) => customer.name ?? '',
+                onSelected: (RestaurantCustomer customer) {
+                  _onCustomerSelected(customer);
+                },
+                fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
+                  // Sync with _nameController
+                  if (_nameController.text != controller.text) {
+                    controller.text = _nameController.text;
+                    controller.selection = TextSelection.collapsed(offset: controller.text.length);
+                  }
+                  _nameController = controller;
+
+                  return CommonTextForm(
+                    controller: controller,
+                    borderc: 5,
+                    obsecureText: false,
+                    BorderColor: primarycolor,
+                    labelText: 'Name (type to search existing customers)',
+                    LabelColor: primarycolor,
+                    focusNode: focusNode,
+                    onfieldsumbitted: (v) {
+                      FocusScope.of(context).requestFocus(emailnode);
+                    },
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: width * 0.9,
+                        constraints: BoxConstraints(maxHeight: 200),
+                        margin: EdgeInsets.only(top: 8),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final customer = options.elementAt(index);
+                            return ListTile(
+                              dense: true,
+                              leading: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: primarycolor.withOpacity(0.2),
+                                child: Text(
+                                  customer.name?.isNotEmpty == true
+                                      ? customer.name![0].toUpperCase()
+                                      : '?',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: primarycolor,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                customer.name ?? 'Unknown',
+                                style: GoogleFonts.poppins(fontSize: 14),
+                              ),
+                              subtitle: Text(
+                                '${customer.phone ?? ''} • ${customer.totalVisites} visits',
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              ),
+                              onTap: () {
+                                onSelected(customer);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
               SizedBox(height: 10),
@@ -181,24 +345,97 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   LabelColor: primarycolor,
                   obsecureText: false),
               SizedBox(height: 10),
-              CommonTextForm(
-                controller: _mobileController,
-                keyboardType: TextInputType.phone,
-                borderc: 5,
-                BorderColor: primarycolor,
-                labelText: 'Mobile No',
-                LabelColor: primarycolor,
-                obsecureText: false,
-                icon: CountryCodePicker(
-                  padding: EdgeInsets.all(10),
-                  initialSelection: 'IN',
-                  favorite: ['+91', 'IN'],
-                  showCountryOnly: false,
-                  showFlag: false,
-                ),
-                focusNode: mobilenode,
-                onfieldsumbitted: (v) {
-                  FocusScope.of(context).requestFocus(namenode);
+
+              // Autocomplete Mobile Field
+              Autocomplete<RestaurantCustomer>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<RestaurantCustomer>.empty();
+                  }
+                  return HiveCustomer.searchCustomers(textEditingValue.text);
+                },
+                displayStringForOption: (RestaurantCustomer customer) => customer.phone ?? '',
+                onSelected: (RestaurantCustomer customer) {
+                  _onCustomerSelected(customer);
+                },
+                fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
+                  // Sync with _mobileController
+                  if (_mobileController.text != controller.text) {
+                    controller.text = _mobileController.text;
+                    controller.selection = TextSelection.collapsed(offset: controller.text.length);
+                  }
+                  _mobileController = controller;
+
+                  return CommonTextForm(
+                    controller: controller,
+                    keyboardType: TextInputType.phone,
+                    borderc: 5,
+                    BorderColor: primarycolor,
+                    labelText: 'Mobile No (type to search)',
+                    LabelColor: primarycolor,
+                    obsecureText: false,
+                    icon: CountryCodePicker(
+                      padding: EdgeInsets.all(10),
+                      initialSelection: 'IN',
+                      favorite: ['+91', 'IN'],
+                      showCountryOnly: false,
+                      showFlag: false,
+                    ),
+                    focusNode: focusNode,
+                    onfieldsumbitted: (v) {
+                      FocusScope.of(context).requestFocus(namenode);
+                    },
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: width * 0.9,
+                        constraints: BoxConstraints(maxHeight: 200),
+                        margin: EdgeInsets.only(top: 8),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final customer = options.elementAt(index);
+                            return ListTile(
+                              dense: true,
+                              leading: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: primarycolor.withOpacity(0.2),
+                                child: Text(
+                                  customer.name?.isNotEmpty == true
+                                      ? customer.name![0].toUpperCase()
+                                      : '?',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: primarycolor,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                customer.name ?? 'Unknown',
+                                style: GoogleFonts.poppins(fontSize: 14),
+                              ),
+                              subtitle: Text(
+                                '${customer.phone ?? ''} • ${customer.totalVisites} visits',
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              ),
+                              onTap: () {
+                                onSelected(customer);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
               SizedBox(height: 10),
@@ -688,9 +925,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
       tableNo: widget.tableid,
       isPaid: true,
       paymentStatus: 'Paid',
+      customerId: selectedCustomer?.customerId, // Link to customer
     );
     try {
       final int billNumber = await completeOrder(completedOrder, calculations);
+
+      // Update customer stats if customer is linked
+      if (selectedCustomer != null) {
+        await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
+      }
+
       await HiveTables.updateTableStatus(widget.tableid!, 'Available');
       // _showSnackBar('Order Completed Successfully!');
 
@@ -784,6 +1028,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
       try {
         await HivePastOrder.addOrder(pastOrder);
+
+        // Update customer stats if customer is linked
+        if (selectedCustomer != null) {
+          await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
+        }
+
         await HiveCart.clearCart();
 
         NotificationService.instance.showSuccess(
@@ -829,9 +1079,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
       kotNumbers: [newKotNumber],
       itemCountAtLastKot: orderItems.length,
       kotBoundaries: [orderItems.length], // First KOT boundary at item count
+      customerId: selectedCustomer?.customerId, // Link to customer
     );
     try {
       await HiveOrders.addOrder(newOrder);
+
+      // Update customer stats if customer is linked
+      if (selectedCustomer != null) {
+        await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
+      }
+
       if (widget.tableid != null && widget.tableid!.isNotEmpty) {
         await HiveTables.updateTableStatus(
           widget.tableid!,
@@ -1023,11 +1280,68 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
   }
 
+  // Update customer statistics (visits, loyalty points, last visit, etc.)
+  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType) async {
+    try {
+      print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
+      print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
+
+      await HiveCustomer.updateCustomerVisit(
+        customerId: customer.customerId,
+        orderType: orderType,
+        pointsToAdd: 10, // Award 10 points per order
+      );
+
+      // Verify the update
+      final updatedCustomer = HiveCustomer.getCustomerById(customer.customerId);
+      if (updatedCustomer != null) {
+        print('✅ Customer stats updated successfully!');
+        print('✅ New visits: ${updatedCustomer.totalVisites}, New points: ${updatedCustomer.loyaltyPoints}');
+      } else {
+        print('❌ Failed to verify customer update');
+      }
+    } catch (e) {
+      print('❌ Error updating customer stats: $e');
+    }
+  }
+
   Future<void> _submitOrder(CartCalculationService calculations) async {
+    // Debug log to verify customer selection
+    if (selectedCustomer != null) {
+      print('📋 Order being placed for customer: ${selectedCustomer!.name} (ID: ${selectedCustomer!.customerId})');
+    } else {
+      print('📋 Order being placed without customer selection');
+    }
+
     if (widget.isSettle == true) {
       await _placeOrder(calculations);
     } else {
       await proceed(calculations);
     }
+  }
+
+  Widget _buildInfoChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

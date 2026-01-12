@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/TaxSetting/addMultipleTax.dart';
 import 'package:unipos/presentation/screens/restaurant/TaxSetting/taxRagistration.dart';
 
@@ -42,7 +43,10 @@ class taxSetting extends StatelessWidget {
                     width: width  ,
                     height: height * 0.05,
                     onTap: () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (context)=>Taxragistration()));
+                      // Navigator.of(context).push(MaterialPageRoute(builder: (context)=>Taxragistration()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantTaxRegistration);
+
 
                     },
                     child: Center(

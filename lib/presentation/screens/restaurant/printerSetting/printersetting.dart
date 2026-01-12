@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
@@ -163,8 +164,10 @@ class _PrintersettingState extends State<Printersetting> {
                 width: width * 0.6,
                 height: height * 0.15,
                 onTap: () {
-                  Navigator.push(context,
-                      MaterialPageRoute(builder: (context) => AddPrinter()));
+                  // Navigator.push(context,
+                  //     MaterialPageRoute(builder: (context) => AddPrinter()));
+                  Navigator.pushNamed(context, RouteNames.restaurantAddPrinter);
+
                 },
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,

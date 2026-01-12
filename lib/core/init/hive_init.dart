@@ -57,6 +57,7 @@ import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
+import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 
 /// Hive Initialization Class
 /// Handles all adapter registrations and box openings
@@ -529,6 +530,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.TestBill)) {
       Hive.registerAdapter(TestBillModelAdapter());
     }
+    // RestaurantCustomer - 125
+    if (!Hive.isAdapterRegistered(HiveTypeIds.RestaurantCustomer)) {
+      Hive.registerAdapter(RestaurantCustomerAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -573,6 +578,9 @@ class HiveInit {
     await Hive.openBox(HiveBoxNames.dayManagementBox);
 
     await Hive.openBox<TestBillModel>(HiveBoxNames.testBillBox);
+
+    // Restaurant Customer
+    await Hive.openBox<RestaurantCustomer>(HiveBoxNames.restaurantCustomer);
 
     _areRestaurantBoxesOpen = true;
     print('✅ All restaurant boxes opened successfully with correct names and guard flag set');

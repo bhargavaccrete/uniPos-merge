@@ -324,6 +324,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Re
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 
 import '../../../../constants/restaurant/color.dart';
+import '../../../../core/routes/routes_name.dart';
 import '../../../widget/componets/restaurant/componets/custom_menu.dart';
 import 'dailyClosingReports/dailyclosing.dart';
 import 'expenseReport/expensereport.dart';
@@ -365,7 +366,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CustomMenu(
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> Totalsales() ));
+                        // Navigator.push(context, MaterialPageRoute(builder: (context)=> Totalsales() ));
+
+                        Navigator.pushNamed(context, RouteNames.restaurantReportsTotalSales);
+
                       },
                       icons: Icons.shopping_bag_outlined,
                       title: 'Total Sale'),
@@ -374,7 +378,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                   CustomMenu(
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> Salesbyitem()));
+                        // Navigator.push(context, MaterialPageRoute(builder: (context)=> Salesbyitem()));
+                        Navigator.pushNamed(context, RouteNames.restaurantReportsSalesBYItem);
                       },
                       icons: Icons.fastfood,color: Colors.deepOrangeAccent,
                       title: 'Sales BY Items'),
@@ -389,7 +394,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> SalesbyCategory()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context)=> SalesbyCategory()));
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsSalesByCategory);
                     },
                     icons: Icons.category,
                     color: Colors.deepOrangeAccent,
@@ -400,7 +406,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> DailyClosingReport()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context)=> DailyClosingReport()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsDailyClosingReport);
 
                     },
                     icons: Icons.auto_graph,
@@ -420,7 +428,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                   CustomMenu(
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> SalesbyTop()));
+                        // Navigator.push(context, MaterialPageRoute(builder: (context)=> SalesbyTop()));
+
+                        Navigator.pushNamed(context, RouteNames.restaurantReportsSalesByTop);
+
 
                       },
                       icons: Icons.graphic_eq_outlined,
@@ -431,7 +442,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomerListReport()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomerListReport()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsCustomerList);
 
                     },
                     icons: Icons.list_alt,
@@ -452,8 +465,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> ComparisonByWeek()));
-
+                      // Navigator.push(context, MaterialPageRoute(builder: (context)=> ComparisonByWeek()));
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByWeek);
                     },
                     icons: Icons.view_week,
                     color: primarycolor,
@@ -464,7 +477,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> ComparisonByMonth()));
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByMonth);
 
                     },
                     icons: Icons.view_week,
@@ -480,7 +493,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> ComparisonByYear()));
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByYear);
 
                     },
                     icons: Icons.view_week,
@@ -492,7 +505,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> ComparisonByProduct()));
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByProduct);
 
                     },
                     icons: Icons.view_week,
@@ -510,7 +523,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> RefundDetails()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context)=> RefundDetails()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsRefundDetails);
 
                     },
                     icons: Icons.backspace_outlined,
@@ -522,7 +537,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> VoidOrderReport()));
+                      // Navigator.push(context, MaterialPageRoute(builder: (context)=> VoidOrderReport()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsVoidOrderReport);
 
                     },
                     icons: Icons.list_alt,
@@ -538,7 +555,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> DiscountOrderReport()));
+                      Navigator.pushNamed(context, RouteNames.restaurantReportsDiscountOrderReport);
 
                     },
                     icons: Icons.note_alt_outlined,
@@ -596,7 +613,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CustomMenu(
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=> PerformanceStatisticsReport()));
+                      Navigator.pushNamed(context, RouteNames.restaurantPerformanceStats);
+
                     },
                     icons: Icons.analytics,
                     color: Colors.purple,

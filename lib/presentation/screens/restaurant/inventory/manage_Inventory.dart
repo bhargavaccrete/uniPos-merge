@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:hive_flutter/adapters.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:unipos/presentation/screens/restaurant/inventory/stockHistoy.dart';
 
@@ -556,10 +557,14 @@ class _ManageInventoryState extends State<ManageInventory> {
                         width: width * 0.42,
                         height: height * 0.05,
                         onTap: () {
-                          Navigator.push(
+                       /*   Navigator.push(
                               context,
                               MaterialPageRoute(
                                   builder: (context) => StockHistory()));
+
+                       */
+                       Navigator.pushNamed(context,RouteNames.restaurantStockHistory);
+
                         },
                         child: Text(
                           'Stock History',

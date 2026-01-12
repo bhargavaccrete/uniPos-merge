@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 
 import '../../../constants/restaurant/color.dart';
 import '../../../constants/restaurant/font.dart';
@@ -55,6 +56,10 @@ class AuthSelectionScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (context) => loginScreen()));
+                    Navigator.pushNamed(context, RouteNames.restaurantChangePassword);
+
+
+
                   },
                   child: Center(
                       child: Text('Login',

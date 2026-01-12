@@ -3,6 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:unipos/constants/restaurant/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/core/routes/app_routes.dart';
+import 'package:unipos/core/routes/restaurant_routes.dart';
+import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart' hide Expense;
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
@@ -119,8 +122,11 @@ class _AddexpenceState extends State<Addexpence> {
                       width: width * 0.5,
                       height: height * 0.05,
                       onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context)=> ManageCategory()));
-                      },
+                        // Navigator.push(context, MaterialPageRoute(builder: (context)=> ManageCategory()));
+
+                      Navigator.pushNamed(context, RouteNames.restaurantExpenseCategory);
+
+                        },
                       child: Text('Manage Category',
                           textScaler: TextScaler.linear(1),
                           style: GoogleFonts.poppins(color: primarycolor)))
