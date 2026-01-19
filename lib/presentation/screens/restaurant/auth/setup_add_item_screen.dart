@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
@@ -268,7 +269,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             child: Text(
               'OK',
               style: GoogleFonts.poppins(
-                color: primarycolor,
+                color: AppColors.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -594,7 +595,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.upload_file, color: primarycolor),
+          icon: Icon(Icons.upload_file, color: AppColors.primary),
           tooltip: 'Bulk Import',
           onPressed: () async {
             await Navigator.push(
@@ -654,7 +655,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: primarycolor, size: 22),
+        Icon(icon, color: AppColors.primary, size: 22),
         const SizedBox(width: 10),
         Text(
           title,
@@ -674,13 +675,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            primarycolor.withOpacity(0.1),
+            AppColors.primary.withOpacity(0.1),
             Colors.blue.withOpacity(0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: primarycolor.withOpacity(0.3),
+          color: AppColors.primary.withOpacity(0.3),
           width: 2,
         ),
       ),
@@ -692,13 +693,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: primarycolor.withOpacity(0.15),
+                  color: AppColors.primary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   Icons.table_chart,
                   size: 32,
-                  color: primarycolor,
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 15),
@@ -751,7 +752,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primarycolor,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -839,7 +840,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.category, color: primarycolor),
+                  Icon(Icons.category, color: AppColors.primary),
                   const SizedBox(width: 15),
                   Expanded(
                     child: Column(
@@ -1102,7 +1103,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                prefixIcon: Icon(Icons.straighten, color: primarycolor),
+                prefixIcon: Icon(Icons.straighten, color: AppColors.primary),
               ),
               items: _units.map((unit) {
                 return DropdownMenuItem<String>(
@@ -1131,22 +1132,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
         decoration: BoxDecoration(
           border: Border.all(
-            color: isSelected ? primarycolor : Colors.grey[300]!,
+            color: isSelected ? AppColors.primary : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(10),
-          color: isSelected ? primarycolor.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? primarycolor : Colors.grey[600], size: 28),
+            Icon(icon, color: isSelected ? AppColors.primary : Colors.grey[600], size: 28),
             const SizedBox(height: 8),
             Text(
               label,
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? primarycolor : Colors.black87,
+                color: isSelected ? AppColors.primary : Colors.black87,
               ),
             ),
           ],
@@ -1187,7 +1188,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               ),
             ),
             value: _trackInventory,
-            activeColor: primarycolor,
+            activeColor: AppColors.primary,
             onChanged: (value) => setState(() {
               _trackInventory = value;
               if (!value) {
@@ -1224,7 +1225,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 ),
               ),
               value: _allowOrderWhenOutOfStock,
-              activeColor: primarycolor,
+              activeColor: AppColors.primary,
               onChanged: (value) => setState(() => _allowOrderWhenOutOfStock = value),
             ),
           ],
@@ -1284,10 +1285,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? primarycolor.withOpacity(0.1) : Colors.grey[50],
+                  color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey[50],
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isSelected ? primarycolor : Colors.grey[300]!,
+                    color: isSelected ? AppColors.primary : Colors.grey[300]!,
                     width: isSelected ? 2 : 1,
                   ),
                 ),
@@ -1314,7 +1315,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                       color: Colors.grey[600],
                     ),
                   ),
-                  activeColor: primarycolor,
+                  activeColor: AppColors.primary,
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 ),
@@ -1427,7 +1428,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: primarycolor,
+                              color: AppColors.primary,
                             ),
                           ),
                         ],
@@ -1468,16 +1469,16 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
             border: Border.all(
-              color: hasSelections ? primarycolor : Colors.grey[300]!,
+              color: hasSelections ? AppColors.primary : Colors.grey[300]!,
             ),
             borderRadius: BorderRadius.circular(8),
-            color: hasSelections ? primarycolor.withOpacity(0.05) : Colors.transparent,
+            color: hasSelections ? AppColors.primary.withOpacity(0.05) : Colors.transparent,
           ),
           child: Row(
             children: [
               Icon(
                 Icons.extension,
-                color: hasSelections ? primarycolor : Colors.grey[600],
+                color: hasSelections ? AppColors.primary : Colors.grey[600],
               ),
               const SizedBox(width: 15),
               Expanded(
@@ -1499,7 +1500,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                           : 'Add variants, choices, and extras',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: hasSelections ? primarycolor : Colors.grey[600],
+                        color: hasSelections ? AppColors.primary : Colors.grey[600],
                       ),
                     ),
                   ],
@@ -1531,7 +1532,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           Expanded(
             child: CommonButton(
               onTap: _saveItem,
-              bgcolor: primarycolor,
+              bgcolor: AppColors.primary,
               bordercircular: 10,
               height: ResponsiveHelper.responsiveHeight(context, 0.06),
               child: Row(

@@ -15,9 +15,8 @@ import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
-import '../../../../../util/restaurant/decimal_settings.dart';
-import '../../../../../util/restaurant/currency_helper.dart';
 import '../../../../../stores/payment_method_store.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../data/models/restaurant/db/database/hive_customer.dart';
@@ -26,7 +25,8 @@ import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../startorder.dart';
 import '../../util/restaurant_print_helper.dart';
-
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/color.dart';
 enum DiscountType { amount, percentage }
 
 class Customerdetails extends StatefulWidget {
@@ -275,9 +275,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     controller: controller,
                     borderc: 5,
                     obsecureText: false,
-                    BorderColor: primarycolor,
+                    BorderColor: AppColors.primary,
                     labelText: 'Name (type to search existing customers)',
-                    LabelColor: primarycolor,
+                    LabelColor: AppColors.primary,
                     focusNode: focusNode,
                     onfieldsumbitted: (v) {
                       FocusScope.of(context).requestFocus(emailnode);
@@ -304,7 +304,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                               dense: true,
                               leading: CircleAvatar(
                                 radius: 18,
-                                backgroundColor: primarycolor.withOpacity(0.2),
+                                backgroundColor: AppColors.primary.withOpacity(0.2),
                                 child: Text(
                                   customer.name?.isNotEmpty == true
                                       ? customer.name![0].toUpperCase()
@@ -312,7 +312,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: primarycolor,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ),
@@ -340,9 +340,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   focusNode: emailnode,
                   controller: _emailController,
                   borderc: 5,
-                  BorderColor: primarycolor,
+                  BorderColor: AppColors.primary,
                   labelText: 'Email Id (optional)',
-                  LabelColor: primarycolor,
+                  LabelColor: AppColors.primary,
                   obsecureText: false),
               SizedBox(height: 10),
 
@@ -370,9 +370,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     controller: controller,
                     keyboardType: TextInputType.phone,
                     borderc: 5,
-                    BorderColor: primarycolor,
+                    BorderColor: AppColors.primary,
                     labelText: 'Mobile No (type to search)',
-                    LabelColor: primarycolor,
+                    LabelColor: AppColors.primary,
                     obsecureText: false,
                     icon: CountryCodePicker(
                       padding: EdgeInsets.all(10),
@@ -407,7 +407,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                               dense: true,
                               leading: CircleAvatar(
                                 radius: 18,
-                                backgroundColor: primarycolor.withOpacity(0.2),
+                                backgroundColor: AppColors.primary.withOpacity(0.2),
                                 child: Text(
                                   customer.name?.isNotEmpty == true
                                       ? customer.name![0].toUpperCase()
@@ -415,7 +415,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: primarycolor,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ),
@@ -456,11 +456,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           obsecureText: false,
                           controller: _houseController,
                           borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
+                          BorderColor: AppColors.primary,
+                          // HintColor: AppColors.primary,
                           // hintText: 'Name',
                           labelText: 'House NO',
-                          LabelColor: primarycolor,
+                          LabelColor: AppColors.primary,
                         ),
                         SizedBox(
                           height: 10,
@@ -469,11 +469,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           obsecureText: false,
                           controller: _stateController,
                           borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
+                          BorderColor: AppColors.primary,
+                          // HintColor: AppColors.primary,
                           // hintText: 'Name',
                           labelText: 'State',
-                          LabelColor: primarycolor,
+                          LabelColor: AppColors.primary,
                         ),
                         SizedBox(
                           height: 10,
@@ -481,12 +481,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
                         CommonTextForm(
                           obsecureText: false,
                           borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
+                          BorderColor: AppColors.primary,
+                          // HintColor: AppColors.primary,
                           // hintText: 'Name',
                           controller: _cityController,
                           labelText: 'City',
-                          LabelColor: primarycolor,
+                          LabelColor: AppColors.primary,
                         ),
                         SizedBox(
                           height: 10,
@@ -494,12 +494,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
                         CommonTextForm(
                           obsecureText: false,
                           borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
+                          BorderColor: AppColors.primary,
+                          // HintColor: AppColors.primary,
                           // hintText: 'Name',
                           controller: _areaController,
                           labelText: 'Area',
-                          LabelColor: primarycolor,
+                          LabelColor: AppColors.primary,
                         ),
                         SizedBox(
                           height: 10,
@@ -507,12 +507,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
                         CommonTextForm(
                           obsecureText: false,
                           borderc: 10,
-                          BorderColor: primarycolor,
-                          // HintColor: primarycolor,
+                          BorderColor: AppColors.primary,
+                          // HintColor: AppColors.primary,
                           // hintText: 'Name',
                           controller: _postCodeController,
                           labelText: 'Post Code',
-                          LabelColor: primarycolor,
+                          LabelColor: AppColors.primary,
                         ),
                         SizedBox(
                           height: 10,
@@ -542,10 +542,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
                         height: height * 0.05,
                         bgcolor: servicechargeapply
                             ? Colors.red.shade300
-                            : primarycolor,
+                            : AppColors.primary,
                         bordercolor: servicechargeapply
                             ? Colors.red.shade300
-                            : primarycolor,
+                            : AppColors.primary,
                         onTap: () {
                           servicechargeapply == false
                               ? setState(() {
@@ -642,10 +642,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
                               height: height * 0.05,
                               bgcolor: discountApply
                                   ? Colors.red.shade300
-                                  : primarycolor,
+                                  : AppColors.primary,
                               bordercolor: discountApply
                                   ? Colors.red.shade300
-                                  : primarycolor,
+                                  : AppColors.primary,
                               onTap: () {
                                 setState(() {
                                   if (discountApply) {
@@ -1160,7 +1160,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
             icon: const Icon(Icons.print, size: 18),
             label: const Text('Print Receipt'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: primarycolor,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
           ),
@@ -1244,7 +1244,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
             icon: const Icon(Icons.print, size: 18),
             label: const Text('Print Bill'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: primarycolor,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
           ),

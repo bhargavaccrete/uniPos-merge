@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 
 class OnlineOrderDesktop extends StatelessWidget {
@@ -31,14 +32,14 @@ class OnlineOrderDesktop extends StatelessWidget {
                     width:width * 0.2,
                     height: height * 0.04,
                     decoration: BoxDecoration(
-                      border: Border.all(color: primarycolor)
+                      border: Border.all(color: AppColors.primary)
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
                             decoration:BoxDecoration(
-                              border: Border.all(color: primarycolor),
+                              border: Border.all(color: AppColors.primary),
                               shape: BoxShape.circle,
 
                             ),
@@ -59,7 +60,7 @@ class OnlineOrderDesktop extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   // crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Lottie.asset(notfoundanimation,height: height * 0.3),
+                    Lottie.asset(AppImages.notfoundanimation,height: height * 0.3),
 
                     Text('No Order Found',style: GoogleFonts.poppins(fontWeight: FontWeight.w600,fontSize: 16),)
 

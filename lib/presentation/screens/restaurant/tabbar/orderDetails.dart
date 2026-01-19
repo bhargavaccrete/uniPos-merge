@@ -1,9 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-
+import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
-import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/database/hive_db.dart';
 import '../../../../data/models/restaurant/db/database/hive_pastorder.dart';
@@ -11,12 +10,12 @@ import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/cart_calculation_service.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
-import '../../../../util/restaurant/currency_helper.dart';
 import '../util/restaurant_print_helper.dart';
 import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
-
+import '../../../../util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/color.dart';
 class Orderdetails extends StatefulWidget {
   final pastOrderModel? Order;
   const Orderdetails({super.key, this.Order});
@@ -70,7 +69,7 @@ class _OrderdetailsState extends State<Orderdetails> {
 
         }, icon: Icon(Icons.arrow_back,color: Colors.white,)),
 
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text('Order Details', style: GoogleFonts.poppins(color: Colors.white)),
       ),
       bottomNavigationBar: SafeArea(
@@ -906,7 +905,7 @@ class _ActionBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = outlined ? Colors.transparent : (color ?? Theme.of(context).primaryColor);
+    final bg = outlined ? Colors.transparent : (color ?? AppColors.primary);
     final fg = outlined ? Theme.of(context).textTheme.bodyMedium?.color : Colors.white;
     final border = outlined ? BorderSide(color: Colors.black12) : BorderSide.none;
 

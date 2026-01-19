@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 
@@ -30,7 +31,7 @@ class SwitchList extends StatelessWidget {
       color: Colors.grey.shade100,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: primarycolor),
+        side: BorderSide(color: AppColors.primary),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -53,7 +54,7 @@ class SwitchList extends StatelessWidget {
                   ),
                 ),
                 Switch(
-                  activeColor: primarycolor,
+                  activeColor: AppColors.primary,
                   value: isvalue,
                   onChanged: onChanged,
                 ),

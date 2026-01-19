@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
-
+import 'package:unipos/util/color.dart';
 class TaxSelectionScreen extends StatefulWidget {
   final String? selectedTaxId;
   final double? currentTaxRate;
@@ -62,7 +62,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_circle_outline, color: primarycolor),
+            icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
             onPressed: () => _showAddTaxDialog(),
             tooltip: 'Add New Tax',
           ),
@@ -170,7 +170,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: isSelected ? primarycolor : Colors.grey.shade300,
+          color: isSelected ? AppColors.primary : Colors.grey.shade300,
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -183,7 +183,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
         },
         leading: Icon(
           isSelected ? Icons.check_circle : Icons.circle_outlined,
-          color: isSelected ? primarycolor : Colors.grey,
+          color: isSelected ? AppColors.primary : Colors.grey,
         ),
         title: Text(
           name,
@@ -228,13 +228,13 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
             child: CommonButton(
               onTap: () => Navigator.pop(context),
               bgcolor: Colors.white,
-              bordercolor: primarycolor,
+              bordercolor: AppColors.primary,
               bordercircular: 10,
               height: ResponsiveHelper.responsiveHeight(context, 0.06),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
-                  color: primarycolor,
+                  color: AppColors.primary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -370,7 +370,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: primarycolor,
+              backgroundColor: AppColors.primary,
             ),
             child: Text(
               'Add Tax',

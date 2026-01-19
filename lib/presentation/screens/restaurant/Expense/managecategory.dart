@@ -6,7 +6,7 @@ import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.d
 import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:uuid/uuid.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
@@ -125,7 +125,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                                         height: height * 0.07,
                                         child: CommonTextForm(
                                             borderc: 0,
-                                            BorderColor: primarycolor,
+                                            BorderColor: AppColors.primary,
                                             controller: categoryController,
                                             HintColor: Colors.grey,
                                             hintText: 'Enter Category Name',

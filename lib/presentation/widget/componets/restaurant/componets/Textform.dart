@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 
@@ -67,7 +68,7 @@ class CommonTextForm extends StatelessWidget {
         focusedBorder:
             OutlineInputBorder(
                 borderSide: BorderSide(
-                  color: BorderColor ?? primarycolor
+                  color: BorderColor ?? AppColors.primary
                 ),
                 borderRadius: BorderRadius.circular(borderc??15)),
         enabledBorder:

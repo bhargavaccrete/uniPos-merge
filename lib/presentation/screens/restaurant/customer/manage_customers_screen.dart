@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
@@ -32,7 +32,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text(
           'Manage Customers',
           style: GoogleFonts.poppins(
@@ -58,8 +58,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
               controller: _searchController,
               hintText: 'Search by name, phone, or email',
               obsecureText: false,
-              BorderColor: primarycolor,
-              icon: Icon(Icons.search, color: primarycolor),
+              BorderColor: AppColors.primary,
+              icon: Icon(Icons.search, color: AppColors.primary),
               gesture: _searchQuery.isNotEmpty
                   ? GestureDetector(
                       onTap: () {
@@ -160,7 +160,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddCustomerDialog(context),
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         child: Icon(Icons.person_add, color: Colors.white),
       ),
     );
@@ -187,7 +187,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
               // Avatar
               CircleAvatar(
                 radius: 30,
-                backgroundColor: primarycolor.withOpacity(0.2),
+                backgroundColor: AppColors.primary.withOpacity(0.2),
                 child: Text(
                   customer.name?.isNotEmpty == true
                       ? customer.name![0].toUpperCase()
@@ -195,7 +195,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 24,
                     fontWeight: FontWeight.w600,
-                    color: primarycolor,
+                    color: AppColors.primary,
                   ),
                 ),
               ),
@@ -318,8 +318,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   controller: nameController,
                   hintText: 'Customer Name',
                   obsecureText: false,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.person, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.person, color: AppColors.primary),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Name is required';
@@ -333,8 +333,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Phone Number',
                   obsecureText: false,
                   keyboardType: TextInputType.number,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.phone, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
                     if (value != null && value.isNotEmpty && value.length < 10) {
                       return 'Enter valid phone number';
@@ -348,8 +348,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Email (Optional)',
                   obsecureText: false,
                   keyboardType: TextInputType.emailAddress,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.email, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.email, color: AppColors.primary),
                 ),
                 SizedBox(height: 15),
                 CommonTextForm(
@@ -357,8 +357,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Address (Optional)',
                   obsecureText: false,
                   maxline: 2,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.location_on, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.location_on, color: AppColors.primary),
                 ),
                 SizedBox(height: 15),
                 CommonTextForm(
@@ -366,8 +366,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Notes (Optional)',
                   obsecureText: false,
                   maxline: 2,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.note, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.note, color: AppColors.primary),
                 ),
               ],
             ),
@@ -397,7 +397,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             child: Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
             height: 40,
             width: 80,
-            bgcolor: primarycolor,
+            bgcolor: AppColors.primary,
           ),
         ],
       ),
@@ -429,8 +429,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   controller: nameController,
                   hintText: 'Customer Name',
                   obsecureText: false,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.person, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.person, color: AppColors.primary),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Name is required';
@@ -444,8 +444,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Phone Number',
                   obsecureText: false,
                   keyboardType: TextInputType.number,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.phone, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
                     if (value != null && value.isNotEmpty && value.length < 10) {
                       return 'Enter valid phone number';
@@ -459,8 +459,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Email (Optional)',
                   obsecureText: false,
                   keyboardType: TextInputType.emailAddress,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.email, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.email, color: AppColors.primary),
                 ),
                 SizedBox(height: 15),
                 CommonTextForm(
@@ -468,8 +468,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Address (Optional)',
                   obsecureText: false,
                   maxline: 2,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.location_on, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.location_on, color: AppColors.primary),
                 ),
                 SizedBox(height: 15),
                 CommonTextForm(
@@ -477,8 +477,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Notes (Optional)',
                   obsecureText: false,
                   maxline: 2,
-                  BorderColor: primarycolor,
-                  icon: Icon(Icons.note, color: primarycolor),
+                  BorderColor: AppColors.primary,
+                  icon: Icon(Icons.note, color: AppColors.primary),
                 ),
               ],
             ),
@@ -509,7 +509,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             child: Text('Update', style: GoogleFonts.poppins(color: Colors.white)),
             height: 40,
             width: 80,
-            bgcolor: primarycolor,
+            bgcolor: AppColors.primary,
           ),
         ],
       ),
@@ -526,7 +526,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           children: [
             CircleAvatar(
               radius: 25,
-              backgroundColor: primarycolor.withOpacity(0.2),
+              backgroundColor: AppColors.primary.withOpacity(0.2),
               child: Text(
                 customer.name?.isNotEmpty == true
                     ? customer.name![0].toUpperCase()
@@ -534,7 +534,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: primarycolor,
+                  color: AppColors.primary,
                 ),
               ),
             ),
@@ -572,7 +572,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Close',
-              style: GoogleFonts.poppins(color: primarycolor),
+              style: GoogleFonts.poppins(color: AppColors.primary),
             ),
           ),
           CommonButton(
@@ -583,7 +583,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             child: Text('Edit', style: GoogleFonts.poppins(color: Colors.white)),
             height: 40,
             width: 80,
-            bgcolor: primarycolor,
+            bgcolor: AppColors.primary,
           ),
         ],
       ),
@@ -596,7 +596,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: primarycolor),
+          Icon(icon, size: 20, color: AppColors.primary),
           SizedBox(width: 12),
           Expanded(
             child: Column(

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/comparisonbyproduct/monthwisecomparison.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/comparisonbyproduct/thisweekbycomparison.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/comparisonbyproduct/todaybycomparison.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/comparisonbyproduct/yearwisebyComparison.dart';
-
+import 'package:unipos/util/color.dart';
 class ComparisonByProduct extends StatefulWidget {
   const ComparisonByProduct({super.key});
 
@@ -37,7 +37,7 @@ class _ComparisonByProductState extends State<ComparisonByProduct> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text("Comparison By Product",
             textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(
@@ -94,12 +94,12 @@ class _ComparisonByProductState extends State<ComparisonByProduct> {
         },
         style: ElevatedButton.styleFrom(
             backgroundColor:
-            selectedFilter == title ? primarycolor : Colors.white,
+            selectedFilter == title ? AppColors.primary : Colors.white,
             foregroundColor:
-            selectedFilter == title ? Colors.white : primarycolor,
+            selectedFilter == title ? Colors.white : AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor))),
+                side: BorderSide(color: AppColors.primary))),
         child: Text(title));
   }
 

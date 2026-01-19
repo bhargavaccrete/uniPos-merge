@@ -5,15 +5,14 @@ import 'package:intl/intl.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/expensel_316.dart';
 import '../../../../data/models/restaurant/db/expensemodel_315.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
-import '../../../../util/restaurant/currency_helper.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 class ViewExpense extends StatefulWidget {
   const ViewExpense({super.key});
 
@@ -167,7 +166,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                         width: double.infinity,
                         height: 50,
                         decoration: BoxDecoration(
-                          border: Border.all(color: primarycolor),
+                          border: Border.all(color: AppColors.primary),
                         ),
                         child: Center(
                           child: Text(
@@ -186,7 +185,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     CommonTextForm(
                       controller: amountController,
                       hintText: 'Enter Amount',
-                      BorderColor: primarycolor,
+                      BorderColor: AppColors.primary,
                       HintColor: Colors.grey,
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
                       borderc: 0,
@@ -206,7 +205,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                           padding: EdgeInsets.all(8),
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
@@ -244,7 +243,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     CommonTextForm(
                       controller: reasonController,
                       hintText: 'Enter Reason',
-                      BorderColor: primarycolor,
+                      BorderColor: AppColors.primary,
                       HintColor: Colors.grey,
                       borderc: 0,
                       obsecureText: false,
@@ -259,7 +258,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                       padding: EdgeInsets.all(8),
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        border: Border.all(color: primarycolor),
+                        border: Border.all(color: AppColors.primary),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
@@ -382,7 +381,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                             width: width * 0.44,
                             height: height * 0.05,
                             decoration:BoxDecoration(
-                                border: Border.all(color:primarycolor)
+                                border: Border.all(color:AppColors.primary)
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -418,7 +417,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                             width: width * 0.44,
                             height: height * 0.05,
                             decoration:BoxDecoration(
-                                border: Border.all(color:primarycolor)
+                                border: Border.all(color:AppColors.primary)
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -511,7 +510,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: primarycolor,
+                        backgroundColor: AppColors.primary,
                         child: Icon(
                           Icons.account_balance_wallet,
                           color: Colors.white,

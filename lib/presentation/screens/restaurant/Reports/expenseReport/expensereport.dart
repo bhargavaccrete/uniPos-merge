@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../core/di/service_locator.dart';
 enum TimePeriod { Today, Month, Year, Custom }
 
@@ -24,7 +23,7 @@ class _ExpenseReportState extends State<ExpenseReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text(
           "Expense Report",
           style: GoogleFonts.poppins(
@@ -84,7 +83,7 @@ class _ExpenseReportState extends State<ExpenseReport> {
         });
       },
       style: ElevatedButton.styleFrom(
-        backgroundColor: isSelected ? primarycolor : Colors.grey.shade300,
+        backgroundColor: isSelected ? AppColors.primary : Colors.grey.shade300,
         foregroundColor: isSelected ? Colors.white : Colors.black87,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -219,7 +218,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: primarycolor),
+            colorScheme: ColorScheme.light(primary: AppColors.primary),
           ),
           child: child!,
         );
@@ -255,7 +254,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
               icon: const Icon(Icons.date_range),
               label: const Text('Pick Date Range'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primarycolor,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
@@ -290,7 +289,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
         // Summary Card
         Card(
           elevation: 4,
-          color: primarycolor,
+          color: AppColors.primary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -416,7 +415,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
-                                    color: primarycolor,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                                 if (expense.reason != null && expense.reason!.isNotEmpty)

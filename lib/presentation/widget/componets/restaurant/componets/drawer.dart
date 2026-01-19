@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
@@ -24,6 +24,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 // import 'package:unipos/presentation/widget/componets/restaurant/componets/import/import.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/listmenu.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/main.dart' as main_app;
 
@@ -173,7 +174,7 @@ class _DrawerrState extends State<Drawerr> {
                           _printerExpanded = expanded;
                         });
                       },
-                      leading: Icon(Icons.print, color: primarycolor),
+                      leading: Icon(Icons.print, color: AppColors.primary),
                       title: Text(
                         "Printer Setting",
                         style: GoogleFonts.poppins(fontSize: 16),
@@ -191,11 +192,11 @@ class _DrawerrState extends State<Drawerr> {
                               child: Listmenu(
                                 title: 'Add Printer',
                                 icons: Icons.circle,
-                                color: primarycolor,
+                                color: AppColors.primary,
                                 listcolor: Colors.grey.shade300,
                                 // heightCon: 50,
                                 borderwidth: 1,
-                                colorb: primarycolor,
+                                colorb: AppColors.primary,
                                 borderradius: 5,
                                 onTap: () {
                                   // Navigator.push(context, MaterialPageRoute(builder: (context)=> Printersetting()));
@@ -212,7 +213,7 @@ class _DrawerrState extends State<Drawerr> {
                               height: height * 0.08,
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade300,
-                                             border: Border.all(color: primarycolor)
+                                             border: Border.all(color: AppColors.primary)
                               ),
                               // width: width * 0.7,
                               child: Listmenu(
@@ -249,7 +250,7 @@ class _DrawerrState extends State<Drawerr> {
                                 listcolor: Colors.grey.shade300,
                                 heightCon: 50,
                                 borderwidth: 1,
-                                colorb: primarycolor,
+                                colorb: AppColors.primary,
                                 borderradius: 5,
                                 onTap: () {
                                   // Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomizationPrinter()));
@@ -360,14 +361,14 @@ class _DrawerrState extends State<Drawerr> {
                         child: Column(
                           children: [
                             Lottie.asset(
-                              syncanimation,
+                              AppImages.syncanimation,
                               width: width * 0.5,
                               height: height * 0.2 ,
                             ),
                             SizedBox(height: 25),
                             Text(
                               'Sync in Progress...',
-                              style: GoogleFonts.poppins(color: primarycolor),
+                              style: GoogleFonts.poppins(color: AppColors.primary),
                             ),
                             SizedBox(height: 10),
                             Text(

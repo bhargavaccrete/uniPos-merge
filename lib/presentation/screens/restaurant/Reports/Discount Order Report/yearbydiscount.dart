@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 
 class YearWisebyDiscount extends StatefulWidget {
@@ -122,7 +121,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                     height: height * 0.05,
                     padding: EdgeInsets.all(5),
                     decoration:
-                    BoxDecoration(border: Border.all(color: primarycolor)),
+                    BoxDecoration(border: Border.all(color: AppColors.primary)),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton(
                           value: dropdownvalue2,
@@ -153,7 +152,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                     child: Container(
                         padding: EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                            color: primarycolor, shape: BoxShape.circle),
+                            color: AppColors.primary, shape: BoxShape.circle),
                         child: Icon(
                           Icons.search,
                           size: 25,

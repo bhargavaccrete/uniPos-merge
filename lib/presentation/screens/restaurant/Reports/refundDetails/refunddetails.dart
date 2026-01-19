@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/refundDetails/monthbyrefund.dart';
@@ -48,7 +48,7 @@ class _RefundDetailsState extends State<RefundDetails> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text("Refund Details",
             textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(
@@ -119,12 +119,12 @@ class _RefundDetailsState extends State<RefundDetails> {
         },
         style: ElevatedButton.styleFrom(
             backgroundColor:
-            selectedFilter == title ? primarycolor: Colors.white,
+            selectedFilter == title ? AppColors.primary: Colors.white,
             foregroundColor:
-            selectedFilter == title ? Colors.white : primarycolor,
+            selectedFilter == title ? Colors.white : AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor))),
+                side: BorderSide(color: AppColors.primary))),
         child: Text(title));
   }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/app_routes.dart';
 import 'package:unipos/core/routes/restaurant_routes.dart';
@@ -12,10 +12,10 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/managecategory.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../data/models/restaurant/db/expensemodel_315.dart';
+import '../../../../util/common/currency_helper.dart';
 
 class Addexpence extends StatefulWidget {
   const Addexpence({super.key});
@@ -118,7 +118,7 @@ class _AddexpenceState extends State<Addexpence> {
                   CommonButton(
                       bordercircular: 0,
                       bgcolor: Colors.white,
-                      bordercolor: primarycolor,
+                      bordercolor: AppColors.primary,
                       width: width * 0.5,
                       height: height * 0.05,
                       onTap: () {
@@ -129,7 +129,7 @@ class _AddexpenceState extends State<Addexpence> {
                         },
                       child: Text('Manage Category',
                           textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(color: primarycolor)))
+                          style: GoogleFonts.poppins(color: AppColors.primary)))
                 ],
               ),
               SizedBox(
@@ -162,7 +162,7 @@ class _AddexpenceState extends State<Addexpence> {
                             width: width * 0.45,
                             height: height * 0.07,
                             decoration: BoxDecoration(
-                                border: Border.all(color: primarycolor)),
+                                border: Border.all(color: AppColors.primary)),
                             child: Center(
                                 child: Text(
                                   _dateselect == null
@@ -201,7 +201,7 @@ class _AddexpenceState extends State<Addexpence> {
                             borderc: 0,
                             obsecureText: false,
                             hintText: "Enter Amount",
-                            BorderColor: primarycolor,
+                            BorderColor: AppColors.primary,
                             HintColor: Colors.grey,
                             keyboardType: TextInputType.numberWithOptions(decimal: true),
                           ),
@@ -229,7 +229,7 @@ class _AddexpenceState extends State<Addexpence> {
                     padding: EdgeInsets.all(5),
                     width: width * 0.9,
                     height: height * 0.06,
-                    decoration: BoxDecoration(border: Border.all(color: primarycolor)),
+                    decoration: BoxDecoration(border: Border.all(color: AppColors.primary)),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
@@ -275,7 +275,7 @@ class _AddexpenceState extends State<Addexpence> {
                   borderc: 0,
                   obsecureText: false,
                   hintText: "Enter Reason",
-                  BorderColor: primarycolor,
+                  BorderColor: AppColors.primary,
                   HintColor: Colors.grey,
                 ),
               ),
@@ -294,7 +294,7 @@ class _AddexpenceState extends State<Addexpence> {
                 width: width,
                 height: height * 0.06,
                 decoration: BoxDecoration(
-                    border: Border.all(color: primarycolor)
+                    border: Border.all(color: AppColors.primary)
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton(

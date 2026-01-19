@@ -8,13 +8,13 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/thiswe
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/todaybytop.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/yearwisebytop.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
-
+import 'package:unipos/util/color.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
+
 
 
 class ThisWeekbyTop extends StatefulWidget {
@@ -121,7 +121,7 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
 
     return Scaffold(
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primarycolor))
+          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -130,7 +130,7 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
             children: [
               Text(
                 'This Week: $weekRange',
-                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: primarycolor),
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.primary),
               ),
               SizedBox(height: 15),
               CommonButton(

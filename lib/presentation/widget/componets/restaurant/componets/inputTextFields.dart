@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 
@@ -36,11 +37,11 @@ class InputTextFields extends StatelessWidget {
                     disabledBorder: OutlineInputBorder(
                         borderSide: BorderSide(color: Colors.black),),
                     focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: primarycolor),
+                        borderSide: BorderSide(color: AppColors.primary),
                         borderRadius: BorderRadius.circular(10)),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: primarycolor))),
+                        borderSide: BorderSide(color: AppColors.primary))),
               ),
             ),
           )

@@ -3,12 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 
@@ -126,7 +127,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Lottie.asset(notfoundanimation, height: height * 0.3),
+                            Lottie.asset(AppImages.notfoundanimation, height: height * 0.3),
                             Text(
                               'No Choices Found',
                               style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w500),
@@ -178,7 +179,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
                                                         Icon(
                                                           Icons.delete,
                                                           size: 100,
-                                                          color: primarycolor,
+                                                          color: AppColors.primary,
                                                         ),
                                                         SizedBox(
                                                           height: 10,
@@ -323,7 +324,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
                                                      Icon(
                                                        Icons.delete,
                                                        size: 100,
-                                                       color: primarycolor,
+                                                       color: AppColors.primary,
                                                      ),
                                                      SizedBox(
                                                        height: 10,
@@ -546,7 +547,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
                       child: Center(
                         child: Text(
                           'Add More',
-                          style: GoogleFonts.poppins(color: primarycolor),
+                          style: GoogleFonts.poppins(color: AppColors.primary),
                         ),
                       ),
                     ),

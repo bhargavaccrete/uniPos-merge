@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 class DayWiseItem extends StatefulWidget {
   const DayWiseItem({super.key});
 
@@ -48,7 +48,7 @@ class _DayWiseItemState extends State<DayWiseItem> {
                     HintColor: Colors.grey,
                     icon: Icon(
                       Icons.search,
-                      color: primarycolor,
+                      color: AppColors.primary,
                       size: 30,
                     ),
                     obsecureText: false),
@@ -76,7 +76,7 @@ class _DayWiseItemState extends State<DayWiseItem> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             // color: Colors.red,
                             borderRadius: BorderRadius.circular(5)),
                         child: Row(
@@ -101,7 +101,7 @@ class _DayWiseItemState extends State<DayWiseItem> {
                     // width: width ,
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor,
+                          color: AppColors.primary,
                           shape: BoxShape.circle
                       ),
                       // alignment: Alignment.bottomCenter,

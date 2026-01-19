@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
 
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 
 class CustomByDiscount extends StatefulWidget {
@@ -150,7 +150,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             // color: Colors.red,
                             borderRadius: BorderRadius.circular(5)
                         ),
@@ -164,7 +164,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                               textScaler: TextScaler.linear(1),
                               style: GoogleFonts.poppins(fontSize: 14),
                             ),
-                            Icon(Icons.date_range,color: primarycolor,)
+                            Icon(Icons.date_range,color: AppColors.primary,)
                           ],
                         )),
                   ),
@@ -193,7 +193,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                             width: width * 0.6,
                             height: height * 0.05,
                             decoration: BoxDecoration(
-                                border: Border.all(color: primarycolor),
+                                border: Border.all(color: AppColors.primary),
                                 // color: Colors.red,
                                 borderRadius: BorderRadius.circular(5)
                             ),
@@ -207,7 +207,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                 ),
-                                Icon(Icons.date_range,color: primarycolor,)
+                                Icon(Icons.date_range,color: AppColors.primary,)
                               ],
                             )),
                       ),
@@ -217,7 +217,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                         child: Container(
                           padding: EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                              color: primarycolor,
+                              color: AppColors.primary,
                               borderRadius: BorderRadius.circular(50)
                           ),
                           child: Icon(

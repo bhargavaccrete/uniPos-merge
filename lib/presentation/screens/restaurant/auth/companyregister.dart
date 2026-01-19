@@ -9,9 +9,10 @@ import 'package:unipos/presentation/screens/restaurant/auth/login.dart';
 
 import 'package:hive/hive.dart';
 import 'package:flutter/widgets.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/color.dart';
 class Companyregister extends StatefulWidget {
   const Companyregister({super.key});
 
@@ -163,7 +164,7 @@ class _CompanyregisterState extends State<Companyregister> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         toolbarHeight: 100,
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         centerTitle: true,
         title: Text(
           'Business Registration',
@@ -853,7 +854,7 @@ class _CompanyregisterState extends State<Companyregister> {
                                   color: Colors.white, fontSize: 18),
                             ),
                           ),
-                          bgcolor: primarycolor,
+                          bgcolor: AppColors.primary,
                         ),
                       ],
                     ),

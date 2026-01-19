@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-
-import '../../../../../constants/restaurant/const.dart';
 import '../../../../../main.dart';
 import '../../../../../util/restaurant/common.dart';
 
@@ -20,7 +18,7 @@ class MultipleListViewWithNavigation extends StatelessWidget {
       this.centerText,
       this.screenheightt,
       this.child});
-
+ var  DeskTop ="Desktop" ;
   @override
   Widget build(BuildContext context) {
     return Column(

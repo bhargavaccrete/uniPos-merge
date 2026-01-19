@@ -1,3 +1,4 @@
+/*
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 
@@ -13,4 +14,4 @@ class PriceFormatter {
 
   /// Get just the currency symbol (for prefix in text fields)
   static String get currencySymbol => '${CurrencyHelper.currentSymbol} ';
-}
+}*/

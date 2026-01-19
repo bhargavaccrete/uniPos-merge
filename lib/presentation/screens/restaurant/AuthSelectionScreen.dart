@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/routes/routes_name.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
-import '../../../constants/restaurant/font.dart';
 import '../../../util/restaurant/images.dart';
 import '../../widget/componets/restaurant/componets/Button.dart';
 import 'auth/companyregister.dart';
@@ -38,14 +39,14 @@ class AuthSelectionScreen extends StatelessWidget {
                   height: height * 0.15,
                   width: width * 0.50,
                   alignment: Alignment.center,
-                  child: Image.asset(logo),
+                  child: Image.asset(AppImages.logo),
                   // child: Image.asset('assets/images/BillBerry1_processed.jpg'),
                 ),
               ),
               SizedBox(height: 10),
               Text(
                 'Welcome Guest',
-                style: customFont20(),
+                style: GoogleFonts.poppins(fontSize: 16),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 50),
@@ -102,7 +103,7 @@ class AuthSelectionScreen extends StatelessWidget {
                         style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w400,
                             fontSize: 25,
-                            color: primarycolor),
+                            color: AppColors.primary),
                       ))),
             ],
           ),

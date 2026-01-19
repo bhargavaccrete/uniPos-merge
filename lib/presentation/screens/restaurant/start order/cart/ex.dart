@@ -51,7 +51,7 @@
 //               children: [
 //                 GestureDetector(
 //                   onTap: () => widget.onDecreseQty(index),
-//                   child: Icon(Icons.remove, color: primarycolor),
+//                   child: Icon(Icons.remove, color: AppColors.primary),
 //                 ),
 //                 SizedBox(width: 5),
 //                 Container(
@@ -71,7 +71,7 @@
 //                 SizedBox(width: 5),
 //                 GestureDetector(
 //                   onTap: () => widget.onIncreseQty(index),
-//                   child: Icon(Icons.add, color: primarycolor),
+//                   child: Icon(Icons.add, color: AppColors.primary),
 //                 ),
 //               ],
 //             ),
@@ -129,7 +129,7 @@
 //                 width: width * 0.3,
 //                 decoration: BoxDecoration(
 //                   color: Colors.white,
-//                   border: Border.all(width: 2, color: primarycolor),
+//                   border: Border.all(width: 2, color: AppColors.primary),
 //                   borderRadius: BorderRadius.circular(5),
 //                 ),
 //                 child:  Text(
@@ -238,26 +238,26 @@
 //                                           const SizedBox(height: 10),
 //                                           CommonTextForm(
 //                                               hintText: 'Name',
-//                                               BorderColor: primarycolor,
-//                                               HintColor: primarycolor,
+//                                               BorderColor: AppColors.primary,
+//                                               HintColor: AppColors.primary,
 //                                               obsecureText: false),
 //                                           const SizedBox(height: 10),
 //                                           CommonTextForm(
 //                                               hintText: 'Mobile No',
-//                                               BorderColor: primarycolor,
-//                                               HintColor: primarycolor,
+//                                               BorderColor: AppColors.primary,
+//                                               HintColor: AppColors.primary,
 //                                               obsecureText: false),
 //                                           const SizedBox(height: 25),
 //                                           CommonTextForm(
 //                                               hintText: 'Email ID (Optional)',
-//                                               BorderColor: primarycolor,
-//                                               HintColor: primarycolor,
+//                                               BorderColor: AppColors.primary,
+//                                               HintColor: AppColors.primary,
 //                                               obsecureText: false),
 //                                           const SizedBox(height: 10),
 //                                           CommonTextForm(
 //                                               hintText: 'Remark',
-//                                               BorderColor: primarycolor,
-//                                               HintColor: primarycolor,
+//                                               BorderColor: AppColors.primary,
+//                                               HintColor: AppColors.primary,
 //                                               obsecureText: false),
 //                                           const SizedBox(height: 25),
 //                                           const Divider(),

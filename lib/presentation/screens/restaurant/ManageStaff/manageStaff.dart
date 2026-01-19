@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_staff.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
@@ -163,14 +163,14 @@ class _manageStaffState extends State<manageStaff> {
                 onChanged: _searchStaff,
                 decoration: InputDecoration(
                   hintText: 'Search staff by name, email, or phone...',
-                  prefixIcon: Icon(Icons.search, color: primarycolor),
+                  prefixIcon: Icon(Icons.search, color: AppColors.primary),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: primarycolor),
+                    borderSide: BorderSide(color: AppColors.primary),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: primarycolor, width: 2),
+                    borderSide: BorderSide(color: AppColors.primary, width: 2),
                   ),
                   contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                 ),
@@ -194,7 +194,7 @@ class _manageStaffState extends State<manageStaff> {
                 Flexible(
                     child: CommonButton(
                         bordercircular: 5,
-                        bordercolor: primarycolor,
+                        bordercolor: AppColors.primary,
                         bgcolor: Colors.white,
                         width: width * 0.3,
                         height: height * 0.06,
@@ -238,9 +238,9 @@ class _manageStaffState extends State<manageStaff> {
                                                   CommonTextForm(
                                                     obsecureText: false,
                                                     labelText: 'UserName',
-                                                    LabelColor: primarycolor,
+                                                    LabelColor: AppColors.primary,
                                                     controller: userNameController,
-                                                    BorderColor: primarycolor,
+                                                    BorderColor: AppColors.primary,
                                                     borderc: 5,
                                                   ),
                                                   SizedBox(
@@ -252,9 +252,9 @@ class _manageStaffState extends State<manageStaff> {
                                                         child:   CommonTextForm(
                                                           obsecureText: false,
                                                           labelText: 'First Name',
-                                                          LabelColor: primarycolor,
+                                                          LabelColor: AppColors.primary,
                                                           controller: firstNameController,
-                                                          BorderColor: primarycolor,
+                                                          BorderColor: AppColors.primary,
                                                           borderc: 5,
                                                         ),
                                                       ),
@@ -268,9 +268,9 @@ class _manageStaffState extends State<manageStaff> {
                                                           child:  CommonTextForm(
                                                             obsecureText: false,
                                                             labelText: 'Last Name',
-                                                            LabelColor: primarycolor,
+                                                            LabelColor: AppColors.primary,
                                                             controller: lastNameController,
-                                                            BorderColor: primarycolor,
+                                                            BorderColor: AppColors.primary,
                                                             borderc: 5,
                                                           ),
                                                         ),
@@ -283,7 +283,7 @@ class _manageStaffState extends State<manageStaff> {
                                                   Container(
                                                     padding: EdgeInsets.symmetric(horizontal: 12),
                                                     decoration: BoxDecoration(
-                                                      border: Border.all(color: primarycolor),
+                                                      border: Border.all(color: AppColors.primary),
                                                       borderRadius: BorderRadius.circular(5),
                                                     ),
                                                     child: DropdownButtonFormField<String>(
@@ -326,9 +326,9 @@ class _manageStaffState extends State<manageStaff> {
                                                           CommonTextForm(
                                                             obsecureText: false,
                                                             labelText: 'Mobile No',
-                                                            LabelColor: primarycolor,
+                                                            LabelColor: AppColors.primary,
                                                             controller: mobileController,
-                                                            BorderColor: primarycolor,
+                                                            BorderColor: AppColors.primary,
                                                             borderc: 5,
                                                           ),
                                                           SizedBox(
@@ -337,9 +337,9 @@ class _manageStaffState extends State<manageStaff> {
                                                           CommonTextForm(
                                                             obsecureText: false,
                                                             labelText: 'Email ID',
-                                                            LabelColor: primarycolor,
+                                                            LabelColor: AppColors.primary,
                                                             controller: mailController,
-                                                            BorderColor: primarycolor,
+                                                            BorderColor: AppColors.primary,
                                                             borderc: 5,
                                                           ),
                                                           SizedBox(
@@ -348,9 +348,9 @@ class _manageStaffState extends State<manageStaff> {
                                                           CommonTextForm(
                                                             obsecureText: false,
                                                             labelText: 'Pin No',
-                                                            LabelColor: primarycolor,
+                                                            LabelColor: AppColors.primary,
                                                             controller: pinNoController,
-                                                            BorderColor: primarycolor,
+                                                            BorderColor: AppColors.primary,
                                                             borderc: 5,
                                                           ),
                                                           SizedBox(
@@ -377,8 +377,8 @@ class _manageStaffState extends State<manageStaff> {
                                                           child: Text("Cancel")),
                                                       CommonButton(
                                                           bordercircular: 5,
-                                                          bordercolor: primarycolor,
-                                                          bgcolor: primarycolor,
+                                                          bordercolor: AppColors.primary,
+                                                          bgcolor: AppColors.primary,
                                                           width: width * 0.3,
                                                           height: height * 0.05,
                                                           onTap: () {
@@ -523,7 +523,7 @@ class _manageStaffState extends State<manageStaff> {
                                             staff.isCashier,
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: primarycolor,
+                                              color: AppColors.primary,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
@@ -562,7 +562,7 @@ class _manageStaffState extends State<manageStaff> {
                                               return Center(
                                                 child: AlertDialog(
                                                   icon: Icon(Icons.person,
-                                                      size: 30.0, color: primarycolor),
+                                                      size: 30.0, color: AppColors.primary),
                                                   title: Text("User Details",
                                                       style: TextStyle(
                                                           fontWeight: FontWeight.bold)),
@@ -639,7 +639,7 @@ class _manageStaffState extends State<manageStaff> {
                                                             Icon(
                                                               Icons.edit,
                                                               size: 40.0,
-                                                              color: primarycolor,
+                                                              color: AppColors.primary,
                                                             ),
                                                             Text(
                                                               'Edit Staff',
@@ -661,9 +661,9 @@ class _manageStaffState extends State<manageStaff> {
                                                               CommonTextForm(
                                                                 obsecureText: false,
                                                                 labelText: 'Username',
-                                                                LabelColor: primarycolor,
+                                                                LabelColor: AppColors.primary,
                                                                 controller: editUserNameController,
-                                                                BorderColor: primarycolor,
+                                                                BorderColor: AppColors.primary,
                                                                 borderc: 5,
                                                               ),
                                                               SizedBox(height: 10),
@@ -673,9 +673,9 @@ class _manageStaffState extends State<manageStaff> {
                                                                     child: CommonTextForm(
                                                                       obsecureText: false,
                                                                       labelText: 'First Name',
-                                                                      LabelColor: primarycolor,
+                                                                      LabelColor: AppColors.primary,
                                                                       controller: editFirstNameController,
-                                                                      BorderColor: primarycolor,
+                                                                      BorderColor: AppColors.primary,
                                                                       borderc: 5,
                                                                     ),
                                                                   ),
@@ -684,9 +684,9 @@ class _manageStaffState extends State<manageStaff> {
                                                                     child: CommonTextForm(
                                                                       obsecureText: false,
                                                                       labelText: 'Last Name',
-                                                                      LabelColor: primarycolor,
+                                                                      LabelColor: AppColors.primary,
                                                                       controller: editLastNameController,
-                                                                      BorderColor: primarycolor,
+                                                                      BorderColor: AppColors.primary,
                                                                       borderc: 5,
                                                                     ),
                                                                   ),
@@ -696,7 +696,7 @@ class _manageStaffState extends State<manageStaff> {
                                                               Container(
                                                                 padding: EdgeInsets.symmetric(horizontal: 12),
                                                                 decoration: BoxDecoration(
-                                                                  border: Border.all(color: primarycolor),
+                                                                  border: Border.all(color: AppColors.primary),
                                                                   borderRadius: BorderRadius.circular(5),
                                                                 ),
                                                                 child: DropdownButton<String>(
@@ -720,27 +720,27 @@ class _manageStaffState extends State<manageStaff> {
                                                               CommonTextForm(
                                                                 obsecureText: false,
                                                                 labelText: 'Mobile No',
-                                                                LabelColor: primarycolor,
+                                                                LabelColor: AppColors.primary,
                                                                 controller: editMobileController,
-                                                                BorderColor: primarycolor,
+                                                                BorderColor: AppColors.primary,
                                                                 borderc: 5,
                                                               ),
                                                               SizedBox(height: 10),
                                                               CommonTextForm(
                                                                 obsecureText: false,
                                                                 labelText: 'Email ID',
-                                                                LabelColor: primarycolor,
+                                                                LabelColor: AppColors.primary,
                                                                 controller: editEmailController,
-                                                                BorderColor: primarycolor,
+                                                                BorderColor: AppColors.primary,
                                                                 borderc: 5,
                                                               ),
                                                               SizedBox(height: 10),
                                                               CommonTextForm(
                                                                 obsecureText: false,
                                                                 labelText: 'Pin No',
-                                                                LabelColor: primarycolor,
+                                                                LabelColor: AppColors.primary,
                                                                 controller: editPinController,
-                                                                BorderColor: primarycolor,
+                                                                BorderColor: AppColors.primary,
                                                                 borderc: 5,
                                                               ),
                                                               SizedBox(height: 15),
@@ -756,7 +756,7 @@ class _manageStaffState extends State<manageStaff> {
                                                                   ),
                                                                   Switch(
                                                                     value: isActive,
-                                                                    activeColor: primarycolor,
+                                                                    activeColor: AppColors.primary,
                                                                     onChanged: (value) {
                                                                       setState(() {
                                                                         isActive = value;
@@ -791,8 +791,8 @@ class _manageStaffState extends State<manageStaff> {
                                                                     fontWeight: FontWeight.bold)),
                                                           ),
                                                           CommonButton(
-                                                            bgcolor: primarycolor,
-                                                            bordercolor: primarycolor,
+                                                            bgcolor: AppColors.primary,
+                                                            bordercolor: AppColors.primary,
                                                             bordercircular: 5,
                                                             height: height * 0.05,
                                                             width: width * 0.25,

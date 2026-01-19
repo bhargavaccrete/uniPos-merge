@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart' show HivePastOrder;
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
 
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 class DayWisebyTop extends StatefulWidget {
   const DayWisebyTop({super.key});
 
@@ -126,7 +126,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             borderRadius: BorderRadius.circular(5)),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -138,7 +138,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                               textScaler: TextScaler.linear(1),
                               style: GoogleFonts.poppins(fontSize: 14),
                             ),
-                            Icon(Icons.date_range, color: primarycolor)
+                            Icon(Icons.date_range, color: AppColors.primary)
                           ],
                         )),
                   ),
@@ -148,7 +148,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor, borderRadius: BorderRadius.circular(50)),
+                          color: AppColors.primary, borderRadius: BorderRadius.circular(50)),
                       child: Icon(Icons.search, size: 25, color: Colors.white),
                     ),
                   )
@@ -178,7 +178,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
 
               // Loading or Results
               if (_isLoading)
-                Center(child: CircularProgressIndicator(color: primarycolor))
+                Center(child: CircularProgressIndicator(color: AppColors.primary))
               else if (_topSellingItems.isEmpty && _fromDate != null)
                 Center(
                   child: Padding(

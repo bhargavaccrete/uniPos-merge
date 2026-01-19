@@ -5,7 +5,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/monthw
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/thisweekbytop.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/todaybytop.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/yearwisebytop.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
 
 
@@ -44,7 +44,7 @@ class _SalesbyTopState extends State<SalesbyTop> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text("Sales by Top Selling",
             textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
@@ -103,11 +103,11 @@ class _SalesbyTopState extends State<SalesbyTop> {
         },
 
         style: ElevatedButton.styleFrom(
-            backgroundColor: selectedFilter==title ? primarycolor: Colors.white,
-            foregroundColor: selectedFilter==title ? Colors.white : primarycolor,
+            backgroundColor: selectedFilter==title ? AppColors.primary: Colors.white,
+            foregroundColor: selectedFilter==title ? Colors.white : AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor)
+                side: BorderSide(color: AppColors.primary)
             )
         ),
         child: Text(title));

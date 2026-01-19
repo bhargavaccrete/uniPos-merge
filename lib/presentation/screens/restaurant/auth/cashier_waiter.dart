@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/admin_login.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
+
+import '../../../../util/color.dart';
 
 class CashierWaiter extends StatefulWidget {
   @override
@@ -17,7 +20,7 @@ class _CashierWaiterState extends State<CashierWaiter> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      backgroundColor: screenBGColor,
+      backgroundColor: AppColors.white,
 
       body: SingleChildScrollView(
 
@@ -30,7 +33,7 @@ class _CashierWaiterState extends State<CashierWaiter> {
                 alignment: Alignment.center,
                 height: height * 0.20,
                 width:width * 0.5,
-                child: Image.asset(logo)),
+                child: Image.asset(AppImages.logo)),
             Padding(
               padding: const EdgeInsets.all(30),
               child: Text("Select Cashier | Waiter",style: TextStyle(fontSize: 20),),
@@ -39,7 +42,7 @@ class _CashierWaiterState extends State<CashierWaiter> {
               width: width,
               height: height*0.5,
               child: RawScrollbar(
-                  thumbColor: primarycolor,
+                  thumbColor: AppColors.primary,
                   thickness: 5,
 
 
@@ -56,7 +59,7 @@ class _CashierWaiterState extends State<CashierWaiter> {
               padding: const EdgeInsets.all(50),
               child: CommonButton(onTap: (){
                 Navigator.pop(context);
-              },bgcolor: Colors.white, child: Text("Back",style: TextStyle(color: primarycolor),)),
+              },bgcolor: Colors.white, child: Text("Back",style: TextStyle(color: AppColors.primary),)),
             ),
           ],
         ),

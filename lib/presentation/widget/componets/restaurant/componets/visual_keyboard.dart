@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
 
 enum KeyboardType {
@@ -201,7 +202,7 @@ class _VisualKeyboardState extends State<VisualKeyboard> {
       child: Padding(
         padding: const EdgeInsets.all(2.0),
         child: Material(
-          color: _isShiftEnabled ? primarycolor : Colors.grey[400],
+          color: _isShiftEnabled ? AppColors.primary : Colors.grey[400],
           borderRadius: BorderRadius.circular(6),
           child: InkWell(
             onTap: _toggleShift,
@@ -270,7 +271,7 @@ class _VisualKeyboardState extends State<VisualKeyboard> {
       child: Padding(
         padding: const EdgeInsets.all(2.0),
         child: Material(
-          color: primarycolor,
+          color: AppColors.primary,
           borderRadius: BorderRadius.circular(6),
           child: InkWell(
             onTap: onPressed,

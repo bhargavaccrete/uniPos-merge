@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../constants/restaurant/color.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
@@ -86,7 +87,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
             Icon(
               Icons.account_balance_wallet,
               size: 50,
-              color: primarycolor,
+              color: AppColors.primary,
             ),
             SizedBox(height: 10),
             Text(
@@ -132,7 +133,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: primarycolor, width: 2),
+                    borderSide: BorderSide(color: AppColors.primary, width: 2),
                   ),
                 ),
               ),
@@ -162,7 +163,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
           ElevatedButton(
             onPressed: _isLoading ? null : _saveOpeningBalance,
             style: ElevatedButton.styleFrom(
-              backgroundColor: primarycolor,
+              backgroundColor: AppColors.primary,
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
             child: _isLoading

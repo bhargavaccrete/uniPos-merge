@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 class MonthWiseTab extends StatefulWidget {
   const MonthWiseTab({super.key});
 
@@ -75,7 +75,7 @@ class _MonthWiseTabState extends State<MonthWiseTab> {
               //       height: height * 0.04,
               //       padding: EdgeInsets.all(5),
               //       decoration: BoxDecoration(
-              //           border: Border.all(color: primarycolor)
+              //           border: Border.all(color: AppColors.primary)
               //       ),
               //       child: DropdownButtonHideUnderline(
               //         child: DropdownButton(
@@ -97,7 +97,7 @@ class _MonthWiseTabState extends State<MonthWiseTab> {
               //       height: height * 0.04,
               //       padding: EdgeInsets.all(5),
               //       decoration: BoxDecoration(
-              //           border: Border.all(color: primarycolor)
+              //           border: Border.all(color: AppColors.primary)
               //       ),
               //       child: DropdownButtonHideUnderline(
               //         child: DropdownButton(
@@ -143,7 +143,7 @@ class _MonthWiseTabState extends State<MonthWiseTab> {
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
                             // color: Colors.green,
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropDownValue1,
@@ -187,7 +187,7 @@ class _MonthWiseTabState extends State<MonthWiseTab> {
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
                             // color: Colors.red,
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropdownvalue2,
@@ -217,7 +217,7 @@ class _MonthWiseTabState extends State<MonthWiseTab> {
                   Container(
                     padding: EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(50)
                     ),
                     child: Icon(

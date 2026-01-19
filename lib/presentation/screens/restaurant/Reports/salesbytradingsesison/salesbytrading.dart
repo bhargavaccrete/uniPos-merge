@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/daywisebytrading.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/monthwisebytrading.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/thisweekbytrading.dart';
@@ -42,7 +42,7 @@ class _SalesbytradingState extends State<Salesbytrading> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text("Sales by Trading Session",
             textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
@@ -101,11 +101,11 @@ class _SalesbytradingState extends State<Salesbytrading> {
         },
 
         style: ElevatedButton.styleFrom(
-            backgroundColor: selectedFilter==title ? primarycolor: Colors.white,
-            foregroundColor: selectedFilter==title ? Colors.white : primarycolor,
+            backgroundColor: selectedFilter==title ? AppColors.primary: Colors.white,
+            foregroundColor: selectedFilter==title ? Colors.white : AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor)
+                side: BorderSide(color: AppColors.primary)
             )
         ),
         child: Text(title));

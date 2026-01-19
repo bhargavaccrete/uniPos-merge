@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 class MonthWiseCategory extends StatefulWidget {
   const MonthWiseCategory({super.key});
 
@@ -62,7 +62,7 @@ class _MonthWiseCategoryState extends State<MonthWiseCategory> {
                     HintColor: Colors.grey,
                     icon: Icon(
                       Icons.search,
-                      color: primarycolor,
+                      color: AppColors.primary,
                       size: 30,
                     ),
                     obsecureText: false),
@@ -94,7 +94,7 @@ class _MonthWiseCategoryState extends State<MonthWiseCategory> {
                           height: height * 0.04,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropDownValue1,
@@ -133,7 +133,7 @@ class _MonthWiseCategoryState extends State<MonthWiseCategory> {
                           height: height * 0.04,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropdownvalue2,
@@ -161,7 +161,7 @@ class _MonthWiseCategoryState extends State<MonthWiseCategory> {
                   Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor, shape: BoxShape.circle),
+                          color: AppColors.primary, shape: BoxShape.circle),
                       child: Icon(
                         Icons.search,
                         size: 30,

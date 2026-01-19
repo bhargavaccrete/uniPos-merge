@@ -9,13 +9,13 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/thiswe
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/todaybytop.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/yearwisebytop.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
-
+import 'package:unipos/util/color.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
+
 
 class YearWisebyTop extends StatefulWidget {
   const YearWisebyTop({super.key});
@@ -47,7 +47,7 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: primarycolor,
+              primary: AppColors.primary,
               onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
@@ -148,7 +148,7 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
 
     return Scaffold(
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primarycolor))
+          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -178,7 +178,7 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
                             height: height * 0.05,
                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              border: Border.all(color: primarycolor),
+                              border: Border.all(color: AppColors.primary),
                               borderRadius: BorderRadius.circular(5),
                             ),
                             child: Row(
@@ -189,7 +189,7 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
                                   textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                 ),
-                                Icon(Icons.calendar_today, color: primarycolor, size: 20),
+                                Icon(Icons.calendar_today, color: AppColors.primary, size: 20),
                               ],
                             ),
                           ),
@@ -205,7 +205,7 @@ class _YearWisebyTopState extends State<YearWisebyTop> {
                       child: Container(
                         padding: EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: primarycolor,
+                          color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(

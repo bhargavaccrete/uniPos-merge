@@ -3,11 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 
 class VariantSelectionScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedVariants;
@@ -167,7 +167,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_circle_outline, color: primarycolor),
+            icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
             onPressed: () => _showAddVariantDialog(),
             tooltip: 'Add New Variant',
           ),
@@ -219,7 +219,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             SizedBox(height: 30),
             CommonButton(
               onTap: () => _showAddVariantDialog(),
-              bgcolor: primarycolor,
+              bgcolor: AppColors.primary,
               bordercircular: 10,
               height: 50,
               width: 200,
@@ -268,11 +268,11 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               padding: EdgeInsets.all(15),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isSelected ? primarycolor : Colors.grey[300]!,
+                  color: isSelected ? AppColors.primary : Colors.grey[300]!,
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(12),
-                color: isSelected ? primarycolor.withValues(alpha: 0.05) : Colors.white,
+                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
               ),
               child: Column(
                 children: [
@@ -288,7 +288,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                             }
                           });
                         },
-                        activeColor: primarycolor,
+                        activeColor: AppColors.primary,
                       ),
                       Expanded(
                         child: Text(
@@ -316,7 +316,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: primarycolor),
+                          borderSide: BorderSide(color: AppColors.primary),
                         ),
                         contentPadding: EdgeInsets.symmetric(
                           horizontal: 12,
@@ -354,13 +354,13 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             child: CommonButton(
               onTap: () => Navigator.pop(context),
               bgcolor: Colors.white,
-              bordercolor: primarycolor,
+              bordercolor: AppColors.primary,
               bordercircular: 10,
               height: ResponsiveHelper.responsiveHeight(context, 0.06),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
-                  color: primarycolor,
+                  color: AppColors.primary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -461,7 +461,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: primarycolor,
+                backgroundColor: AppColors.primary,
               ),
               child: Text(
                 'Add',
@@ -601,7 +601,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
         //         });
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: primarycolor,
+                backgroundColor: AppColors.primary,
               ),
               child: Text(
                 'Add',
@@ -642,7 +642,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: primarycolor,
+                backgroundColor: AppColors.primary,
               ),
               child: Text(
                 'Add',

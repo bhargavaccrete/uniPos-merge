@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 
 
 class CustomMenu extends StatelessWidget {
@@ -32,7 +32,7 @@ class CustomMenu extends StatelessWidget {
         decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(15),
-            // border: Border.all(color: primarycolor, width: 2)
+            // border: Border.all(color: AppColors.primary, width: 2)
             ),
         // color: Colors.green,
         child: Column(
@@ -40,7 +40,7 @@ class CustomMenu extends StatelessWidget {
           children: [
             Icon(
               icons,
-              color: color?? primarycolor,
+              color: color?? AppColors.primary,
               size: 40,
             ),
             SizedBox(height: 5),

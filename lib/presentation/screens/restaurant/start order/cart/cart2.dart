@@ -358,7 +358,7 @@
 //   Widget build(BuildContext context) {
 //     return Scaffold(
 //       appBar: AppBar(
-//         backgroundColor: primarycolor,
+//         backgroundColor: AppColors.primary,
 //         title: Text(
 //           isExistingOrder ? 'Update Order' : 'Cart',
 //           style: GoogleFonts.poppins(
@@ -406,7 +406,7 @@
 //         onPressed: _navigateAndAddMoreItems, // Call your function
 //         label: Text("Add More Items"),
 //         icon: Icon(Icons.add),
-//         backgroundColor: primarycolor,
+//         backgroundColor: AppColors.primary,
 //       )
 //           : null, // Button will be hidden for new orders
 //

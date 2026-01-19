@@ -3,10 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 
@@ -101,7 +102,7 @@ class _VariantTabState extends State<VariantTab> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             // SizedBox(height: 50,),
-                            Lottie.asset(notfoundanimation, height: height * 0.3),
+                            Lottie.asset(AppImages.notfoundanimation, height: height * 0.3),
 
                             Text(
                               'No Variant Found',
@@ -157,7 +158,7 @@ class _VariantTabState extends State<VariantTab> {
                                                         Icon(
                                                           Icons.delete,
                                                           size: 100,
-                                                          color: primarycolor,
+                                                          color: AppColors.primary,
                                                         ),
                                                         SizedBox(
                                                           height: 10,
@@ -309,7 +310,7 @@ class _VariantTabState extends State<VariantTab> {
                                                         Icon(
                                                           Icons.delete,
                                                           size: 100,
-                                                          color: primarycolor,
+                                                          color: AppColors.primary,
                                                         ),
                                                         SizedBox(
                                                           height: 10,

@@ -32,7 +32,7 @@
 //
 //     ValueNotifier obsecurepass = ValueNotifier(true);
 //     return Scaffold(
-//       backgroundColor: screenBGColor,
+//       backgroundColor: AppColors.white,
 //       body: SingleChildScrollView(
 //         child: Container(
 //           // color: Colors.red,
@@ -168,7 +168,7 @@
 //                         alignment: Alignment.centerRight,
 //                         child: Text(
 //                           'Forgot Password?',
-//                           style: GoogleFonts.poppins(color: primarycolor),
+//                           style: GoogleFonts.poppins(color: AppColors.primary),
 //                         ),
 //                       ),
 //                     ),
@@ -183,7 +183,7 @@
 //                       children: [
 //                         Checkbox(
 //                           value: isRemember,
-//                           activeColor: primarycolor,
+//                           activeColor: AppColors.primary,
 //                           onChanged: (bool? newvalue) {
 //                             setState(() {
 //                               isRemember = newvalue;
@@ -225,7 +225,7 @@
 //                               color: Colors.white, fontSize: 18),
 //                         ),
 //                       ),
-//                       bgcolor: primarycolor,
+//                       bgcolor: AppColors.primary,
 //                     ),
 //
 //                     SizedBox(
@@ -242,7 +242,7 @@
 //                           child: Text(
 //                         'Back',
 //                         style: GoogleFonts.poppins(
-//                             color: primarycolor, fontSize: 18),
+//                             color: AppColors.primary, fontSize: 18),
 //                       )),
 //                       bgcolor: Colors.white,
 //                       bordercolor: Colors.grey,
@@ -263,11 +263,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/widgets.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/dashboard.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 
@@ -297,7 +299,7 @@ class _loginScreenState extends State<loginScreen> {
 
     ValueNotifier obsecurepass = ValueNotifier(true);
     return Scaffold(
-      backgroundColor: screenBGColor,
+      backgroundColor: AppColors.white,
       body: SingleChildScrollView(
         child: Container(
           // color: Colors.red,
@@ -315,7 +317,7 @@ class _loginScreenState extends State<loginScreen> {
                 height: ResponsiveHelper.responsiveHeight(context, 0.2),
                 width: ResponsiveHelper.responsiveWidth(context, 0.5),
                 child: Image.asset(
-                  logo,
+                  AppImages.logo,
                   // 'assets/images/BillBerry3_processed.jpg',
                 ),
               ),
@@ -445,7 +447,7 @@ class _loginScreenState extends State<loginScreen> {
                         alignment: Alignment.centerRight,
                         child: Text(
                           'Forgot Password?',
-                          style: GoogleFonts.poppins(color: primarycolor,
+                          style: GoogleFonts.poppins(color: AppColors.primary,
                               fontSize: ResponsiveHelper.responsiveTextSize(context, 20),
                         ),
                         ),
@@ -463,7 +465,7 @@ class _loginScreenState extends State<loginScreen> {
                       children: [
                         Checkbox(
                           value: isRemember,
-                          activeColor: primarycolor,
+                          activeColor: AppColors.primary,
                           onChanged: (bool? newvalue) {
                             setState(() {
                               isRemember = newvalue;
@@ -510,7 +512,7 @@ class _loginScreenState extends State<loginScreen> {
                           ),
                         ),
                       ),
-                      bgcolor: primarycolor,
+                      bgcolor: AppColors.primary,
                     ),
 
                     SizedBox(
@@ -531,7 +533,7 @@ class _loginScreenState extends State<loginScreen> {
                         style: GoogleFonts.poppins(
                           fontSize:
                               ResponsiveHelper.responsiveTextSize(context, 18),
-                          color: primarycolor,
+                          color: AppColors.primary,
                         ),
                       )),
                       bgcolor: Colors.white,

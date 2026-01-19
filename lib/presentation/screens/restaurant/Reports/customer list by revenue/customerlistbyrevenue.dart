@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 class CustomerListByRevenue extends StatefulWidget {
   const CustomerListByRevenue({super.key});
 
@@ -99,7 +98,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                 color: Colors.white,
                 fontWeight: FontWeight.w500)),
         centerTitle: true,
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         leading: IconButton(
             onPressed: () {
               Navigator.pop(context);
@@ -110,7 +109,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
             )),
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primarycolor))
+          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -144,7 +143,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                         ),
                         IconButton(
                           onPressed: _loadCustomerRevenue,
-                          icon: Icon(Icons.refresh, color: primarycolor),
+                          icon: Icon(Icons.refresh, color: AppColors.primary),
                           tooltip: 'Refresh',
                         ),
                       ],

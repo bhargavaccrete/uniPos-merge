@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 
 class YearWisebytrading extends StatefulWidget {
   const YearWisebytrading({super.key});
@@ -53,7 +52,7 @@ class _YearWisebytradingState extends State<YearWisebytrading> {
                     height: height * 0.05,
                     padding: EdgeInsets.all(5),
                     decoration:
-                    BoxDecoration(border: Border.all(color: primarycolor)),
+                    BoxDecoration(border: Border.all(color: AppColors.primary)),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton(
                           value: dropdownvalue2,
@@ -80,7 +79,7 @@ class _YearWisebytradingState extends State<YearWisebytrading> {
                   Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor, shape: BoxShape.circle),
+                          color: AppColors.primary, shape: BoxShape.circle),
                       child: Icon(
                         Icons.search,
                         size: 30,

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
+import '../../../../util/color.dart';
 import '../../../widget/componets/restaurant/componets/drawer.dart';
 import '../tabbar/menu.dart';
 import '../tabbar/order.dart';
@@ -51,6 +52,45 @@ class _StartorderState extends State<Startorder>
     });
   }
 
+  Widget _buildTabButton(int index, IconData icon, String label, bool isTablet) {
+    final isSelected = tabController.index == index;
+    return GestureDetector(
+      onTap: () {
+        tabController.animateTo(index);
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected ? AppColors.white : AppColors.textSecondary,
+            ),
+            SizedBox(width: 10),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? AppColors.white : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
 
 
@@ -71,7 +111,7 @@ class _StartorderState extends State<Startorder>
   //         TextButton.icon(
   //           icon: const Icon(Icons.clear, color: Colors.white),
   //           label: const Text('Clear Cart', style: TextStyle(color: Colors.white)),
-  //           style: TextButton.styleFrom(backgroundColor: primarycolor),
+  //           style: TextButton.styleFrom(backgroundColor: AppColors.primary),
   //           onPressed: () {
   //             // You can add a confirmation dialog here
   //             setState(() {
@@ -90,7 +130,7 @@ class _StartorderState extends State<Startorder>
   //             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
   //             children: [
   //               ElevatedButton.icon(onPressed: (){}, icon: Icon(Icons.delivery_dining), label: Text('Take Away')),
-  //               ElevatedButton.icon(onPressed: (){}, icon: Icon(Icons.dinner_dining), label: Text('Dine In'), style: ElevatedButton.styleFrom(backgroundColor: primarycolor)),
+  //               ElevatedButton.icon(onPressed: (){}, icon: Icon(Icons.dinner_dining), label: Text('Dine In'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary)),
   //               ElevatedButton.icon(onPressed: (){}, icon: Icon(Icons.delivery_dining_outlined), label: Text('Delivery')),
   //             ],
   //           ),
@@ -105,7 +145,7 @@ class _StartorderState extends State<Startorder>
   //                 Container(
   //                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
   //                   decoration: BoxDecoration(
-  //                       border: Border.all(color: primarycolor),
+  //                       border: Border.all(color: AppColors.primary),
   //                       borderRadius: BorderRadius.circular(20)
   //                   ),
   //                   child: Text('Table No: $_tableIdForCurrentSession', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
@@ -150,9 +190,9 @@ class _StartorderState extends State<Startorder>
   //                     child: Row(
   //                       mainAxisAlignment: MainAxisAlignment.center,
   //                       children: [
-  //                         IconButton(icon: Icon(Icons.remove_circle_outline, color: primarycolor), onPressed: () => _decreaseQuantity(item)),
+  //                         IconButton(icon: Icon(Icons.remove_circle_outline, color: AppColors.primary), onPressed: () => _decreaseQuantity(item)),
   //                         Text(item.quantity.toString(), style: GoogleFonts.poppins(fontSize: 16)),
-  //                         IconButton(icon: Icon(Icons.add_circle_outline, color: primarycolor), onPressed: () => _increaseQuantity(item)),
+  //                         IconButton(icon: Icon(Icons.add_circle_outline, color: AppColors.primary), onPressed: () => _increaseQuantity(item)),
   //                       ],
   //                     ),
   //                   ),
@@ -202,373 +242,174 @@ class _StartorderState extends State<Startorder>
   /// Builds the default TabBar view for starting new orders.
   Widget build(BuildContext context) {
     print(widget.newOrderForTableId ?? 'no table id ');
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    final height = size.height;
+    final width = size.width;
+
     return Scaffold(
-      appBar: AppBar(
-        leading: Builder(
-          builder: (context) {
-            return IconButton(
-              icon: Icon(Icons.menu, size: 28),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-              padding: EdgeInsets.zero,        // remove unwanted padding
-              constraints: BoxConstraints(),   // remove default constraints
-              alignment: Alignment.center,     // force icon to stay centered
-            );
-          },
-        ),
-
-        title: Text(
-          'orange',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.person),
-                    Text(
-                      'Admin',
-                      style: GoogleFonts.poppins(fontSize: 12),
-                      textScaler: TextScaler.linear(1),
-                    )
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(50),
-          child: Container(
-            width: double.infinity,
-            child: TabBar(
-              isScrollable: false,
-              // indicatorSize: TabBarIndicatorSize.values(),
-              controller: tabController,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.grey,
-              dividerColor: Colors.transparent,
-
-              indicatorColor: Primarysecond,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                  color: primarycolor, borderRadius: BorderRadius.circular(2)),
-
-              tabs: const [
-                Tab(
-                  text: 'Menu',
-                ),
-                Tab(
-                  text: 'Order',
-                ),
-                Tab(
-                  text: 'Tables',
-                )
-              ],
-            ),
-          ),
-        ),
-      ),
+      backgroundColor: AppColors.surfaceLight,
       drawer: Drawerr(),
-      body: TabBarView(
-        controller: tabController,
-        children: [ MenuScreen(tableIdForNewOrder:_tableIdForCurrentSession,isForAddingItem: widget.isForAddingItem ?? false,), Order(), const TableScreen()],
-      ),
-    );
-
-   /*   LayoutBuilder(
-      builder: (context , constraints){
-        if(constraints.maxWidth <700){
-          return Scaffold(
-            appBar: AppBar(
-              leading: Builder(
-                builder: (context) {
-                  return IconButton(
-                    icon: Icon(Icons.menu, size: 28),
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                    padding: EdgeInsets.zero,        // remove unwanted padding
-                    constraints: BoxConstraints(),   // remove default constraints
-                    alignment: Alignment.center,     // force icon to stay centered
-                  );
-                },
-              ),
-
-              title: Text(
-                'orange',
-                style: GoogleFonts.poppins(),
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.person),
-                          Text(
-                            'Admin',
-                            style: GoogleFonts.poppins(fontSize: 12),
-                            textScaler: TextScaler.linear(1),
-                          )
-                        ],
-                      ),
-                    ],
-                  ),
+      body: Column(
+        children: [
+          // Header
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
                 ),
               ],
-              bottom: PreferredSize(
-                preferredSize: Size.fromHeight(50),
-                child: Container(
-                  width: double.infinity,
-                  child: TabBar(
-                    isScrollable: false,
-                    // indicatorSize: TabBarIndicatorSize.values(),
-                    controller: tabController,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.grey,
-                    dividerColor: Colors.transparent,
-
-                    indicatorColor: Primarysecond,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                        color: primarycolor, borderRadius: BorderRadius.circular(2)),
-
-                    tabs: const [
-                      Tab(
-                        text: 'Menu',
-                      ),
-                      Tab(
-                        text: 'Order',
-                      ),
-                      Tab(
-                        text: 'Tables',
-                      )
-                    ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  Builder(
+                    builder: (context) {
+                      return GestureDetector(
+                        onTap: () => Scaffold.of(context).openDrawer(),
+                        child: Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.menu, color: AppColors.white, size: 24),
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ),
-            ),
-            drawer: Drawerr(),
-            body: TabBarView(
-              controller: tabController,
-              children: [ MenuScreen(tableIdForNewOrder:_tableIdForCurrentSession,isForAddingItem: widget.isForAddingItem ?? false,), Order(), const TableScreen()],
-            ),
-          );
-        }      else{
-          return  Scaffold(
-            appBar:AppBar(
-              surfaceTintColor: Colors.transparent,
-              shadowColor: Colors.black.withValues(alpha: 1),
-              elevation: 5,
-              title: Text('Orange',style: GoogleFonts.poppins(fontWeight: FontWeight.w600),),
-              actions: [
-                Card(
-                  color: Colors.white,
-                  elevation: 25,
-                  shape: StadiumBorder(
-                      side: BorderSide(
-                        color: Colors.white,
-                        width: 2.0,
-                      )),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('15'),
-                        SizedBox(width: 5,),
-                        Image.asset('assets/icons/restaurant.png')
-                        // Container(
-                        //   padding: EdgeInsets.all(10),
-                        //   decoration: BoxDecoration(
-                        //     color: Colors.white,
-                        //     shape: BoxShape.circle
-                        //   ),
-                        //   child: ,),
+                        Text(
+                          'UniPOS',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          widget.newOrderForTableId != null
+                              ? 'Table ${widget.newOrderForTableId}'
+                              : 'Quick Order',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-                SizedBox(width:25),
-                InkWell(
-                  onTap: (){
-                    Navigator.push(context, MaterialPageRoute(builder: (context)=> OnlineDesktop()));
-                  },
-                  child: Card(
-                    color: Colors.white,
-                    elevation: 25,
-                    shape: StadiumBorder(
-                        side: BorderSide(
-                          color: Colors.white,
-                          width: 2.0,
-                        )),
-                    // color: Colors.white,
+                 /* GestureDetector(
+                    onTap: () {
+                      setState(() {});
+                    },
                     child: Container(
-                      padding: EdgeInsets.all(10),
+                      padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        // color: Colors.white,
-                        shape: BoxShape.circle,
-
+                        color: AppColors.surfaceMedium,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Image.asset('assets/icons/dinner.png'),),
+                      child: Icon(Icons.refresh, size: 22, color: AppColors.textSecondary),
+                    ),
                   ),
-                ),
-                SizedBox(width:10),
-
-                Card(
-                  color: Colors.white,
-                  elevation: 25,
-                  shape: StadiumBorder(
-                      side: BorderSide(
-                        color: Colors.white,
-                        width: 2.0,
-                      )),
-                  // color: Colors.white,
-                  child: Container(
-                    padding: EdgeInsets.all(10),
+                  SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      // color: Colors.white,
-                      shape: BoxShape.circle,
-
+                      color: AppColors.surfaceMedium,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Image.asset('assets/icons/volume.png'),),
-                ),
-                SizedBox(width:10),
+                    child: Icon(Icons.more_vert, size: 22, color: AppColors.textSecondary),
+                  ),*/
+                ],
+              ),
+            ),
+          ),
 
-                Card(
-                  color: Colors.white,
-                  elevation: 25,
-                  shape: StadiumBorder(
-                      side: BorderSide(
-                        color: Colors.white,
-                        width: 2.0,
-                      )),
-                  child: Container(
-                    padding: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle
-                    ),
-                    child: Image.asset('assets/icons/home.png'),),
-                ),
-                SizedBox(width:10),
-                Card(
-                  color: Colors.white,
-                  elevation: 25,
-                  shape: StadiumBorder(
-                      side: BorderSide(
-                        color: Colors.white,
-                        width: 2.0,
-                      )),
-                  child: Container(
-                    padding: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle
-                    ),
-                    child: Image.asset('assets/icons/printer3.png'),),
-                ),
-                SizedBox(width:10),
-                Card(
-                  color: Colors.white,
-                  elevation: 25,
-                  shape: StadiumBorder(
-                      side: BorderSide(
-                        color: Colors.white,
-                        width: 2.0,
-                      )),
-                  child: Container(
-                    padding: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle
-                    ),
-                    child: Image.asset('assets/icons/internet.png'),),
-                ),
-                SizedBox(width:10),
-                Card(
-                    color: Colors.white,
-                    elevation: 25,
-                    shape: StadiumBorder(
-                        side: BorderSide(
-                          color: Colors.white,
-                          width: 2.0,
-                        )),
-                    child:Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text('V 5.8'),
-                    )
-                ),
-                SizedBox(width:10),
-                Card(
-                    color: Colors.white,
-                    elevation: 25,
-                    shape: StadiumBorder(
-                        side: BorderSide(
-                          color: Colors.white,
-                          width: 2.0,
-                        )),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          Image.asset('assets/icons/user.png'),
-                          SizedBox(width:5),
+          // Horizontal Tabs for Tablet
+          if (isTablet)
+            Container(
+              color: AppColors.white,
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Expanded(child: _buildTabButton(0, Icons.restaurant_menu, 'Menu', isTablet)),
+                  SizedBox(width: 16),
+                  Expanded(child: _buildTabButton(1, Icons.receipt_long, 'Orders', isTablet)),
+                  SizedBox(width: 16),
+                  Expanded(child: _buildTabButton(2, Icons.table_restaurant, 'Tables', isTablet)),
+                ],
+              ),
+            ),
 
-                          Text('Admin'),
-                          SizedBox(width:5),
-
-                          Image.asset('assets/icons/arrows.png',height: 20,)
-                        ],
-                      ),
-                    )
+          // TabBarView
+          Expanded(
+            child: TabBarView(
+              controller: tabController,
+              children: [ MenuScreen(tableIdForNewOrder:_tableIdForCurrentSession,isForAddingItem: widget.isForAddingItem ?? false,), Order(), const TableScreen()],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: isTablet ? null : Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Container(
+            height: 60,
+            child: TabBar(
+              controller: tabController,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              labelStyle: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              tabs: [
+                Tab(
+                  icon: Icon(Icons.restaurant_menu, size: 24),
+                  text: 'Menu',
+                ),
+                Tab(
+                  icon: Icon(Icons.receipt_long, size: 24),
+                  text: 'Orders',
+                ),
+                Tab(
+                  icon: Icon(Icons.table_restaurant, size: 24),
+                  text: 'Tables',
                 ),
               ],
             ),
-            body: SingleChildScrollView(
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      // color: Colors.red,
-                      width: width,
-                      height: height * 0.6,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                              padding: EdgeInsets.only(left: 50),
-                              width: width * 0.3,
-                              // alignment: Alignment.center,
-                              //   color: Colors.red,
-                              child: Center(child: Image.asset('assets/images/menu.jpg',))),
-                          SizedBox(height: 15),
-                          Text('If Menu Is Already Added , Sync The Menu'),
-                          SizedBox(height: 10,),
-                          CommonButton(
-                              height: height * 0.06,
-                              width: width * 0.3,
-                              onTap: (){},
-                              child: Text("Sync Menu",style: GoogleFonts.poppins(fontWeight: FontWeight.w700),))
-                        ],
-                      ) ,
-                    )
-                  ],
-                ),
-              ),
-            ),
-            drawer:Drawerr() ,
-          );
-        }
-      },
+          ),
+        ),
+      ),
+    );
 
-    );*/
+
   }
 }

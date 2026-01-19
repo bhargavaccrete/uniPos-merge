@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/Desktop/componets/ListMenuD.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 
@@ -36,7 +37,7 @@ class _MenuscreenDesktopState extends State<MenuscreenDesktop> {
               // width: width ,
               // color: Colors.purple,
               child: Image.asset(
-                logo,
+                AppImages.logo,
                 width: 150,
                 fit: BoxFit.fill,
               )),

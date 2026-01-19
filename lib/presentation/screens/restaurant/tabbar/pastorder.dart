@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../constants/restaurant/color.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'orderDetails.dart';
-
+import '../../../../util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 class Pastorder extends StatefulWidget {
   const Pastorder({super.key});
 
@@ -72,7 +72,7 @@ class _PastorderState extends State<Pastorder> {
       builder: (ctx, child) {
         // color theming to match your primary color
         final scheme = Theme.of(ctx).colorScheme.copyWith(
-          primary: primarycolor,
+          primary: AppColors.primary,
           onPrimary: Colors.white,
           surface: Colors.white,
           onSurface: Colors.black,
@@ -127,7 +127,7 @@ class _PastorderState extends State<Pastorder> {
                   controller: _searchCtrl,
                   decoration: InputDecoration(
                     hintText: 'Search by name / KOT / phone',
-                    prefixIcon: Icon(Icons.search, color: primarycolor),
+                    prefixIcon: Icon(Icons.search, color: AppColors.primary),
                     isDense: true,
                     border: inputBorder,
                     enabledBorder: inputBorder,
@@ -482,7 +482,7 @@ class _PastorderState extends State<Pastorder> {
                             GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: primarycolor,
+                          color: AppColors.primary,
                           size: 30,
                         ),
                         focusedBorder: outr,

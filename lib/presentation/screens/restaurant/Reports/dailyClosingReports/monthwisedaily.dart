@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
 class MonthWisebyDaily extends StatefulWidget {
@@ -148,7 +147,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                           height: height * 0.05,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
@@ -194,7 +193,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                           height: height * 0.05,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
@@ -227,7 +226,7 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(50),
                       ),
                       child: Icon(

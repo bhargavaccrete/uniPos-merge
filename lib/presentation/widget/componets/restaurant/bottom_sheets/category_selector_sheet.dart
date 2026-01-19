@@ -6,7 +6,7 @@ import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/database/hive_db.dart';
 import '../componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 /// Result from category selection
 class CategorySelectionResult {
   final String id;
@@ -232,7 +232,7 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: primarycolor,
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: const Icon(Icons.edit, color: Colors.white),

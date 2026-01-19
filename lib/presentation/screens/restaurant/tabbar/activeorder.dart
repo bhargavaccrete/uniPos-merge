@@ -7,6 +7,7 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
@@ -507,127 +508,168 @@ class _ActiveorderState extends State<Activeorder> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // FIX: The main layout is now a Column
-      body: Padding(
-        padding: const EdgeInsets.all(15.0),
-        child: Column(
-          children: [
-            // This Row stays at the top
-            Row(
+      backgroundColor: AppColors.surfaceLight,
+      body: Column(
+        children: [
+          // Order Type Filter Row
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            color: AppColors.white,
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Order Type',
                   style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w700, fontSize: 18),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                DropdownButton<String>(
-                  value: dropDownValue,
-                  items: dropdownItems.map((String item) {
-                    return DropdownMenuItem(
-                      value: item,
-                      child: Text(item),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      dropDownValue = newValue!;
-                    });
-                  },
-                )
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.divider, width: 1.5),
+                  ),
+                  child: DropdownButton<String>(
+                    value: dropDownValue,
+                    underline: SizedBox(),
+                    icon: Icon(Icons.keyboard_arrow_down, color: AppColors.textPrimary),
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                    items: dropdownItems.map((String item) {
+                      return DropdownMenuItem(
+                        value: item,
+                        child: Text(item),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        dropDownValue = newValue!;
+                      });
+                    },
+                  ),
+                ),
               ],
             ),
-            SizedBox(height: 10), // Add some spacing
+          ),
 
-            // FIX: This Expanded now has a fixed space to fill
-            Expanded(
-                child:  ValueListenableBuilder(
-                  valueListenable: Hive.box<OrderModel>('orderBox').listenable(),
-                  builder: (context, orders ,_){
+          // Orders List
+          Expanded(
+            child: ValueListenableBuilder(
+              valueListenable: Hive.box<OrderModel>('orderBox').listenable(),
+              builder: (context, orders, _) {
+                // Show all orders except 'Served' orders that are already paid
+                final activeOrders = orders.values
+                    .where((order) =>
+                        order.status != 'Served' ||
+                        (order.status == 'Served' && order.paymentStatus != 'Paid'))
+                    .toList();
 
-                    // Show all orders except 'Served' orders that are already paid
-                    // Keep 'Served' orders in active view if payment is not complete
-                    final activeOrders = orders.values
-                        .where((order) =>
-                          order.status != 'Served' ||
-                          (order.status == 'Served' && order.paymentStatus != 'Paid')
-                        )
-                        .toList();
+                activeOrders.sort((a, b) => b.timeStamp.compareTo(a.timeStamp));
 
-                    activeOrders.sort((a,b)=> b.timeStamp.compareTo(a.timeStamp));
-
-
-                    if(activeOrders.isEmpty){
-                      return Center(
-                        child: Text(
-                          'No Active Orders',
+                if (activeOrders.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 80,
+                          color: AppColors.divider,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No active orders',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w500,
-                            fontSize: 28,
-                            color: Colors.grey.shade800,
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
                           ),
                         ),
-                      );
-                    }
+                      ],
+                    ),
+                  );
+                }
 
-                    final filterOrderList = dropDownValue == 'All'
-                        ? activeOrders
-                        : activeOrders.where((order)=> order.orderType == dropDownValue)
+                final filterOrderList = dropDownValue == 'All'
+                    ? activeOrders
+                    : activeOrders
+                        .where((order) => order.orderType == dropDownValue)
                         .toList();
 
-                    if(filterOrderList.isEmpty){
-                      return Center(child: Text('No Order of Type "$dropDownValue" found.'));
-                    }
+                if (filterOrderList.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 80,
+                          color: AppColors.divider,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No orders of type "$dropDownValue"',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                    return ListView.builder(
-                      itemCount: filterOrderList.length,
-                      itemBuilder: (context, index) {
-                        final order = filterOrderList[index];
-                        return OrderCard(
-                          color: _getColorForStatus(order.status),
+                return ListView.builder(
+                  padding: EdgeInsets.all(16),
+                  itemCount: filterOrderList.length,
+                  itemBuilder: (context, index) {
+                    final order = filterOrderList[index];
+                    return OrderCard(
+                      color: _getColorForStatus(order.status),
+                      order: order,
+                      onDelete: _deleteOrder,
+                      ontapcooking: () async {
+                        if (order.status == 'Processing' ||
+                            order.status == 'Cooking' ||
+                            order.status == 'Ready' ||
+                            order.status == 'Served') {
+                          _showStatusUpdateDialog(
+                              order, order.orderType == 'Take Away' ? true : false);
+                        }
+                      },
+                      ontap: () async {
+                        if (order.isPaid != true) {
+                          print(
+                              'Card with Kot ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id}');
 
-                          order: order,
-                          onDelete: _deleteOrder,
-                          ontapcooking: () async {
-                            if (order.status == 'Processing' || order.status == 'Cooking' || order.status == 'Ready' || order.status == 'Served') {
-                              _showStatusUpdateDialog(order,order.orderType == 'Take Away'? true : false);
-                            }
-                          },
-
-                          ontap: () async { // Make the function async
-                            // If status is 'Cooking', show the update dialog
-
-                            // If not paid, navigate to the cart to complete payment
-                            if (order.isPaid != true) {
-                              print('Card with Kot ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id}');
-
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CartScreen(
-                                    existingOrder: order,
-                                    selectedTableNo: order.tableNo,
-                                  ),
-                                ),
-                              );
-                              // _refreshOrders();
-                            }
-                            // Handle other statuses if needed
-                            else {
-                              print("Order is in status: ${order.status}");
-                            }
-                          },
-                        );
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CartScreen(
+                                existingOrder: order,
+                                selectedTableNo: order.tableNo,
+                              ),
+                            ),
+                          );
+                        } else {
+                          print("Order is in status: ${order.status}");
+                        }
                       },
                     );
                   },
-                )
-
-
-
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

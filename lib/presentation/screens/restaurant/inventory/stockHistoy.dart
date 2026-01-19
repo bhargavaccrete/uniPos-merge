@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:unipos/util/images.dart';
 
 import '../../../../util/restaurant/images.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -72,7 +73,7 @@ class StockHistory extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Lottie.asset(notfoundanimation,
+                    Lottie.asset(AppImages.notfoundanimation,
                         height: height * 0.3),
                     Text(
                       'No Stock Found',

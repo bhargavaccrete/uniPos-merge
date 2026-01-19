@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
 
 class DayWiseCategory extends StatefulWidget {
@@ -54,7 +54,7 @@ class _DayWiseCategoryState extends State<DayWiseCategory> {
                     controller: SearchCategory,
                     hintText: "Search Category",
                     HintColor: Colors.grey,
-                    icon: Icon(Icons.search,color: primarycolor,size: 30,),
+                    icon: Icon(Icons.search,color: AppColors.primary,size: 30,),
                     obsecureText: false),
               ),
               SizedBox(height: 20,),
@@ -73,7 +73,7 @@ class _DayWiseCategoryState extends State<DayWiseCategory> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             // color: Colors.red,
                             borderRadius: BorderRadius.circular(5)
                         ),
@@ -95,7 +95,7 @@ class _DayWiseCategoryState extends State<DayWiseCategory> {
                   Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor,
+                          color: AppColors.primary,
                           shape: BoxShape.circle),
                       child: Icon(Icons.search,size: 30,color: Colors.white,))
                 ],

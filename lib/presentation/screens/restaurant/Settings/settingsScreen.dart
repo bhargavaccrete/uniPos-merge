@@ -2,17 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.dart';
 
-import '../../../../util/restaurant/currency_helper.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
+import '../../../../util/common/currency_helper.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../../widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
-import '../../../widget/componets/restaurant/componets/toggleSwitch.dart';
-import 'addressCustomizationScreen.dart';
-import 'changePassword.dart';
-import 'data_generator_screen.dart';
-import 'orderNotificationSetting.dart';
-import 'orderSettings.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 class Settingsscreen extends StatefulWidget {
   const Settingsscreen({super.key});

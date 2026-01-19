@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 class YearWiseItem extends StatefulWidget {
   const YearWiseItem({super.key});
 
@@ -48,7 +48,7 @@ class _YearWiseItemState extends State<YearWiseItem> {
                     HintColor: Colors.grey,
                     icon: Icon(
                       Icons.search,
-                      color: primarycolor,
+                      color: AppColors.primary,
                       size: 30,
                     ),
                     obsecureText: false),
@@ -73,7 +73,7 @@ class _YearWiseItemState extends State<YearWiseItem> {
                     height: height * 0.05,
                     padding: EdgeInsets.all(5),
                     decoration:
-                    BoxDecoration(border: Border.all(color: primarycolor)),
+                    BoxDecoration(border: Border.all(color: AppColors.primary)),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton(
                           value: dropdownvalue2,
@@ -98,7 +98,7 @@ class _YearWiseItemState extends State<YearWiseItem> {
                   Container(
                     padding: EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(50)
                     ),
                     child: Icon(

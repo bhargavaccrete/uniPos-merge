@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_customer.dart';
 import 'package:unipos/util/color.dart';

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'variant_selection_screen.dart';
 import 'choice_selection_screen.dart';
 import 'extra_selection_screen.dart';
 import 'tax_selection_screen.dart';
-
+import 'package:unipos/util/color.dart';
 class AddMoreInfoScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
 
@@ -193,13 +193,13 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                       'taxRate': selectedTaxRate,
                     }),
                     bgcolor: Colors.white,
-                    bordercolor: primarycolor,
+                    bordercolor: AppColors.primary,
                     bordercircular: 10,
                     height: ResponsiveHelper.responsiveHeight(context, 0.06),
                     child: Text(
                       'Continue',
                       style: GoogleFonts.poppins(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -251,23 +251,23 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           border: Border.all(
-            color: hasSelection ? primarycolor : Colors.grey[300]!,
+            color: hasSelection ? AppColors.primary : Colors.grey[300]!,
             width: hasSelection ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
-          color: hasSelection ? primarycolor.withValues(alpha: 0.05) : Colors.grey[50],
+          color: hasSelection ? AppColors.primary.withValues(alpha: 0.05) : Colors.grey[50],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: primarycolor.withValues(alpha: 0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                color: primarycolor,
+                color: AppColors.primary,
                 size: 24,
               ),
             ),
@@ -327,12 +327,12 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: primarycolor.withValues(alpha: 0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                color: primarycolor,
+                color: AppColors.primary,
                 size: 24,
               ),
             ),
@@ -355,7 +355,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: primarycolor,
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(

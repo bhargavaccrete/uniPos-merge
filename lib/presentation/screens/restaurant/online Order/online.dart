@@ -63,7 +63,7 @@
 //                 dividerColor: Colors.transparent,
 //                 indicatorColor: Primarysecond,
 //                 indicator: BoxDecoration(
-//                   color: primarycolor,
+//                   color: AppColors.primary,
 //                     borderRadius:BorderRadius.circular(8),
 //                 ),
 //                 indicatorSize: TabBarIndicatorSize.tab,

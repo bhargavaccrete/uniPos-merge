@@ -5,13 +5,15 @@ import 'package:lottie/lottie.dart';
 import 'package:hive/hive.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
-import '../../../../../util/restaurant/decimal_settings.dart';
-import '../../../../../util/restaurant/currency_helper.dart';
+
 import '../../../../../util/restaurant/images.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 
 class AllTab extends StatefulWidget {
   const AllTab({super.key});
@@ -100,7 +102,7 @@ class _AllTabState extends State<AllTab> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Lottie.asset(notfoundanimation, height: height * 0.3),
+                                  Lottie.asset(AppImages.notfoundanimation, height: height * 0.3),
                                   Text('No Categories Found!', style: GoogleFonts.poppins(fontSize: 16)),
                                 ],
                               ),
@@ -144,7 +146,7 @@ class _AllTabState extends State<AllTab> {
                                                             // thumb when ON
                                                             activeColor: Colors.white,
                                                             // track when ON
-                                                            activeTrackColor: primarycolor,
+                                                            activeTrackColor: AppColors.primary,
                                                             // thumb when OFF
                                                             inactiveThumbColor: Colors.white70,
                                                             // track when OFF
@@ -194,7 +196,7 @@ class _AllTabState extends State<AllTab> {
                                                                 style: GoogleFonts.poppins(
                                                                   fontSize: 11,
                                                                   fontWeight: FontWeight.w500,
-                                                                  color: primarycolor,
+                                                                  color: AppColors.primary,
                                                                 ),
                                                               ),
                                                             ],

@@ -7,7 +7,7 @@ import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/dailyClosingReports/customedaily.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/dailyClosingReports/daywisedaily.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/dailyClosingReports/monthwisedaily.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -43,7 +43,7 @@ class _DailyClosingReportState extends State<DailyClosingReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text("Daily Closing Report",    textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
         ),
@@ -98,11 +98,11 @@ class _DailyClosingReportState extends State<DailyClosingReport> {
         },
 
         style: ElevatedButton.styleFrom(
-            backgroundColor: selectedFilter==title ? primarycolor : Colors.white,
-            foregroundColor: selectedFilter==title ? Colors.white : primarycolor,
+            backgroundColor: selectedFilter==title ? AppColors.primary : Colors.white,
+            foregroundColor: selectedFilter==title ? Colors.white : AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor)
+                side: BorderSide(color: AppColors.primary)
             )
         ),
         child: Text(title));

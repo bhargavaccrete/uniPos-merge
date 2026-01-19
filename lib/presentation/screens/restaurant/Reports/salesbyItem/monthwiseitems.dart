@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 class MonthWiseItem extends StatefulWidget {
   const MonthWiseItem({super.key});
 
@@ -44,7 +44,7 @@ class _MonthWiseItemState extends State<MonthWiseItem> {
                     controller: SearchController(),
                     hintText: "Search Item",
                     HintColor: Colors.grey,
-                    icon: Icon(Icons.search,color: primarycolor,size: 30,),
+                    icon: Icon(Icons.search,color: AppColors.primary,size: 30,),
                     obsecureText: false),
               ),
 
@@ -72,7 +72,7 @@ class _MonthWiseItemState extends State<MonthWiseItem> {
               //       height: height * 0.04,
               //       padding: EdgeInsets.all(5),
               //       decoration: BoxDecoration(
-              //           border: Border.all(color: primarycolor)
+              //           border: Border.all(color: AppColors.primary)
               //       ),
               //       child: DropdownButtonHideUnderline(
               //         child: DropdownButton(
@@ -94,7 +94,7 @@ class _MonthWiseItemState extends State<MonthWiseItem> {
               //       height: height * 0.04,
               //       padding: EdgeInsets.all(5),
               //       decoration: BoxDecoration(
-              //           border: Border.all(color: primarycolor)
+              //           border: Border.all(color: AppColors.primary)
               //       ),
               //       child: DropdownButtonHideUnderline(
               //         child: DropdownButton(
@@ -140,7 +140,7 @@ class _MonthWiseItemState extends State<MonthWiseItem> {
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
                             // color: Colors.green,
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropDownValue1,
@@ -184,7 +184,7 @@ class _MonthWiseItemState extends State<MonthWiseItem> {
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
                             // color: Colors.red,
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropdownvalue2,
@@ -214,7 +214,7 @@ class _MonthWiseItemState extends State<MonthWiseItem> {
                   Container(
                     padding: EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(50)
                     ),
                     child: Icon(

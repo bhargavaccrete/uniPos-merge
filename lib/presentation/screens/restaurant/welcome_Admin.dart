@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/util/color.dart';
 import '../../../constants/restaurant/color.dart';
 import '../../../core/routes/routes_name.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
@@ -41,9 +42,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     // final height = MediaQuery.of(context).size.height * 1;
     // final width = MediaQuery.of(context).size.width * 1;
     return  Scaffold(
-      backgroundColor: screenBGColor,
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-          backgroundColor: screenBGColor,
+          backgroundColor: AppColors.white,
           automaticallyImplyLeading: false,
           // toolbarHeight: 50,
           // backgroundColor: Colors.red,
@@ -537,7 +538,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                                             height:
                                             ResponsiveHelper.responsiveHeight(
                                                 context, 0.05),
-                                            bgcolor: primarycolor,
+                                            bgcolor: AppColors.primary,
                                             onTap: () {
                                               Navigator.pushNamed(context, RouteNames.restaurantAdminLogin);
                                             },
@@ -626,7 +627,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                 children: [
                   Image.asset(
                     'assets/icons/system-administration.png',
-                    color: primarycolor,
+                    color: AppColors.primary,
                     width: 30,
                     height: 30,
                   ),
@@ -648,7 +649,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   children: [
                     Image.asset(
                       'assets/icons/support.png',
-                      color: primarycolor,
+                      color: AppColors.primary,
                       width: 30,
                       height: 30,
                     ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
+
+import 'package:unipos/util/common/currency_helper.dart';
 
 class MonthWisebytrading extends StatefulWidget {
   const MonthWisebytrading({super.key});
@@ -79,7 +79,7 @@ class _MonthWisebytradingState extends State<MonthWisebytrading> {
                           height: height * 0.05,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropDownValue1,
@@ -123,7 +123,7 @@ class _MonthWisebytradingState extends State<MonthWisebytrading> {
                           height: height * 0.05,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropdownvalue2,
@@ -155,7 +155,7 @@ class _MonthWisebytradingState extends State<MonthWisebytrading> {
                   Container(
                     padding: EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(50)),
                     child: Icon(
                       Icons.search,

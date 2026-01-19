@@ -1,10 +1,11 @@
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/pastorder.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../constants/restaurant/color.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
-import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import 'activeorder.dart';
 
 class Order extends StatefulWidget {
@@ -33,69 +34,105 @@ class _OrderState extends State<Order> {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
 
     return Scaffold(
-      body: Container(
-        padding: EdgeInsets.symmetric(horizontal: 5, vertical: 10),
-        child: Column(
-          children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                // crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Filterbutton(
-                        title: 'Active Order',
-                        selectedFilter: selectedFilter,
-                        onpressed: () {
-                          setState(() {
-                            selectedFilter = 'Active Order';
-                          });
-                        },
-                      ),
-                      // _filterButton('Active Order'),
-                      SizedBox(
-                        width: 10,
-                      ),
-                      Filterbutton(
-                        title: 'Past Order',
-                        selectedFilter: selectedFilter,
-                        onpressed: () {
-                          setState(() {
-                            selectedFilter = 'Past Order';
-                          });
-                        },
-                      ),
-
-                      SizedBox(
-                        width: 30,
-                      ),
-                    ],
-                  ),
-                  Container(
-                      height: height * 0.04,
-                      width: width * 0.15,
+      backgroundColor: AppColors.surfaceLight,
+      body: Column(
+        children: [
+          // Tab Buttons
+          Container(
+            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            color: AppColors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedFilter = 'Active Order';
+                      });
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
                       decoration: BoxDecoration(
-                          color: primarycolor,
-                          borderRadius: BorderRadius.circular(5)),
-                      child: Icon(
-                        Icons.refresh,
-                        color: Colors.white,
-                      ))
-                ],
-              ),
+                        color: selectedFilter == 'Active Order' ? AppColors.primary : AppColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selectedFilter == 'Active Order' ? AppColors.primary : AppColors.divider,
+                          width: 2,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long_rounded,
+                            size: isTablet ? 22 : 20,
+                            color: selectedFilter == 'Active Order' ? AppColors.white : AppColors.textSecondary,
+                          ),
+                          SizedBox(width: isTablet ? 10 : 8),
+                          Text(
+                            'Active Orders',
+                            style: GoogleFonts.poppins(
+                              fontSize: isTablet ? 16 : 15,
+                              fontWeight: FontWeight.w600,
+                              color: selectedFilter == 'Active Order' ? AppColors.white : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: isTablet ? 16 : 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        selectedFilter = 'Past Order';
+                      });
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
+                      decoration: BoxDecoration(
+                        color: selectedFilter == 'Past Order' ? AppColors.primary : AppColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selectedFilter == 'Past Order' ? AppColors.primary : AppColors.divider,
+                          width: 2,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.history_rounded,
+                            size: isTablet ? 22 : 20,
+                            color: selectedFilter == 'Past Order' ? AppColors.white : AppColors.textSecondary,
+                          ),
+                          SizedBox(width: isTablet ? 10 : 8),
+                          Text(
+                            'Past Orders',
+                            style: GoogleFonts.poppins(
+                              fontSize: isTablet ? 16 : 15,
+                              fontWeight: FontWeight.w600,
+                              color: selectedFilter == 'Past Order' ? AppColors.white : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            Expanded(child: _getBody())
-          ],
-        ),
+          ),
+
+          Expanded(child: _getBody()),
+        ],
       ),
     );
   }
-
-// CommonButton;
 }

@@ -51,7 +51,7 @@ class _TodayByposUserState extends State<TodayByposUser> {
                     borderRadius: BorderRadius.circular(5)),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton(
-                    // dropdownColor: primarycolor,
+                    // dropdownColor: AppColors.primary,
                       value: dropvalue,
                       items: userlist.map((String items) {
                         return DropdownMenuItem(

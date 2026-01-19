@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/util/responsive.dart';
 import 'package:unipos/util/color.dart';
 
@@ -533,7 +534,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 40, color: Theme.of(context).primaryColor),
+            Icon(icon, size: 40, color: AppColors.primary),
             const SizedBox(height: 16),
             Text(
               title,
@@ -568,7 +569,7 @@ class HomeScreen extends StatelessWidget {
                     Icon(
                       Icons.notifications_active,
                       size: 40,
-                      color: hasCritical ? Colors.red : Theme.of(context).primaryColor,
+                      color: hasCritical ? Colors.red : AppColors.primary,
                     ),
                     if (alertCount > 0)
                       Positioned(

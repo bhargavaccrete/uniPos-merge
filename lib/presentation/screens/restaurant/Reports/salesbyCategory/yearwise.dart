@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 class YearWiseCategory extends StatefulWidget {
   const YearWiseCategory({super.key});
 
@@ -40,7 +40,7 @@ class _YearWiseCategoryState extends State<YearWiseCategory> {
                     controller: SearchCategory,
                     hintText: "Search Category",
                     HintColor: Colors.grey,
-                    icon: Icon(Icons.search,color: primarycolor,size: 30,),
+                    icon: Icon(Icons.search,color: AppColors.primary,size: 30,),
                     obsecureText: false),
               ),
 
@@ -57,7 +57,7 @@ class _YearWiseCategoryState extends State<YearWiseCategory> {
                     height: height * 0.05,
                     padding: EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                        border: Border.all(color: primarycolor)
+                        border: Border.all(color: AppColors.primary)
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton(
@@ -81,7 +81,7 @@ class _YearWiseCategoryState extends State<YearWiseCategory> {
                   Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor,
+                          color: AppColors.primary,
                           shape: BoxShape.circle),
                       child: Icon(Icons.search,size: 30,color: Colors.white,))
 

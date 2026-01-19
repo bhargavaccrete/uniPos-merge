@@ -4,12 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 class CustomeDaily extends StatefulWidget {
   const CustomeDaily({super.key});
 
@@ -181,7 +180,7 @@ class _CustomeDailyState extends State<CustomeDaily> {
                       width: width * 0.6,
                       height: height * 0.05,
                       decoration: BoxDecoration(
-                        border: Border.all(color: primarycolor),
+                        border: Border.all(color: AppColors.primary),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Row(
@@ -194,7 +193,7 @@ class _CustomeDailyState extends State<CustomeDaily> {
                             textScaler: TextScaler.linear(1),
                             style: GoogleFonts.poppins(fontSize: 14),
                           ),
-                          Icon(Icons.date_range, color: primarycolor)
+                          Icon(Icons.date_range, color: AppColors.primary)
                         ],
                       ),
                     ),
@@ -218,7 +217,7 @@ class _CustomeDailyState extends State<CustomeDaily> {
                       width: width * 0.6,
                       height: height * 0.05,
                       decoration: BoxDecoration(
-                        border: Border.all(color: primarycolor),
+                        border: Border.all(color: AppColors.primary),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Row(
@@ -231,7 +230,7 @@ class _CustomeDailyState extends State<CustomeDaily> {
                             textScaler: TextScaler.linear(1),
                             style: GoogleFonts.poppins(fontSize: 14),
                           ),
-                          Icon(Icons.date_range, color: primarycolor)
+                          Icon(Icons.date_range, color: AppColors.primary)
                         ],
                       ),
                     ),
@@ -246,7 +245,7 @@ class _CustomeDailyState extends State<CustomeDaily> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(

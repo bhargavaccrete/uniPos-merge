@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../util/restaurant/responsive_helper.dart';
@@ -114,7 +115,7 @@ class ImagePickerSheet extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 50, color: primarycolor),
+            Icon(icon, size: 50, color: AppColors.primary),
             Text(label),
           ],
         ),

@@ -415,14 +415,14 @@ class OrderCard extends StatelessWidget {
 //
 // Row(
 // children: [
-// Icon(Icons.person_outline_outlined,color: primarycolor,),
+// Icon(Icons.person_outline_outlined,color: AppColors.primary,),
 // Text('#Admin',style: GoogleFonts.poppins(fontSize: 12)),
 // ],
 // ),
 // Container(
 // padding: EdgeInsets.all(5),
 // decoration: BoxDecoration(
-// color: primarycolor,
+// color: AppColors.primary,
 // borderRadius: BorderRadius.circular(
 // 5
 // )

@@ -3,13 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 // Import your local files
 import '../../../../../constants/restaurant/color.dart';
 import 'CategoryReportData.dart';
-
+import 'package:unipos/util/color.dart';
 class CategoryReportView extends StatefulWidget {
   final List<CategoryReportData> reportData;
 
@@ -72,7 +71,7 @@ class _CategoryReportViewState extends State<CategoryReportView> {
             controller: _searchController,
             hintText: "Search Category",
             HintColor: Colors.grey,
-            icon: Icon(Icons.search, color: primarycolor, size: 30),
+            icon: Icon(Icons.search, color: AppColors.primary, size: 30),
             obsecureText: false,
           ),
         ),

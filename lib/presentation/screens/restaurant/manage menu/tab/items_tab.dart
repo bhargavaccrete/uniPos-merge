@@ -4,16 +4,18 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart' show EdititemScreen;
 import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
-import '../../../../../util/restaurant/currency_helper.dart';
-import '../../../../../util/restaurant/decimal_settings.dart';
+
 import '../../../../../util/restaurant/images.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 
@@ -93,7 +95,7 @@ class _AllTabState extends State<ItemsTab> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Lottie.asset(notfoundanimation, height: height * 0.3),
+                              Lottie.asset(AppImages.notfoundanimation, height: height * 0.3),
                               Text(
                                 'No such items Found!',
                                 style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w400),
@@ -147,7 +149,7 @@ class _AllTabState extends State<ItemsTab> {
                                           // thumb when ON
                                           activeThumbColor: Colors.white,
                                           // track when ON
-                                          activeTrackColor: primarycolor,
+                                          activeTrackColor: AppColors.primary,
                                           // thumb when OFF
                                           inactiveThumbColor: Colors.white70,
                                           // track when OFF
@@ -213,7 +215,7 @@ class _AllTabState extends State<ItemsTab> {
                                           // 💰 CURRENCY: Display price with selected currency symbol
                                           Text(
                                               "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}",
-                                              style: GoogleFonts.poppins(fontSize: 16, color: primarycolor, fontWeight: FontWeight.bold)),
+                                              style: GoogleFonts.poppins(fontSize: 16, color: AppColors.primary, fontWeight: FontWeight.bold)),
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                             children: [

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/login.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:country_code_picker/country_code_picker.dart';
-
+import 'package:unipos/util/color.dart';
 import 'package:mobx/mobx.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,11 +36,11 @@ class _signUpState extends State<Signup> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         appBar: PreferredSize(
           preferredSize: Size.fromHeight(150),
           child: AppBar(
-            backgroundColor: primarycolor,
+            backgroundColor: AppColors.primary,
             automaticallyImplyLeading: false,
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.only(
@@ -317,7 +317,7 @@ class _signUpState extends State<Signup> {
 
 
                                       style: TextStyle(
-                                          color: primarycolor, fontSize:16),
+                                          color: AppColors.primary, fontSize:16),
                                     ),
                                   ),
                                 )

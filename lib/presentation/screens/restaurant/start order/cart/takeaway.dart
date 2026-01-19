@@ -6,9 +6,8 @@ import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
-import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/database/hive_order.dart' show HiveOrders;
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
@@ -16,10 +15,9 @@ import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
-import '../../../../../util/restaurant/decimal_settings.dart';
 import '../../../../../util/restaurant/order_settings.dart';
-import '../../../../../util/restaurant/currency_helper.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../data/models/restaurant/db/database/hive_customer.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
@@ -29,7 +27,7 @@ import '../startorder.dart';
 import 'customerdetails.dart';
 import '../../util/restaurant_print_helper.dart';
 import '../../../../../server/websocket.dart' as ws;
-
+import 'package:unipos/util/common/decimal_settings.dart';
 class Takeaway extends StatefulWidget {
   bool isexisting = false;
   final OrderModel? existingModel;
@@ -1140,7 +1138,7 @@ class _TakeawayState extends State<Takeaway> {
               : Column(
             children: [
               Container(
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: primarycolor)),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: AppColors.primary)),
                   child: widget.isDineIn
                       ? Text("Table no:${widget.selectedTableNo.toString()}")
                       : Text(widget.isexisting ? 'Existing Order' : 'New Order')),
@@ -1182,7 +1180,7 @@ class _TakeawayState extends State<Takeaway> {
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: primarycolor,
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
@@ -1290,7 +1288,7 @@ class _TakeawayState extends State<Takeaway> {
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: primarycolor,
+            backgroundColor: AppColors.primary,
             minimumSize: Size(double.infinity, 50),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
@@ -1470,8 +1468,8 @@ class _TakeawayState extends State<Takeaway> {
                               CommonTextForm(
                                 hintText: 'Name (type to search customers)',
                                 controller: nameController,
-                                BorderColor: primarycolor,
-                                HintColor: primarycolor,
+                                BorderColor: AppColors.primary,
+                                HintColor: AppColors.primary,
                                 obsecureText: false,
                                 onChanged: (value) {
                                   setDialogState(() {
@@ -1493,7 +1491,7 @@ class _TakeawayState extends State<Takeaway> {
                                   margin: EdgeInsets.only(top: 5, bottom: 10),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    border: Border.all(color: primarycolor.withOpacity(0.3)),
+                                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                                     borderRadius: BorderRadius.circular(8),
                                     boxShadow: [
                                       BoxShadow(
@@ -1533,7 +1531,7 @@ class _TakeawayState extends State<Takeaway> {
                                             children: [
                                               CircleAvatar(
                                                 radius: 16,
-                                                backgroundColor: primarycolor.withOpacity(0.2),
+                                                backgroundColor: AppColors.primary.withOpacity(0.2),
                                                 child: Text(
                                                   customer.name?.isNotEmpty == true
                                                       ? customer.name![0].toUpperCase()
@@ -1541,7 +1539,7 @@ class _TakeawayState extends State<Takeaway> {
                                                   style: GoogleFonts.poppins(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold,
-                                                    color: primarycolor,
+                                                    color: AppColors.primary,
                                                   ),
                                                 ),
                                               ),
@@ -1582,8 +1580,8 @@ class _TakeawayState extends State<Takeaway> {
                               CommonTextForm(
                                 hintText: 'Mobile No (type to search customers)',
                                 controller: mobileController,
-                                BorderColor: primarycolor,
-                                HintColor: primarycolor,
+                                BorderColor: AppColors.primary,
+                                HintColor: AppColors.primary,
                                 obsecureText: false,
                                 onChanged: (value) {
                                   setDialogState(() {
@@ -1605,7 +1603,7 @@ class _TakeawayState extends State<Takeaway> {
                                   margin: EdgeInsets.only(top: 5, bottom: 10),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    border: Border.all(color: primarycolor.withOpacity(0.3)),
+                                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                                     borderRadius: BorderRadius.circular(8),
                                     boxShadow: [
                                       BoxShadow(
@@ -1645,7 +1643,7 @@ class _TakeawayState extends State<Takeaway> {
                                             children: [
                                               CircleAvatar(
                                                 radius: 16,
-                                                backgroundColor: primarycolor.withOpacity(0.2),
+                                                backgroundColor: AppColors.primary.withOpacity(0.2),
                                                 child: Text(
                                                   customer.name?.isNotEmpty == true
                                                       ? customer.name![0].toUpperCase()
@@ -1653,7 +1651,7 @@ class _TakeawayState extends State<Takeaway> {
                                                   style: GoogleFonts.poppins(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold,
-                                                    color: primarycolor,
+                                                    color: AppColors.primary,
                                                   ),
                                                 ),
                                               ),
@@ -1692,15 +1690,15 @@ class _TakeawayState extends State<Takeaway> {
                               CommonTextForm(
                                   hintText: 'Email ID (Optional)',
                                   controller: emailController,
-                                  BorderColor: primarycolor,
-                                  HintColor: primarycolor,
+                                  BorderColor: AppColors.primary,
+                                  HintColor: AppColors.primary,
                                   obsecureText: false),
                               const SizedBox(height: 10),
                               CommonTextForm(
                                   hintText: 'Remark',
                                   controller: remarkController,
-                                  BorderColor: primarycolor,
-                                  HintColor: primarycolor,
+                                  BorderColor: AppColors.primary,
+                                  HintColor: AppColors.primary,
                                   obsecureText: false),
                               const SizedBox(height: 25),
                               const Divider(),
@@ -1819,7 +1817,7 @@ class _TakeawayState extends State<Takeaway> {
             // Handle checkout
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: primarycolor,
+            backgroundColor: AppColors.primary,
             minimumSize: Size(double.infinity, 50),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),

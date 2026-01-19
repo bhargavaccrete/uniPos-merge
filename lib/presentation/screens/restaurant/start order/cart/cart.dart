@@ -5,6 +5,7 @@ import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../core/di/service_locator.dart';
@@ -728,7 +729,7 @@ class _CartScreenState extends State<CartScreen>
                 bottom: 150,
                 right: 130,
                 child:   FloatingActionButton.extended(
-                  backgroundColor: primarycolor,
+                  backgroundColor: AppColors.primary,
 
                   onPressed: _navigateAndAddMoreItems,
                   icon: const Icon(Icons.add,color: Colors.white,), // The icon to display.
@@ -946,7 +947,7 @@ class _CartScreenState extends State<CartScreen>
                               ),
                             ],
                           ),
-                          trailing: Icon(Icons.arrow_forward, color: primarycolor),
+                          trailing: Icon(Icons.arrow_forward, color: AppColors.primary),
                           onTap: () {
                             Navigator.pop(context);
                             _confirmMerge(order);

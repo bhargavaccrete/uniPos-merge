@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
@@ -13,7 +13,7 @@ import 'package:unipos/domain/services/restaurant/eod_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../data/models/restaurant/db/database/hive_cart.dart';
 import '../../../../data/models/restaurant/db/database/hive_pastorder.dart';
 
@@ -279,7 +279,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(backgroundColor: primarycolor),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               child: Text('Confirm', style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
@@ -426,7 +426,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
               width: width,
               height: height * 0.07,
               decoration:
-              BoxDecoration(border: Border.all(color: primarycolor)),
+              BoxDecoration(border: Border.all(color: AppColors.primary)),
               child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -434,7 +434,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                       'Opening Balance:',
                       textScaler: TextScaler.linear(1),
                       style: GoogleFonts.poppins(
-                          color: primarycolor,
+                          color: AppColors.primary,
                           fontSize: 16,
                           fontWeight: FontWeight.w600),
                     ),
@@ -768,7 +768,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     child: CommonTextForm(
                       hintText: expectedCash.toStringAsFixed(2),
                       obsecureText: false,
-                      BorderColor: primarycolor,
+                      BorderColor: AppColors.primary,
                       borderc: 0,
                       enabled: false,
                     ),
@@ -896,11 +896,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                       decoration: InputDecoration(
                         hintText: 'Enter Actual Cash',
                         border: OutlineInputBorder(
-                          borderSide: BorderSide(color: primarycolor),
+                          borderSide: BorderSide(color: AppColors.primary),
                           borderRadius: BorderRadius.circular(0),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: primarycolor),
+                          borderSide: BorderSide(color: AppColors.primary),
                           borderRadius: BorderRadius.circular(0),
                         ),
                       ),

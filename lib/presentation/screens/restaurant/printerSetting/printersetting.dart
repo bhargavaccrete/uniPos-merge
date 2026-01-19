@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -33,7 +33,7 @@ class _PrintersettingState extends State<Printersetting> {
             Container(
               padding: EdgeInsets.all(5),
               decoration:
-              BoxDecoration(border: Border.all(color: primarycolor)),
+              BoxDecoration(border: Border.all(color: AppColors.primary)),
               width: width,
               height: height * 0.35,
               child: Row(
@@ -58,7 +58,7 @@ class _PrintersettingState extends State<Printersetting> {
                   // SizedBox(width: 20,),
                   Icon(
                     Icons.check_circle_rounded,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     size: 40,
                   )
                 ],
@@ -70,7 +70,7 @@ class _PrintersettingState extends State<Printersetting> {
             Container(
               padding: EdgeInsets.all(5),
               decoration:
-              BoxDecoration(border: Border.all(color: primarycolor)),
+              BoxDecoration(border: Border.all(color: AppColors.primary)),
               width: width,
               height: height * 0.35,
               child: Row(
@@ -95,7 +95,7 @@ class _PrintersettingState extends State<Printersetting> {
                   // SizedBox(width: 20,),
                   Icon(
                     Icons.check_circle_rounded,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     size: 40,
                   )
                 ],

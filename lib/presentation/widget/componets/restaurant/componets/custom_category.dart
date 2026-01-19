@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 
 class CustomCategory extends StatefulWidget {
   final String? imagePath;
@@ -113,7 +113,7 @@ class _CustomCategoryState extends State<CustomCategory> {
                                   // thumb when ON
                                   activeColor: Colors.white,
                                   // track when ON
-                                  activeTrackColor: primarycolor,
+                                  activeTrackColor: AppColors.primary,
                                   // thumb when OFF
                                   inactiveThumbColor: Colors.white70,
                                   // track when OFF

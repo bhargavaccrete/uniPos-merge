@@ -7,10 +7,10 @@ import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 
 class Todaytab extends StatefulWidget {
   const Todaytab({super.key});
@@ -194,7 +194,7 @@ class _TodaytabState extends State<Todaytab> {
                     DataCell(Text(order.orderType ?? 'N/A')),
                     DataCell(Text((order.totalPrice - (order.refundAmount ?? 0.0)).toStringAsFixed(2))), // Show net amount
                     DataCell(IconButton( // Placeholder for a 'Details' button/icon.
-                      icon: Icon(Icons.visibility, color: primarycolor),
+                      icon: Icon(Icons.visibility, color: AppColors.primary),
                       onPressed: () {
                         // TODO: Add navigation to a detailed order view if needed.
                       },

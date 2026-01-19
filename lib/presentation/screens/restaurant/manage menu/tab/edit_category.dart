@@ -2,13 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
-
+import 'package:unipos/util/color.dart';
 class EditCategory extends StatefulWidget {
   final Category category;
   const EditCategory({super.key, required this.category,});
@@ -58,7 +58,7 @@ class _EditCategoryState extends State<EditCategory> {
                           Icon(
                             Icons.photo_library,
                             size: 50,
-                            color: primarycolor,
+                            color: AppColors.primary,
                           ),
                           Text('From Gallery'),
                         ],
@@ -78,7 +78,7 @@ class _EditCategoryState extends State<EditCategory> {
                         Icon(
                           Icons.search,
                           size: 50,
-                          color: primarycolor,
+                          color: AppColors.primary,
                         ),
                         Text('From Search'),
                       ],
@@ -130,7 +130,7 @@ class _EditCategoryState extends State<EditCategory> {
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text('Edit Category',style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w600,fontSize: 20),),
         automaticallyImplyLeading: false,
         leading: InkWell(

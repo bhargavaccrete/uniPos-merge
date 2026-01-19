@@ -1,265 +1,3 @@
-// import 'package:flutter/material.dart';
-// import 'package:BillBerry/componets/Button.dart';
-// import 'package:BillBerry/constant/color.dart';
-// import 'package:google_fonts/google_fonts.dart';
-//
-// class Salesbyitem extends StatefulWidget {
-//   const Salesbyitem({super.key});
-//
-//   @override
-//   State<Salesbyitem> createState() => _SalesbyitemState();
-// }
-//
-// class _SalesbyitemState extends State<Salesbyitem> {
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final height = MediaQuery
-//         .of(context)
-//         .size
-//         .height * 1;
-//     final width = MediaQuery
-//         .of(context)
-//         .size
-//         .width * 1;
-//     return Scaffold(
-//       appBar: AppBar(
-//         leading: IconButton(onPressed: (){
-//           Navigator.pop(context);
-//         }, icon: Icon(Icons.arrow_back_ios_new_outlined,color: Colors.white,)),
-//         backgroundColor: primarycolor,
-//         centerTitle: true,
-//         title: Text('Sales By Items',style:GoogleFonts.poppins(fontWeight: FontWeight.w500,color: Colors.white)),
-//       ),
-//
-//       body:SingleChildScrollView(
-//         child: Container(
-//       padding: EdgeInsets.symmetric(horizontal: 20,vertical: 10),
-//           child: Column(
-//             children: [
-//               SingleChildScrollView(
-//                 scrollDirection: Axis.horizontal,
-//                 child: Row(
-//                   children: [
-//                     CommonButton(
-//                       bordercircular: 5,
-//                         width: width * 0.3,
-//                         height:  height * 0.04,
-//                         onTap: (){}, child: Center(child: Text('Today',textAlign: TextAlign.center,style: GoogleFonts.poppins(fontSize: 16,color: Colors.white),))),
-//                     SizedBox(width: 5,),
-//                     CommonButton(
-//                       bordercircular: 5,
-//                         width: width * 0.3,
-//                         height:  height * 0.04,
-//                         onTap: (){}, child: Center(child: Text('Today',textAlign: TextAlign.center,style: GoogleFonts.poppins(fontSize: 16,color: Colors.white),))),
-//                     SizedBox(width: 5,),
-//
-//                     CommonButton(
-//                       bordercircular: 5,
-//                         width: width * 0.3,
-//                         height:  height * 0.04,
-//                         onTap: (){}, child: Center(child: Text('Today',textAlign: TextAlign.center,style: GoogleFonts.poppins(fontSize: 16,color: Colors.white),))),
-//                   ],
-//                 ),
-//               )
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-
-
-
-
-/*
-import 'package:flutter/material.dart';
-import 'package:BillBerry/componets/filterButton.dart';
-import 'package:BillBerry/screens/Reports/salesbyItem/daywiseitem.dart';
-import 'package:BillBerry/screens/Reports/salesbyItem/monthwiseitems.dart';
-import 'package:BillBerry/screens/Reports/salesbyItem/thisweek.dart';
-import 'package:BillBerry/screens/Reports/salesbyItem/today.dart';
-import 'package:BillBerry/screens/Reports/salesbyItem/yearwise.dart';
-import 'package:BillBerry/utils/responsive_helper.dart';
-import 'package:google_fonts/google_fonts.dart';
-
-class Salesbyitem extends StatefulWidget {
-  @override
-  _SalesbyitemState createState() => _SalesbyitemState();
-}
-
-class _SalesbyitemState extends State<Salesbyitem> {
-  String selectedFilter = "Today";
-
-  Widget _getBody() {
-    switch (selectedFilter) {
-      case "Today":
-        return TodayByItem();
-      case "Day Wise":
-        return DayWiseItem();
-      case "This Week":
-        return ThisWeekItems();
-      case "Month Wise Sales":
-        return MonthWiseItem();
-        case "Year Wise":
-        return YearWiseItem();
-      default:
-        return Center(child: Text("No data available"));
-    }
-  }
-
-  // TodayByItem();
-
-  // Widget _dayWiseSales() {
-  //   return Center(child: Text("Day Wise Sales Data"));
-  // }
-
-
-
-  // Widget _monthlySales() {
-  //   return Center(child: Text("Monthly Sales Data"));
-  // }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: Text("Sales By Items",
-          textScaler: TextScaler.linear(1),
-          style: GoogleFonts.poppins(fontSize:20,color: Colors.white),),
-        backgroundColor: Colors.teal,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios,color: Colors.white,),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: Container(
-        padding: ResponsiveHelper.responsiveSymmetricPadding(context,
-        verticalPercent: 0.01,
-          horizontalPercent: 0.02,
-        ),
-        child: Column(
-          children: [
-
-            Container(
-                alignment: Alignment.bottomLeft,
-                child: Text('Sales By Items',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(fontSize: 18,fontWeight: FontWeight.w500),)),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Filterbutton(
-                      height: ResponsiveHelper.responsiveHeight(context, 0.05),
-                      width: ResponsiveHelper.responsiveWidth(context,0.3),
-                      title: 'Today',
-                      selectedFilter: selectedFilter,
-                      onpressed: (){
-                    setState(() {
-                      selectedFilter = 'Today';
-                    });
-                      }),
-                  SizedBox(width: ResponsiveHelper.responsiveWidth(context, 0.02),),
-                  Filterbutton(
-                      height: ResponsiveHelper.responsiveHeight(context, 0.05),
-                      width: ResponsiveHelper.responsiveWidth(context,0.4),
-                      title: 'Day Wise',
-                      selectedFilter: selectedFilter,
-                      onpressed: (){
-                    setState(() {
-                      selectedFilter = 'Day Wise';
-                    });
-                      }),
-                  SizedBox(width: ResponsiveHelper.responsiveWidth(context, 0.02),),
-                  Filterbutton(
-                      height: ResponsiveHelper.responsiveHeight(context, 0.05),
-                      width: ResponsiveHelper.responsiveWidth(context,0.4),
-                      title: 'This Week',
-                      selectedFilter: selectedFilter,
-                      onpressed: (){
-                    setState(() {
-                      selectedFilter = 'This Week';
-                    });
-                      }),
-                  SizedBox(width: ResponsiveHelper.responsiveWidth(context, 0.02),),
-                  Filterbutton(
-                      height: ResponsiveHelper.responsiveHeight(context, 0.05),
-                      width: ResponsiveHelper.responsiveWidth(context,0.5),
-                      title: 'Month Wise Sales',
-                      selectedFilter: selectedFilter,
-                      onpressed: (){
-                    setState(() {
-                      selectedFilter = 'Month Wise Sales';
-                    });
-                      }),
-                  SizedBox(width: ResponsiveHelper.responsiveWidth(context, 0.02),),
-                  Filterbutton(
-                      height: ResponsiveHelper.responsiveHeight(context, 0.05),
-                      width: ResponsiveHelper.responsiveWidth(context,0.4),
-                      title: 'Year wise',
-                      selectedFilter: selectedFilter,
-                      onpressed: (){
-                    setState(() {
-                      selectedFilter = 'Year Wise';
-                    });
-                      }),
-                  SizedBox(width: ResponsiveHelper.responsiveWidth(context, 0.02),),
-                  _filterButton("Today"),
-                  SizedBox(width: 10,),
-                  _filterButton("Day Wise"),
-                  SizedBox(width: 10,),
-
-                  _filterButton("This Week"),
-                  SizedBox(width: 10,),
-
-                  _filterButton("Month Wise Sales"),
-                  SizedBox(width: 10,),
-
-                  _filterButton("Year Wise"),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _getBody(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _filterButton(String title) {
-    return ElevatedButton(
-      onPressed: () {
-        setState(() {
-          selectedFilter = title;
-        });
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: selectedFilter == title ? Colors.teal : Colors.white,
-        foregroundColor: selectedFilter == title ? Colors.white : Colors.teal,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Colors.teal),
-        ),
-      ),
-      child: Text(title,  textScaler: TextScaler.linear(1),
-          style: GoogleFonts.poppins(fontSize: 14),),
-    );
-  }
-}
-*/
-
-
-
-// A simple data class to hold our final calculated report data
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -270,7 +8,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/today
 
 import '../../../../../constants/restaurant/color.dart';
 import 'ItemsReportData.dart';
-
+import 'package:unipos/util/color.dart';
 class Salesbyitem extends StatefulWidget {
   @override
   _SalesbyitemState createState() => _SalesbyitemState();
@@ -395,7 +133,7 @@ class _SalesbyitemState extends State<Salesbyitem> {
       appBar: AppBar(
         centerTitle: true,
         title: Text("Sales By Items", style: GoogleFonts.poppins(fontSize: 20, color: Colors.white)),
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -438,11 +176,11 @@ class _SalesbyitemState extends State<Salesbyitem> {
       child: ElevatedButton(
         onPressed: () => _onFilterSelected(title),
         style: ElevatedButton.styleFrom(
-          backgroundColor: _selectedFilter == title ? primarycolor : Colors.white,
-          foregroundColor: _selectedFilter == title ? Colors.white : primarycolor,
+          backgroundColor: _selectedFilter == title ? AppColors.primary : Colors.white,
+          foregroundColor: _selectedFilter == title ? Colors.white : AppColors.primary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            side:  BorderSide(color: primarycolor),
+            side:  BorderSide(color: AppColors.primary),
           ),
           elevation: _selectedFilter == title ? 2 : 0,
         ),

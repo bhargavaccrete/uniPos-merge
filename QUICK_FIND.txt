@@ -1,0 +1,92 @@
+===========================================
+    UNIPOS QUICK FILE FINDER
+    Press Ctrl+P and type these shortcuts
+===========================================
+
+MOST USED FILES (Type in Ctrl+P):
+───────────────────────────────────────
+main          → main.dart
+color         → color.dart
+menu          → menu.dart
+cart          → cart.dart
+table         → table.dart
+order.dart    → order.dart
+active        → activeorder.dart
+item_options  → item_options_dialog.dart
+startorder    → startorder.dart
+routes        → app_routes.dart
+
+MODELS (Type in Ctrl+P):
+───────────────────────────────────────
+itemmodel     → itemmodel_302.dart
+ordermodel    → ordermodel_309.dart
+cartmodel     → cartmodel_308.dart
+categorymodel → categorymodel_300.dart
+table_model   → table_Model_311.dart
+hive_cart     → hive_cart.dart
+hive_order    → hive_order.dart
+hive_Table    → hive_Table.dart
+
+SERVICES (Type in Ctrl+P):
+───────────────────────────────────────
+notification  → notification_service.dart
+receipt       → receipt_pdf_service.dart
+printer       → retail_printer_settings_service.dart
+
+CONFIG (Type in Ctrl+P):
+───────────────────────────────────────
+app_config    → app_config.dart
+hive_init     → hive_init.dart
+service_loc   → service_locator.dart
+
+UTILS (Type in Ctrl+P):
+───────────────────────────────────────
+currency      → currency_helper.dart
+decimal       → decimal_settings.dart
+print_set     → print_settings.dart
+
+WIDGETS (Type in Ctrl+P):
+───────────────────────────────────────
+Button        → Button.dart
+drawer        → drawer.dart
+visual_key    → visual_keyboard.dart
+
+KEYBOARD SHORTCUTS:
+───────────────────────────────────────
+Ctrl+P              Quick file search
+Ctrl+Shift+F        Search in all files
+Ctrl+T              Search symbols
+Ctrl+Click          Go to definition
+Ctrl+B              Go to declaration
+Alt+←              Back
+Alt+→              Forward
+Ctrl+Tab            Recent files
+
+COMMON SEARCHES (Type in Ctrl+Shift+F):
+───────────────────────────────────────
+"Add to Cart"       Find cart buttons
+"Total Amount"      Find totals
+"AppColors."        Find color usage
+"Hive.box"          Find Hive operations
+"Navigator.push"    Find navigation
+"setState"          Find state updates
+
+TIPS:
+───────────────────────────────────────
+1. Type partial names (menu.dart)
+2. Use camel case (MS = MenuScreen)
+3. Check recent files (Ctrl+Tab)
+4. Search file content (Ctrl+Shift+F)
+5. Bookmark important files (F11)
+
+IF LOST:
+───────────────────────────────────────
+1. Check FILE_NAVIGATION_GUIDE.md
+2. Check FILE_INDEX.md
+3. Check FOLDER_STRUCTURE.md
+4. Search for feature name
+5. Ask team member
+
+===========================================
+Keep this file open for quick reference!
+===========================================

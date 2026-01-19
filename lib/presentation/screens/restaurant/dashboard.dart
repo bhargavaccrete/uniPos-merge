@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
 import '../../../main.dart';
@@ -12,7 +13,7 @@ import 'auth/admin_login.dart';
 import 'auth/cashier_waiter.dart';
 import 'auth/login.dart';
 import 'need help/needhelp.dart';
-
+import 'package:unipos/util/color.dart';
 class Dashboard extends StatelessWidget {
   Dashboard({super.key});
 
@@ -32,7 +33,7 @@ class Dashboard extends StatelessWidget {
     final width = MediaQuery.of(context).size.width * 1;
 
     return Scaffold(
-      backgroundColor: screenBGColor,
+      backgroundColor: AppColors.white,
       body: SingleChildScrollView(
         child: Container(
           width: width,
@@ -52,7 +53,7 @@ class Dashboard extends StatelessWidget {
                 width: ResponsiveHelper.responsiveWidth(context, 0.5),
 
                 child: Image.asset(
-                  logo,
+                  AppImages.logo,
                 ),
               ),
               SizedBox(
@@ -83,14 +84,14 @@ class Dashboard extends StatelessWidget {
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: primarycolor, width: 2)),
+                            border: Border.all(color: AppColors.primary, width: 2)),
                         // color: Colors.green,
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.person_2_outlined,
-                              color: primarycolor,
+                              color: AppColors.primary,
                               size:ResponsiveHelper.responsiveTextSize(context, 40),
                             ),
                             Text(
@@ -99,7 +100,7 @@ class Dashboard extends StatelessWidget {
                               style: GoogleFonts.poppins(
                                   fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
                                   fontWeight: FontWeight.w600,
-                                  color: primarycolor),
+                                  color: AppColors.primary),
                             ),
                           ],
                         ),
@@ -120,7 +121,7 @@ class Dashboard extends StatelessWidget {
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: primarycolor, width: 2)),
+                            border: Border.all(color: AppColors.primary, width: 2)),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -128,14 +129,14 @@ class Dashboard extends StatelessWidget {
                               Icons.receipt_long,
                               size:ResponsiveHelper.responsiveTextSize(context, 40),
 
-                              color: primarycolor,
+                              color: AppColors.primary,
                             ),
                             // SizedBox(height: 5),
                             Text('Cashier|Waiter',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(
                                     fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
-                                    fontWeight: FontWeight.w600, color: primarycolor)),
+                                    fontWeight: FontWeight.w600, color: AppColors.primary)),
                           ],
                         ),
                       ),
@@ -159,7 +160,7 @@ class Dashboard extends StatelessWidget {
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: primarycolor, width: 2)),
+                            border: Border.all(color: AppColors.primary, width: 2)),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -167,7 +168,7 @@ class Dashboard extends StatelessWidget {
                               Icons.support_agent_outlined,
                               size:ResponsiveHelper.responsiveTextSize(context, 40),
 
-                              color: primarycolor,
+                              color: AppColors.primary,
                             ),
                             // SizedBox(
                             //   height: 5,
@@ -176,7 +177,7 @@ class Dashboard extends StatelessWidget {
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(
                                     fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
-                                    fontWeight: FontWeight.w600, color: primarycolor)),
+                                    fontWeight: FontWeight.w600, color: AppColors.primary)),
                           ],
                         ),
                       ),
@@ -223,7 +224,7 @@ class Dashboard extends StatelessWidget {
                                       bordercircular: 2,
                                       width: width * 0.3,
                                       height: height * 0.05,
-                                      bgcolor: primarycolor,
+                                      bgcolor: AppColors.primary,
                                       onTap: () {
                                         Navigator.push(context,
                                             MaterialPageRoute(builder: (context) => AuthSelectionScreen()));
@@ -243,7 +244,7 @@ class Dashboard extends StatelessWidget {
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: primarycolor, width: 2)),
+                            border: Border.all(color: AppColors.primary, width: 2)),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -251,7 +252,7 @@ class Dashboard extends StatelessWidget {
                               Icons.logout_outlined,
                               size:ResponsiveHelper.responsiveTextSize(context, 40),
 
-                              color: primarycolor,
+                              color: AppColors.primary,
                             ),
                             // SizedBox(
                             //   height: 5,
@@ -261,7 +262,7 @@ class Dashboard extends StatelessWidget {
 
                                 style: GoogleFonts.poppins(
                                     fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
-                                    fontWeight: FontWeight.w600, color: primarycolor)),
+                                    fontWeight: FontWeight.w600, color: AppColors.primary)),
                           ],
                         ),
                       ),

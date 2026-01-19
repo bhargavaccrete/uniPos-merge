@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
 
@@ -96,7 +96,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
 
     return Scaffold(
       appBar: AppBar(
-          backgroundColor: primarycolor,
+          backgroundColor: AppColors.primary,
           title: Text('Pos End Day Report',
               textScaler: TextScaler.linear(1),
               style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
@@ -139,7 +139,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                       borderRadius: BorderRadius.circular(5)),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton(
-                      // dropdownColor: primarycolor,
+                      // dropdownColor: AppColors.primary,
                         value: dropvalue,
                         items: userlist.map((String items) {
                           return DropdownMenuItem(
@@ -170,7 +170,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                         width: width * 0.4,
                         padding: EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             borderRadius: BorderRadius.circular(5)
                         ),
                         child:Row(
@@ -182,7 +182,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                               textScaler: TextScaler.linear(1),
                               style: GoogleFonts.poppins(fontSize: 14),
                             ),
-                            Icon(Icons.date_range,color: primarycolor,)
+                            Icon(Icons.date_range,color: AppColors.primary,)
                           ],
                         ),
                       ),
@@ -195,7 +195,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                       child: Container(
                         padding: EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                            color: primarycolor,
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(50)
                         ),
                         child: Icon(
@@ -259,7 +259,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                 _isLoading
                     ? Center(
                   child: CircularProgressIndicator(
-                    color: primarycolor,
+                    color: AppColors.primary,
                   ),
                 )
                     : _filteredReports.isEmpty

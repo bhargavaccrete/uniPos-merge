@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 
 
@@ -52,14 +53,14 @@ lastDate: DateTime(2100));
                     width:width * 0.2,
                     height: height * 0.04,
                     decoration: BoxDecoration(
-                        border: Border.all(color: primarycolor)
+                        border: Border.all(color: AppColors.primary)
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
                             decoration:BoxDecoration(
-                              border: Border.all(color: primarycolor),
+                              border: Border.all(color: AppColors.primary),
                               shape: BoxShape.circle,
 
                             ),
@@ -105,11 +106,11 @@ lastDate: DateTime(2100));
                         child: Row(
                           children: [
 
-                            Icon(Icons.date_range,color: primarycolor,),
+                            Icon(Icons.date_range,color: AppColors.primary,),
                             Text(
                               _datepicker == null
                                   ? 'Date Filter'
-                                  : '${_datepicker!.year}-${_datepicker!.month}-${_datepicker!.day}',style: GoogleFonts.poppins(color: primarycolor),
+                                  : '${_datepicker!.year}-${_datepicker!.month}-${_datepicker!.day}',style: GoogleFonts.poppins(color: AppColors.primary),
                             ),
                           ],
                         ),
@@ -129,7 +130,7 @@ lastDate: DateTime(2100));
                   mainAxisAlignment: MainAxisAlignment.center,
                   // crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Lottie.asset(notfoundanimation,height: height * 0.3),
+                    Lottie.asset(AppImages.notfoundanimation,height: height * 0.3),
                     Text('No Order Found',style: GoogleFonts.poppins(fontWeight: FontWeight.w600,fontSize: 16),)
 
                   ],

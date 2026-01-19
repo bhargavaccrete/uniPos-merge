@@ -527,7 +527,8 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderSide: BorderSide(
-              color: highlight ? Colors.orange : Theme.of(context).primaryColor,
+              // color: highlight ? Colors.orange : Theme.of(context).AppColors.primary,
+              color: Colors.orange ,
               width: 2,
             ),
           ),

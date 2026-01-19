@@ -5,7 +5,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/Discount%20Order%
 import 'package:unipos/presentation/screens/restaurant/Reports/Discount%20Order%20Report/thisweekbydiscount.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/Discount%20Order%20Report/todaybydiscount.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/Discount%20Order%20Report/yearbydiscount.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
 import 'monthbydiscount.dart';
 
@@ -44,7 +44,7 @@ class _DiscountOrderReportState extends State<DiscountOrderReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text("Discount Order Report",    textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
         ),
@@ -101,11 +101,11 @@ class _DiscountOrderReportState extends State<DiscountOrderReport> {
         },
 
         style: ElevatedButton.styleFrom(
-            backgroundColor: selectedFilter==title ? primarycolor : Colors.white,
-            foregroundColor: selectedFilter==title ? Colors.white : primarycolor,
+            backgroundColor: selectedFilter==title ? AppColors.primary : Colors.white,
+            foregroundColor: selectedFilter==title ? Colors.white : AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor)
+                side: BorderSide(color: AppColors.primary)
             )
         ),
         child: Text(title));

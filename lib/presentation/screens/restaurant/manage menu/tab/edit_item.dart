@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
@@ -22,7 +22,7 @@ import 'package:unipos/util/restaurant/audit_trail_helper.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as p;
-
+import 'package:unipos/util/color.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -281,7 +281,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text('Edit Item',style: GoogleFonts.poppins(color: Colors.white),),
       ),
       body: FutureBuilder<EditScreenData>(
@@ -948,7 +948,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon:  Icon(Icons.edit, color: primarycolor),
+                        icon:  Icon(Icons.edit, color: AppColors.primary),
                         onPressed: () {
                           // TODO: Implement navigation to an EditCategoryScreen
                         },
@@ -1146,7 +1146,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                             Icon(
 //                               Icons.photo_library,
 //                               size: 50,
-//                               color: primarycolor,
+//                               color: AppColors.primary,
 //                             ),
 //                             Text('From Gallery'),
 //                           ],
@@ -1165,7 +1165,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                           Icon(
 //                             Icons.search,
 //                             size: 50,
-//                             color: primarycolor,
+//                             color: AppColors.primary,
 //                           ),
 //                           Text('From Search'),
 //                         ],
@@ -1358,7 +1358,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //     return Scaffold(
 //       appBar: AppBar(
 //         automaticallyImplyLeading: false,
-//         backgroundColor: primarycolor,
+//         backgroundColor: AppColors.primary,
 //         leading: IconButton(
 //             onPressed: () {
 //               Navigator.pop(context);
@@ -1885,7 +1885,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                                                             height:
 //                                                                                 ResponsiveHelper.responsiveHeight(context, 0.04),
 //                                                                             decoration:
-//                                                                                 BoxDecoration(color: primarycolor, borderRadius: BorderRadius.circular(5)),
+//                                                                                 BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(5)),
 //                                                                             child:
 //                                                                                 Icon(
 //                                                                               Icons.edit,
@@ -2168,7 +2168,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                              isCheckedList[index] = value!;
 //                                            });
 //                                          },
-//                                          activeColor: primarycolor,
+//                                          activeColor: AppColors.primary,
 //                                          checkColor: Colors.white,
 //                                        ),
 //                                        SizedBox(
@@ -2218,7 +2218,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                           isChecked = value!;
 //                                         });
 //                                       },
-//                                       activeColor: primarycolor,
+//                                       activeColor: AppColors.primary,
 //                                       checkColor: Colors.white,
 //                                     ),
 //                                     SizedBox(
@@ -2257,7 +2257,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                           isCheckedone = value!;
 //                                         });
 //                                       },
-//                                       activeColor: primarycolor,
+//                                       activeColor: AppColors.primary,
 //                                       checkColor: Colors.white,
 //                                     ),
 //                                     SizedBox(
@@ -2296,7 +2296,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                           isCheckedtwo = value!;
 //                                         });
 //                                       },
-//                                       activeColor: primarycolor,
+//                                       activeColor: AppColors.primary,
 //                                       checkColor: Colors.white,
 //                                     ),
 //                                     SizedBox(
@@ -2374,7 +2374,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                           isCheckedListChoice[index] = value!;
 //                                         });
 //                                       },
-//                                       activeColor: primarycolor,
+//                                       activeColor: AppColors.primary,
 //                                       checkColor: Colors.white,
 //                                     ),
 //                                   title: Text(
@@ -2448,7 +2448,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                    //           isCheckedListChoice[index] = value!;
 //                                    //         });
 //                                    //       },
-//                                    //       activeColor: primarycolor,
+//                                    //       activeColor: AppColors.primary,
 //                                    //       checkColor: Colors.white,
 //                                    //     ),
 //                                    //     SizedBox(
@@ -2498,7 +2498,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                           isChecked = value!;
 //                                         });
 //                                       },
-//                                       activeColor: primarycolor,
+//                                       activeColor: AppColors.primary,
 //                                       checkColor: Colors.white,
 //                                     ),
 //                                     SizedBox(
@@ -2537,7 +2537,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                           isCheckedone = value!;
 //                                         });
 //                                       },
-//                                       activeColor: primarycolor,
+//                                       activeColor: AppColors.primary,
 //                                       checkColor: Colors.white,
 //                                     ),
 //                                     SizedBox(
@@ -2576,7 +2576,7 @@ class _VegNonVegSheet extends StatelessWidget {
 //                                           isCheckedtwo = value!;
 //                                         });
 //                                       },
-//                                       activeColor: primarycolor,
+//                                       activeColor: AppColors.primary,
 //                                       checkColor: Colors.white,
 //                                     ),
 //                                     SizedBox(

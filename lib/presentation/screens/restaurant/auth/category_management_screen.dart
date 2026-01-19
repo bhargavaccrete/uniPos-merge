@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -114,7 +115,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
               child: Text(
                 'OK',
                 style: GoogleFonts.poppins(
-                  color: primarycolor,
+                  color: AppColors.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -211,7 +212,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_circle, color: primarycolor, size: 28),
+            icon: Icon(Icons.add_circle, color: AppColors.primary, size: 28),
             onPressed: _addCategory,
             tooltip: 'Add New Category',
           ),
@@ -224,7 +225,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
               : _buildCategoryList(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addCategory,
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add),
         label: Text(
           'Add Category',
@@ -263,7 +264,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
             const SizedBox(height: 30),
             CommonButton(
               onTap: _addCategory,
-              bgcolor: primarycolor,
+              bgcolor: AppColors.primary,
               bordercircular: 10,
               height: 50,
               width: 200,
@@ -315,7 +316,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     height: 60,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      color: primarycolor.withOpacity(0.1),
+                      color: AppColors.primary.withOpacity(0.1),
                     ),
                     child: category.imagePath != null && category.imagePath!.isNotEmpty
                         ? ClipRRect(
@@ -324,11 +325,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                               File(category.imagePath!),
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
-                                return Icon(Icons.category, color: primarycolor, size: 30);
+                                return Icon(Icons.category, color: AppColors.primary, size: 30);
                               },
                             ),
                           )
-                        : Icon(Icons.category, color: primarycolor, size: 30),
+                        : Icon(Icons.category, color: AppColors.primary, size: 30),
                   ),
                   const SizedBox(width: 15),
 
@@ -528,7 +529,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                 // Header
                 Row(
                   children: [
-                    Icon(Icons.category, color: primarycolor, size: 28),
+                    Icon(Icons.category, color: AppColors.primary, size: 28),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -676,7 +677,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                     Expanded(
                       child: CommonButton(
                         onTap: _saveCategory,
-                        bgcolor: primarycolor,
+                        bgcolor: AppColors.primary,
                         bordercircular: 10,
                         height: 50,
                         child: Text(

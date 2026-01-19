@@ -4,46 +4,15 @@ import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/init/hive_init.dart';
 import 'package:unipos/core/routes/app_routes.dart';
 import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/restaurant_login.dart';
-import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
-import 'package:unipos/presentation/screens/retail/home_screen.dart';
-import 'package:unipos/screen/existingUserRestoreScreen.dart';
-import 'package:unipos/screen/setupWizardScreen.dart';
-import 'package:unipos/screen/splashScreen.dart';
-import 'package:unipos/screen/userSelectionScreen.dart';
-import 'package:unipos/screen/walkthroughScreen.dart';
-// Retail Screens Imports
-import 'package:unipos/presentation/screens/retail/inventory_screen.dart';
-import 'package:unipos/presentation/screens/retail/add_product_screen.dart';
-import 'package:unipos/presentation/screens/retail/category_management_screen.dart';
-import 'package:unipos/presentation/screens/retail/stock_alerts_screen.dart';
-import 'package:unipos/presentation/screens/retail/checkout_screen.dart';
-import 'package:unipos/presentation/screens/retail/parked_sales_screen.dart';
-import 'package:unipos/presentation/screens/retail/customer_list_screen.dart';
-import 'package:unipos/presentation/screens/retail/credit_reports_screen.dart';
-import 'package:unipos/presentation/screens/retail/supplier_list_screen.dart';
-import 'package:unipos/presentation/screens/retail/purchase_history_screen.dart';
-import 'package:unipos/presentation/screens/retail/purchase_order_list_screen.dart';
-import 'package:unipos/presentation/screens/retail/add_purchase_screen.dart';
-import 'package:unipos/presentation/screens/retail/reports_screen.dart';
-import 'package:unipos/presentation/screens/retail/sales_history_screen.dart';
-import 'package:unipos/presentation/screens/retail/eod_report_screen.dart';
-import 'package:unipos/presentation/screens/retail/gst_report_screen.dart';
-import 'package:unipos/presentation/screens/retail/settings_screen.dart';
-import 'package:unipos/presentation/screens/retail/store_info_settings_screen.dart';
-import 'package:unipos/presentation/screens/retail/gst_settings_screen.dart';
-import 'package:unipos/presentation/screens/retail/payment_setup_screen.dart';
-import 'package:unipos/presentation/screens/retail/staff_setup_screen.dart';
-import 'package:unipos/presentation/screens/retail/backup_screen.dart';
+
 import 'package:unipos/server/server.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 
 import 'domain/store/restaurant/appStore.dart';
+import 'util/common/decimal_settings.dart';
 import 'util/restaurant/staticswitch.dart';
 import 'util/restaurant/print_settings.dart';
-import 'util/restaurant/decimal_settings.dart';
 import 'util/restaurant/order_settings.dart';
-import 'util/restaurant/currency_helper.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
 final appStore = AppStore();
 
@@ -64,10 +33,9 @@ void main() async{
 
 
 
-  await Future.wait([
-    HiveInit.init(),
-    AppConfig.init(),
-  ]);
+  // Initialize Hive FIRST, then AppConfig
+  await HiveInit.init();
+  await AppConfig.init();
 
 
   // Initialize business-specific boxes if business mode is already set
@@ -160,7 +128,7 @@ class UniPOSApp extends StatelessWidget {
       title: 'UniPOS',
       debugShowCheckedModeBanner: false,
       // theme: ThemeData(
-      //   primaryColor: AppColors.primary,
+      //   AppColors.primary: AppColors.primary,
       //   scaffoldBackgroundColor: AppColors.lightNeutral,
       //   appBarTheme: const AppBarTheme(
       //     backgroundColor: AppColors.primary,

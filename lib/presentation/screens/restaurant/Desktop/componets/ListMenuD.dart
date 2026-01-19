@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart' show GoogleFonts;
-import 'package:unipos/constants/restaurant/color.dart';
-
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/color.dart';
 
 
 class Listmenud extends StatefulWidget {
@@ -39,7 +39,7 @@ class _ListmenudState extends State<Listmenud> {
                 width: width * 0.1,
                 height: height * 0.1,
                 decoration: BoxDecoration(
-                  color: primarycolor,
+                  color: AppColors.primary,
                   shape: BoxShape.circle,
                   // borderRadius: BorderRadius.circular(10)
                 ),

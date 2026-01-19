@@ -3,17 +3,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
-import '../../../../../util/restaurant/decimal_settings.dart';
-import '../../../../../util/restaurant/currency_helper.dart';
+
 import '../../../../../presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 
@@ -102,7 +104,7 @@ class _ExtraTabState extends State<ExtraTab> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Lottie.asset(
-            notfoundanimation,
+            AppImages.notfoundanimation,
             height: size.height * 0.3,
           ),
           Text(
@@ -249,12 +251,12 @@ class _ExtraTabState extends State<ExtraTab> {
         width: size.width * 0.8,
         height: size.height * 0.06,
         bordercircular: 5,
-        bordercolor: primarycolor,
+        bordercolor: AppColors.primary,
         bgcolor: Colors.white,
         onTap: () => _openToppingBottomSheet(extra: extra),
         child: Text(
           'Add Topping Names',
-          style: GoogleFonts.poppins(color: primarycolor),
+          style: GoogleFonts.poppins(color: AppColors.primary),
         ),
       ),
     );
@@ -462,7 +464,7 @@ class _ExtraTabState extends State<ExtraTab> {
           children: [
             TextSpan(
               text: categoryName,
-              style: GoogleFonts.poppins(color: primarycolor, fontSize: 16),
+              style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 16),
             ),
           ],
         ),
@@ -491,7 +493,7 @@ class _ExtraTabState extends State<ExtraTab> {
         height: size.height * 0.06,
         padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
-          border: Border.all(color: isSelected ? primarycolor : Colors.grey),
+          border: Border.all(color: isSelected ? AppColors.primary : Colors.grey),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -518,7 +520,7 @@ class _ExtraTabState extends State<ExtraTab> {
               const SizedBox(width: 8),
               Container(
                 decoration: BoxDecoration(
-                  color: primarycolor,
+                  color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -599,7 +601,7 @@ class _ExtraTabState extends State<ExtraTab> {
                       }
                     });
                   },
-                  activeColor: primarycolor,
+                  activeColor: AppColors.primary,
                 ),
                 Expanded(
                   flex: 2,
@@ -751,7 +753,7 @@ class _ExtraTabState extends State<ExtraTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.delete, size: 80, color: primarycolor),
+            Icon(Icons.delete, size: 80, color: AppColors.primary),
             const SizedBox(height: 15),
             Text(
               'Delete Extra',

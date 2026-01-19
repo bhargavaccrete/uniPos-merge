@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 class NeedhelpDrawer extends StatelessWidget {
   const NeedhelpDrawer({super.key});
@@ -12,7 +12,7 @@ class NeedhelpDrawer extends StatelessWidget {
     final heigth = MediaQuery.of(context).size.height * 1;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         leading: IconButton(onPressed: (){
           Navigator.pop(context);
         },

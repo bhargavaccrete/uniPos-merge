@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 class ExtraTabex extends StatefulWidget {
   const ExtraTabex({super.key});
 
@@ -168,7 +168,7 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                         Icons.delete,
                                                         size: 100,
                                                         color:
-                                                        primarycolor,
+                                                        AppColors.primary,
                                                       ),
                                                       SizedBox(
                                                         height: 10,
@@ -308,12 +308,12 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                 width: width * 0.8,
                                 height: height * 0.06,
                                 bordercircular: 5,
-                                bordercolor: primarycolor,
+                                bordercolor: AppColors.primary,
                                 bgcolor: Colors.white,
                                 child: Text(
                                   'Add Topping Names',
                                   style: GoogleFonts.poppins(
-                                      color: primarycolor),
+                                      color: AppColors.primary),
                                 ),
                                 onTap: () {
                                   openBottomSheettoping();
@@ -373,7 +373,7 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                               extras[index],
                                                               style: GoogleFonts.poppins(
                                                                   color:
-                                                                  primarycolor,
+                                                                  AppColors.primary,
                                                                   fontSize:
                                                                   16))
                                                         ]),
@@ -435,7 +435,7 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                             decoration: BoxDecoration(
                                                                 border: Border.all(
                                                                     color: Cveg
-                                                                        ? primarycolor
+                                                                        ? AppColors.primary
                                                                         : Colors.grey)),
                                                             child: Row(
                                                               mainAxisAlignment:
@@ -468,7 +468,7 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                                   ),
                                                                   Container(
                                                                       decoration:
-                                                                      BoxDecoration(color: primarycolor, shape: BoxShape.circle),
+                                                                      BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                                                                       child: Icon(
                                                                         Icons.check,
                                                                         color: Colors.white,
@@ -509,7 +509,7 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                             decoration: BoxDecoration(
                                                                 border: Border.all(
                                                                     color: !Cveg
-                                                                        ? primarycolor
+                                                                        ? AppColors.primary
                                                                         : Colors.grey)),
                                                             child: Row(
                                                               mainAxisAlignment:
@@ -542,7 +542,7 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                                   ),
                                                                   Container(
                                                                       decoration:
-                                                                      BoxDecoration(color: primarycolor, shape: BoxShape.circle),
+                                                                      BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                                                                       child: Icon(
                                                                         Icons.check,
                                                                         color: Colors.white,

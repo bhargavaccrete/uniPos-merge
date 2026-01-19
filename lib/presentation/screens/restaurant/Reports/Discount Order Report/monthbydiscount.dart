@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
 
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 
 class MonthbyDiscount extends StatefulWidget {
@@ -148,7 +148,7 @@ class _MonthbyDiscountState extends State<MonthbyDiscount> {
                           height: height * 0.05,
                           decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(5),
-                              border: Border.all(color: primarycolor)),
+                              border: Border.all(color: AppColors.primary)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
                                 value: dropDownValue1,
@@ -191,7 +191,7 @@ class _MonthbyDiscountState extends State<MonthbyDiscount> {
                           height: height * 0.05,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              border: Border.all(color: primarycolor),
+                              border: Border.all(color: AppColors.primary),
                               borderRadius: BorderRadius.circular(5)),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
@@ -225,7 +225,7 @@ class _MonthbyDiscountState extends State<MonthbyDiscount> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor,
+                          color: AppColors.primary,
                           borderRadius: BorderRadius.circular(50)),
                       child: Icon(
                         Icons.search,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 
 
 class CommonButton extends StatelessWidget {
@@ -30,8 +30,8 @@ class CommonButton extends StatelessWidget {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          border: Border.all(color: bordercolor ?? primarycolor, width: borderwidth?? 2),
-          color: bgcolor ?? Primarysecond,
+          border: Border.all(color: bordercolor ?? AppColors.primary, width: borderwidth?? 2),
+          color: bgcolor ?? AppColors.primary,
           borderRadius: BorderRadius.circular(bordercircular??15),
         ),
         child: Center(child: child),

@@ -6,7 +6,7 @@ import 'package:hive_flutter/adapters.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:unipos/presentation/screens/restaurant/inventory/stockHistoy.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/categorymodel_300.dart';
@@ -374,7 +374,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
-                                color: primarycolor,
+                                color: AppColors.primary,
                               ),
                             ),
                           ],
@@ -453,7 +453,7 @@ class _ManageInventoryState extends State<ManageInventory> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: primarycolor),
+                borderSide: BorderSide(color: AppColors.primary),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -700,7 +700,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                             ),
                             leading: Icon(
                               Icons.category,
-                              color: primarycolor,
+                              color: AppColors.primary,
                             ),
                             initiallyExpanded: isExpanded,
                             onExpansionChanged: (expanded) {

@@ -13,7 +13,7 @@ import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/items_t
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/variant_tab.dart';
 
 import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 
 
 import '../../../../data/models/restaurant/db/categorymodel_300.dart';
@@ -110,10 +110,10 @@ class _ManagemenuState extends State<Managemenu>
                                   labelColor: Colors.black,
                                   unselectedLabelColor: Colors.grey,
                                   dividerColor: Colors.transparent,
-                                  indicatorColor: primarycolor,
+                                  indicatorColor: AppColors.primary,
                                   indicatorSize: TabBarIndicatorSize.tab,
                                   indicator: UnderlineTabIndicator(
-                                      borderSide: BorderSide(width: 3.0, color: primarycolor),
+                                      borderSide: BorderSide(width: 3.0, color: AppColors.primary),
                                       insets: EdgeInsets.symmetric(horizontal: 20)
                                   ),
                                   tabs: [
@@ -165,7 +165,7 @@ class _ManagemenuState extends State<Managemenu>
         //       indicatorColor: Primarysecond,
         //       indicatorSize: TabBarIndicatorSize.tab,
         //       indicator: BoxDecoration(
-        //           color: primarycolor, borderRadius: BorderRadius.circular(2)),
+        //           color: AppColors.primary, borderRadius: BorderRadius.circular(2)),
         //
         //         tabs: const [
         //

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 class CustomByRefund extends StatefulWidget {
   const CustomByRefund({super.key});
@@ -141,9 +140,9 @@ class _CustomByRefundState extends State<CustomByRefund> {
                   //   child: CommonTextForm(
                   //     hintText: 'DD/MM/YYYY',
                   //     HintColor: Colors.grey,
-                  //     gesture: Icon(Icons.date_range, color: primarycolor,),
+                  //     gesture: Icon(Icons.date_range, color: AppColors.primary,),
                   //
-                  //     BorderColor: primarycolor,
+                  //     BorderColor: AppColors.primary,
                   //     obsecureText: false,
                   //   ),
                   // ),
@@ -158,7 +157,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
                   //       width: width * 0.6,
                   //       height: height * 0.04,
                   //       decoration: BoxDecoration(
-                  //         border: Border.all(color: primarycolor),
+                  //         border: Border.all(color: AppColors.primary),
                   //         // color: Colors.red,
                   //         borderRadius: BorderRadius.circular(15)
                   //       ),
@@ -183,7 +182,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             // color: Colors.red,
                             borderRadius: BorderRadius.circular(5)),
                         child: Row(
@@ -220,7 +219,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
                               padding: EdgeInsets.symmetric(horizontal: 10),
                               height: height * 0.05,
                               decoration: BoxDecoration(
-                                  border: Border.all(color: primarycolor),
+                                  border: Border.all(color: AppColors.primary),
                                   // color: Colors.red,
                                   borderRadius: BorderRadius.circular(5)),
                               child: Row(
@@ -248,7 +247,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
                         child: Container(
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              color: primarycolor,
+                              color: AppColors.primary,
                               borderRadius: BorderRadius.circular(50)),
                           child: Icon(
                             Icons.search,
@@ -511,7 +510,7 @@ class _CustomByRefundState extends State<CustomByRefund> {
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
-                    child: CircularProgressIndicator(color: primarycolor),
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ),
                 ),
 

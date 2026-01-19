@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart'; // Or wherever AppSettings is located
 import 'package:flutter/widgets.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/togglelist.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
@@ -54,7 +54,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
     // Use a ListenableBuilder to listen for changes in AppSettings
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         automaticallyImplyLeading: false,
         leading: InkWell(
             onTap: (){
@@ -126,7 +126,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: primarycolor
+                              color: AppColors.primary
                           ),
                         ),
                       ),

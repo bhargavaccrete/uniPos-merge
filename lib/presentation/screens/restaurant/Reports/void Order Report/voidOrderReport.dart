@@ -7,7 +7,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Re
 import '../../../../../constants/restaurant/color.dart';
 import 'customebyvoid.dart';
 import 'monthbyvoid.dart';
-
+import 'package:unipos/util/color.dart';
 class VoidOrderReport extends StatefulWidget {
   const VoidOrderReport({super.key});
 
@@ -43,7 +43,7 @@ class _VoidOrderReportState extends State<VoidOrderReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text("Void Order Report",    textScaler: TextScaler.linear(1),
             style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
         ),
@@ -100,11 +100,11 @@ class _VoidOrderReportState extends State<VoidOrderReport> {
         },
 
         style: ElevatedButton.styleFrom(
-            backgroundColor: selectedFilter==title ? primarycolor: Colors.white,
-            foregroundColor: selectedFilter==title ? Colors.white : primarycolor,
+            backgroundColor: selectedFilter==title ? AppColors.primary: Colors.white,
+            foregroundColor: selectedFilter==title ? Colors.white : AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor)
+                side: BorderSide(color: AppColors.primary)
             )
         ),
         child: Text(title));

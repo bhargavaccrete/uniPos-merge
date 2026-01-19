@@ -1,6 +1,7 @@
  
 import 'package:flutter/material.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
  
@@ -31,16 +32,16 @@ class textFelids extends StatelessWidget {
       style: TextStyle(color: textStyleColors ?? Colors.black),
       decoration: InputDecoration(
           labelStyle: TextStyle(color: Colors.amber),
-          hintStyle: TextStyle(color: primarycolor),
+          hintStyle: TextStyle(color: AppColors.primary),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  BorderSide(color: enabledBorderColor ?? primarycolor)),
+                  BorderSide(color: enabledBorderColor ?? AppColors.primary)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  BorderSide(color: focusedBorderColor ?? primarycolor)),
+                  BorderSide(color: focusedBorderColor ?? AppColors.primary)),
           hintText: hintText),
     );
 
@@ -70,16 +71,16 @@ class ShowInputData extends StatelessWidget {
       style: TextStyle(color: textStyleColors ?? Colors.black),
       decoration: InputDecoration(
           labelStyle: TextStyle(color: Colors.amber),
-          hintStyle: TextStyle(color: primarycolor),
+          hintStyle: TextStyle(color: AppColors.primary),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  BorderSide(color: enabledBorderColor ?? primarycolor)),
+                  BorderSide(color: enabledBorderColor ?? AppColors.primary)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  BorderSide(color: focusedBorderColor ?? primarycolor)),
+                  BorderSide(color: focusedBorderColor ?? AppColors.primary)),
           hintText: hintText),
     );
 
@@ -112,7 +113,7 @@ class CustomUserInfoButton extends StatelessWidget {
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
-              icon: Icon(Icons.person, size: 30.0, color: primarycolor),
+              icon: Icon(Icons.person, size: 30.0, color: AppColors.primary),
               
               title: Text("User Details", style: TextStyle(fontWeight: FontWeight.bold)),
               content: Column(
@@ -129,12 +130,12 @@ class CustomUserInfoButton extends StatelessWidget {
               actions: [
                 CommonButton(
                   onTap:  () => Navigator.of(context).pop(),
-                  child: Text("ADD", style: TextStyle(color: primarycolor, fontWeight: FontWeight.bold)),
+                  child: Text("ADD", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                 ),
                 CommonButton(
-                  bgcolor: primarycolor,
+                  bgcolor: AppColors.primary,
                   onTap:  () => Navigator.of(context).pop(),
-                  child: Text("Close", style: TextStyle(color: primarycolor, fontWeight: FontWeight.bold)),
+                  child: Text("Close", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -142,10 +143,10 @@ class CustomUserInfoButton extends StatelessWidget {
 
         );
       },
-      icon: Icon(Icons.edit, color: primarycolor),
+      icon: Icon(Icons.edit, color: AppColors.primary),
       label: Text("Edit"),
       style: ElevatedButton.styleFrom(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
 

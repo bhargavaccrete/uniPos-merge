@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import '../../../../../constants/restaurant/color.dart';
-
+import 'package:unipos/util/color.dart';
 class CustomeTab extends StatefulWidget {
   const CustomeTab({super.key});
 
@@ -95,7 +95,7 @@ class _CustomeTabState extends State<CustomeTab> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             // color: Colors.red,
                             borderRadius: BorderRadius.circular(15)
                         ),
@@ -119,7 +119,7 @@ class _CustomeTabState extends State<CustomeTab> {
                         // width: width ,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              color: primarycolor,
+                              color: AppColors.primary,
                               shape: BoxShape.circle
                           ),
                           // alignment: Alignment.bottomCenter,
@@ -144,7 +144,7 @@ class _CustomeTabState extends State<CustomeTab> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             // color: Colors.red,
                             borderRadius: BorderRadius.circular(15)
                         ),

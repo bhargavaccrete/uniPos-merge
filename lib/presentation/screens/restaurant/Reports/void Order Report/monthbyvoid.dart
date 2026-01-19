@@ -5,12 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
+import '../../../../../util/common/currency_helper.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 
 class MonthbyVoid extends StatefulWidget {
   const MonthbyVoid({super.key});
@@ -123,7 +122,7 @@ class _MonthbyVoidState extends State<MonthbyVoid> {
                           height:  height * 0.05,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(5),
-                            border: Border.all(color: primarycolor)
+                            border: Border.all(color: AppColors.primary)
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton(
@@ -159,7 +158,7 @@ class _MonthbyVoidState extends State<MonthbyVoid> {
                           height: height *0.05,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             borderRadius: BorderRadius.circular(5)
                           ),
                           child: DropdownButtonHideUnderline(
@@ -188,7 +187,7 @@ class _MonthbyVoidState extends State<MonthbyVoid> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          color: primarycolor,
+                          color: AppColors.primary,
                           borderRadius: BorderRadius.circular(50)
                       ),
                       child: _isLoading 

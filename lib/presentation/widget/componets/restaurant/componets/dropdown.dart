@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 
@@ -38,7 +39,7 @@ class _DropdownState extends State<Dropdown> {
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        border: Border.all(color: primarycolor),
+        border: Border.all(color: AppColors.primary),
         borderRadius: BorderRadius.circular(8),
       ),
       child: DropdownButtonHideUnderline(
@@ -49,7 +50,7 @@ class _DropdownState extends State<Dropdown> {
               value: item,
               child: Text(
                 item,
-                style: TextStyle(color: primarycolor),
+                style: TextStyle(color: AppColors.primary),
               ),
             );
           }).toList(),

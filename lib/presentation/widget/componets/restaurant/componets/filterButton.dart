@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 
@@ -29,12 +30,12 @@ class Filterbutton extends StatelessWidget {
           onPressed: onpressed,
           style: ElevatedButton.styleFrom(
               backgroundColor:
-                  selectedFilter == title ? primarycolor : Colors.white,
+                  selectedFilter == title ? AppColors.primary : Colors.white,
               foregroundColor:
-                  selectedFilter == title ? Colors.white : primarycolor,
+                  selectedFilter == title ? Colors.white : AppColors.primary,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(borderc ?? 8),
-                  side: BorderSide(color: primarycolor))),
+                  side: BorderSide(color: AppColors.primary))),
           child: Text(title,style:GoogleFonts.poppins(),textScaler: TextScaler.linear(1),)),
     );
   }

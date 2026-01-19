@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../util/restaurant/responsive_helper.dart';
@@ -35,7 +36,7 @@ class _ListmenuState extends State<Listmenu> {
         color: widget.listcolor??Colors.white,
         border: Border.all(
           width: widget.borderwidth??1,
-          color: widget.colorb??primarycolor,
+          color: widget.colorb??AppColors.primary,
         ),
         borderRadius: BorderRadius.circular(widget.borderradius??10),
 
@@ -47,7 +48,7 @@ class _ListmenuState extends State<Listmenu> {
         style: ListTileStyle.drawer,
 
         onTap:widget.onTap,
-        leading:Icon(widget.icons,color:widget.color?? primarycolor,size: widget.iconssize??ResponsiveHelper.responsiveTextSize(context, 20),
+        leading:Icon(widget.icons,color:widget.color?? AppColors.primary,size: widget.iconssize??ResponsiveHelper.responsiveTextSize(context, 20),
           ),
         titleAlignment: ListTileTitleAlignment.center,
         title: Text(widget.title,style: GoogleFonts.poppins(

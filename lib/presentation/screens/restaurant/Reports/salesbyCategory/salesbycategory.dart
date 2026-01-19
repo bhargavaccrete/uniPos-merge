@@ -17,7 +17,8 @@ import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import 'CategoryReportData.dart'; // Imports the data model
-import 'CategoryReportView.dart';   // Imports the UI widget
+import 'CategoryReportView.dart';
+import 'package:unipos/util/color.dart';// Imports the UI widget
 class SalesbyCategory extends StatefulWidget {
   @override
   _SalesbyCategoryState createState() => _SalesbyCategoryState();
@@ -132,7 +133,7 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Sales By Category", style: GoogleFonts.poppins(fontSize: 20, color: Colors.white)),
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
@@ -176,11 +177,11 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
       child: ElevatedButton(
         onPressed: () => _onFilterSelected(filterValue),
         style: ElevatedButton.styleFrom(
-          backgroundColor: _selectedFilter == filterValue ? primarycolor : Colors.white,
-          foregroundColor: _selectedFilter == filterValue ? Colors.white : primarycolor,
+          backgroundColor: _selectedFilter == filterValue ? AppColors.primary : Colors.white,
+          foregroundColor: _selectedFilter == filterValue ? Colors.white : AppColors.primary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            side:  BorderSide(color: primarycolor),
+            side:  BorderSide(color: AppColors.primary),
           ),
         ),
         child: Text(title, style: GoogleFonts.poppins(fontSize: 14)),

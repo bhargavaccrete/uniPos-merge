@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 class Support extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Padding(
           padding: const EdgeInsets.only(left: 10),
           child: Text(
@@ -34,7 +34,7 @@ class Support extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.phone,
-                    color: primarycolor,
+                    color: AppColors.primary,
                   ),
                   SizedBox(
                     width: 8,
@@ -72,7 +72,7 @@ class Support extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.attach_email_outlined,
-                    color: primarycolor,
+                    color: AppColors.primary,
                   ),
                   SizedBox(
                     width: 8,

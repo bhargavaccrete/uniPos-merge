@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
+import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../constants/restaurant/color.dart';
@@ -14,9 +15,8 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../../data/models/restaurant/db/toppingmodel_304.dart';
 import '../../../../data/models/restaurant/db/variantmodel_305.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
-import '../../../../util/restaurant/currency_helper.dart';
-
+import '../../../../util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 class DisplayVariant {
   final String id;
   final String name;
@@ -65,11 +65,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   void _prepareVariants() {
     if (widget.item.variant == null || widget.item.variant!.isEmpty) return;
     final variantBox = Hive.box<VariantModel>('variante');
-    
+
     for (ItemVariante itemVariant in widget.item.variant!) {
       // Use direct key lookup which is O(1) and safer
       final variantDetails = variantBox.get(itemVariant.variantId);
-      
+
       if (variantDetails != null) {
         _displayVariants.add(DisplayVariant(id: variantDetails.id, name: variantDetails.name, price: itemVariant.price));
       } else {
@@ -87,7 +87,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     for (String choiceId in widget.item.choiceIds!) {
       // Use direct key lookup
       final choiceGroup = choiceBox.get(choiceId);
-      
+
       if (choiceGroup != null) {
         _displayChoiceGroups.add(choiceGroup);
       } else {
@@ -102,7 +102,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     for(String extraId in widget.item.extraId!){
       // Use direct key lookup
       final extraGroup = ExtraBox.get(extraId);
-      
+
       if(extraGroup != null){
         _displayExtra.add(extraGroup);
         // Initialize quantities for all toppings in this category
@@ -181,39 +181,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     });
   }
 
-  // void _confirmAndAddItem() {
-  //   // Build the final title string
-  //   List<String> optionNames = [];
-  //   if (_selectedVariant != null) {
-  //     optionNames.add(_selectedVariant!.name);
-  //   }
-  //   for (var choice in _selectedChoices) {
-  //     optionNames.add(choice.name);
-  //   }
-  //   String finalTitle = widget.item.name;
-  //   if (optionNames.isNotEmpty) {
-  //     finalTitle += ' (${optionNames.join(', ')})';
-  //   }
-  //
-  //   // Create the final CartItem
-  //   final cartItem = CartItem(
-  //     id: const Uuid().v4(),
-  //     // title: finalTitle,
-  //     title: widget.item.name,
-  //     price: _totalPrice,
-  //     imagePath: widget.item.imagePath ?? '',
-  //     quantity: 1,
-  //
-  //     variantName:  _selectedVariant?.name,
-  //     variantPrice: _selectedVariant?.price,
-  //     choiceNames: _selectedChoices.map((c)=> c.name).toList()
-  //
-  //   );
-  //   Navigator.of(context).pop(cartItem);
-  // }
-
-  // ... inside _ItemOptionsDialogState class
-
   void _confirmAndAddItem() {
     // Validate minimum requirements for extras
     if (!_validateMinimumRequirements()) {
@@ -229,7 +196,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('OK', style: GoogleFonts.poppins(color: primarycolor)),
+              child: Text('OK', style: GoogleFonts.poppins(color: AppColors.primary)),
             ),
           ],
         ),
@@ -237,15 +204,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
       return;
     }
 
-    // --- MODIFIED LOGIC ---
-    // The title will now only contain the item name and its selected variant.
     String finalTitle = widget.item.name;
-    // if (_selectedVariant != null) {
-    //   finalTitle += ' (${_selectedVariant!.name})';
-    // }
-    // --- END OF MODIFICATION ---
-
-    // Create the final CartItem with separate fields
 
     print("DEBUG in Dialog: Received category name: '${widget.categoryName}'");
 
@@ -253,16 +212,13 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         productId: widget.item.id,
         isStockManaged: widget.item.trackInventory,
         id: const Uuid().v4(),
-        // 1. The title is now clean.
         title: finalTitle,
         price: _totalPrice,
-        imagePath: '', // CartItem uses path as identifier, not actual image data
+        imagePath: '',
         quantity: 1,
-        // 2. The variant info is stored separately.
         categoryName: widget.categoryName,
         variantName:  _selectedVariant?.name,
         variantPrice: _selectedVariant?.price,
-        // 3. The choices are stored *only* in this list, not in the title.
         choiceNames: _selectedChoices.map((c) => c.name).toList(),
         taxRate: widget.item.taxRate,
         extras: _selectedExtra.map((e) {
@@ -302,54 +258,174 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     Navigator.of(context).pop(cartItem);
   }
 
-// ... rest of the class
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.divider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
 
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: Row(
               children: [
-                Expanded(child: Text(widget.item.name, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.item.name,
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (widget.categoryName != null) ...[
+                        SizedBox(height: 4),
+                        Text(
+                          widget.categoryName!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMedium,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                  ),
+                ),
               ],
             ),
-            const Divider(),
+          ),
 
-            // --- Variants Section ---
-            if (_displayVariants.isNotEmpty) _buildVariantSection(),
+          SizedBox(height: 20),
 
-            // --- Choices Section ---
-            if (_displayChoiceGroups.isNotEmpty) _buildChoiceSection(),
-
-
-            // ------Extra Section-----
-            if(_displayExtra.isNotEmpty) _buildExtraSection(),
-
-            const SizedBox(height: 20),
-            // Total and Add Button
-            Container(
-              decoration: BoxDecoration(color: primarycolor, borderRadius: BorderRadius.circular(8)),
-              child: Row(
+          // Scrollable content
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16.0), child: Text('Total: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalPrice)}', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)))),
-                  TextButton(
-                    style: TextButton.styleFrom(backgroundColor: Colors.white, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8))), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
-                    onPressed: _confirmAndAddItem,
-                    child: Text('Add Item', style: GoogleFonts.poppins(color: primarycolor, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
+                  // --- Variants Section ---
+                  if (_displayVariants.isNotEmpty) _buildVariantSection(),
+
+                  // --- Choices Section ---
+                  if (_displayChoiceGroups.isNotEmpty) _buildChoiceSection(),
+
+                  // ------Extra Section-----
+                  if(_displayExtra.isNotEmpty) _buildExtraSection(),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+
+          // Bottom Add to Cart button
+          Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: GestureDetector(
+                onTap: _confirmAndAddItem,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, AppColors.primary],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Total Amount',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.white.withOpacity(0.8),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalPrice)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            'Add to Cart',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.white,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward_rounded, color: AppColors.white, size: 20),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -358,29 +434,113 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Select Size', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600))),
-        ..._displayVariants.map((variant) => RadioListTile<DisplayVariant>(
-          title: Text(variant.name),
-          secondary: Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}'),
-          value: variant,
-          groupValue: _selectedVariant,
-          onChanged: (newValue) {
-            setState(() {
-              _selectedVariant = newValue;
-              // Clear selected extras that are not available for the new variant
-              _selectedExtra.removeWhere((topping) {
-                if (topping.isContainSize == true && topping.variantPrices != null) {
-                  return !topping.variantPrices!.containsKey(_selectedVariant?.id);
-                }
-                return false;
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMedium,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.straighten_rounded, size: 16, color: AppColors.textSecondary),
+            ),
+            SizedBox(width: 10),
+            Text(
+              'Select Size',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        ..._displayVariants.map((variant) {
+          final isSelected = _selectedVariant == variant;
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedVariant = variant;
+                // Clear selected extras that are not available for the new variant
+                _selectedExtra.removeWhere((topping) {
+                  if (topping.isContainSize == true && topping.variantPrices != null) {
+                    return !topping.variantPrices!.containsKey(_selectedVariant?.id);
+                  }
+                  return false;
+                });
+                _recalculateTotal();
               });
-              _recalculateTotal();
-            });
-          },
-          activeColor: primarycolor,
-          contentPadding: EdgeInsets.zero,
-        )),
-        const Divider(),
+            },
+            child: Container(
+              margin: EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.divider,
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? AppColors.white : AppColors.divider,
+                        width: 2,
+                      ),
+                      color: isSelected ? AppColors.white : Colors.transparent,
+                    ),
+                    child: isSelected
+                        ? Center(
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      variant.name,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: isSelected ? AppColors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.white.withOpacity(0.2) : AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? AppColors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+        SizedBox(height: 16),
       ],
     );
   }
@@ -392,27 +552,86 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text(choiceGroup.name, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600))),
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMedium,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.checklist_rounded, size: 16, color: AppColors.textSecondary),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  choiceGroup.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
             ...choiceGroup.choiceOption.map((option) {
-              return CheckboxListTile(
-                title: Text(option.name),
-                // Note: Add a secondary widget here if your choices have a price.
-                value: _selectedChoices.contains(option),
-                onChanged: (bool? isSelected) {
+              final isSelected = _selectedChoices.contains(option);
+              return GestureDetector(
+                onTap: () {
                   setState(() {
-                    if (isSelected == true) {
-                      _selectedChoices.add(option);
-                    } else {
+                    if (isSelected) {
                       _selectedChoices.remove(option);
+                    } else {
+                      _selectedChoices.add(option);
                     }
                     _recalculateTotal();
                   });
                 },
-                activeColor: Colors.teal,
-                contentPadding: EdgeInsets.zero,
+                child: Container(
+                  margin: EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.divider,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primary : AppColors.divider,
+                            width: 2,
+                          ),
+                          color: isSelected ? AppColors.primary : Colors.transparent,
+                        ),
+                        child: isSelected
+                            ? Icon(Icons.check, size: 14, color: AppColors.white)
+                            : null,
+                      ),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          option.name,
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               );
             }).toList(),
-            const Divider(),
+            SizedBox(height: 16),
           ],
         );
       }).toList(),
@@ -433,54 +652,61 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           final filteredToppings = extraGroup.topping!.where((topping) {
             // Filter toppings based on size availability
             if (topping.isContainSize == true) {
-              // If topping is size-dependent, only show it if:
-              // 1. A variant is selected AND
-              // 2. The topping has a price for that variant AND
-              // 3. The price is greater than 0
               if (_selectedVariant != null && topping.variantPrices != null) {
                 if (topping.variantPrices!.containsKey(_selectedVariant!.id)) {
                   final price = topping.variantPrices![_selectedVariant!.id] ?? 0.0;
-                  // Only show if price is greater than 0
                   return price > 0;
                 }
                 return false;
               }
-              // Don't show size-dependent toppings when no variant is selected
               return false;
             }
-            // If topping is not size-dependent, always show it (unless you want to filter by base price)
             return true;
           }).toList();
 
           // Only show this extra group if there are toppings to display
           if (filteredToppings.isEmpty) {
-            return const SizedBox.shrink(); // Return empty widget
+            return const SizedBox.shrink();
           }
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  children: [
-                    Text(extraGroup.Ename, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-                    if (minRequired > 0 || maxAllowed > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMedium,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.add_circle_outline, size: 16, color: AppColors.textSecondary),
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    extraGroup.Ename,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (minRequired > 0 || maxAllowed > 0) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
+                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+                    ),
                   ],
-                ),
+                ],
               ),
+              SizedBox(height: 12),
               if (maxAllowed > 0 && currentCount >= maxAllowed)
                 Padding(
-                  padding: const EdgeInsets.only(left: 16.0, bottom: 8.0),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
                     'Maximum selection reached',
-                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange[700], fontWeight: FontWeight.w500),
+                    style: GoogleFonts.poppins(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w500),
                   ),
                 ),
               ...filteredToppings.map((topping){
@@ -493,29 +719,47 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 final currentQuantity = _extraQuantities[topping.name] ?? 0;
                 final canIncrement = maxAllowed == 0 || currentCount < maxAllowed;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                return Container(
+                  margin: EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.05) : AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.3) : AppColors.divider,
+                      width: 1,
+                    ),
+                  ),
                   child: Row(
                     children: [
-                      // Topping name and price
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(topping.name, style: GoogleFonts.poppins(fontSize: 14)),
-                            Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(displayPrice)}',
-                                style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+                            Text(
+                              topping.name,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(displayPrice)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-
                       // Quantity controls
                       Row(
                         children: [
-                          // Minus button
-                          IconButton(
-                            icon: Icon(Icons.remove_circle_outline, color: currentQuantity > 0 ? primarycolor : Colors.grey[400]),
-                            onPressed: currentQuantity > 0 ? () {
+                          GestureDetector(
+                            onTap: currentQuantity > 0 ? () {
                               setState(() {
                                 final newQuantity = currentQuantity - 1;
                                 _extraQuantities[topping.name] = newQuantity;
@@ -525,24 +769,33 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                                 _recalculateTotal();
                               });
                             } : null,
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(),
+                            child: Container(
+                              padding: EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.1) : AppColors.surfaceMedium,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.remove,
+                                size: 18,
+                                color: currentQuantity > 0 ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                            ),
                           ),
-
-                          // Quantity display
                           Container(
                             width: 40,
                             alignment: Alignment.center,
                             child: Text(
                               currentQuantity.toString(),
-                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
-
-                          // Plus button
-                          IconButton(
-                            icon: Icon(Icons.add_circle_outline, color: canIncrement ? primarycolor : Colors.grey[400]),
-                            onPressed: canIncrement ? () {
+                          GestureDetector(
+                            onTap: canIncrement ? () {
                               setState(() {
                                 final newQuantity = currentQuantity + 1;
                                 _extraQuantities[topping.name] = newQuantity;
@@ -552,8 +805,18 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                                 _recalculateTotal();
                               });
                             } : null,
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(),
+                            child: Container(
+                              padding: EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: canIncrement ? AppColors.primary : AppColors.surfaceMedium,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.add,
+                                size: 18,
+                                color: canIncrement ? AppColors.white : AppColors.textSecondary,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -561,15 +824,12 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                   ),
                 );
               }).toList(),
-              const Divider()
-
+              SizedBox(height: 16),
             ],
           );
 
         }).toList()
     );
-
-
   }
 
 }

@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/color.dart';
 class Delivery extends StatelessWidget {
   const Delivery({super.key});
 
@@ -48,7 +48,7 @@ class Delivery extends StatelessWidget {
                 width: width * 0.3,
                 decoration: BoxDecoration(
                     color: Colors.white,
-                    border: Border.all(width: 2, color: primarycolor),
+                    border: Border.all(width: 2, color: AppColors.primary),
                     borderRadius: BorderRadius.circular(5)),
                 child: Text(
                   'New Order',
@@ -69,7 +69,7 @@ class Delivery extends StatelessWidget {
                     Text('Fruit Punch'),
                     Row(
                       children: [
-                        Icon(Icons.remove,color: primarycolor,),
+                        Icon(Icons.remove,color: AppColors.primary,),
                         SizedBox(width: 5,),
                         Container(
                           alignment: Alignment.center,
@@ -85,7 +85,7 @@ class Delivery extends StatelessWidget {
                           ),
                         ),
                         SizedBox(width: 5,),
-                        Icon(Icons.add,color: primarycolor,)
+                        Icon(Icons.add,color: AppColors.primary,)
                       ],
                     ),
 

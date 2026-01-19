@@ -1,17 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/daywisebytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/monthwisebytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/thisweekbytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/todaybytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/yearwisebytrading.dart';
-
-import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
 class ThisWeekbytrading extends StatefulWidget {

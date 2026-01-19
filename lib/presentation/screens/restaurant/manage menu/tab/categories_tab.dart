@@ -10,6 +10,8 @@ import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
@@ -107,7 +109,7 @@ class _CategoryTabState extends State<CategoryTab> {
                           Icon(
                             Icons.photo_library,
                             size: 50,
-                            color: primarycolor,
+                            color: AppColors.primary,
                           ),
                           Text('From Gallery'),
                         ],
@@ -126,7 +128,7 @@ class _CategoryTabState extends State<CategoryTab> {
                         Icon(
                           Icons.search,
                           size: 50,
-                          color: primarycolor,
+                          color: AppColors.primary,
                         ),
                         Text('From Search'),
                       ],
@@ -279,7 +281,7 @@ class _CategoryTabState extends State<CategoryTab> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Lottie.asset(
-                          notfoundanimation,
+                          AppImages.notfoundanimation,
                           height: ResponsiveHelper.responsiveHeight(
                               context, 0.3),
                         ),
@@ -699,7 +701,7 @@ class _CategoryTabState extends State<CategoryTab> {
 //                           Icon(
 //                             Icons.photo_library,
 //                             size: 50,
-//                             color: primarycolor,
+//                             color: AppColors.primary,
 //                           ),
 //                           Text('From Gallery'),
 //                         ],
@@ -718,7 +720,7 @@ class _CategoryTabState extends State<CategoryTab> {
 //                         Icon(
 //                           Icons.search,
 //                           size: 50,
-//                           color: primarycolor,
+//                           color: AppColors.primary,
 //                         ),
 //                         Text('From Search'),
 //                       ],

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
@@ -63,7 +63,7 @@ class _DayWisebytradingState extends State<DayWisebytrading> {
                         width: width * 0.6,
                         height: height * 0.05,
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor),
+                            border: Border.all(color: AppColors.primary),
                             // color: Colors.red,
                             borderRadius: BorderRadius.circular(5)),
                         child: Row(
@@ -76,7 +76,7 @@ class _DayWisebytradingState extends State<DayWisebytrading> {
                               textScaler: TextScaler.linear(1),
                               style: GoogleFonts.poppins(fontSize: 14),
                             ),
-                            Icon(Icons.date_range, color: primarycolor)
+                            Icon(Icons.date_range, color: AppColors.primary)
                           ],
                         )),
                   ),
@@ -86,7 +86,7 @@ class _DayWisebytradingState extends State<DayWisebytrading> {
                   Container(
                     padding: EdgeInsets.all(5),
                     decoration: BoxDecoration(
-                        color: primarycolor,
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(50)),
                     child: Icon(
                       Icons.search,

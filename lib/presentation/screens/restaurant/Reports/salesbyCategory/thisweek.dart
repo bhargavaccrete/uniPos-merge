@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 class ThisWeekCategory extends StatefulWidget {
   const ThisWeekCategory({super.key});
 
@@ -33,7 +33,7 @@ class _ThisWeekCategoryState extends State<ThisWeekCategory> {
                     HintColor: Colors.grey,
                     icon: Icon(
                       Icons.search,
-                      color: primarycolor,
+                      color: AppColors.primary,
                       size: 30,
                     ),
                     obsecureText: false),

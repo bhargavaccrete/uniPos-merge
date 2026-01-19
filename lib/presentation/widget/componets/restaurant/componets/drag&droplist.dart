@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 
 class DraggableEditableList extends StatefulWidget {
   @override
@@ -48,7 +48,7 @@ class _DraggableEditableListState extends State<DraggableEditableList> {
             ),
             title: editingIndex == index
                 ? TextField(
-                  decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),borderSide: BorderSide(color: primarycolor))),
+                  decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),borderSide: BorderSide(color: AppColors.primary))),
                     controller: _controller,
                     autofocus: true,
                     onSubmitted: (value) {
@@ -68,7 +68,7 @@ class _DraggableEditableListState extends State<DraggableEditableList> {
               },
               icon: Icon(
                 Icons.edit,
-                color: primarycolor,
+                color: AppColors.primary,
               ),
             ),
           );

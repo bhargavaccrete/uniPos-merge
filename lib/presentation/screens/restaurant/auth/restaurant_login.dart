@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../util/restaurant/images.dart';
 import '../../../../util/restaurant/responsive_helper.dart';
@@ -114,7 +116,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: screenBGColor,
+      backgroundColor: AppColors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
@@ -135,7 +137,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     alignment: Alignment.center,
                     width: ResponsiveHelper.responsiveWidth(context, 0.5),
                     height: ResponsiveHelper.responsiveHeight(context, 0.20),
-                    child: Image.asset(logo),
+                    child: Image.asset(AppImages.logo),
                   ),
 
                   SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.02)),
@@ -146,7 +148,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     style: GoogleFonts.poppins(
                       fontSize: ResponsiveHelper.responsiveTextSize(context, 24),
                       fontWeight: FontWeight.w700,
-                      color: primarycolor,
+                      color: AppColors.primary,
                     ),
                   ),
 
@@ -265,7 +267,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                         },
                         child: Icon(
                           _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: primarycolor,
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -278,7 +280,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     width: width,
                     height: ResponsiveHelper.responsiveHeight(context, 0.065),
                     onTap: _isLoading ? () {} : _handleLogin,
-                    bgcolor: _isLoading ? Colors.grey : primarycolor,
+                    bgcolor: _isLoading ? Colors.grey : AppColors.primary,
                     child: _isLoading
                         ? const SizedBox(
                             height: 24,

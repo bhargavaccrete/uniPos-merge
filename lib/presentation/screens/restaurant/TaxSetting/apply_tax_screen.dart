@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
-import '../../../../util/restaurant/currency_helper.dart';
-
+import 'package:unipos/util/common/decimal_settings.dart';
 class ApplyTaxScreen extends StatefulWidget {
   final Tax taxToApply;
   const ApplyTaxScreen({super.key,
@@ -124,7 +124,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                     value: isAllSelected,
                     onChanged: (value) => _onSelectedAllChecked(value, items),
                     activeColor: Colors.white,
-                    checkColor: Theme.of(context).primaryColor,
+                    checkColor: AppColors.primary,
                   ),
                 ],
               );

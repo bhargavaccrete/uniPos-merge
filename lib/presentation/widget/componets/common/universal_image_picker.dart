@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:unipos/util/common/image_picker_service.dart';
+import 'package:unipos/util/color.dart';
 
 /// Universal image picker widget that works on web and mobile
 /// Replaces the old File-based approach with Uint8List
@@ -11,7 +12,7 @@ class UniversalImagePicker {
   static Future<Uint8List?> showPicker(
     BuildContext context, {
     bool showCameraOption = true,
-    Color? primaryColor,
+    Color? primary,
   }) async {
     if (kIsWeb || !showCameraOption) {
       // On web or if camera disabled, go directly to gallery
@@ -49,7 +50,7 @@ class UniversalImagePicker {
                       final bytes = await ImagePickerService.pickImageFromGallery();
                       Navigator.pop(context, bytes);
                     },
-                    color: primaryColor,
+                    color: AppColors.primary ,
                   ),
                   if (!kIsWeb)
                     _buildOption(
@@ -60,7 +61,7 @@ class UniversalImagePicker {
                         final bytes = await ImagePickerService.pickImageFromCamera();
                         Navigator.pop(context, bytes);
                       },
-                      color: primaryColor,
+                      color: AppColors.primary,
                     ),
                 ],
               ),

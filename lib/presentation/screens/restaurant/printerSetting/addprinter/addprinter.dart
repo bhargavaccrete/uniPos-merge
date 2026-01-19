@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/Blutooth.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/usb.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/wifi.dart';
+import 'package:unipos/util/color.dart';
 class AddPrinter extends StatefulWidget {
   const AddPrinter({super.key});
 
@@ -45,7 +46,7 @@ class _AddPrinterState extends State<AddPrinter> with SingleTickerProviderStateM
                   unselectedLabelColor: Colors.grey.shade400,
                   indicatorColor: Colors.red,
                   indicator:  UnderlineTabIndicator(
-                      borderSide: BorderSide(width: 3.0 ,color: primarycolor)
+                      borderSide: BorderSide(width: 3.0 ,color: AppColors.primary)
                   ),
                   tabs:[
                     Tab(

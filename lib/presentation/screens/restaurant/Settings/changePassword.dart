@@ -5,7 +5,7 @@ import '../../../../constants/restaurant/color.dart';
 import '../../../../util/restaurant/responsive_helper.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 class Changepassword extends StatefulWidget {
   @override
   State<Changepassword> createState() => _ChangepasswordState();
@@ -121,7 +121,7 @@ class _ChangepasswordState extends State<Changepassword> {
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: primarycolor,
+                color: AppColors.primary,
               ),
             ),
           ],
@@ -134,7 +134,7 @@ class _ChangepasswordState extends State<Changepassword> {
           CommonButton(
             width: 100,
             height: 45,
-            bgcolor: primarycolor,
+            bgcolor: AppColors.primary,
             bordercircular: 8,
             onTap: () {
               Navigator.of(context).pop(); // Close dialog
@@ -161,9 +161,9 @@ class _ChangepasswordState extends State<Changepassword> {
     final height = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: screenBGColor,
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         elevation: 1,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
@@ -317,7 +317,7 @@ class _ChangepasswordState extends State<Changepassword> {
                     },
                     child: Icon(
                       _obscureCurrentPass ? Icons.visibility_off : Icons.visibility,
-                      color: primarycolor,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -354,7 +354,7 @@ class _ChangepasswordState extends State<Changepassword> {
                     },
                     child: Icon(
                       _obscureNewPass ? Icons.visibility_off : Icons.visibility,
-                      color: primarycolor,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -391,7 +391,7 @@ class _ChangepasswordState extends State<Changepassword> {
                     },
                     child: Icon(
                       _obscureConfirmPass ? Icons.visibility_off : Icons.visibility,
-                      color: primarycolor,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -404,8 +404,8 @@ class _ChangepasswordState extends State<Changepassword> {
                   height: height * 0.065,
                   onTap: _isLoading ? () {} : _handleChangePassword,
                   bordercircular: 8,
-                  bgcolor: _isLoading ? Colors.grey : primarycolor,
-                  bordercolor: _isLoading ? Colors.grey : primarycolor,
+                  bgcolor: _isLoading ? Colors.grey : AppColors.primary,
+                  bordercolor: _isLoading ? Colors.grey : AppColors.primary,
                   child: _isLoading
                       ? const SizedBox(
                           height: 24,
@@ -468,7 +468,7 @@ class _ChangepasswordState extends State<Changepassword> {
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         children: [
-          Icon(Icons.check_circle_outline, size: 16, color: primarycolor),
+          Icon(Icons.check_circle_outline, size: 16, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

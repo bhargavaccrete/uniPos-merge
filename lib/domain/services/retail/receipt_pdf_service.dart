@@ -88,7 +88,7 @@ class ReceiptPdfService {
     if (retailSettings != null) {
       switch (retailSettings.paperSize) {
         case PaperSize.mm58:
-          // Note: Using roll80 as PDF package doesn't have roll58, can be customized
+        // Note: Using roll80 as PDF package doesn't have roll58, can be customized
           return const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 8);
         case PaperSize.mm80:
           return PdfPageFormat.roll80;
@@ -261,7 +261,7 @@ class ReceiptPdfService {
           // KOT Format (simplified for kitchen)
           pw.Text(
             'KOT #: ${data.kotNumber.toString().padLeft(3, '0')}',
-            style: const pw.TextStyle(fontSize: 10),
+            style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
           ),
           if (data.tableNo != null && data.tableNo!.isNotEmpty) ...[
             pw.Text(
@@ -272,19 +272,19 @@ class ReceiptPdfService {
           if (data.orderNo != null && data.orderNo!.isNotEmpty) ...[
             pw.Text(
               'Order No: ${data.orderNo}',
-              style: const pw.TextStyle(fontSize: 10),
+              style: pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
           if (data.orderType != null) ...[
             pw.Text(
               'Type: ${data.orderType!.toUpperCase()}${data.isAddonKot == true ? ' (ADD-ON)' : ''}',
-              style: const pw.TextStyle(fontSize: 10),
+              style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
           if (data.orderTimestamp != null) ...[
             pw.Text(
               _formatDateTime(data.orderTimestamp!.toIso8601String()),
-              style: const pw.TextStyle(fontSize: 10),
+              style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
         ] else ...[
@@ -296,8 +296,8 @@ class ReceiptPdfService {
                 pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   data.billNumber != null
-                    ? data.billNumber.toString().padLeft(3, '0')
-                    : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
+                      ? data.billNumber.toString().padLeft(3, '0')
+                      : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
                   style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                 ),
               ],
@@ -333,8 +333,8 @@ class ReceiptPdfService {
               children: [
                 pw.Text('Customer:', style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
                 pw.Text(
-                  data.customer!.name,
-                  style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
+                    data.customer!.name,
+                    style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
               ],
             ),
           ],
@@ -395,7 +395,7 @@ class ReceiptPdfService {
 
           // Totals - Display only (NO calculations)
           // All values pre-calculated by CartCalculationService
-          () {
+              () {
             final isRestaurantInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
 
             // ✅ GOLDEN RULE: Only display pre-calculated values
@@ -846,14 +846,14 @@ class ReceiptPdfService {
                     // Taxable Amount / Sub Total - Pre-calculated (mode-aware label only)
                     if (showSubtotal)
                       _buildInvoiceTotalRow(
-                        isRestaurantInclusive ? 'Taxable Amount' : 'Sub Total (Before Tax)',
-                        data.sale.subtotal
+                          isRestaurantInclusive ? 'Taxable Amount' : 'Sub Total (Before Tax)',
+                          data.sale.subtotal
                       ),
                     // GST - Pre-calculated (mode-aware label only)
                     if (showTax && data.sale.taxAmount > 0)
                       _buildInvoiceTotalRow(
-                        isRestaurantInclusive ? 'GST (Included)' : 'GST',
-                        data.sale.taxAmount
+                          isRestaurantInclusive ? 'GST (Included)' : 'GST',
+                          data.sale.taxAmount
                       ),
 
                     // Second Separator
@@ -995,7 +995,7 @@ class ReceiptPdfService {
               padding: const pw.EdgeInsets.only(left: 4, top: 1),
               child: pw.Text(
                 '  ${item.weight!}',
-                style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700,fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
               ),
             ),
         ],

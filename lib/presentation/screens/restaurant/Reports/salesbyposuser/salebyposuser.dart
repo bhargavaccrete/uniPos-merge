@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyposuser/todayByPosUser.dart';
-
+import 'package:unipos/util/color.dart';
 class SalesByPOsUSer extends StatefulWidget {
   const SalesByPOsUSer({super.key});
 
@@ -63,7 +63,7 @@ class _SalesByPOsUSerState extends State<SalesByPOsUSer> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text(
           "Sales By Pos User",
           textScaler: TextScaler.linear(1),
@@ -134,12 +134,12 @@ class _SalesByPOsUSerState extends State<SalesByPOsUSer> {
         },
         style: ElevatedButton.styleFrom(
             backgroundColor:
-            selectedFilter == title ?primarycolor : Colors.white,
+            selectedFilter == title ?AppColors.primary : Colors.white,
             foregroundColor:
-            selectedFilter == title ? Colors.white :primarycolor,
+            selectedFilter == title ? Colors.white :AppColors.primary,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: primarycolor))),
+                side: BorderSide(color: AppColors.primary))),
         child: Text(title));
   }
 

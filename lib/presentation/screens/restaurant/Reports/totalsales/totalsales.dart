@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/constants/restaurant/color.dart';
-import 'package:unipos/util/restaurant/decimal_settings.dart';
-import 'package:unipos/util/restaurant/currency_helper.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 
@@ -31,7 +31,7 @@ class _TotalsalesState extends State<Totalsales> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
         title: Text(
           "Total Sales",
           style: GoogleFonts.poppins(
@@ -101,11 +101,11 @@ class _TotalsalesState extends State<Totalsales> {
       },
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        backgroundColor: isSelected ? primarycolor : Colors.white,
-        foregroundColor: isSelected ? Colors.white : primarycolor,
+        backgroundColor: isSelected ? AppColors.primary : Colors.white,
+        foregroundColor: isSelected ? Colors.white : AppColors.primary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side:  BorderSide(color: primarycolor),
+          side:  BorderSide(color: AppColors.primary),
         ),
       ),
       child: Text(title),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../constants/restaurant/color.dart';
@@ -261,7 +262,7 @@ class _AddtaxState extends State<Addtax> {
 
 
                 CommonButton(
-                  bgcolor: primarycolor,
+                  bgcolor: AppColors.primary,
                   bordercircular: 10,
                   height: height * 0.06,
                   width: width * 0.8,
@@ -404,7 +405,7 @@ class _AddtaxState extends State<Addtax> {
                       children: [
                         Checkbox(
                             value: _ischecked1,
-                            activeColor: primarycolor,
+                            activeColor: AppColors.primary,
                             onChanged: (bool? value) {
                               setModalState(() => _ischecked1 = value ?? false);
                             }),

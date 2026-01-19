@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
-import '../../../../../util/restaurant/currency_helper.dart';
-import '../../../../../util/restaurant/decimal_settings.dart';
 import 'ItemsReportData.dart';
-
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 class ThisWeekItems extends StatefulWidget {
   // 1. This widget accepts the report data
   final List<ItemReportData> reportData;
@@ -74,7 +73,7 @@ class _ThisWeekItemsState extends State<ThisWeekItems> {
                     HintColor: Colors.grey,
                     icon: Icon(
                       Icons.search,
-                      color: primarycolor,
+                      color: AppColors.primary,
                       size: 30,
                     ),
                     obsecureText: false),
@@ -113,7 +112,7 @@ class _ThisWeekItemsState extends State<ThisWeekItems> {
                           headingRowHeight: 50,
                           columnSpacing: 20,
                           headingRowColor:
-                          WidgetStateProperty.all(primarycolor),
+                          WidgetStateProperty.all(AppColors.primary),
                           border: TableBorder.all(color: Colors.grey.shade300),
                           columns: [
                             // 5. Columns are updated to match the data

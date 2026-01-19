@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
@@ -67,7 +67,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_circle_outline, color: primarycolor),
+            icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
             onPressed: () => _showAddChoiceDialog(),
             tooltip: 'Add New Choice',
           ),
@@ -119,7 +119,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
             SizedBox(height: 30),
             CommonButton(
               onTap: () => _showAddChoiceDialog(),
-              bgcolor: primarycolor,
+              bgcolor: AppColors.primary,
               bordercircular: 10,
               height: 50,
               width: 200,
@@ -166,11 +166,11 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
               margin: EdgeInsets.only(bottom: 15),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isSelected ? primarycolor : Colors.grey[300]!,
+                  color: isSelected ? AppColors.primary : Colors.grey[300]!,
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(12),
-                color: isSelected ? primarycolor.withValues(alpha: 0.05) : Colors.white,
+                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
               ),
               child: CheckboxListTile(
                 value: isSelected,
@@ -183,7 +183,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     }
                   });
                 },
-                activeColor: primarycolor,
+                activeColor: AppColors.primary,
                 title: Text(
                   choice.name,
                   style: GoogleFonts.poppins(
@@ -275,13 +275,13 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
             child: CommonButton(
               onTap: () => Navigator.pop(context),
               bgcolor: Colors.white,
-              bordercolor: primarycolor,
+              bordercolor: AppColors.primary,
               bordercircular: 10,
               height: ResponsiveHelper.responsiveHeight(context, 0.06),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
-                  color: primarycolor,
+                  color: AppColors.primary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -391,10 +391,10 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                           optionControllers.add(TextEditingController());
                         });
                       },
-                      icon: Icon(Icons.add_circle_outline, color: primarycolor),
+                      icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
                       label: Text(
                         'Add Option',
-                        style: GoogleFonts.poppins(color: primarycolor),
+                        style: GoogleFonts.poppins(color: AppColors.primary),
                       ),
                     ),
                   ],
@@ -485,7 +485,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primarycolor,
+                    backgroundColor: AppColors.primary,
                   ),
                   child: Text(
                     'Add',

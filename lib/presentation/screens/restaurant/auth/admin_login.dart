@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/constants/restaurant/color.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/dashboard.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 
@@ -28,7 +30,7 @@ class _AdminLoginState extends State<AdminLogin> {
     ValueNotifier obsecurepass = ValueNotifier(true);
     PasswordController.text = '123456';
     return Scaffold(
-      backgroundColor: screenBGColor,
+      backgroundColor: AppColors.white,
       body: SingleChildScrollView(
         child: Container(
           width: width,
@@ -51,7 +53,7 @@ class _AdminLoginState extends State<AdminLogin> {
                   alignment: Alignment.bottomCenter,
                   width: ResponsiveHelper.responsiveWidth(context, 0.5) ,
                   height: ResponsiveHelper.responsiveHeight(context, 0.20),
-                  child: Image.asset(logo),
+                  child: Image.asset(AppImages.logo),
                 ),
                 SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.02),
                 ),
@@ -101,11 +103,11 @@ class _AdminLoginState extends State<AdminLogin> {
                             child: obsecurepass.value == true
                                 ? Icon(
                               Icons.visibility_off,
-                              color: primarycolor,
+                              color: AppColors.primary,
                             )
                                 : Icon(
                               Icons.visibility,
-                              color: primarycolor,
+                              color: AppColors.primary,
                             )),
                       );
                     },
@@ -151,7 +153,7 @@ class _AdminLoginState extends State<AdminLogin> {
                             text: '123456',
                             style: GoogleFonts.poppins(
                                 fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-                                color: Primarysecond, fontWeight: FontWeight.bold, letterSpacing: 1),
+                                color: AppColors.primary, fontWeight: FontWeight.bold, letterSpacing: 1),
                           )
                         ])),
 
@@ -172,11 +174,11 @@ class _AdminLoginState extends State<AdminLogin> {
                         style: GoogleFonts.poppins(
                           fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
                           fontWeight: FontWeight.w600,
-                          color: primarycolor,
+                          color: AppColors.primary,
                         ),
                       )),
                   bgcolor: Colors.white,
-                  bordercolor: primarycolor,
+                  bordercolor: AppColors.primary,
                 )
               ],
             ),

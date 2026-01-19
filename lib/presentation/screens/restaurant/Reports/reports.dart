@@ -43,7 +43,7 @@
 //           textScaler: TextScaler.linear(1),
 //
 //           style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w500),),
-//         backgroundColor: primarycolor,
+//         backgroundColor: AppColors.primary,
 //
 //       ),
 //       body: SingleChildScrollView(
@@ -138,7 +138,7 @@
 //
 //                     },
 //                     icons: Icons.list_alt,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Customer List',
 //                   ),
 //                   SizedBox(
@@ -167,7 +167,7 @@
 //
 //                     },
 //                     icons: Icons.view_week,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Coparision BY Week',
 //                   ),
 //                   SizedBox(
@@ -179,7 +179,7 @@
 //
 //                     },
 //                     icons: Icons.view_week,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Coparision BY Month',
 //                   ),
 //                 ],
@@ -195,7 +195,7 @@
 //
 //                     },
 //                     icons: Icons.view_week,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Coparision BY Year',
 //                   ),
 //                   SizedBox(
@@ -207,7 +207,7 @@
 //
 //                     },
 //                     icons: Icons.view_week,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Coparision BY Product',
 //                   ),
 //                 ],
@@ -225,7 +225,7 @@
 //
 //                     },
 //                     icons: Icons.backspace_outlined,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Refund Details',
 //                   ),
 //                   SizedBox(
@@ -237,7 +237,7 @@
 //
 //                     },
 //                     icons: Icons.list_alt,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Void Order Report',
 //                   ),
 //                 ],
@@ -265,7 +265,7 @@
 //
 //                     },
 //                     icons: Icons.list_alt,
-//                     color: primarycolor,
+//                     color: AppColors.primary,
 //                     title: 'Pos End Day',
 //                   ),
 //
@@ -322,7 +322,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingses
 import 'package:unipos/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Report/voidOrderReport.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
-
+import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/routes/routes_name.dart';
 import '../../../widget/componets/restaurant/componets/custom_menu.dart';
@@ -353,7 +353,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           style: GoogleFonts.poppins(
               fontSize: ResponsiveHelper.responsiveTextSize(context, 20),
               color: Colors.white,fontWeight: FontWeight.w500),),
-        backgroundColor: primarycolor,
+        backgroundColor: AppColors.primary,
 
       ),
       body: SingleChildScrollView(
@@ -448,7 +448,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                     },
                     icons: Icons.list_alt,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Customer List',
                   ),
 
@@ -469,7 +469,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByWeek);
                     },
                     icons: Icons.view_week,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Coparision BY Week',
                   ),
                   SizedBox(
@@ -481,7 +481,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                     },
                     icons: Icons.view_week,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Coparision BY Month',
                   ),
                 ],
@@ -497,7 +497,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                     },
                     icons: Icons.view_week,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Coparision BY Year',
                   ),
                   SizedBox(
@@ -509,7 +509,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                     },
                     icons: Icons.view_week,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Coparision BY Product',
                   ),
                 ],
@@ -529,7 +529,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                     },
                     icons: Icons.backspace_outlined,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Refund Details',
                   ),
                   SizedBox(
@@ -543,7 +543,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                     },
                     icons: Icons.list_alt,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Void Order Report',
                   ),
                 ],
@@ -571,7 +571,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                     },
                     icons: Icons.list_alt,
-                    color: primarycolor,
+                    color: AppColors.primary,
                     title: 'Pos End Day',
                   ),
 

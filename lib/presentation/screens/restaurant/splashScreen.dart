@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
 import '../../../util/restaurant/images.dart';
@@ -51,8 +53,8 @@ class _SplashscreenState extends State<Splashscreen> {
       child: Container(
         height: height * 0.5,
         width: width * 0.5,
-        color:screenBGColor,
-        child:Image.asset(logo,
+        color:AppColors.white,
+        child:Image.asset(AppImages.logo,
         ) ,
         // child:Image.asset('assets/images/BillBerry1_processed.jpg') ,
       ),

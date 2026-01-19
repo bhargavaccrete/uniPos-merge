@@ -4,17 +4,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/util/color.dart';
 
-import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/database/hive_Table.dart';
 import '../../../../data/models/restaurant/db/database/hive_order.dart';
 import '../../../../data/models/restaurant/db/table_Model_311.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
-import '../../../../util/restaurant/currency_helper.dart';
-import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../start order/cart/cart.dart';
 import '../start order/startorder.dart';
+import '../../../../util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 class TableScreen extends StatefulWidget {
   final bool? isfromcart;
@@ -25,7 +24,6 @@ class TableScreen extends StatefulWidget {
 }
 
 class _TableScreenState extends State<TableScreen> {
-  // Use a Future to handle the asynchronous loading of tables
   late Future<List<TableModel>> _tablesFuture;
 
   @override
@@ -34,393 +32,265 @@ class _TableScreenState extends State<TableScreen> {
     _loadTables();
   }
 
-  /// Loads or reloads the list of tables from the database.
   void _loadTables() {
     setState(() {
       _tablesFuture = HiveTables.getAllTables();
     });
   }
 
-  /// Shows a dialog to add a new table.
-  ///
   void _addTable() {
     final Tcontroller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add New Table'),
-
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Add New Table',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+        ),
         content: Container(
-          width: 200,
-          height: 200,
-          child: Column(
-            children: [
-              TextField(
-                controller: Tcontroller,
-                autofocus: true,
-                decoration: InputDecoration(hintText: 'Enter Table Name (e.g., T-4)'),
+          width: 300,
+          child: TextField(
+            controller: Tcontroller,
+            autofocus: true,
+            style: GoogleFonts.poppins(),
+            decoration: InputDecoration(
+              hintText: 'Enter Table Name (e.g., T-4)',
+              hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.divider),
               ),
-            ],
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
               if (Tcontroller.text.isNotEmpty) {
-                final newTable = TableModel(
-                  id: Tcontroller.text.trim(),
-
-                );
+                final newTable = TableModel(id: Tcontroller.text.trim());
                 await HiveTables.addTable(newTable);
                 Navigator.pop(context);
-                _loadTables(); // Refresh the list after adding
+                _loadTables();
               }
             },
-            child: Text('Add'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'Add',
+              style: GoogleFonts.poppins(color: AppColors.white, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
     );
   }
-
-  // // --- SUGGESTION 1: Refactored onTap logic for clarity and safety ---
-  // /// Handles the logic for when any table card is tapped.
-  // void _onTableTapped(TableModel table) async {
-  //   // --- SCENARIO A: The screen is being used to SELECT a table for a new order. ---
-  //   if (widget.isFromCart) {
-  //     if (table.status == 'Available') {
-  //       // If the table is free, pop the screen and return the selected table's ID.
-  //       Navigator.pop(context, table.id);
-  //     } else {
-  //       // If the table is occupied, show a message and do nothing.
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text('Table ${table.id} is already occupied.')),
-  //       );
-  //     }
-  //     return; // Stop here.
-  //   }
-  //
-  //   // --- SCENARIO B: The screen is being used as a general table overview. ---
-  //
-  //   // If the table is occupied...
-  //   if (table.status == 'Cooking' || table.status == 'Reserved') {
-  //     final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
-  //     if (!mounted) return;
-  //
-  //     if (existingOrder != null) {
-  //       // Navigate to the cart, passing the existing order data directly.
-  //       // SUGGESTION 2: Removed the unnecessary writes to the 'app_state' Hive box.
-  //       Navigator.push(
-  //         context,
-  //         MaterialPageRoute(
-  //           builder: (context) => CartScreen(
-  //             existingOrder: existingOrder,
-  //           ),
-  //         ),
-  //       );
-  //     } else {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text('Could not find an active order for Table ${table.id}.')),
-  //       );
-  //     }
-  //   }
-  //   // If the table is available...
-  //   else {
-  //     // Navigate to the MenuScreen to start a brand new order for this specific table.
-  //     Navigator.push(
-  //       context,
-  //       MaterialPageRoute(
-  //         builder: (context) => (tableIdForNewOrder: table.id),
-  //       ),
-  //     );
-  //   }
-  // }
-  //
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height;
-    final width = MediaQuery.of(context).size.width;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text("Table Layout"),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.sync),
-            onPressed: _loadTables,
-            tooltip: 'Sync Table',
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Add Table Button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      backgroundColor: AppColors.surfaceLight,
+      body: Column(
+        children: [
+          // Add Table Button and Legend
+          Container(
+            padding: EdgeInsets.all(isTablet ? 24 : 20),
+            color: AppColors.white,
+            child: Column(
               children: [
-                CommonButton(
-                  bordercircular: 6,
-                  width: width * 0.35,
-                  height: height * 0.05,
+                // Add Table Button
+                GestureDetector(
                   onTap: _addTable,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('Add Table', style: GoogleFonts.poppins(color: Colors.white)),
-                    ],
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.tablesTab,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.tablesTab.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add, color: AppColors.white, size: isTablet ? 22 : 20),
+                        SizedBox(width: isTablet ? 10 : 8),
+                        Text(
+                          'Add Table',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.white,
+                            fontSize: isTablet ? 17 : 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-
-
-                // CommonButton(
-                //   bordercircular: 5,
-                //     width: width * 0.40,
-                //     height: height * 0.05,
-                //     onTap: (){
-                //
-                //       final controllerone = TextEditingController();
-                //       final controllertwo = TextEditingController();
-                //     showDialog(context: context, builder: (context)=> AlertDialog(
-                //
-                //       title: Text('Merge Tables'),
-                //       content: Row(
-                //         mainAxisAlignment: MainAxisAlignment.center,
-                //
-                //         children: [
-                //          Container(
-                //              width: 30,
-                //              child: TextFormField(
-                //                controller: controllerone,
-                //              )),
-                //           Icon(Icons.add),
-                //           Container(
-                //              width: 30,
-                //              child: TextFormField(
-                //                controller: controllertwo,
-                //              )),
-                //
-                //         ],
-                //       ),
-                //       // content:
-                //       // Container(
-                //       //   width: 100,
-                //       //   height:  100,
-                //       //   child: Row(
-                //       //     children: [
-                //       //       CommonTextForm(
-                //       //         height: 50,
-                //       //           width: 50,
-                //       //           obsecureText: false),
-                //       //       CommonTextForm(
-                //       //           height: 50,
-                //       //
-                //       //           width: 50,
-                //       //           obsecureText: false),
-                //       //     ],
-                //       //   ),
-                //       // ),
-                //       actions: [
-                //         TextButton(
-                //           onPressed: () => Navigator.pop(context),
-                //           child: Text('Cancel'),
-                //         ),
-                //         ElevatedButton(
-                //           onPressed: () async {
-                //
-                //           },
-                //           child: Text('Confirm'),
-                //         ),
-                //       ],
-                //
-                //     ));
-                //     },
-                //     child:Text('merge Table Order',style: GoogleFonts.poppins(color: Colors.white,fontSize: 12),))
+                SizedBox(height: isTablet ? 20 : 16),
+                // Legend
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildLegendItem(AppColors.success, 'Available', isTablet),
+                    _buildLegendItem(AppColors.warning, 'Reserved', isTablet),
+                    _buildLegendItem(AppColors.danger, 'Occupied', isTablet),
+                  ],
+                ),
               ],
             ),
-            SizedBox(height: 20),
+          ),
 
-            // Legend for table statuses
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildLegendItem(Colors.green, 'Available'),
-                _buildLegendItem(Colors.orange, 'Reserved'),
-                _buildLegendItem(Colors.red, 'Cooking'),
-              ],
-            ),
-            SizedBox(height: 20),
-
-            // Grid of tables loaded from the database
-            Expanded(
-              child:ValueListenableBuilder(
-                valueListenable: Hive.box<TableModel>('tablesBox').listenable(),
-                builder: (context,table,_ ) {
-
-
-                  if(table.isEmpty){
-                    return Center(child: Text('No tables found. Add one to get started.'));
-                  }
-
-                  dynamic allTable = table.values.toList();
-
-
-                  return GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.1,
+          // Tables Grid
+          Expanded(
+            child: ValueListenableBuilder(
+              valueListenable: Hive.box<TableModel>('tablesBox').listenable(),
+              builder: (context, table, _) {
+                if (table.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.table_restaurant_outlined,
+                          size: 80,
+                          color: AppColors.divider,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No tables found.',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Add one to get started.',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    itemCount: allTable.length,
-                    itemBuilder: (context, index) {
-                      final table = allTable[index];
-                      return TableCard(
-                        table: table,
-                        onTap: () async {
-
-                          // SCENARIO 1: Table is OCCUPIED ('Cooking' or 'Served')
-                          if (table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running') {
-                            final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
-                            // if (!mounted) return;
-
-                            if (existingOrder != null) {
-                              final appStateBox = Hive.box('app_state');
-                              await appStateBox.put('is_existing_order', true);
-                              await appStateBox.put('table_id', existingOrder.tableNo);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CartScreen(
-                                    // tableid: table.id,
-                                    existingOrder: existingOrder,
-                                    // cartItems: existingOrder.items,
-                                    selectedTableNo: table.id,
-                                  ),
-                                ),
-                              );
-                            }
-                            else {
-                              // ScaffoldMessenger.of(context).showSnackBar(
-                              //   SnackBar(content: Text('Could not find an active order for Table ${table.id}.')),
-                              // );
-                              NotificationService.instance.showError(
-                                'Could not find an active order for Table ${table.id}.',
-                              );
-
-
-                            }
-                          }
-                          // SCENARIO 2: Table is AVAILABLE
-                          else {
-                            // Navigate to the main order screen to start a new order,
-                            // passing the selected table's ID.
-                            // Navigator.push(
-                            //   context,
-                            //   MaterialPageRoute(
-                            //     builder: (context) => Startorder(newOrderForTableId: table.id),
-                            //   ),
-                            // );
-
-                            if(widget.isfromcart==true){
-                              print(table.id);
-                              Navigator.pop(context ,table.id);
-
-                            }else{
-                              Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder(newOrderForTableId: table.id,)));
-                            }
-
-                          }
-                        },
-
-
-                        // onTap: () async { // Make the callback async
-                        //
-                        //   // If the table is OCCUPIED...
-                        //   if (table.status == 'Cooking' || table.status == 'Reserved') {
-                        //     // Find the active order associated with this table's ID.
-                        //     final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
-                        //
-                        //     if (!mounted) return;
-                        //
-                        //     // If an active order was found...
-                        //     if (existingOrder != null) {
-                        //       // Navigate to YOUR CartScreen, passing the existing order's details.
-                        //       Navigator.push(
-                        //         context,
-                        //         MaterialPageRoute(
-                        //           builder: (context) => CartScreen(
-                        //             existingOrder: existingOrder,
-                        //             cartItems: existingOrder.items, // Pass the items as well
-                        //             selectedTableNo: existingOrder.tableNo,
-                        //           ),
-                        //         ),
-                        //       );
-                        //     } else {
-                        //       ScaffoldMessenger.of(context).showSnackBar(
-                        //         SnackBar(content: Text('Could not find an active order for Table ${table.id}.')),
-                        //       );
-                        //     }
-                        //   }
-                        //   // You can add an `else` block here for what happens when an 'Available' table is tapped.
-                        // },
-                        //
-
-
-
-                        // onTap: () async {
-                        //   // Only allow selection of available tables
-                        //   if (table.status == 'Available') {
-                        //     Navigator.of(context).pop(table.id);
-                        //  // Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder(newOrderForTableId: table.id,)));
-                        //
-                        //   }
-                        //   // else {
-                        //   //   ScaffoldMessenger.of(context).showSnackBar(
-                        //   //     SnackBar(content: Text('Table ${table.id} is currently occupied.')),
-                        //   //   );
-                        //   // }
-                        //   else{
-                        //     final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
-                        //     if(!mounted) return;
-                        //     if(existingOrder != null){
-                        //       Navigator.push(context,
-                        //       MaterialPageRoute(builder: (context)=> Startorder(existingOrder: existingOrder,))
-                        //       );
-                        //
-                        //     }else{
-                        //         ScaffoldMessenger.of(context).showSnackBar(
-                        //           SnackBar(content: Text('Could not find an active order for Table ${table.id}.')),
-                        //         );
-                        //     }
-                        //   }
-                        // },
-                      );
-                    },
                   );
-                },
-              ),
+                }
+
+                dynamic allTable = table.values.toList();
+
+                // Responsive grid columns
+                final size = MediaQuery.of(context).size;
+                final isTablet = size.width > 600;
+                final crossAxisCount = isTablet ? 4 : 2;
+
+                return GridView.builder(
+                  padding: EdgeInsets.all(20),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 1.1,
+                  ),
+                  itemCount: allTable.length,
+                  itemBuilder: (context, index) {
+                    final table = allTable[index];
+                    return TableCard(
+                      table: table,
+                      onTap: () async {
+                        // SCENARIO 1: Table is OCCUPIED
+                        if (table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running') {
+                          final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
+
+                          if (existingOrder != null) {
+                            final appStateBox = Hive.box('app_state');
+                            await appStateBox.put('is_existing_order', true);
+                            await appStateBox.put('table_id', existingOrder.tableNo);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CartScreen(
+                                  existingOrder: existingOrder,
+                                  selectedTableNo: table.id,
+                                ),
+                              ),
+                            );
+                          } else {
+                            NotificationService.instance.showError(
+                              'Could not find an active order for Table ${table.id}.',
+                            );
+                          }
+                        }
+                        // SCENARIO 2: Table is AVAILABLE
+                        else {
+                          if (widget.isfromcart == true) {
+                            print(table.id);
+                            Navigator.pop(context, table.id);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => Startorder(newOrderForTableId: table.id),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildLegendItem(Color color, String text) {
+  Widget _buildLegendItem(Color color, String text, bool isTablet) {
     return Row(
       children: [
-        Icon(Icons.circle, color: color, size: 12),
-        SizedBox(width: 8),
-        Text(text, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w600)),
+        Container(
+          width: isTablet ? 14 : 12,
+          height: isTablet ? 14 : 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        SizedBox(width: isTablet ? 10 : 8),
+        Text(
+          text,
+          style: GoogleFonts.poppins(
+            color: color,
+            fontWeight: FontWeight.w600,
+            fontSize: isTablet ? 15 : 13,
+          ),
+        ),
       ],
     );
   }
@@ -441,16 +311,11 @@ class TableCard extends StatelessWidget {
       final now = DateTime.now();
       final difference = now.difference(dateTime);
 
-      // If less than 1 hour, show minutes
       if (difference.inMinutes < 60) {
         return '${difference.inMinutes}m ago';
-      }
-      // If less than 24 hours, show hours
-      else if (difference.inHours < 24) {
+      } else if (difference.inHours < 24) {
         return '${difference.inHours}h ago';
-      }
-      // Otherwise show the time
-      else {
+      } else {
         return DateFormat('hh:mm a').format(dateTime);
       }
     } catch (e) {
@@ -463,22 +328,30 @@ class TableCard extends StatelessWidget {
     final Color statusColor;
     switch (table.status) {
       case 'Cooking':
-        statusColor = Colors.red;
+      case 'Running':
+        statusColor = AppColors.danger;
         break;
       case 'Reserved':
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
         break;
       default: // Available
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
     }
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: statusColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: statusColor, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: statusColor.withOpacity(0.1),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
         child: Stack(
           clipBehavior: Clip.none,
@@ -488,48 +361,50 @@ class TableCard extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        table.id,
-                        style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
-                      ),
-
-                      // Text(
-                      //   '(${table.tableCapacity.toString()})',
-                      //   style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
-                      // ),
-
-                    ],
+                  Text(
+                    table.id,
+                    style: GoogleFonts.poppins(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   if (table.status != 'Available') ...[
-                    SizedBox(height: 8),
+                    SizedBox(height: 12),
                     Text(
                       '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(table.currentOrderTotal ?? 0.0)}',
-                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    SizedBox(height: 4),
+                    SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person, size: 14, color: Colors.grey.shade700),
+                        Icon(Icons.person, size: 14, color: AppColors.textSecondary),
                         SizedBox(width: 4),
-                        Text('#Admin', style: GoogleFonts.poppins(color: Colors.grey.shade700, fontSize: 12)),
+                        Text(
+                          '#Admin',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
-                    // Display order time
                     if (table.timeStamp != null && table.timeStamp!.isNotEmpty) ...[
-                      SizedBox(height: 4),
+                      SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.access_time, size: 14, color: Colors.grey.shade700),
+                          Icon(Icons.access_time, size: 14, color: AppColors.textSecondary),
                           SizedBox(width: 4),
                           Text(
                             _formatOrderTime(table.timeStamp),
                             style: GoogleFonts.poppins(
-                              color: Colors.grey.shade700,
+                              color: AppColors.textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
@@ -543,18 +418,28 @@ class TableCard extends StatelessWidget {
             ),
             // Status label positioned over the top border
             Positioned(
-              top: -10,
+              top: -12,
               left: 20,
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor, width: 1.5),
+                  color: statusColor,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: statusColor.withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Text(
                   table.status,
-                  style: GoogleFonts.poppins(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                  style: GoogleFonts.poppins(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),

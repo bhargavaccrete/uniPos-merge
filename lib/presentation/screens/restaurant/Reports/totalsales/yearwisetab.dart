@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import '../../../../../constants/restaurant/color.dart';
-
+import 'package:unipos/util/color.dart';
 class YearWiseTab extends StatefulWidget {
   const YearWiseTab({super.key});
 
@@ -47,7 +47,7 @@ class _YearWiseTabState extends State<YearWiseTab> {
                         height: height * 0.05,
                         padding: EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                            border: Border.all(color: primarycolor)
+                            border: Border.all(color: AppColors.primary)
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton(
@@ -72,7 +72,7 @@ class _YearWiseTabState extends State<YearWiseTab> {
                       Container(
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              color: primarycolor,
+                              color: AppColors.primary,
                               shape: BoxShape.circle
                           ),
                           // alignment: Alignment.bottomCenter,

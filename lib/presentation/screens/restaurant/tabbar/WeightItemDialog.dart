@@ -1,14 +1,12 @@
-// lib/screens/tabbar/weight_item_dialog.dart
 
 import 'package:flutter/material.dart';   // Make sure this path is correct
 import 'package:google_fonts/google_fonts.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
-import '../../../../util/restaurant/decimal_settings.dart';
-import '../../../../util/restaurant/currency_helper.dart';
-
+import '../../../../util/color.dart';
+import '../../../../util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 // Enum to manage which mode is currently active
 enum EditMode { amount, quantity, price }
@@ -20,7 +18,8 @@ Future<CartItem?> showWeightItemDialog(BuildContext context, Items item) async {
   return showModalBottomSheet<CartItem>(
     context: context,
     isScrollControlled: true,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    backgroundColor: Colors.transparent,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     builder: (_) => WeightItemDialog(item: item),
   );
 }
@@ -144,129 +143,332 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16, right: 16, top: 16,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildDisplaySection(),
-          SizedBox(height: 16),
-          _buildModeButtons(),
-          SizedBox(height: 16),
-          TextField(
-            controller: _inputController,
-            readOnly: true,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              hintText: _getHintText,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          SizedBox(height: 16),
-          _buildNumpad(),
-          SizedBox(height: 16),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              minimumSize: Size(double.infinity, 40),
-              backgroundColor: Color(0xFF1ABC9C),
-              foregroundColor: Colors.white,
-            ),
-            // --- KEY CHANGE IS HERE ---
-            onPressed: () {
-              if (_displayWeight > 0 && _displayAmount > 0) {
-                final cartItem = CartItem(
-                  productId: widget.item.id,
-                  id: widget.item.id, // Use item ID for proper stock deduction
-                  title: widget.item.name,
-                  imagePath: '', // CartItem uses path as identifier, not actual image data
-                  price: _displayAmount, // The price for the specified weight
 
-                  // Weight items are always 1 line item, actual weight is stored in weightDisplay
-                  quantity: 1,
-                  taxRate: widget.item.taxRate, // Add tax rate for weight-based items
-                  weightDisplay: _formatWeightDisplay(_displayWeight, widget.item.unit),
-                );
-                Navigator.pop(context, cartItem);
-              }
-            },
-            child: Text('Add Item', style: TextStyle(fontSize: 18)),
-          )
-        ],
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.name,
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Weight-based Item',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMedium,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 20),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  _buildDisplaySection(),
+                  SizedBox(height: 20),
+                  _buildModeButtons(),
+                  SizedBox(height: 20),
+                  TextField(
+                    controller: _inputController,
+                    readOnly: true,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: _getHintText,
+                      hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary),
+                      filled: true,
+                      fillColor: AppColors.surfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  _buildNumpad(),
+                ],
+              ),
+            ),
+
+            // Bottom Add Button
+            Container(
+              padding: EdgeInsets.all(20),
+              child: GestureDetector(
+                onTap: () {
+                  if (_displayWeight > 0 && _displayAmount > 0) {
+                    final cartItem = CartItem(
+                      productId: widget.item.id,
+                      id: widget.item.id,
+                      title: widget.item.name,
+                      imagePath: '',
+                      price: _displayAmount,
+                      quantity: 1,
+                      taxRate: widget.item.taxRate,
+                      weightDisplay: _formatWeightDisplay(_displayWeight, widget.item.unit),
+                    );
+                    Navigator.pop(context, cartItem);
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, AppColors.primary],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total Amount',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: AppColors.white.withOpacity(0.8),
+                            ),
+                          ),
+                          Text(
+                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_displayAmount)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            'Add to Cart',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.white,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward_rounded, color: AppColors.white, size: 20),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // --- Helper build methods for UI components (No changes needed here) ---
+  // --- Helper build methods for UI components ---
   Widget _buildDisplaySection() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildDisplayItem('Item', widget.item.name),
-          _buildDisplayItem('Weight', _formatWeightDisplay(_displayWeight, widget.item.unit)),
-          _buildDisplayItem('Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_displayAmount)}'),
+          _buildDisplayItem(Icons.restaurant_menu, 'Item', widget.item.name),
+          Container(width: 1, height: 40, color: AppColors.divider),
+          _buildDisplayItem(Icons.scale, 'Weight', _formatWeightDisplay(_displayWeight, widget.item.unit)),
+          Container(width: 1, height: 40, color: AppColors.divider),
+          _buildDisplayItem(Icons.payments, 'Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_displayAmount)}'),
         ],
       ),
     );
   }
 
-  Widget _buildDisplayItem(String label, String value) {
-    return Column(
-      children: [
-        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-        SizedBox(height: 4),
-        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
+  Widget _buildDisplayItem(IconData icon, String label, String value) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          SizedBox(height: 6),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildModeButtons() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        Expanded(child: _buildModeButton(EditMode.amount, 'Edit Amount')),
-        Expanded(child: _buildModeButton(EditMode.quantity, 'Edit Quantity')),
-        Expanded(child: _buildModeButton(EditMode.price, 'Edit Price')),
+        Expanded(child: _buildModeButton(EditMode.amount, Icons.attach_money, 'Amount')),
+        SizedBox(width: 8),
+        Expanded(child: _buildModeButton(EditMode.quantity, Icons.scale, 'Quantity')),
+        SizedBox(width: 8),
+        Expanded(child: _buildModeButton(EditMode.price, Icons.payments, 'Price')),
       ],
     );
   }
 
-  Widget _buildModeButton(EditMode mode, String text) {
+  Widget _buildModeButton(EditMode mode, IconData icon, String text) {
     bool isSelected = _currentMode == mode;
-    return ElevatedButton(
-      onPressed: () => _changeMode(mode),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isSelected ? Color(0xFF1ABC9C) : Colors.grey[200],
-        foregroundColor: isSelected ? Colors.white : Colors.black,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    return GestureDetector(
+      onTap: () => _changeMode(mode),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected ? AppColors.white : AppColors.textSecondary,
+            ),
+            SizedBox(height: 4),
+            Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? AppColors.white : AppColors.textSecondary,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
-      child: Text(text,style: GoogleFonts.poppins(fontSize: 10, ),overflow: TextOverflow.ellipsis,),
     );
   }
 
   Widget _buildNumpad() {
-    final keys = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['.', '0', '⌫']];
+    final keys = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['.', '0', '⌫']
+    ];
     return Column(
-      children: keys.map((row) => Row(
-        children: row.map((key) => Expanded(
-          child: InkWell(
-            onTap: () => _onNumpadTap(key),
-            child: Container(
-              alignment: Alignment.center,
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Text(key, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w500)),
+      children: keys.map((row) => Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Row(
+          children: row.map((key) => Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: InkWell(
+                onTap: () => _onNumpadTap(key),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  alignment: Alignment.center,
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    color: key == '⌫' ? AppColors.danger.withOpacity(0.1) : AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+                  ),
+                  child: key == '⌫'
+                      ? Icon(Icons.backspace_outlined, size: 24, color: AppColors.danger)
+                      : Text(
+                          key,
+                          style: GoogleFonts.poppins(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                ),
+              ),
             ),
-          ),
-        )).toList(),
+          )).toList(),
+        ),
       )).toList(),
     );
   }

@@ -3,6 +3,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:unipos/domain/store/retail/attribute_store.dart';
+import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 
@@ -203,7 +204,7 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                color: AppColors.primary.withOpacity(0.1),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               ),
               child: Row(
@@ -384,7 +385,7 @@ class _FilterChip extends StatelessWidget {
 
     return Material(
       color: isSelected
-          ? Theme.of(context).primaryColor
+          ? AppColors.primary
           : (chipColor?.withOpacity(0.2) ?? Colors.grey[200]),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
