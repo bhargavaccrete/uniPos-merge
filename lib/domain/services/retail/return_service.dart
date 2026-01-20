@@ -84,7 +84,7 @@ class ReturnService {
     // 6. Update customer points (deduct points if customer exists)
     if (originalSale.customerId != null) {
       final pointsToDeduct = (originalSale.totalAmount / 10).floor();
-      await customerStore.updateAfterPurchase(
+      await customerStoreRestail.updateAfterPurchase(
         originalSale.customerId!,
         -originalSale.totalAmount, // Negative amount
         -pointsToDeduct, // Negative points
@@ -235,7 +235,7 @@ class ReturnService {
     // 8. Update customer points (deduct proportional points)
     if (originalSale.customerId != null) {
       final pointsToDeduct = (returnTotal / 10).floor();
-      await customerStore.updateAfterPurchase(
+      await customerStoreRestail.updateAfterPurchase(
         originalSale.customerId!,
         -returnTotal, // Negative amount
         -pointsToDeduct, // Negative points

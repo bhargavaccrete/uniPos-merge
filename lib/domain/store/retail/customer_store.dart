@@ -5,7 +5,7 @@ import '../../../data/repositories/retail/customer_repository.dart';
 
 part 'customer_store.g.dart';
 
-class CustomerStore = _CustomerStore with _$CustomerStore;
+class CustomerStoreRetail = _CustomerStore with _$CustomerStore;
 
 abstract class _CustomerStore with Store {
   late final CustomerRepository _customerRepository;

@@ -310,7 +310,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Observer(
-                  builder: (context) => _buildStatItem(Icons.people, 'Customers', '${customerStore.customers.length}', Colors.white),
+                  builder: (context) => _buildStatItem(Icons.people, 'Customers', '${customerStoreRestail.customers.length}', Colors.white),
                 ),
               ],
             ),

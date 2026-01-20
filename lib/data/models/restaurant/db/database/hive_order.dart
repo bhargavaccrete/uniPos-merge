@@ -136,7 +136,12 @@ static Future<void> deleteOrder (String id )async{
       final Order = allOrder.firstWhere(
           (order)=>
               order.tableNo == tableId &&
-                  (order.status == 'Processing'|| order.status == 'Cooking'),
+                  (order.status == 'Processing' ||
+                   order.status == 'Cooking' ||
+                   order.status == 'Ready' ||
+                   order.status == 'Running' ||
+                   order.status == 'Reserved' ||
+                   order.status == 'Served'),
       );
       return Order;
     }catch(e){

@@ -87,7 +87,7 @@ class EODReportService {
     totalProfit = totalSales - totalCost;
 
     // Customer Outstanding Summary
-    final customersWithCredit = await customerStore.getCustomersWithCredit();
+    final customersWithCredit = await customerStoreRestail.getCustomersWithCredit();
     final totalOutstanding = await saleStore.getTotalDueAmount();
 
     // Cash Drawer Summary

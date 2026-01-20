@@ -21,7 +21,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   void initState() {
     super.initState();
     // Clear any previous selection and search
-    customerStore.clearSelection();
+    customerStoreRestail.clearSelection();
   }
 
   @override
@@ -32,11 +32,11 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   }
 
   void _onSearchChanged(String query) {
-    customerStore.searchCustomers(query);
+    customerStoreRestail.searchCustomers(query);
   }
 
   void _selectCustomer(CustomerModel customer) {
-    customerStore.selectCustomer(customer);
+    customerStoreRestail.selectCustomer(customer);
     Navigator.pop(context, customer);
   }
 
@@ -119,7 +119,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                 address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
               );
 
-              await customerStore.addCustomer(newCustomer);
+              await customerStoreRestail.addCustomer(newCustomer);
 
               if (mounted) {
                 Navigator.pop(context);
@@ -169,7 +169,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                   return _buildEmptyState();
                 }
 
-                if (customerStore.searchResults.isEmpty) {
+                if (customerStoreRestail.searchResults.isEmpty) {
                   return _buildNoResultsState();
                 }
 
@@ -323,13 +323,13 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
       builder: (context) {
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: customerStore.searchResults.length + 1,
+          itemCount: customerStoreRestail.searchResults.length + 1,
           itemBuilder: (context, index) {
             if (index == 0) {
               return _buildAddNewCustomerTile();
             }
 
-            final customer = customerStore.searchResults[index - 1];
+            final customer = customerStoreRestail.searchResults[index - 1];
             return _buildCustomerTile(customer);
           },
         );

@@ -608,7 +608,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final customers = await customerStore.getCustomersWithCredit();
+      final customers = await customerStoreRestail.getCustomersWithCredit();
       final total = customers.fold<double>(0, (sum, c) => sum + c.creditBalance);
 
       // Sort by credit balance descending

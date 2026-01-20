@@ -35,22 +35,44 @@ import 'package:unipos/domain/store/retail/stock_alert_store.dart';
 import 'package:unipos/domain/store/retail/supplier_store.dart';
 
 // ==================== RESTAURANT IMPORTS ====================
-// All restaurant repositories and stores have been removed
-// Restaurant functionality now uses direct Hive database access via:
-// - HiveBoxes (for categories and items)
-// - itemsBoxes (for items)
-// - HiveChoice (for choices)
-// - HiveExtra (for extras)
-// - HiveVariante (for variants)
-// - HiveCart (for cart operations)
-// - HiveTable (for table management)
-// - HiveOrder (for order management)
-// - HivePastOrder (for past orders)
-// - HiveStaff (for staff management)
-// - HiveEOD (for end of day operations)
-// - HiveExpenseCategory (for expense categories)
-// - HiveTax (for tax management)
-// - HiveTestBill (for test bills)
+import 'package:unipos/data/repositories/restaurant/category_repository.dart';
+import 'package:unipos/data/repositories/restaurant/item_repository.dart';
+import 'package:unipos/data/repositories/restaurant/variant_repository.dart' as restaurant;
+import 'package:unipos/data/repositories/restaurant/choice_repository.dart';
+import 'package:unipos/data/repositories/restaurant/extra_repository.dart';
+import 'package:unipos/data/repositories/restaurant/order_repository.dart';
+import 'package:unipos/data/repositories/restaurant/past_order_repository.dart';
+import 'package:unipos/data/repositories/restaurant/cart_repository.dart';
+import 'package:unipos/data/repositories/restaurant/table_repository.dart';
+import 'package:unipos/data/repositories/restaurant/customer_repository.dart' as restaurant;
+import 'package:unipos/data/repositories/restaurant/staff_repository.dart';
+import 'package:unipos/data/repositories/restaurant/expense_repository.dart';
+import 'package:unipos/data/repositories/restaurant/expense_category_repository.dart';
+import 'package:unipos/data/repositories/restaurant/tax_repository.dart';
+import 'package:unipos/data/repositories/restaurant/company_repository.dart';
+import 'package:unipos/data/repositories/restaurant/eod_repository.dart';
+
+import 'package:unipos/domain/store/restaurant/category_store.dart';
+import 'package:unipos/domain/store/restaurant/item_store.dart';
+import 'package:unipos/domain/store/restaurant/variant_store.dart';
+import 'package:unipos/domain/store/restaurant/choice_store.dart';
+import 'package:unipos/domain/store/restaurant/extra_store.dart';
+import 'package:unipos/domain/store/restaurant/order_store.dart';
+import 'package:unipos/domain/store/restaurant/past_order_store.dart';
+import 'package:unipos/domain/store/restaurant/cart_store.dart' as restaurant;
+import 'package:unipos/domain/store/restaurant/table_store.dart';
+import 'package:unipos/domain/store/restaurant/customer_store.dart' as restaurant;
+import 'package:unipos/domain/store/restaurant/staff_store.dart';
+import 'package:unipos/domain/store/restaurant/expense_store.dart';
+import 'package:unipos/domain/store/restaurant/expense_category_store.dart';
+import 'package:unipos/domain/store/restaurant/tax_store.dart';
+import 'package:unipos/domain/store/restaurant/company_store.dart';
+import 'package:unipos/domain/store/restaurant/eod_store.dart';
+import 'package:unipos/domain/store/restaurant/appStore.dart';
+
+import '../../data/repositories/restaurant/customer_repository.dart';
+import '../../data/repositories/restaurant/variant_repository.dart';
+import '../../domain/store/restaurant/customer_store.dart';
 
 final locator = GetIt.instance;
 
@@ -135,7 +157,7 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<retail.CartStore>(() => retail.CartStore());
   locator.registerLazySingleton<ProductStore>(() => ProductStore());
   locator.registerLazySingleton<SaleStore>(() => SaleStore());
-  locator.registerLazySingleton<CustomerStore>(() => CustomerStore());
+  locator.registerLazySingleton<CustomerStoreRetail>(() => CustomerStoreRetail());
   locator.registerLazySingleton<SupplierStore>(() => SupplierStore());
   locator.registerLazySingleton<PurchaseStore>(() => PurchaseStore());
   locator.registerLazySingleton<PurchaseOrderStore>(() => PurchaseOrderStore());
@@ -163,13 +185,81 @@ Future<void> _registerRetailDependencies() async {
 /// Register restaurant-specific dependencies
 /// Called when business mode is set to restaurant
 Future<void> _registerRestaurantDependencies() async {
-  // ignore: avoid_print
-  print('_registerRestaurantDependencies: checking if already registered');
-  // All restaurant repositories and stores have been removed
-  // Restaurant functionality now uses direct Hive database access
-  // No dependencies to register
-  // ignore: avoid_print
-  print('_registerRestaurantDependencies: using direct Hive access, no dependencies to register');
+  // Skip if already registered
+  if (locator.isRegistered<CategoryStore>()) return;
+
+  print('🍽️ Registering restaurant dependencies...');
+
+  // ==================== RESTAURANT REPOSITORIES ====================
+  locator.registerLazySingleton<CategoryRepository>(() => CategoryRepository());
+  locator.registerLazySingleton<ItemRepository>(() => ItemRepository());
+  locator.registerLazySingleton<VariantRepositoryRes>(() => restaurant.VariantRepositoryRes());
+  locator.registerLazySingleton<ChoiceRepository>(() => ChoiceRepository());
+  locator.registerLazySingleton<ExtraRepository>(() => ExtraRepository());
+  locator.registerLazySingleton<OrderRepository>(() => OrderRepository());
+  locator.registerLazySingleton<PastOrderRepository>(() => PastOrderRepository());
+  locator.registerLazySingleton<CartRepository>(() => CartRepository());
+  locator.registerLazySingleton<TableRepository>(() => TableRepository());
+  locator.registerLazySingleton<CustomerRepositoryRes>(() => CustomerRepositoryRes());
+  locator.registerLazySingleton<StaffRepository>(() => StaffRepository());
+  locator.registerLazySingleton<ExpenseRepository>(() => ExpenseRepository());
+  locator.registerLazySingleton<ExpenseCategoryRepository>(() => ExpenseCategoryRepository());
+  locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
+  locator.registerLazySingleton<CompanyRepository>(() => CompanyRepository());
+  locator.registerLazySingleton<EodRepository>(() => EodRepository());
+
+  // ==================== RESTAURANT STORES ====================
+  locator.registerLazySingleton<CategoryStore>(
+    () => CategoryStore(locator<CategoryRepository>()),
+  );
+  locator.registerLazySingleton<ItemStore>(
+    () => ItemStore(locator<ItemRepository>()),
+  );
+  locator.registerLazySingleton<VariantStore>(
+    () => VariantStore(locator<restaurant.VariantRepositoryRes>()),
+  );
+  locator.registerLazySingleton<ChoiceStore>(
+    () => ChoiceStore(locator<ChoiceRepository>()),
+  );
+  locator.registerLazySingleton<ExtraStore>(
+    () => ExtraStore(locator<ExtraRepository>()),
+  );
+  locator.registerLazySingleton<OrderStore>(
+    () => OrderStore(locator<OrderRepository>()),
+  );
+  locator.registerLazySingleton<PastOrderStore>(
+    () => PastOrderStore(locator<PastOrderRepository>()),
+  );
+  locator.registerLazySingleton<restaurant.CartStore>(
+    () => restaurant.CartStore(locator<CartRepository>()),
+  );
+  locator.registerLazySingleton<TableStore>(
+    () => TableStore(locator<TableRepository>()),
+  );
+  locator.registerLazySingleton<restaurant.CustomerStoreRes>(
+    () => restaurant.CustomerStoreRes(locator<restaurant.CustomerRepositoryRes>()),
+  );
+  locator.registerLazySingleton<StaffStore>(
+    () => StaffStore(locator<StaffRepository>()),
+  );
+  locator.registerLazySingleton<ExpenseStore>(
+    () => ExpenseStore(locator<ExpenseRepository>()),
+  );
+  locator.registerLazySingleton<ExpenseCategoryStore>(
+    () => ExpenseCategoryStore(locator<ExpenseCategoryRepository>()),
+  );
+  locator.registerLazySingleton<TaxStore>(
+    () => TaxStore(locator<TaxRepository>()),
+  );
+  locator.registerLazySingleton<CompanyStore>(
+    () => CompanyStore(locator<CompanyRepository>()),
+  );
+  locator.registerLazySingleton<EodStore>(
+    () => EodStore(locator<EodRepository>()),
+  );
+  locator.registerLazySingleton<AppStore>(() => AppStore());
+
+  print('✅ Restaurant dependencies registered successfully');
 }
 
 /// Register business dependencies dynamically (called during setup wizard)
@@ -211,7 +301,7 @@ Future<void> resetLocator() async {
 retail.CartStore get cartStore => locator<retail.CartStore>();
 ProductStore get productStore => locator<ProductStore>();
 SaleStore get saleStore => locator<SaleStore>();
-CustomerStore get customerStore => locator<CustomerStore>();
+CustomerStoreRetail get customerStoreRestail => locator<CustomerStoreRetail>();
 SupplierStore get supplierStore => locator<SupplierStore>();
 PurchaseStore get purchaseStore => locator<PurchaseStore>();
 PurchaseOrderStore get purchaseOrderStore => locator<PurchaseOrderStore>();
@@ -241,19 +331,39 @@ AttributeRepository get attributeRepository => locator<AttributeRepository>();
 
 // ==================== RESTAURANT CONVENIENCE GETTERS ====================
 
-// All restaurant stores and repositories have been removed
-// Restaurant functionality now uses direct Hive database access via:
-// - HiveBoxes.getAllCategories(), HiveBoxes.addCategory(), etc.
-// - itemsBoxes.getAllItems(), itemsBoxes.addItem(), itemsBoxes.updateItem(), etc.
-// - HiveChoice.getAllChoice(), HiveChoice.addChoice(), etc.
-// - HiveExtra.getAllExtra(), HiveExtra.addExtra(), etc.
-// - HiveVariante.getAllVariante(), HiveVariante.addVariante(), etc.
-// - HiveCart for cart operations
-// - HiveTable for table management
-// - HiveOrder for order management
-// - HivePastOrder for past orders
-// - HiveStaff for staff management
-// - HiveEOD for end of day operations
-// - HiveExpenseCategory for expense categories
-// - HiveTax for tax management
-// - HiveTestBill for test bills
+/// Restaurant Stores
+CategoryStore get categoryStore => locator<CategoryStore>();
+ItemStore get itemStore => locator<ItemStore>();
+VariantStore get variantStore => locator<VariantStore>();
+ChoiceStore get choiceStore => locator<ChoiceStore>();
+ExtraStore get extraStore => locator<ExtraStore>();
+OrderStore get orderStore => locator<OrderStore>();
+PastOrderStore get pastOrderStore => locator<PastOrderStore>();
+restaurant.CartStore get restaurantCartStore => locator<restaurant.CartStore>();
+TableStore get tableStore => locator<TableStore>();
+CustomerStoreRes get restaurantCustomerStore => locator<restaurant.CustomerStoreRes>();
+StaffStore get staffStore => locator<StaffStore>();
+ExpenseStore get expenseStore => locator<ExpenseStore>();
+ExpenseCategoryStore get expenseCategoryStore => locator<ExpenseCategoryStore>();
+TaxStore get taxStore => locator<TaxStore>();
+CompanyStore get companyStore => locator<CompanyStore>();
+EodStore get eodStore => locator<EodStore>();
+AppStore get appStore => locator<AppStore>();
+
+/// Restaurant Repositories
+CategoryRepository get categoryRepository => locator<CategoryRepository>();
+ItemRepository get itemRepository => locator<ItemRepository>();
+restaurant.VariantRepositoryRes get restaurantVariantRepository => locator<restaurant.VariantRepositoryRes>();
+ChoiceRepository get choiceRepository => locator<ChoiceRepository>();
+ExtraRepository get extraRepository => locator<ExtraRepository>();
+OrderRepository get orderRepository => locator<OrderRepository>();
+PastOrderRepository get pastOrderRepository => locator<PastOrderRepository>();
+CartRepository get cartRepository => locator<CartRepository>();
+TableRepository get tableRepository => locator<TableRepository>();
+CustomerRepositoryRes get restaurantCustomerRepository => locator<CustomerRepositoryRes>();
+StaffRepository get staffRepository => locator<StaffRepository>();
+ExpenseRepository get expenseRepository => locator<ExpenseRepository>();
+ExpenseCategoryRepository get expenseCategoryRepository => locator<ExpenseCategoryRepository>();
+TaxRepository get taxRepository => locator<TaxRepository>();
+CompanyRepository get companyRepository => locator<CompanyRepository>();
+EodRepository get eodRepository => locator<EodRepository>();

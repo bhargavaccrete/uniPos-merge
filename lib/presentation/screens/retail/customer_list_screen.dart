@@ -23,7 +23,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   void _onSearchChanged(String query) {
-    customerStore.searchCustomers(query);
+    customerStoreRestail.searchCustomers(query);
   }
 
   void _showAddCustomerDialog() {
@@ -240,7 +240,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 openingBalance: openingBalance,
               );
 
-              await customerStore.addCustomer(newCustomer);
+              await customerStoreRestail.addCustomer(newCustomer);
 
               if (mounted) {
                 Navigator.pop(context);
@@ -275,7 +275,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       ),
     ).then((_) {
       // Refresh customer list when returning from detail screen
-      customerStore.loadCustomers();
+      customerStoreRestail.loadCustomers();
     });
   }
 
@@ -297,14 +297,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               builder: (context) {
                 // Show all customers when search is empty
                 if (_searchController.text.isEmpty) {
-                  if (customerStore.customerCount == 0) {
+                  if (customerStoreRestail.customerCount == 0) {
                     return _buildEmptyState();
                   }
                   return _buildAllCustomersList();
                 }
 
                 // Show no results when searching but no matches
-                if (customerStore.searchResults.isEmpty) {
+                if (customerStoreRestail.searchResults.isEmpty) {
                   return _buildNoResultsState();
                 }
 
@@ -432,7 +432,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Widget _buildAllCustomersList() {
     return Observer(
       builder: (context) {
-        final customers = customerStore.customers;
+        final customers = customerStoreRestail.customers;
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
@@ -451,9 +451,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       builder: (context) {
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: customerStore.searchResults.length,
+          itemCount: customerStoreRestail.searchResults.length,
           itemBuilder: (context, index) {
-            final customer = customerStore.searchResults[index];
+            final customer = customerStoreRestail.searchResults[index];
             return _buildCustomerCard(customer);
           },
         );

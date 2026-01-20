@@ -45,7 +45,7 @@ class _TableScreenState extends State<TableScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'Add New Table',
+          'Add New Tablee',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
         ),
         content: Container(
@@ -222,8 +222,8 @@ class _TableScreenState extends State<TableScreen> {
                     return TableCard(
                       table: table,
                       onTap: () async {
-                        // SCENARIO 1: Table is OCCUPIED
-                        if (table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running') {
+                        // SCENARIO 1: Table is OCCUPIED (includes Cooking, Reserved, Running, Served)
+                        if (table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running'|| table.status == 'Ready'  || table.status == 'Served') {
                           final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
 
                           if (existingOrder != null) {

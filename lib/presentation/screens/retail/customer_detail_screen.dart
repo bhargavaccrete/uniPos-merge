@@ -51,7 +51,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
   }
 
   Future<void> _refreshCustomer() async {
-    final updated = await customerStore.getCustomerById(_customer.customerId);
+    final updated = await customerStoreRestail.getCustomerById(_customer.customerId);
     if (updated != null) {
       setState(() => _customer = updated);
     }
@@ -200,7 +200,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 updatedAt: DateTime.now().toIso8601String(),
               );
 
-              await customerStore.updateCustomer(updatedCustomer);
+              await customerStoreRestail.updateCustomer(updatedCustomer);
               setState(() => _customer = updatedCustomer);
 
               if (mounted) {
@@ -281,7 +281,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 return;
               }
 
-              await customerStore.redeemCustomerPoints(
+              await customerStoreRestail.redeemCustomerPoints(
                   _customer.customerId, points);
               await _refreshCustomer();
 

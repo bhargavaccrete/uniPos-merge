@@ -1,39 +1,36 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/util/color.dart';
-
-import '../../../../core/di/service_locator.dart';
-import '../../../../data/models/restaurant/db/ordermodel_309.dart';
-import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/ordermodel_309.dart';
+import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/OrderCard.dart';
 import '../start order/cart/cart.dart';
 import '../../../../services/websocket_client_service.dart';
 import '../../../../server/websocket.dart' as ws;
 
-
-class Activeorder extends StatefulWidget {
-  const Activeorder({super.key});
+/// ✅ REFACTORED: Now uses OrderStore instead of direct Hive access
+class ActiveOrderRefactored extends StatefulWidget {
+  const ActiveOrderRefactored({super.key});
 
   @override
-  State<Activeorder> createState() => _ActiveorderState();
+  State<ActiveOrderRefactored> createState() => _ActiveOrderRefactoredState();
 }
 
-class _ActiveorderState extends State<Activeorder> {
+class _ActiveOrderRefactoredState extends State<ActiveOrderRefactored> {
   String dropDownValue = 'All';
   StreamSubscription? _wsSubscription;
   final _wsService = WebSocketClientService();
 
   List<String> dropdownItems = [
     'All',
-    'Take Away', // Note: Make sure this matches the string in your OrderModel exactly
+    'Take Away',
     'Delivery',
     'Dine In',
   ];
@@ -41,6 +38,8 @@ class _ActiveorderState extends State<Activeorder> {
   @override
   void initState() {
     super.initState();
+    // ✅ Load orders from store
+    orderStore.loadOrders();
     _initializeWebSocket();
   }
 
@@ -59,6 +58,9 @@ class _ActiveorderState extends State<Activeorder> {
         final kotNumber = message['kotNumber'];
 
         print('🔔 UniPOS: Order status updated - KOT #$kotNumber (Table $tableNo) → $status');
+
+        // ✅ Refresh orders from store
+        orderStore.refresh();
 
         // Show notification to user
         if (mounted && status != null) {
@@ -82,15 +84,15 @@ class _ActiveorderState extends State<Activeorder> {
             ),
           );
         }
-
-        // UI will automatically refresh via ValueListenableBuilder
-        // because server already updated Hive database
       } else if (type == 'ORDER_UPDATED' || type == 'NEW_ITEMS_ADDED') {
         final kotNumber = message['kotNumber'];
         final newItemCount = message['newItemCount'];
         final tableNo = message['tableNo'];
 
         print('🔔 UniPOS: Order updated - KOT #$kotNumber with $newItemCount new items');
+
+        // ✅ Refresh orders from store
+        orderStore.refresh();
 
         // Show notification
         if (mounted) {
@@ -119,6 +121,9 @@ class _ActiveorderState extends State<Activeorder> {
         final tableNo = message['tableNo'];
 
         print('🔔 UniPOS: New order received - KOT #$kotNumber (Table $tableNo)');
+
+        // ✅ Refresh orders from store
+        orderStore.refresh();
 
         // Show notification
         if (mounted) {
@@ -150,58 +155,54 @@ class _ActiveorderState extends State<Activeorder> {
     super.dispose();
   }
 
+  // ✅ REFACTORED: Delete order using OrderStore
   Future<void> _deleteOrder(String orderId) async {
-    // Show a confirmation dialog
     final bool? shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Order'),
-        content: Text('Are you sure you want to delete this order?'),
+        title: const Text('Delete Order'),
+        content: const Text('Are you sure you want to delete this order?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
 
-    // Only delete if the user confirmed
     if (shouldDelete == true) {
-      await HiveOrders.deleteOrder(orderId);
-      // setState(() {
-      //   // Refresh the FutureBuilder by getting the updated list of orders
-      //   // _ordersFuture = HiveOrders.getAllOrder();
-      // });
+      final success = await orderStore.deleteOrder(orderId);
+      if (success) {
+        NotificationService.instance.showSuccess('Order deleted successfully');
+      } else {
+        NotificationService.instance.showError(
+          orderStore.errorMessage ?? 'Failed to delete order',
+        );
+      }
     }
   }
 
-
-
-  // In _ActiveorderState class
   Color _getColorForStatus(String? status) {
     switch (status) {
       case 'Processing':
-        return Colors.red.shade500; // Red for Processing (new orders)
+        return Colors.red.shade500;
       case 'Cooking':
-        return Colors.red.shade500; // Red for Cooking
+        return Colors.red.shade500;
       case 'Ready':
-        return Colors.orange.shade300; // Orange for Ready
+        return Colors.orange.shade300;
       case 'Served':
-        return Colors.green.shade300; // Green for Served (awaiting payment)
+        return Colors.green.shade300;
       default:
-        return Colors.grey.shade400; // Default color for unknown status
+        return Colors.grey.shade400;
     }
   }
 
-  // In _ActiveorderState class
-
-// This function shows the main dialog with KOT-level status updates
-  void _showStatusUpdateDialog(OrderModel order, bool istakeaway,) {
+  void _showStatusUpdateDialog(OrderModel order, bool isTakeaway) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -229,12 +230,12 @@ class _ActiveorderState extends State<Activeorder> {
                   ),
                   InkWell(
                     onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.cancel, color: Colors.grey),
+                    child: const Icon(Icons.cancel, color: Colors.grey),
                   )
                 ],
               ),
               content: SingleChildScrollView(
-                child: Container(
+                child: SizedBox(
                   width: 400,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -242,7 +243,7 @@ class _ActiveorderState extends State<Activeorder> {
                     children: [
                       // Order Info
                       Container(
-                        padding: EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(8),
@@ -256,7 +257,7 @@ class _ActiveorderState extends State<Activeorder> {
                                   : order.orderType,
                               style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               'Overall Status: ${order.status}',
                               style: GoogleFonts.poppins(color: Colors.grey.shade700),
@@ -264,14 +265,14 @@ class _ActiveorderState extends State<Activeorder> {
                           ],
                         ),
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // KOT Status Updates
                       Text(
                         'Update KOT Status:',
                         style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
                       // List all KOTs with status buttons
                       ...order.kotNumbers.map((kotNum) {
@@ -282,8 +283,8 @@ class _ActiveorderState extends State<Activeorder> {
                         final itemCount = endIndex - startIndex;
 
                         return Container(
-                          margin: EdgeInsets.only(bottom: 12),
-                          padding: EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             border: Border.all(color: _getColorForStatus(currentStatus)),
                             borderRadius: BorderRadius.circular(8),
@@ -304,7 +305,7 @@ class _ActiveorderState extends State<Activeorder> {
                                   ),
                                 ],
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
                                 'Status: $currentStatus',
                                 style: GoogleFonts.poppins(
@@ -312,7 +313,7 @@ class _ActiveorderState extends State<Activeorder> {
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,
                                 children: [
@@ -329,10 +330,8 @@ class _ActiveorderState extends State<Activeorder> {
                                   if (currentStatus != 'Served')
                                     _buildStatusButton('Served', Colors.green, () {
                                       if (order.paymentStatus == 'Paid') {
-                                        // Check if all KOTs are served
                                         final allServed = order.kotNumbers.every((k) =>
-                                          (k == kotNum) || (kotStatuses[k] == 'Served')
-                                        );
+                                            (k == kotNum) || (kotStatuses[k] == 'Served'));
                                         if (allServed) {
                                           _moveOrderToPast(order);
                                         } else {
@@ -360,13 +359,12 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 
-  // Helper to build status button
   Widget _buildStatusButton(String status, Color color, VoidCallback onTap) {
     return ElevatedButton(
       onPressed: onTap,
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       ),
       child: Text(
@@ -376,7 +374,7 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 
-// ACTION 1: Updates KOT status and syncs with KDS
+  // ✅ REFACTORED: Update KOT status using OrderStore
   Future<void> _updateKotStatus(OrderModel order, int kotNumber, String newStatus) async {
     try {
       print('🔄 Updating KOT #$kotNumber to $newStatus');
@@ -388,134 +386,92 @@ class _ActiveorderState extends State<Activeorder> {
       // Calculate overall order status
       String overallStatus = _calculateOverallStatus(updatedKotStatuses, order.kotNumbers);
 
-      // Update the order in database
-      final updatedOrder = order.copyWith(
-        kotStatuses: updatedKotStatuses,
-        status: overallStatus,
-      );
-      await HiveOrders.updateOrder(updatedOrder);
+      // ✅ Update using OrderStore
+      final success = await orderStore.updateKotStatus(order.id, kotNumber, newStatus);
 
-      // Update table status to match order status
-      if (order.tableNo != null && order.tableNo!.isNotEmpty) {
-        await HiveTables.updateTableStatus(
-          order.tableNo!,
-          overallStatus,
-          total: order.totalPrice,
-          orderId: order.id,
-          orderTime: order.timeStamp,
-        );
-        print('📍 Table ${order.tableNo} status updated to $overallStatus');
-      }
+      if (success) {
+        print('✅ KOT #$kotNumber updated to $newStatus (Overall: $overallStatus)');
 
-      print('✅ KOT #$kotNumber updated to $newStatus (Overall: $overallStatus)');
+        // Broadcast to KDS via WebSocket
+        try {
+          final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
 
-      // Broadcast to KDS via WebSocket
-      try {
-        // Convert integer keys to strings for JSON encoding
-        final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
+          ws.broadcastEvent({
+            'type': 'KOT_STATUS_UPDATE',
+            'orderId': order.id,
+            'kotNumber': kotNumber,
+            'kotStatus': newStatus,
+            'overallStatus': overallStatus,
+            'tableNo': order.tableNo,
+            'allKotNumbers': order.kotNumbers,
+            'kotStatuses': kotStatusesJson,
+          });
+          print('📡 Status update broadcast to KDS');
+        } catch (e) {
+          print('⚠️ Failed to broadcast to KDS: $e');
+        }
 
-        ws.broadcastEvent({
-          'type': 'KOT_STATUS_UPDATE',
-          'orderId': order.id,
-          'kotNumber': kotNumber,
-          'kotStatus': newStatus,
-          'overallStatus': overallStatus,
-          'tableNo': order.tableNo,
-          'allKotNumbers': order.kotNumbers,
-          'kotStatuses': kotStatusesJson,
-        });
-        print('📡 Status update broadcast to KDS');
-      } catch (e) {
-        print('⚠️ Failed to broadcast to KDS: $e');
-      }
-
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('KOT #$kotNumber updated to $newStatus'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        // Show success message
+        if (mounted) {
+          NotificationService.instance.showSuccess('KOT #$kotNumber updated to $newStatus');
+        }
+      } else {
+        throw Exception(orderStore.errorMessage ?? 'Failed to update KOT status');
       }
     } catch (e) {
       print('❌ Error updating KOT status: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update status: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to update status: $e');
       }
     }
   }
 
-  // Helper function to calculate overall order status from KOT statuses
   String _calculateOverallStatus(Map<int, String> kotStatuses, List<int> kotNumbers) {
     if (kotStatuses.isEmpty) return 'Processing';
 
-    // Get all statuses
     final statuses = kotNumbers.map((kot) => kotStatuses[kot] ?? 'Processing').toList();
 
-    // If all KOTs are Served, order is Served
     if (statuses.every((s) => s == 'Served')) return 'Served';
-
-    // If all KOTs are Ready or Served, order is Ready
     if (statuses.every((s) => s == 'Ready' || s == 'Served')) return 'Ready';
-
-    // If any KOT is Cooking, order is Cooking
     if (statuses.any((s) => s == 'Cooking')) return 'Cooking';
 
-    // Otherwise, order is Processing
     return 'Processing';
   }
 
-  // Legacy: Updates the overall order status (kept for backward compatibility)
-  Future<void> _updateOrderStatus(OrderModel order, String newStatus) async {
-    // Create an updated version of the order
-    final updatedOrder = order.copyWith(status: newStatus);
-    // Save the change to the Hive database
-    await HiveOrders.updateOrder(updatedOrder);
-    // Refresh the screen to show the new color
-    // _refreshOrders();
-    print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} status updated to $newStatus.");
-  }
-
-// ACTION 2: Moves the order to the past orders box
+  // ✅ REFACTORED: Move order to past orders
   Future<void> _moveOrderToPast(OrderModel order) async {
-    // NOTE: This assumes you have a `pastOrderModel` and `HivePastOrder` setup.
-    // Create a past order record from the active order
-    final pastOrder = pastOrderModel(
-      id: order.id,
-      customerName: order.customerName,
-      totalPrice: order.totalPrice,
-      items: order.items,
-      orderAt: order.timeStamp,
-      orderType: order.orderType,
-      paymentmode: order.paymentMethod ?? 'N/A',
-      subTotal: order.subTotal,
-      gstAmount: order.gstAmount,
-      Discount: order.discount,
-      remark: order.remark,
-      // ✅ KOT tracking - REQUIRED
-      kotNumbers: order.kotNumbers,
-      kotBoundaries: order.kotBoundaries, // KOT boundaries for grouping items
-      // ... copy other relevant fields
-    );
+    try {
+      final pastOrder = pastOrderModel(
+        id: order.id,
+        customerName: order.customerName,
+        totalPrice: order.totalPrice,
+        items: order.items,
+        orderAt: order.timeStamp,
+        orderType: order.orderType,
+        paymentmode: order.paymentMethod ?? 'N/A',
+        subTotal: order.subTotal,
+        gstAmount: order.gstAmount,
+        Discount: order.discount,
+        remark: order.remark,
+        kotNumbers: order.kotNumbers,
+        kotBoundaries: order.kotBoundaries,
+      );
 
-    // Add to past orders and delete from active orders
-    await HivePastOrder.addOrder(pastOrder);
-    await HiveOrders.deleteOrder(order.id);
-    await HiveTables.updateTableStatus(order.tableNo!, 'Available');
+      await HivePastOrder.addOrder(pastOrder);
 
-    // Refresh the screen to remove the card
-    // _refreshOrders();
-    print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} moved to past orders.");
+      // ✅ Delete using OrderStore
+      final success = await orderStore.deleteOrder(order.id);
+
+      if (success) {
+        await HiveTables.updateTableStatus(order.tableNo!, 'Available');
+        print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} moved to past orders.");
+        NotificationService.instance.showSuccess('Order completed and moved to history');
+      }
+    } catch (e) {
+      print('❌ Error moving order to past: $e');
+      NotificationService.instance.showError('Failed to complete order: $e');
+    }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -525,7 +481,7 @@ class _ActiveorderState extends State<Activeorder> {
         children: [
           // Order Type Filter Row
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             color: AppColors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -539,7 +495,7 @@ class _ActiveorderState extends State<Activeorder> {
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(8),
@@ -547,7 +503,7 @@ class _ActiveorderState extends State<Activeorder> {
                   ),
                   child: DropdownButton<String>(
                     value: dropDownValue,
-                    underline: SizedBox(),
+                    underline: const SizedBox(),
                     icon: Icon(Icons.keyboard_arrow_down, color: AppColors.textPrimary),
                     style: GoogleFonts.poppins(
                       fontSize: 14,
@@ -571,13 +527,17 @@ class _ActiveorderState extends State<Activeorder> {
             ),
           ),
 
-          // Orders List
+          // ✅ REFACTORED: Orders List with Observer
           Expanded(
-            child: ValueListenableBuilder(
-              valueListenable: Hive.box<OrderModel>('orderBox').listenable(),
-              builder: (context, orders, _) {
-                // Show all orders except 'Served' orders that are already paid
-                final activeOrders = orders.values
+            child: Observer(
+              builder: (_) {
+                // Show loading indicator
+                if (orderStore.isLoading && orderStore.orders.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                // ✅ Get active orders from store
+                final activeOrders = orderStore.activeOrders
                     .where((order) =>
                         order.status != 'Served' ||
                         (order.status == 'Served' && order.paymentStatus != 'Paid'))
@@ -595,7 +555,7 @@ class _ActiveorderState extends State<Activeorder> {
                           size: 80,
                           color: AppColors.divider,
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         Text(
                           'No active orders',
                           style: GoogleFonts.poppins(
@@ -609,13 +569,12 @@ class _ActiveorderState extends State<Activeorder> {
                   );
                 }
 
-                final filterOrderList = dropDownValue == 'All'
+                // Apply dropdown filter
+                final filteredOrders = dropDownValue == 'All'
                     ? activeOrders
-                    : activeOrders
-                        .where((order) => order.orderType == dropDownValue)
-                        .toList();
+                    : activeOrders.where((order) => order.orderType == dropDownValue).toList();
 
-                if (filterOrderList.isEmpty) {
+                if (filteredOrders.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -625,7 +584,7 @@ class _ActiveorderState extends State<Activeorder> {
                           size: 80,
                           color: AppColors.divider,
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         Text(
                           'No orders of type "$dropDownValue"',
                           style: GoogleFonts.poppins(
@@ -640,10 +599,10 @@ class _ActiveorderState extends State<Activeorder> {
                 }
 
                 return ListView.builder(
-                  padding: EdgeInsets.all(16),
-                  itemCount: filterOrderList.length,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredOrders.length,
                   itemBuilder: (context, index) {
-                    final order = filterOrderList[index];
+                    final order = filteredOrders[index];
                     return OrderCard(
                       color: _getColorForStatus(order.status),
                       order: order,
@@ -654,7 +613,7 @@ class _ActiveorderState extends State<Activeorder> {
                             order.status == 'Ready' ||
                             order.status == 'Served') {
                           _showStatusUpdateDialog(
-                              order, order.orderType == 'Take Away' ? true : false);
+                              order, order.orderType == 'Take Away');
                         }
                       },
                       ontap: () async {
@@ -686,51 +645,3 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 }
-
-
-// Future Builder
-/*  FutureBuilder<List<OrderModel>>(
-                future: _ordersFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No Active Orders',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 28,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                    );
-                  }
-
-                  final allOrders = snapshot.data!;
-
-                  allOrders.sort((a,b)=> b.timeStamp.compareTo(a.timeStamp!));
-
-                  // Filter the orders based on the dropdown value
-                  // final filteredOrders = dropDownValue == 'All'
-                  //     ? allOrders
-                  //     : allOrders
-                  //     .where((order) => order.orderType == dropDownValue)
-                  //     .toList();
-                  //
-                  // if (filteredOrders.isEmpty) {
-                  //   return Center(child: Text('No orders of type "$dropDownValue" found.'));
-                  // }
-
-
-
-
-                  // The ListView provides its own scrolling
-                  // Inside your build method's FutureBuilder
-
-                },
-              ),*/

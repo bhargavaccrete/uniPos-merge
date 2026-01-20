@@ -47,7 +47,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       // Load customer if exists
       CustomerModel? customer;
       if (sale?.customerId != null) {
-        customer = await customerStore.getCustomerById(sale!.customerId!);
+        customer = await customerStoreRestail.getCustomerById(sale!.customerId!);
       }
 
       // Check if this sale has been refunded (look for return transactions)

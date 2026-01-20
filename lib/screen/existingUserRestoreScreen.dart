@@ -310,8 +310,8 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       }
 
       // Force reload CustomerStore
-      if (locator.isRegistered<CustomerStore>()) {
-        final customerStore = locator<CustomerStore>();
+      if (locator.isRegistered<CustomerStoreRetail>()) {
+        final customerStore = locator<CustomerStoreRetail>();
         await customerStore.loadCustomers();
         debugPrint("📦 CustomerStore reloaded: ${customerStore.customers.length} customers");
       }

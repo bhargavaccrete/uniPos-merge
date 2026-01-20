@@ -96,7 +96,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
         // Reload invoices
         await _loadDueInvoices();
         // Reload customer store
-        await customerStore.loadCustomers();
+        await customerStoreRestail.loadCustomers();
 
         if (mounted) {
           // Show success message

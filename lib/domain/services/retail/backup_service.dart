@@ -58,7 +58,7 @@ class BackupService {
       'barcode': si.barcode,
     }).toList();
 
-    final customers = customerStore.customers.map((c) => {
+    final customers = customerStoreRestail.customers.map((c) => {
       'customerId': c.customerId,
       'name': c.name,
       'email': c.email,
@@ -605,7 +605,7 @@ class BackupService {
                 createdAt: customerMap['createdAt'] ?? DateTime.now().toIso8601String(),
                 updatedAt: customerMap['updatedAt'],
               );
-              await customerStore.addCustomer(customer);
+              await customerStoreRestail.addCustomer(customer);
               restoredCount++;
             } catch (e) {
               // Skip individual customer errors
