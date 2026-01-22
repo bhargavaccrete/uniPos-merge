@@ -9,7 +9,9 @@ class VariantStore = _VariantStore with _$VariantStore;
 abstract class _VariantStore with Store {
   final VariantRepositoryRes _repository;
 
-  _VariantStore(this._repository);
+  _VariantStore(this._repository) {
+    loadVariants();
+  }
 
   @observable
   ObservableList<VariantModel> variants = ObservableList<VariantModel>();
@@ -44,8 +46,10 @@ abstract class _VariantStore with Store {
       errorMessage = null;
       final loadedVariants = await _repository.getAllVariants();
       variants = ObservableList.of(loadedVariants);
+      print('✅ VariantStore: Loaded ${variants.length} variants');
     } catch (e) {
       errorMessage = 'Failed to load variants: $e';
+      print('❌ VariantStore: Error loading variants - $e');
     } finally {
       isLoading = false;
     }
@@ -59,11 +63,14 @@ abstract class _VariantStore with Store {
   @action
   Future<bool> addVariant(VariantModel variant) async {
     try {
+      print('📝 VariantStore: Adding variant "${variant.name}" with ID: ${variant.id}');
       await _repository.addVariant(variant);
       variants.add(variant);
+      print('✅ VariantStore: Added successfully. Total variants now: ${variants.length}');
       return true;
     } catch (e) {
       errorMessage = 'Failed to add variant: $e';
+      print('❌ VariantStore: Failed to add variant - $e');
       return false;
     }
   }

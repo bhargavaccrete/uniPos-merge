@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:uuid/uuid.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
@@ -19,9 +20,30 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    customerStoreRestail.loadCustomers();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  List<CustomerModel> _getFilteredCustomers() {
+    if (_searchQuery.isEmpty) {
+      return customerStoreRestail.customers.toList();
+    }
+
+    return customerStoreRestail.customers.where((customer) {
+      final name = customer.name.toLowerCase();
+      final phone = customer.phone.toLowerCase();
+      final email = customer.email?.toLowerCase() ?? '';
+      return name.contains(_searchQuery) ||
+          phone.contains(_searchQuery) ||
+          email.contains(_searchQuery);
+    }).toList();
   }
 
   @override
@@ -81,10 +103,9 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
           // Customer List
           Expanded(
-            child: ValueListenableBuilder(
-              valueListenable: Hive.box<CustomerModel>(HiveBoxNames.customers).listenable(),
-              builder: (context, Box<CustomerModel> box, _) {
-                if (box.isEmpty) {
+            child: Observer(
+              builder: (context) {
+                if (customerStoreRestail.customerCount == 0) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -112,18 +133,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   );
                 }
 
-                // Filter customers based on search query
-                final customers = box.values.where((customer) {
-                  if (_searchQuery.isEmpty) return true;
-
-                  final name = customer.name?.toLowerCase() ?? '';
-                  final phone = customer.phone?.toLowerCase() ?? '';
-                  final email = customer.email?.toLowerCase() ?? '';
-
-                  return name.contains(_searchQuery) ||
-                      phone.contains(_searchQuery) ||
-                      email.contains(_searchQuery);
-                }).toList();
+                final customers = _getFilteredCustomers();
 
                 if (customers.isEmpty) {
                   return Center(
@@ -218,6 +228,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                       SizedBox(height: 4),
                       Row(
                         children: [
+
                           Icon(Icons.phone, size: 14, color: Colors.grey[600]),
                           SizedBox(width: 4),
                           Text(
@@ -382,16 +393,18 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             ),
           ),
           CommonButton(
-            onTap: () {
+            onTap: () async {
               if (formKey.currentState!.validate()) {
-                _addCustomer(
+                await _addCustomer(
                   nameController.text.trim(),
                   phoneController.text.trim(),
                   emailController.text.trim(),
                   addressController.text.trim(),
                   notesController.text.trim(),
                 );
-                Navigator.pop(context);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
               }
             },
             child: Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
@@ -493,9 +506,9 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             ),
           ),
           CommonButton(
-            onTap: () {
+            onTap: () async {
               if (formKey.currentState!.validate()) {
-                _updateCustomer(
+                await _updateCustomer(
                   customer,
                   nameController.text.trim(),
                   phoneController.text.trim(),
@@ -503,7 +516,9 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   addressController.text.trim(),
                   notesController.text.trim(),
                 );
-                Navigator.pop(context);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
               }
             },
             child: Text('Update', style: GoogleFonts.poppins(color: Colors.white)),
@@ -647,9 +662,11 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             ),
           ),
           TextButton(
-            onPressed: () {
-              _deleteCustomer(customer);
-              Navigator.pop(context);
+            onPressed: () async {
+              await _deleteCustomer(customer);
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
             },
             child: Text(
               'Delete',
@@ -661,84 +678,63 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     );
   }
 
-  void _addCustomer(String name, String phone, String email, String address, String notes) {
-    final box = Hive.box<CustomerModel>(HiveBoxNames.customers);
-    final customerId = 'CUST_${DateTime.now().millisecondsSinceEpoch}';
-    final now = DateTime.now().toIso8601String();
-
-    final customer = CustomerModel(
-      customerId: customerId,
+  Future<void> _addCustomer(String name, String phone, String email, String address, String notes) async {
+    final customer = CustomerModel.create(
+      customerId: const Uuid().v4(),
       name: name,
       phone: phone,
       email: email.isNotEmpty ? email : null,
       address: address.isNotEmpty ? address : null,
       notes: notes.isNotEmpty ? notes : null,
-      createdAt: now,
-      updatedAt: now,
-      visitCount: 0,
-      totalPurchaseAmount: 0.0,
-      pointsBalance: 0,
-      totalPointEarned: 0,
-      totalPointRedeemed: 0,
-      creditBalance: 0.0,
-      creditLimit: 0.0,
     );
 
-    box.put(customerId, customer);
+    await customerStoreRestail.addCustomer(customer);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Customer added successfully'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Customer added successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
-  void _updateCustomer(CustomerModel customer, String name, String phone, String email, String address, String notes) {
-    final box = Hive.box<CustomerModel>(HiveBoxNames.customers);
-
-    final updatedCustomer = CustomerModel(
-      customerId: customer.customerId,
+  Future<void> _updateCustomer(CustomerModel customer, String name, String phone, String email, String address, String notes) async {
+    final updatedCustomer = customer.copyWith(
       name: name,
       phone: phone,
       email: email.isNotEmpty ? email : null,
       address: address.isNotEmpty ? address : null,
       notes: notes.isNotEmpty ? notes : null,
-      createdAt: customer.createdAt,
       updatedAt: DateTime.now().toIso8601String(),
-      visitCount: customer.visitCount,
-      totalPurchaseAmount: customer.totalPurchaseAmount,
-      pointsBalance: customer.pointsBalance,
-      totalPointEarned: customer.totalPointEarned,
-      totalPointRedeemed: customer.totalPointRedeemed,
-      creditBalance: customer.creditBalance,
-      creditLimit: customer.creditLimit,
-      gstNumber: customer.gstNumber,
-      lastVisited: customer.lastVisited,
     );
 
-    box.put(customer.customerId, updatedCustomer);
+    await customerStoreRestail.updateCustomer(updatedCustomer);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Customer updated successfully'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Customer updated successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
-  void _deleteCustomer(CustomerModel customer) {
-    final box = Hive.box<CustomerModel>(HiveBoxNames.customers);
-    box.delete(customer.customerId);
+  Future<void> _deleteCustomer(CustomerModel customer) async {
+    await customerStoreRestail.deleteCustomer(customer.customerId);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Customer deleted successfully'),
-        backgroundColor: Colors.red,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Customer deleted successfully'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_customer.dart';
-import 'package:unipos/util/color.dart';
 import 'add_edit_customer_screen.dart';
 import 'customer_detail_screen.dart';
 
@@ -15,61 +15,37 @@ class CustomerListScreen extends StatefulWidget {
 }
 
 class _CustomerListScreenState extends State<CustomerListScreen> {
-  List<RestaurantCustomer> customers = [];
-  List<RestaurantCustomer> filteredCustomers = [];
   final TextEditingController _searchController = TextEditingController();
-  bool isLoading = true;
   String sortBy = 'name'; // name, visits, points
 
   @override
   void initState() {
     super.initState();
-    _loadCustomers();
+    restaurantCustomerStore.loadCustomers();
   }
 
-  void _loadCustomers() {
-    setState(() {
-      isLoading = true;
-    });
-
-    customers = HiveCustomer.getAllCustomers();
-    filteredCustomers = customers;
-    _sortCustomers();
-
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  void _sortCustomers() {
-    setState(() {
-      switch (sortBy) {
-        case 'name':
-          filteredCustomers.sort((a, b) {
-            final nameA = a.name?.toLowerCase() ?? '';
-            final nameB = b.name?.toLowerCase() ?? '';
-            return nameA.compareTo(nameB);
-          });
-          break;
-        case 'visits':
-          filteredCustomers.sort((a, b) => b.totalVisites.compareTo(a.totalVisites));
-          break;
-        case 'points':
-          filteredCustomers.sort((a, b) => b.loyaltyPoints.compareTo(a.loyaltyPoints));
-          break;
-      }
-    });
+  List<RestaurantCustomer> _getSortedCustomers(List<RestaurantCustomer> customers) {
+    final sorted = customers.toList();
+    switch (sortBy) {
+      case 'name':
+        sorted.sort((a, b) {
+          final nameA = a.name?.toLowerCase() ?? '';
+          final nameB = b.name?.toLowerCase() ?? '';
+          return nameA.compareTo(nameB);
+        });
+        break;
+      case 'visits':
+        sorted.sort((a, b) => b.totalVisites.compareTo(a.totalVisites));
+        break;
+      case 'points':
+        sorted.sort((a, b) => b.loyaltyPoints.compareTo(a.loyaltyPoints));
+        break;
+    }
+    return sorted;
   }
 
   void _searchCustomers(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        filteredCustomers = customers;
-      } else {
-        filteredCustomers = HiveCustomer.searchCustomers(query);
-      }
-      _sortCustomers();
-    });
+    restaurantCustomerStore.setSearchQuery(query);
   }
 
   void _navigateToAddCustomer() async {
@@ -80,8 +56,19 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       ),
     );
 
-    if (result == true) {
-      _loadCustomers();
+    if (result == 'added') {
+      await restaurantCustomerStore.loadCustomers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Customer added successfully',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 
@@ -93,8 +80,19 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       ),
     );
 
-    if (result == true) {
-      _loadCustomers();
+    if (result == 'updated') {
+      await restaurantCustomerStore.loadCustomers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Customer updated successfully',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 
@@ -106,8 +104,21 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       ),
     );
 
-    if (result == true) {
-      _loadCustomers();
+    if (result == 'deleted') {
+      await restaurantCustomerStore.loadCustomers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Customer deleted successfully',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else if (result != null) {
+      await restaurantCustomerStore.loadCustomers();
     }
   }
 
@@ -137,9 +148,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (confirm == true) {
-      await HiveCustomer.deleteCustomer(customer.customerId);
-      _loadCustomers();
-      if (mounted) {
+      final success = await restaurantCustomerStore.deleteCustomer(customer.customerId);
+      if (mounted && success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -175,7 +185,6 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             onSelected: (value) {
               setState(() {
                 sortBy = value;
-                _sortCustomers();
               });
             },
             itemBuilder: (context) => [
@@ -251,12 +260,12 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _searchCustomers('');
-                        },
-                      )
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    _searchCustomers('');
+                  },
+                )
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -268,92 +277,110 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           ),
 
           // Stats Row
-          if (customers.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'Total',
-                      customers.length.toString(),
-                      Icons.people,
-                      Colors.blue,
+          Observer(
+            builder: (context) {
+              final customers = restaurantCustomerStore.customers;
+              if (customers.isEmpty) return const SizedBox.shrink();
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        'Total',
+                        customers.length.toString(),
+                        Icons.people,
+                        Colors.blue,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Visits',
-                      customers
-                          .fold(0, (sum, c) => sum + c.totalVisites)
-                          .toString(),
-                      Icons.calendar_today,
-                      Colors.green,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildStatCard(
+                        'Visits',
+                        customers
+                            .fold(0, (sum, c) => sum + c.totalVisites)
+                            .toString(),
+                        Icons.calendar_today,
+                        Colors.green,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Points',
-                      customers
-                          .fold(0, (sum, c) => sum + c.loyaltyPoints)
-                          .toString(),
-                      Icons.star,
-                      Colors.orange,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildStatCard(
+                        'Points',
+                        customers
+                            .fold(0, (sum, c) => sum + c.loyaltyPoints)
+                            .toString(),
+                        Icons.star,
+                        Colors.orange,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                  ],
+                ),
+              );
+            },
+          ),
 
           const SizedBox(height: 16),
 
           // Customer List
           Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredCustomers.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.person_off_outlined,
-                              size: 80,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchController.text.isEmpty
-                                  ? 'No customers yet'
-                                  : 'No customers found',
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            if (_searchController.text.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Text(
-                                  'Add your first customer',
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
-                              ),
-                          ],
+            child: Observer(
+              builder: (context) {
+                if (restaurantCustomerStore.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final filteredCustomers = _getSortedCustomers(
+                  restaurantCustomerStore.filteredCustomers,
+                );
+
+                if (filteredCustomers.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.person_off_outlined,
+                          size: 80,
+                          color: Colors.grey[400],
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: filteredCustomers.length,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemBuilder: (context, index) {
-                          final customer = filteredCustomers[index];
-                          return _buildCustomerCard(customer);
-                        },
-                      ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchController.text.isEmpty
+                              ? 'No customers yet'
+                              : 'No customers found',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        if (_searchController.text.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              'Add your first customer',
+                              style: GoogleFonts.poppins(
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: filteredCustomers.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemBuilder: (context, index) {
+                    final customer = filteredCustomers[index];
+                    return _buildCustomerCard(customer);
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),

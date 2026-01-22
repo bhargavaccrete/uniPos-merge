@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/routes/app_routes.dart';
-import 'package:unipos/core/routes/restaurant_routes.dart';
 import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart' hide Expense;
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/screens/restaurant/Expense/managecategory.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../data/models/restaurant/db/expensemodel_315.dart';
 import '../../../../util/common/currency_helper.dart';
 
 class Addexpence extends StatefulWidget {
@@ -28,6 +23,12 @@ class _AddexpenceState extends State<Addexpence> {
   DateTime? _dateselect;
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    expenseCategoryStore.loadCategories();
+  }
 
   Future<void> _pickedDate(BuildContext context) async {
     DateTime? _pickedDate = await showDatePicker(
@@ -72,10 +73,13 @@ class _AddexpenceState extends State<Addexpence> {
         paymentType: Dropvalue2,
       );
 
-
-      await HiveExpenceL.addItem(expense);
-      NotificationService.instance.showSuccess('Expense added successfully');
-      _clearForm();
+      final success = await expenseStore.addExpense(expense);
+      if (success) {
+        NotificationService.instance.showSuccess('Expense added successfully');
+        _clearForm();
+      } else {
+        NotificationService.instance.showError('Failed to add expense');
+      }
     } catch (e) {
       NotificationService.instance.showError('Please enter a valid amount');
     }
@@ -220,10 +224,9 @@ class _AddexpenceState extends State<Addexpence> {
                     fontSize: 18,
                   )),
               SizedBox(height: 10),
-              ValueListenableBuilder(
-                valueListenable: HiveExpenseCat.getECategory().listenable(),
-                builder: (context, Box<ExpenseCategory> box, _) {
-                  final categories = box.values.where((cat) => cat.isEnabled).toList();
+              Observer(
+                builder: (context) {
+                  final categories = expenseCategoryStore.enabledCategories;
 
                   return Container(
                     padding: EdgeInsets.all(5),
@@ -239,7 +242,7 @@ class _AddexpenceState extends State<Addexpence> {
                           textScaler: TextScaler.linear(1),
                           style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
                         ),
-                        items: categories.map((ExpenseCategory category) {
+                        items: categories.map((category) {
                           return DropdownMenuItem<String>(
                             value: category.id,
                             child: Text(

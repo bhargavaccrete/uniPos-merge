@@ -1,7 +1,9 @@
+
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/util/color.dart';
 
+import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
@@ -19,10 +21,13 @@ class ApplyTaxScreen extends StatefulWidget {
 }
 
 class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
-
-
-  final Box<Items> itemBox = Hive.box<Items>('itemBoxs');
   final Set<String> _selectedItemIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    itemStore.loadItems();
+  }
 
 
   void _onItemChecked(bool? isChecked, Items item) {
@@ -46,7 +51,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
   }
 
 
-  void _applyTaxToSelected() {
+  Future<void> _applyTaxToSelected() async {
     if (_selectedItemIds.isEmpty) return;
 
     final double rate = widget.taxToApply.taxperecentage! / 100.0;
@@ -55,15 +60,14 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     debugPrint("🔵 Selected items: ${_selectedItemIds.length}");
 
     for (String id in _selectedItemIds) {
-      // Get item directly from box using the id as key
-      final item = itemBox.get(id);
-      if (item != null) {
+      try {
+        final item = itemStore.items.firstWhere((item) => item.id == id);
         debugPrint("🔵 Applying tax to: ${item.name}, current taxRate: ${item.taxRate}");
         item.applyTax(rate);
+        await itemStore.updateItem(item);
         debugPrint("🔵 After apply - ${item.name}, new taxRate: ${item.taxRate}");
-      } else {
-        debugPrint("❌ Item not found with key: $id");
-        debugPrint("❌ Available keys in box: ${itemBox.keys.take(5).toList()}");
+      } catch (e) {
+        debugPrint("❌ Item not found with id: $id");
       }
     }
 
@@ -72,38 +76,26 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     NotificationService.instance.showInfo(
       '${widget.taxToApply.taxname} (${widget.taxToApply.taxperecentage}%) applied to selected items.',
     );
-
-
-    // ScaffoldMessenger.of(context).showSnackBar(
-    //   SnackBar(
-    //     content: Text('${widget.taxToApply.taxname} (${widget.taxToApply.taxperecentage}%) applied to selected items.'),
-    //     backgroundColor: Colors.green,
-    //   ),
-    // );
   }
 
-// ✅ OPTIMIZED: This method is also now more performant
-  void _removeTaxFromSelected() {
+  Future<void> _removeTaxFromSelected() async {
     if (_selectedItemIds.isEmpty) return;
 
     for (String id in _selectedItemIds) {
-      final item = itemBox.get(id); // Get item directly from box
-      item?.removeTax();
+      try {
+        final item = itemStore.items.firstWhere((item) => item.id == id);
+        item.removeTax();
+        await itemStore.updateItem(item);
+      } catch (e) {
+        debugPrint("❌ Item not found with id: $id");
+      }
     }
 
     setState(() => _selectedItemIds.clear());
 
-
     NotificationService.instance.showInfo(
       'Tax removed from selected items.',
     );
-
-    // ScaffoldMessenger.of(context).showSnackBar(
-    //   const SnackBar(
-    //     content: Text('Tax removed from selected items.'),
-    //     backgroundColor: Colors.red,
-    //   ),
-    // );
   }
   @override
   Widget build(BuildContext context) {
@@ -111,10 +103,9 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
       appBar: AppBar(
         title: Text("Apply ${widget.taxToApply.taxname}"),
         actions: [
-          ValueListenableBuilder(
-            valueListenable: itemBox.listenable(),
-            builder: (context, Box<Items> box, _) {
-              final items = box.values.toList();
+          Observer(
+            builder: (context) {
+              final items = itemStore.items;
               final isAllSelected = items.isNotEmpty && _selectedItemIds.length == items.length;
 
               return Row(
@@ -132,10 +123,13 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
           ),
         ],
       ),
-      body: ValueListenableBuilder(
-        valueListenable: itemBox.listenable(),
-        builder: (context, Box<Items> box, _) {
-          final items = box.values.toList();
+      body: Observer(
+        builder: (context) {
+          if (itemStore.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final items = itemStore.items;
 
           return Column(
             children: [

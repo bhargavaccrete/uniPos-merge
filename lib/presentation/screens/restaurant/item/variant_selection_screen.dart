@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 
 class VariantSelectionScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedVariants;
@@ -75,8 +74,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   // }
 
   void _loadVariants() {
-    final variantBox = Hive.box<VariantModel>('variante');
-    final variants = variantBox.values.toList();
+    final variants = variantStore.variants.toList();
 
     // Ensure we don't leak controllers
     for (var variant in variants) {
@@ -446,14 +444,16 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   return;
                 }
 
-                // Create and save the variant
+                // Create and save the variant using store
                 final newVariant = VariantModel(
                   id: const Uuid().v4(),
                   name: name,
                 );
 
-                final variantBox = Hive.box<VariantModel>('variante');
-                await variantBox.put(newVariant.id, newVariant);
+                await variantStore.addVariant(newVariant);
+
+                // Reload the list to show the new variant
+                _loadVariants();
 
                 // Close dialog and pass the variant name for success message
                 if (dialogContext.mounted) {

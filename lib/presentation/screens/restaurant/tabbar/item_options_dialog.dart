@@ -21,7 +21,8 @@ class DisplayVariant {
   final String id;
   final String name;
   final double price;
-  DisplayVariant({required this.id, required this.name, required this.price});
+  final double stockQuantity;
+  DisplayVariant({required this.id, required this.name, required this.price, required this.stockQuantity});
 }
 
 class ItemOptionsDialog extends StatefulWidget {
@@ -71,13 +72,22 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
       final variantDetails = variantBox.get(itemVariant.variantId);
 
       if (variantDetails != null) {
-        _displayVariants.add(DisplayVariant(id: variantDetails.id, name: variantDetails.name, price: itemVariant.price));
+        _displayVariants.add(DisplayVariant(
+          id: variantDetails.id,
+          name: variantDetails.name,
+          price: itemVariant.price,
+          stockQuantity: itemVariant.stockQuantity ?? 0,
+        ));
       } else {
         print("Warning: Variant ID ${itemVariant.variantId} found in item but not in 'variante' box.");
       }
     }
     if (_displayVariants.isNotEmpty) {
-      _selectedVariant = _displayVariants.first;
+      // Select the first variant that has stock, or the first variant if all are out of stock
+      _selectedVariant = _displayVariants.firstWhere(
+        (v) => v.stockQuantity > 0,
+        orElse: () => _displayVariants.first,
+      );
     }
   }
 
@@ -458,8 +468,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         SizedBox(height: 12),
         ..._displayVariants.map((variant) {
           final isSelected = _selectedVariant == variant;
+          final isOutOfStock = widget.item.trackInventory && variant.stockQuantity <= 0;
+          final canOrder = !widget.item.trackInventory || widget.item.allowOrderWhenOutOfStock || variant.stockQuantity > 0;
+
           return GestureDetector(
-            onTap: () {
+            onTap: canOrder ? () {
               setState(() {
                 _selectedVariant = variant;
                 // Clear selected extras that are not available for the new variant
@@ -471,71 +484,102 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 });
                 _recalculateTotal();
               });
-            },
-            child: Container(
-              margin: EdgeInsets.only(bottom: 8),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : AppColors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.divider,
-                  width: 1.5,
+            } : null,
+            child: Opacity(
+              opacity: canOrder ? 1.0 : 0.5,
+              child: Container(
+                margin: EdgeInsets.only(bottom: 8),
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : (canOrder ? AppColors.white : AppColors.surfaceMedium),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : AppColors.divider,
+                    width: 1.5,
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected ? AppColors.white : AppColors.divider,
-                        width: 2,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? AppColors.white : AppColors.divider,
+                          width: 2,
+                        ),
+                        color: isSelected ? AppColors.white : Colors.transparent,
                       ),
-                      color: isSelected ? AppColors.white : Colors.transparent,
+                      child: isSelected
+                          ? Center(
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : null,
                     ),
-                    child: isSelected
-                        ? Center(
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.primary,
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            variant.name,
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: isSelected ? AppColors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                          if (widget.item.trackInventory && isOutOfStock) ...[
+                            SizedBox(height: 2),
+                            Text(
+                              widget.item.allowOrderWhenOutOfStock ? 'Order Available' : 'Out of Stock',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: isSelected
+                                  ? AppColors.white.withOpacity(0.8)
+                                  : (widget.item.allowOrderWhenOutOfStock ? AppColors.warning : AppColors.danger),
                               ),
                             ),
-                          )
-                        : null,
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      variant.name,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: isSelected ? AppColors.white : AppColors.textPrimary,
+                          ] else if (widget.item.trackInventory) ...[
+                            SizedBox(height: 2),
+                            Text(
+                              '${variant.stockQuantity.toInt()} in stock',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: isSelected ? AppColors.white.withOpacity(0.8) : AppColors.success,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.white.withOpacity(0.2) : AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isSelected ? AppColors.white : AppColors.textPrimary,
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.white.withOpacity(0.2) : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? AppColors.white : AppColors.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );

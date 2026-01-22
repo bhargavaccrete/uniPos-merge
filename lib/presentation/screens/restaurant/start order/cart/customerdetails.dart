@@ -19,7 +19,6 @@ import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../stores/payment_method_store.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
-import '../../../../../data/models/restaurant/db/database/hive_customer.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -253,11 +252,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
               // Autocomplete Name Field
               Autocomplete<RestaurantCustomer>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
+                optionsBuilder: (TextEditingValue textEditingValue) async {
                   if (textEditingValue.text.isEmpty) {
                     return const Iterable<RestaurantCustomer>.empty();
                   }
-                  return HiveCustomer.searchCustomers(textEditingValue.text);
+                  return await restaurantCustomerStore.searchCustomers(textEditingValue.text);
                 },
                 displayStringForOption: (RestaurantCustomer customer) => customer.name ?? '',
                 onSelected: (RestaurantCustomer customer) {
@@ -348,11 +347,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
               // Autocomplete Mobile Field
               Autocomplete<RestaurantCustomer>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
+                optionsBuilder: (TextEditingValue textEditingValue) async {
                   if (textEditingValue.text.isEmpty) {
                     return const Iterable<RestaurantCustomer>.empty();
                   }
-                  return HiveCustomer.searchCustomers(textEditingValue.text);
+                  return await restaurantCustomerStore.searchCustomers(textEditingValue.text);
                 },
                 displayStringForOption: (RestaurantCustomer customer) => customer.phone ?? '',
                 onSelected: (RestaurantCustomer customer) {
@@ -1286,14 +1285,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
       print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
       print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
 
-      await HiveCustomer.updateCustomerVisit(
+      await restaurantCustomerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
         pointsToAdd: 10, // Award 10 points per order
       );
 
       // Verify the update
-      final updatedCustomer = HiveCustomer.getCustomerById(customer.customerId);
+      final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
       if (updatedCustomer != null) {
         print('✅ Customer stats updated successfully!');
         print('✅ New visits: ${updatedCustomer.totalVisites}, New points: ${updatedCustomer.loyaltyPoints}');

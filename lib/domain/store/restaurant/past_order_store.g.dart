@@ -267,6 +267,27 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
     return _$getOrderCountAsyncAction.run(() => super.getOrderCount());
   }
 
+  late final _$processRefundAsyncAction =
+      AsyncAction('_PastOrderStore.processRefund', context: context);
+
+  @override
+  Future<pastOrderModel?> processRefund(
+      {required pastOrderModel order,
+      required PartialRefundResult refundResult}) {
+    return _$processRefundAsyncAction.run(
+        () => super.processRefund(order: order, refundResult: refundResult));
+  }
+
+  late final _$voidOrderAsyncAction =
+      AsyncAction('_PastOrderStore.voidOrder', context: context);
+
+  @override
+  Future<pastOrderModel?> voidOrder(
+      {required pastOrderModel order, required String reason}) {
+    return _$voidOrderAsyncAction
+        .run(() => super.voidOrder(order: order, reason: reason));
+  }
+
   late final _$_PastOrderStoreActionController =
       ActionController(name: '_PastOrderStore', context: context);
 

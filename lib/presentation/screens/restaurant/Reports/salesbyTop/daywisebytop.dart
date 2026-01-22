@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart' show HivePastOrder;
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 class DayWisebyTop extends StatefulWidget {
@@ -17,8 +16,6 @@ class DayWisebyTop extends StatefulWidget {
 
 class _DayWisebyTopState extends State<DayWisebyTop> {
   DateTime? _fromDate;
-  List<Map<String, dynamic>> _topSellingItems = [];
-  bool _isLoading = false;
 
   // Function to show the Date Picker
   Future<void> _pickDate(BuildContext context) async {
@@ -43,56 +40,73 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+    setState(() {});
+  }
 
-    try {
-      // Get all past orders
-      final allOrders = await HivePastOrder.getAllPastOrderModel();
+  List<Map<String, dynamic>> _calculateTopSellingItems() {
+    if (_fromDate == null) return [];
 
-      // Filter orders for selected date only
-      final selectedDateOrders = allOrders.where((order) {
-        if (order.orderAt == null) return false;
-        final orderDate = order.orderAt!;
-        return orderDate.year == _fromDate!.year &&
-            orderDate.month == _fromDate!.month &&
-            orderDate.day == _fromDate!.day;
-      }).toList();
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
 
-      // Calculate item sales
-      Map<String, Map<String, dynamic>> itemSales = {};
+    // Filter orders for selected date only
+    final selectedDateOrders = allOrders.where((order) {
+      if (order.orderAt == null) return false;
+      final orderDate = order.orderAt!;
+      return orderDate.year == _fromDate!.year &&
+          orderDate.month == _fromDate!.month &&
+          orderDate.day == _fromDate!.day;
+    }).toList();
 
-      for (var order in selectedDateOrders) {
-        for (var item in order.items) {
-          final itemName = item.title;
-          final quantity = item.quantity;
-          final price = item.price;
-          final totalAmount = price * quantity;
+    // Calculate item sales with refund handling
+    Map<String, Map<String, dynamic>> itemSales = {};
 
-          if (itemSales.containsKey(itemName)) {
-            itemSales[itemName]!['quantity'] += quantity;
-            itemSales[itemName]!['totalAmount'] += totalAmount;
-          } else {
-            itemSales[itemName] = {
-              'itemName': itemName,
-              'quantity': quantity,
-              'totalAmount': totalAmount,
-            };
-          }
+    for (var order in selectedDateOrders) {
+      // Skip fully refunded orders
+      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+
+      // Calculate order-level refund ratio
+      final orderTotal = order.totalPrice ?? 0.0;
+      final refundAmount = order.refundAmount ?? 0.0;
+      final orderRefundRatio = orderTotal > 0 ? ((orderTotal - refundAmount) / orderTotal) : 1.0;
+
+      for (var item in order.items) {
+        final itemName = item.title;
+
+        // Calculate effective quantity (after refunds)
+        final originalQuantity = item.quantity ?? 0;
+        final refundedQuantity = item.refundedQuantity ?? 0;
+        final effectiveQuantity = originalQuantity - refundedQuantity;
+
+        // Skip fully refunded items
+        if (effectiveQuantity <= 0) continue;
+
+        final price = item.price;
+        final baseTotal = price * effectiveQuantity;
+
+        // Apply order-level refund ratio for accurate revenue
+        final totalAmount = baseTotal * orderRefundRatio;
+
+        if (itemSales.containsKey(itemName)) {
+          itemSales[itemName]!['quantity'] += effectiveQuantity;
+          itemSales[itemName]!['totalAmount'] += totalAmount;
+        } else {
+          itemSales[itemName] = {
+            'itemName': itemName,
+            'quantity': effectiveQuantity,
+            'totalAmount': totalAmount,
+          };
         }
       }
-
-      // Convert to list and sort by quantity (most sold first)
-      final sortedItems = itemSales.values.toList()
-        ..sort((a, b) => (b['quantity'] as int).compareTo(a['quantity'] as int));
-
-      setState(() {
-        _topSellingItems = sortedItems;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading top selling items: $e');
-      setState(() => _isLoading = false);
     }
+
+    // Convert to list and sort by quantity (most sold first)
+    final sortedItems = itemSales.values.toList()
+      ..sort((a, b) => (b['quantity'] as int).compareTo(a['quantity'] as int));
+
+    return sortedItems;
   }
 
   @override
@@ -102,7 +116,11 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
     final displayDate = _fromDate != null ? DateFormat('yyyy-MM-dd').format(_fromDate!) : '';
 
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          final topSellingItems = _calculateTopSellingItems();
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -177,9 +195,9 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
               SizedBox(height: 25),
 
               // Loading or Results
-              if (_isLoading)
+              if (pastOrderStore.isLoading)
                 Center(child: CircularProgressIndicator(color: AppColors.primary))
-              else if (_topSellingItems.isEmpty && _fromDate != null)
+              else if (topSellingItems.isEmpty && _fromDate != null)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -195,7 +213,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                     ),
                   ),
                 )
-              else if (_topSellingItems.isNotEmpty)
+              else if (topSellingItems.isNotEmpty)
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
@@ -267,7 +285,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
                                       style: GoogleFonts.poppins(fontSize: 14),
                                       textAlign: TextAlign.center))),
                         ],
-                        rows: _topSellingItems.map((item) {
+                        rows: topSellingItems.map((item) {
                           return DataRow(
                             cells: [
                               DataCell(
@@ -298,6 +316,8 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
             ],
           ),
         ),
+        );
+        },
       ),
     );
   }

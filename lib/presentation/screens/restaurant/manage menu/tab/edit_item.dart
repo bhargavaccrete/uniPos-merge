@@ -4,16 +4,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
@@ -22,7 +17,6 @@ import 'package:unipos/util/restaurant/audit_trail_helper.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as p;
-import 'package:unipos/util/color.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -113,18 +107,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
 // In _EdititemScreenState
 
   Future<EditScreenData> _loadInitialData() async {
-    // ✅ FIX: Use synchronous box access since boxes are already open from main.dart
-    final categoryBox = HiveBoxes.getCategory();
-    final variantBox = HiveVariante.getVariante();
-    final choiceBox = HiveChoice.getchoice();
-    final extraBox = HiveExtra.getextra();
-    final itemBox = itemsBoxes.getItemBox();
-
-    final allCategories = categoryBox.values.toList();
-    final allVariants = variantBox.values.toList();
-    final allChoices = choiceBox.values.toList();
-    final allExtra = extraBox.values.toList();
-    final allItems = itemBox.values.toList();
+    // Load data from stores
+    final allCategories = categoryStore.categories.toList();
+    final allVariants = variantStore.variants.toList();
+    final allChoices = choiceStore.choices.toList();
+    final allExtra = extraStore.extras.toList();
+    final allItems = itemStore.items.toList();
 
     // The rest of the function remains the same, as it correctly
     // pre-selects the variants and choices.
@@ -273,7 +261,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     // 🔍 AUDIT TRAIL: Track this edit
     AuditTrailHelper.trackEdit(updateItem, editedBy: 'Admin'); // TODO: Replace 'Admin' with actual logged-in user
 
-    await itemsBoxes.updateItem(updateItem);
+    await itemStore.updateItem(updateItem);
     Navigator.pop(context, true);
   }
 
@@ -870,7 +858,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
     );
 
     if (confirmed == true) {
-      await HiveBoxes.getCategory().delete(categoryId);
+      await categoryStore.deleteCategory(categoryId);
       // Refresh the list inside the sheet
       setState(() {
         _currentCategories.removeWhere((cat) => cat.id == categoryId);
@@ -886,7 +874,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
 
     if (newCategoryName != null && newCategoryName.isNotEmpty) {
       final newCategory = Category(id: const Uuid().v4(), name: newCategoryName);
-      await HiveBoxes.getCategory().put(newCategory.id, newCategory);
+      await categoryStore.addCategory(newCategory);
       // Refresh the list inside this sheet to show the new category
       setState(() {
         _currentCategories.add(newCategory);

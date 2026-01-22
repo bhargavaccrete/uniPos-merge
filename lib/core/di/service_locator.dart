@@ -72,6 +72,7 @@ import 'package:unipos/domain/store/restaurant/appStore.dart';
 
 import '../../data/repositories/restaurant/customer_repository.dart';
 import '../../data/repositories/restaurant/variant_repository.dart';
+import '../../domain/store/restaurant/cart_store.dart';
 import '../../domain/store/restaurant/customer_store.dart';
 
 final locator = GetIt.instance;
@@ -230,8 +231,8 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<PastOrderStore>(
     () => PastOrderStore(locator<PastOrderRepository>()),
   );
-  locator.registerLazySingleton<restaurant.CartStore>(
-    () => restaurant.CartStore(locator<CartRepository>()),
+  locator.registerLazySingleton<restaurant.CartStoreRes>(
+    () => restaurant.CartStoreRes(locator<CartRepository>()),
   );
   locator.registerLazySingleton<TableStore>(
     () => TableStore(locator<TableRepository>()),
@@ -339,9 +340,9 @@ ChoiceStore get choiceStore => locator<ChoiceStore>();
 ExtraStore get extraStore => locator<ExtraStore>();
 OrderStore get orderStore => locator<OrderStore>();
 PastOrderStore get pastOrderStore => locator<PastOrderStore>();
-restaurant.CartStore get restaurantCartStore => locator<restaurant.CartStore>();
+CartStoreRes get restaurantCartStore => locator<CartStoreRes>();
 TableStore get tableStore => locator<TableStore>();
-CustomerStoreRes get restaurantCustomerStore => locator<restaurant.CustomerStoreRes>();
+CustomerStoreRes get restaurantCustomerStore => locator<CustomerStoreRes>();
 StaffStore get staffStore => locator<StaffStore>();
 ExpenseStore get expenseStore => locator<ExpenseStore>();
 ExpenseCategoryStore get expenseCategoryStore => locator<ExpenseCategoryStore>();
@@ -367,3 +368,22 @@ ExpenseCategoryRepository get expenseCategoryRepository => locator<ExpenseCatego
 TaxRepository get taxRepository => locator<TaxRepository>();
 CompanyRepository get companyRepository => locator<CompanyRepository>();
 EodRepository get eodRepository => locator<EodRepository>();
+
+// ==================== GLOBAL REFRESH FUNCTION ====================
+
+/// Call this after modifying data directly in Hive (e.g., from test data generator)
+/// to ensure all stores reload their cached data
+Future<void> refreshAllRestaurantStores() async {
+  print('🔄 Global refresh: reloading all restaurant stores');
+  await Future.wait([
+    categoryStore.loadCategories(),
+    itemStore.loadItems(),
+    variantStore.loadVariants(),
+    extraStore.loadExtras(),
+    choiceStore.loadChoices(),
+    tableStore.loadTables(),
+    orderStore.loadOrders(),
+    restaurantCartStore.loadCartItems(),
+  ]);
+  print('✅ Global refresh complete');
+}

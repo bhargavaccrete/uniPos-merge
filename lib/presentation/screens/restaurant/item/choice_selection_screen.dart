@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/color.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/core/di/service_locator.dart';
 
 
 class ChoiceSelectionScreen extends StatefulWidget {
@@ -35,10 +34,9 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
   }
 
   void _loadChoices() {
-    final choiceBox = Hive.box<ChoicesModel>('choice');
     if (mounted) {
       setState(() {
-        availableChoices = choiceBox.values.toList();
+        availableChoices = choiceStore.choices.toList();
       });
     }
   }
@@ -452,9 +450,8 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                       choiceOption: options,
                     );
 
-                    // Save to Hive
-                    final choiceBox = Hive.box<ChoicesModel>('choice');
-                    await choiceBox.put(newChoice.id, newChoice);
+                    // Save using store
+                    await choiceStore.addChoice(newChoice);
 
                     // Unfocus keyboard first
                     FocusScope.of(parentContext).unfocus();

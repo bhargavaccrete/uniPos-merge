@@ -1,13 +1,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 
-import '../../../../data/models/restaurant/db/database/hive_Table.dart';
-import '../../../../data/models/restaurant/db/database/hive_order.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/table_Model_311.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../start order/cart/cart.dart';
@@ -24,18 +22,10 @@ class TableScreen extends StatefulWidget {
 }
 
 class _TableScreenState extends State<TableScreen> {
-  late Future<List<TableModel>> _tablesFuture;
-
   @override
   void initState() {
     super.initState();
-    _loadTables();
-  }
-
-  void _loadTables() {
-    setState(() {
-      _tablesFuture = HiveTables.getAllTables();
-    });
+    tableStore.loadTables();
   }
 
   void _addTable() {
@@ -80,9 +70,8 @@ class _TableScreenState extends State<TableScreen> {
             onPressed: () async {
               if (Tcontroller.text.isNotEmpty) {
                 final newTable = TableModel(id: Tcontroller.text.trim());
-                await HiveTables.addTable(newTable);
+                await tableStore.addTable(newTable);
                 Navigator.pop(context);
-                _loadTables();
               }
             },
             style: ElevatedButton.styleFrom(
@@ -165,10 +154,13 @@ class _TableScreenState extends State<TableScreen> {
 
           // Tables Grid
           Expanded(
-            child: ValueListenableBuilder(
-              valueListenable: Hive.box<TableModel>('tablesBox').listenable(),
-              builder: (context, table, _) {
-                if (table.isEmpty) {
+            child: Observer(
+              builder: (_) {
+                if (tableStore.isLoading && tableStore.tables.isEmpty) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                if (tableStore.tables.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -201,7 +193,7 @@ class _TableScreenState extends State<TableScreen> {
                   );
                 }
 
-                dynamic allTable = table.values.toList();
+                final allTable = tableStore.tables;
 
                 // Responsive grid columns
                 final size = MediaQuery.of(context).size;
@@ -221,15 +213,17 @@ class _TableScreenState extends State<TableScreen> {
                     final table = allTable[index];
                     return TableCard(
                       table: table,
-                      onTap: () async {
-                        // SCENARIO 1: Table is OCCUPIED (includes Cooking, Reserved, Running, Served)
-                        if (table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running'|| table.status == 'Ready'  || table.status == 'Served') {
-                          final existingOrder = await HiveOrders.getActiveOrderByTableId(table.id);
+                      onTap: () {
+                        // SCENARIO 1: Table is OCCUPIED (includes Processing, Cooking, Reserved, Running, Ready, Served)
+                        if (table.status == 'Processing' || table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running'|| table.status == 'Ready'  || table.status == 'Served') {
+                          print('🔍 Table ${table.id} tapped - Status: ${table.status}');
+                          print('🔍 Looking for active order for table ${table.id}');
+                          print('🔍 Total orders in store: ${orderStore.orders.length}');
+
+                          final existingOrder = orderStore.getActiveOrderByTableId(table.id);
 
                           if (existingOrder != null) {
-                            final appStateBox = Hive.box('app_state');
-                            await appStateBox.put('is_existing_order', true);
-                            await appStateBox.put('table_id', existingOrder.tableNo);
+                            print('✅ Found order ${existingOrder.id} for table ${table.id}');
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -240,6 +234,7 @@ class _TableScreenState extends State<TableScreen> {
                               ),
                             );
                           } else {
+                            print('❌ No active order found for table ${table.id}');
                             NotificationService.instance.showError(
                               'Could not find an active order for Table ${table.id}.',
                             );
@@ -327,8 +322,11 @@ class TableCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color statusColor;
     switch (table.status) {
+      case 'Processing':
       case 'Cooking':
       case 'Running':
+      case 'Ready':
+      case 'Served':
         statusColor = AppColors.danger;
         break;
       case 'Reserved':

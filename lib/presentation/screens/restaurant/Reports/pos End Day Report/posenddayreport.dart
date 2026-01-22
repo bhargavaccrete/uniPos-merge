@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:unipos/util/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 
 
@@ -17,10 +16,7 @@ class Posenddayreport extends StatefulWidget {
 }
 
 class _PosenddayreportState extends State<Posenddayreport> {
-  DateTime? _dateTime;
-  List<EndOfDayReport> _allReports = [];
-  List<EndOfDayReport> _filteredReports = [];
-  bool _isLoading = false;
+  DateTime? _selectedDate;
   List<String> userlist = [
     'Admin User',
     'James 1 ',
@@ -29,19 +25,6 @@ class _PosenddayreportState extends State<Posenddayreport> {
   ];
   String dropvalue = 'Admin User';
 
-  Future<void> _pickDate (BuildContext context) async{
-    DateTime? pickedDate = await showDatePicker(context: context,
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100));
-
-    if(pickedDate != null){
-      setState(() {
-        _dateTime = pickedDate;
-      });
-    }
-
-  }
-
   @override
   void initState() {
     super.initState();
@@ -49,43 +32,34 @@ class _PosenddayreportState extends State<Posenddayreport> {
   }
 
   Future<void> _loadAllReports() async {
-    setState(() {
-      _isLoading = true;
-    });
+    // Use eodStore instead of direct Hive access
+    await eodStore.loadEODReports();
+  }
 
-    try {
-      final reports = await HiveEOD.getAllEODReports();
+  Future<void> _pickDate(BuildContext context) async {
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    if (pickedDate != null) {
       setState(() {
-        _allReports = reports;
-        _filteredReports = reports;
-        _isLoading = false;
+        _selectedDate = pickedDate;
       });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading reports: $e')),
-        );
-      }
     }
   }
 
-  void _filterReportsByDate() {
-    if (_dateTime == null) {
-      setState(() {
-        _filteredReports = _allReports;
-      });
-    } else {
-      setState(() {
-        _filteredReports = _allReports.where((report) {
-          return report.date.year == _dateTime!.year &&
-              report.date.month == _dateTime!.month &&
-              report.date.day == _dateTime!.day;
-        }).toList();
-      });
+  List<EndOfDayReport> _getFilteredReports() {
+    if (_selectedDate == null) {
+      return eodStore.eodReports;
     }
+
+    return eodStore.eodReports.where((report) {
+      return report.date.year == _selectedDate!.year &&
+          report.date.month == _selectedDate!.month &&
+          report.date.day == _selectedDate!.day;
+    }).toList();
   }
 
   @override
@@ -176,9 +150,9 @@ class _PosenddayreportState extends State<Posenddayreport> {
                         child:Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(_dateTime ==null?
+                            Text(_selectedDate ==null?
                             'DD/MM/YYYY'
-                                : '${_dateTime!.day}/${_dateTime!.month}/${_dateTime!.year}',
+                                : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
                               textScaler: TextScaler.linear(1),
                               style: GoogleFonts.poppins(fontSize: 14),
                             ),
@@ -190,7 +164,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                     SizedBox(width: 25,),
                     InkWell(
                       onTap: () {
-                        _filterReportsByDate();
+                        setState(() {}); // Refresh UI with filtered data
                       },
                       child: Container(
                         padding: EdgeInsets.all(5),
@@ -256,47 +230,56 @@ class _PosenddayreportState extends State<Posenddayreport> {
                       ],
                     )),
                 SizedBox(height: 20,),
-                _isLoading
-                    ? Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.primary,
-                  ),
-                )
-                    : _filteredReports.isEmpty
-                    ? Center(
-                  child: Container(
-                    padding: EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 50,
-                          color: Colors.grey,
+                // Use Observer to reactively update UI based on store state
+                Observer(
+                  builder: (_) {
+                    if (eodStore.isLoading) {
+                      return Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
                         ),
-                        SizedBox(height: 10),
-                        Text(
-                          _dateTime != null
-                              ? 'No End Day Report found for selected date'
-                              : 'No End Day Reports found',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            color: Colors.grey,
+                      );
+                    }
+
+                    final filteredReports = _getFilteredReports();
+
+                    if (filteredReports.isEmpty) {
+                      return Center(
+                        child: Container(
+                          padding: EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 50,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                _selectedDate != null
+                                    ? 'No End Day Report found for selected date'
+                                    : 'No End Day Reports found',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                'Complete End Day process to see reports here',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(height: 10),
-                        Text(
-                          'Complete End Day process to see reports here',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                    : SingleChildScrollView(
+                      );
+                    }
+
+                    return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                       headingRowHeight: 50,
@@ -427,9 +410,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                                     textAlign: TextAlign.center))),
 
                       ],
-                      rows: _isLoading
-                          ? []
-                          : _filteredReports.map((report) {
+                      rows: filteredReports.map((report) {
                         final dateFormatter = DateFormat('dd/MM/yyyy');
                         final timeFormatter = DateFormat('HH:mm');
 
@@ -502,6 +483,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
                           ],
                         );
                       }).toList()),
+                    );
+                  },
                 )
               ]),
         ),

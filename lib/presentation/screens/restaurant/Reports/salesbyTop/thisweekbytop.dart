@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/daywisebytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/monthwisebytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/thisweekbytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/todaybytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/yearwisebytop.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
 import 'package:unipos/util/color.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 
@@ -25,9 +19,6 @@ class ThisWeekbyTop extends StatefulWidget {
 }
 
 class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
-  List<Map<String, dynamic>> _topSellingItems = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -35,27 +26,29 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
   }
 
   Future<void> _loadTopSellingItems() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      // Get all past orders
-      final allOrders = await HivePastOrder.getAllPastOrderModel();
-      final now = DateTime.now();
+  List<Map<String, dynamic>> _calculateTopSellingItems() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final now = DateTime.now();
 
-      // Calculate start of week (Monday)
-      final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      final weekStartDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
+    // Calculate start of week (Monday)
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStartDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
 
-      // Filter orders for this week
-      final thisWeekOrders = allOrders.where((order) {
-        if (order.orderAt == null) return false;
-        final orderDate = order.orderAt!;
-        return orderDate.isAfter(weekStartDate.subtract(Duration(seconds: 1))) &&
-            orderDate.isBefore(now.add(Duration(days: 1)));
-      }).toList();
+    // Filter orders for this week
+    final thisWeekOrders = allOrders.where((order) {
+      if (order.orderAt == null) return false;
+      final orderDate = order.orderAt!;
+      return orderDate.isAfter(weekStartDate.subtract(Duration(seconds: 1))) &&
+          orderDate.isBefore(now.add(Duration(days: 1)));
+    }).toList();
 
-      // Calculate item sales with refund handling
-      Map<String, Map<String, dynamic>> itemSales = {};
+    // Calculate item sales with refund handling
+    Map<String, Map<String, dynamic>> itemSales = {};
 
       for (var order in thisWeekOrders) {
         // Skip fully refunded orders
@@ -100,14 +93,7 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
       final sortedItems = itemSales.values.toList()
         ..sort((a, b) => (b['quantity'] as int).compareTo(a['quantity'] as int));
 
-      setState(() {
-        _topSellingItems = sortedItems;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading top selling items: $e');
-      setState(() => _isLoading = false);
-    }
+      return sortedItems;
   }
 
   @override
@@ -120,9 +106,15 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
     final weekRange = '${DateFormat('dd/MM').format(weekStart)} - ${DateFormat('dd/MM/yyyy').format(weekEnd)}';
 
     return Scaffold(
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+
+          final topSellingItems = _calculateTopSellingItems();
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -150,7 +142,7 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
                     ],
                   )),
               SizedBox(height: 25),
-              if (_topSellingItems.isEmpty)
+              if (topSellingItems.isEmpty)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -238,7 +230,7 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
                                     style: GoogleFonts.poppins(fontSize: 14),
                                     textAlign: TextAlign.center))),
                       ],
-                      rows: _topSellingItems.map((item) {
+                      rows: topSellingItems.map((item) {
                         return DataRow(
                           cells: [
                             DataCell(
@@ -268,7 +260,8 @@ class _ThisWeekbyTopState extends State<ThisWeekbyTop> {
                 )
             ],
           ),
-        ),
+        ));
+        },
       ),
     );
   }

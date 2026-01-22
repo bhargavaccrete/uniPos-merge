@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
-import '../../../../../data/models/restaurant/db/database/hive_db.dart';
+import '../../../../../core/di/service_locator.dart';
 import '../componets/Button.dart';
 import 'image_picker_sheet.dart';
 
@@ -93,7 +93,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       editCount: 0,
     );
 
-    await HiveBoxes.addCategory(newCategory);
+    await categoryStore.addCategory(newCategory);
 
     widget.onCategoryAdded?.call();
     if (mounted) Navigator.pop(context);

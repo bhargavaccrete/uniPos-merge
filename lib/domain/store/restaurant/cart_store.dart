@@ -4,7 +4,7 @@ import '../../../data/repositories/restaurant/cart_repository.dart';
 
 part 'cart_store.g.dart';
 
-class CartStore = _CartStore with _$CartStore;
+class CartStoreRes = _CartStore with _$CartStoreRes;
 
 abstract class _CartStore with Store {
   final CartRepository _repository;

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/util/color.dart';
 
 import '../../../../constants/restaurant/color.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'orderDetails.dart';
 import '../../../../util/common/currency_helper.dart';
@@ -26,6 +27,7 @@ class _PastorderState extends State<Pastorder> {
   void initState() {
     super.initState();
     _searchCtrl.addListener(() => setState(() {})); // live filter
+    pastOrderStore.loadPastOrders(); // Load past orders from store
   }
 
   @override
@@ -208,10 +210,13 @@ class _PastorderState extends State<Pastorder> {
 
         // 🔽 Orders list
         Expanded(
-          child: ValueListenableBuilder(
-            valueListenable: Hive.box<pastOrderModel>('pastorderBox').listenable(),
-            builder: (context, Box<pastOrderModel> box, _) {
-              final all = box.values.toList();
+          child: Observer(
+            builder: (_) {
+              final all = pastOrderStore.pastOrders.toList();
+
+              if (pastOrderStore.isLoading && all.isEmpty) {
+                return Center(child: CircularProgressIndicator());
+              }
 
               if (all.isEmpty) {
                 return Center(child: Text('No past orders found', style: GoogleFonts.poppins()));

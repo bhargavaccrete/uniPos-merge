@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/database/hive_order.dart' show HiveOrders;
+import '../../../../../data/models/restaurant/db/database/hive_cart.dart' show HiveCart;
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
@@ -20,6 +18,7 @@ import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../data/models/restaurant/db/database/hive_customer.dart';
+import '../../../../../core/di/service_locator.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../tabbar/table.dart';
@@ -600,7 +599,7 @@ class _TakeawayState extends State<Takeaway> {
 
   Future<void> clearCart() async {
     try {
-      await HiveCart.clearCart();
+      await restaurantCartStore.clearCart();
       // await loadCartItems();
       if (mounted) {
         NotificationService.instance.showInfo(
@@ -707,11 +706,17 @@ class _TakeawayState extends State<Takeaway> {
       gstAmount: gstDetails['totalGstAmount'],
     );
 
-    await HiveOrders.addOrder(neworder);
+    await orderStore.addOrder(neworder);
     print("✅ New active order saved with GST: ${gstDetails['totalGstAmount']}");
 
     if (widget.isDineIn && widget.selectedTableNo != null) {
-      await HiveTables.updateTableStatus(widget.selectedTableNo!, 'Reserved', total: totalPrice);
+      await tableStore.updateTableStatus(
+        widget.selectedTableNo!,
+        'Reserved',
+        total: totalPrice,
+        orderId: neworder.id,
+        orderTime: neworder.timeStamp,
+      );
     }
 
     await clearCart();
@@ -791,7 +796,7 @@ class _TakeawayState extends State<Takeaway> {
       customerId: selectedCustomer?.customerId, // Link to customer
     );
 
-    await HiveOrders.addOrder(neworder);
+    await orderStore.addOrder(neworder);
 
     // Update customer stats if customer is linked
     if (selectedCustomer != null) {
@@ -799,6 +804,10 @@ class _TakeawayState extends State<Takeaway> {
     }
 
     print("✅ New active order saved with Total: ${neworder.totalPrice}");
+    print("✅ Order ID: ${neworder.id}");
+    print("✅ Table No: ${neworder.tableNo}");
+    print("✅ Order Status: ${neworder.status}");
+    print("✅ Total orders in store: ${orderStore.orders.length}");
 
     // Auto-print KOT directly to printer (only if Generate KOT setting is enabled)
     if (mounted && AppSettings.generateKOT) {
@@ -826,12 +835,15 @@ class _TakeawayState extends State<Takeaway> {
     // print("")
     if (widget.isDineIn && widget.selectedTableNo != null) {
       // Also use the correct total here
-      await HiveTables.updateTableStatus(
+      print('🔄 Updating table ${widget.selectedTableNo} status to Running');
+      await tableStore.updateTableStatus(
         widget.selectedTableNo!,
         'Running',
         total: neworder.totalPrice,
+        orderId: neworder.id,
         orderTime: neworder.timeStamp,
       );
+      print('✅ Table ${widget.selectedTableNo} status updated');
     }
 
     await clearCart();
@@ -923,7 +935,14 @@ class _TakeawayState extends State<Takeaway> {
         kotStatuses: updatedKotStatuses, // Update KOT statuses
       );
 
-      await HiveOrders.updateOrder(updateOrder);
+      print('🔍 UPDATE ORDER DEBUG:');
+      print('   Order ID: ${updateOrder.id}');
+      print('   Table No: ${updateOrder.tableNo}');
+      print('   Status: ${updateOrder.status}');
+      print('   Total: ${updateOrder.totalPrice}');
+      print('   Items count: ${updateOrder.items.length}');
+
+      await orderStore.updateOrder(updateOrder);
 
       // Broadcast update to KDS via WebSocket
       if (hasNewItems && newKotNumber != null) {
@@ -968,15 +987,29 @@ class _TakeawayState extends State<Takeaway> {
 
       // Update the table's total price as well
       if (updateOrder.tableNo != null) {
-        await HiveTables.updateTableStatus(updateOrder.tableNo!, 'Reserved', total: calculations.grandTotal);
+        print('🔄 UPDATE ORDER: Updating table ${updateOrder.tableNo} status to ${updateOrder.status}');
+        print('🔄 UPDATE ORDER: Total = ${calculations.grandTotal}');
+        await tableStore.updateTableStatus(
+          updateOrder.tableNo!,
+          updateOrder.status,
+          total: calculations.grandTotal,
+          orderId: updateOrder.id,
+          orderTime: updateOrder.timeStamp,
+        );
+        print('✅ UPDATE ORDER: Table ${updateOrder.tableNo} status updated');
+      } else {
+        print('⚠️ UPDATE ORDER: No table number found, skipping table status update');
       }
 
       // Clear the cart after successfully updating the order
       await clearCart();
 
       if (mounted) {
-        // Pop with 'true' to let the previous screen know the update was successful.
-        Navigator.of(context).pop(true);
+        // Navigate back to Startorder to reset the UI completely
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => Startorder()),
+          (Route<dynamic> route) => false,
+        );
 
         if (hasNewItems) {
           NotificationService.instance.showSuccess(
@@ -1897,11 +1930,11 @@ class _TakeawayState extends State<Takeaway> {
       billNumber: billNumber, // Daily bill number (resets every day)
     );
 
-    await HivePastOrder.addOrder(pastOrder);
+    await pastOrderStore.addOrder(pastOrder);
     print("✅ Order saved to past orders history with Bill #$billNumber");
 
     // This is the critical missing step: delete the order from the ACTIVE list.
-    await HiveOrders.deleteOrder(activeModel.id);
+    await orderStore.deleteOrder(activeModel.id);
     print("🗑️ Active order has been deleted.");
   }
 
@@ -2004,14 +2037,14 @@ class _TakeawayState extends State<Takeaway> {
     );
 
     // 1. Add the completed order to history
-    await HivePastOrder.addOrder(pastOrder);
+    await pastOrderStore.addOrder(pastOrder);
 
     // 2. Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
     print("✅ Stock deducted for quick settle order");
 
     // 3. Clear the user's cart
-    await HiveCart.clearCart();
+    await restaurantCartStore.clearCart();
 
     // 4. Navigate and show success message
     if (mounted) {

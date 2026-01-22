@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart'; // <-- Import hive_flutter
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
-import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
-
+import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../util/restaurant/images.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/common/currency_helper.dart';
@@ -64,36 +63,26 @@ class _AllTabState extends State<AllTab> {
                 ),
               ),
 
-              // ✅ This builder automatically listens for any changes in your Hive boxes
-              ValueListenableBuilder(
-                // Listens to the 'categories' box
-                valueListenable: Hive.box<Category>('categories').listenable(),
-                builder: (context, Box<Category> categoryBox, _) {
-                  final allCategories = categoryBox.values.toList();
+              // Observer automatically listens for any changes in the stores
+              Observer(
+                builder: (_) {
+                  final allCategories = categoryStore.categories.toList();
+                  final allItems = itemStore.items.toList();
+                  final allVariants = variantStore.variants.toList();
 
-                  return ValueListenableBuilder(
-                    // Listens to the 'items' box
-                    valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-                    builder: (context, Box<Items> itemBox, _) {
-                      final allItems = itemBox.values.toList();
+                  final filtercat = query.isEmpty
+                      ? allCategories
+                      : allCategories.where((cat) {
+                          final name = cat.name.toLowerCase();
+                          final queryLower = query.toLowerCase();
+                          return name.contains(queryLower);
+                        }).toList();
 
-                      return ValueListenableBuilder(
-                        // Listens to the 'variants' box
-                        valueListenable: Hive.box<VariantModel>('variante').listenable(),
-                        builder: (context, Box<VariantModel> variantBox, _) {
-                          final filtercat = query.isEmpty
-                              ? allCategories
-                              : allCategories.where((cat) {
-                                  final name = cat.name.toLowerCase();
-                                  final queryLower = query.toLowerCase();
-                                  return name.contains(queryLower);
-                                }).toList();
-
-                          // This logic now runs automatically whenever data changes
-                          final Map<String, List<Items>> categoryItemsMap = {};
-                          for (var category in allCategories) {
-                            categoryItemsMap[category.id] = allItems.where((item) => item.categoryOfItem == category.id).toList();
-                          }
+                  // This logic now runs automatically whenever data changes
+                  final Map<String, List<Items>> categoryItemsMap = {};
+                  for (var category in allCategories) {
+                    categoryItemsMap[category.id] = allItems.where((item) => item.categoryOfItem == category.id).toList();
+                  }
 
                           // --- Build UI with the always-fresh data ---
                           if (allCategories.isEmpty) {
@@ -153,8 +142,7 @@ class _AllTabState extends State<AllTab> {
                                                             inactiveTrackColor: Colors.grey.shade400,
                                                             value: item.isEnabled,
                                                             onChanged: (bool value) async {
-                                                              item.isEnabled = value;
-                                                              await item.save();
+                                                              await itemStore.toggleItemStatus(item.id);
                                                             },
                                                           ),
                                                         ),
@@ -178,7 +166,7 @@ class _AllTabState extends State<AllTab> {
                                                       ),
                                                       SizedBox(height: 4),
                                                       ...item.variant!.map((variant) {
-                                                        final variantData = variantBox.values.firstWhere(
+                                                        final variantData = allVariants.firstWhere(
                                                           (v) => v.id == variant.variantId,
                                                           orElse: () => VariantModel(id: variant.variantId, name: 'Unknown'),
                                                         );
@@ -214,11 +202,10 @@ class _AllTabState extends State<AllTab> {
                             ),
                           );
                         },
-                      );
-                    },
-                  );
-                },
-              ),
+                      ),
+
+
+
 
               // BottomsheetMenu no longer needs a callback, as the UI is reactive
               BottomsheetMenu(),

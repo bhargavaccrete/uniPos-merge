@@ -4,22 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/refund_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
-// A helper class to hold the result from the dialog
-class PartialRefundResult {
-  final Map<CartItem, int> itemsToRefund;
-  final String reason;
-  final double totalRefundAmount;
-  final Map<CartItem, int> itemsToRestock;
 
-  PartialRefundResult({
-    required this.itemsToRefund,
-    required this.reason,
-    required this.totalRefundAmount,
-    required this.itemsToRestock, // <-- FIX 1: Corrected comma
-  });
-}
+// Export PartialRefundResult so UI screens can use it
+export '../../../../domain/services/restaurant/refund_service.dart' show PartialRefundResult;
 
 class PartialRefundDialog extends StatefulWidget {
   final List<CartItem> orderItems; // Refundable items only
@@ -48,6 +38,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
   late Map<CartItem, int> _refundQuantities;
   double _totalRefundAmount = 0.0;
   late Map<CartItem, bool> _restockStatus;
+  bool _showReasonError = false;
 
   @override
   void initState() {
@@ -151,6 +142,14 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       } else {
         _updateRefundTotal();
       }
+
+      // Suggest a default reason if empty
+      if (_refundReasonController.text.trim().isEmpty) {
+        _refundReasonController.text = 'Full order refund requested by customer';
+      }
+
+      // Clear error state if shown
+      _showReasonError = false;
     });
   }
 
@@ -263,14 +262,59 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
                 },
               ),
               const SizedBox(height: 16),
+              // Required indicator
+              Row(
+                children: [
+                  Text(
+                    'Reason for Refund',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    ' *',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: _refundReasonController,
+                onChanged: (value) {
+                  // Clear error when user starts typing
+                  if (_showReasonError && value.trim().isNotEmpty) {
+                    setState(() => _showReasonError = false);
+                  }
+                },
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  hintText: 'Enter reason for refund...',
-                  hintStyle: GoogleFonts.poppins(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: _showReasonError ? Colors.red : Colors.grey.shade400),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: _showReasonError ? Colors.red : Colors.grey.shade400),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: _showReasonError ? Colors.red : Colors.orange, width: 2),
+                  ),
+                  hintText: 'e.g., Customer complaint, wrong order, quality issue...',
+                  hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade500),
+                  filled: true,
+                  fillColor: _showReasonError ? Colors.red.shade50 : Colors.grey.shade50,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  errorText: _showReasonError ? 'This field is required' : null,
+                  errorStyle: GoogleFonts.poppins(fontSize: 12, color: Colors.red),
                 ),
-                maxLines: 2,
+                maxLines: 3,
+                minLines: 2,
               ),
               const SizedBox(height: 16),
               Text(
@@ -288,30 +332,82 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
         ),
         ElevatedButton(
           onPressed: () {
+            print('🔘 Confirm Refund button pressed');
+            print('Total refund amount: $_totalRefundAmount');
+            print('Reason: ${_refundReasonController.text.trim()}');
+
             if (_totalRefundAmount <= 0) {
-              NotificationService.instance.showInfo('Please select at least one item to refund.');
+              print('❌ Validation failed: No items selected');
+              NotificationService.instance.showError('Please select at least one item to refund');
               return;
             }
             if (_refundReasonController.text.trim().isEmpty) {
-              NotificationService.instance.showInfo('Please enter a reason for refund.');
+              print('❌ Validation failed: No reason provided');
+              setState(() => _showReasonError = true);
+              NotificationService.instance.showError('Reason is required! Please enter a reason for this refund.');
+              // Also show a dialog for emphasis
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  title: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Reason Required',
+                          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                  content: Text(
+                    'Please provide a reason for this refund. This is mandatory for record-keeping and audit purposes.',
+                    style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
+                  ),
+                  actions: [
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      child: Text('OK', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              );
               return;
             }
 
             final itemsToRefund = Map.of(_refundQuantities)..removeWhere((key, value) => value == 0);
+            print('Items to refund: ${itemsToRefund.length}');
 
             final Map<CartItem, int> itemsToRestock = {};
             itemsToRefund.forEach((item, quantity) {
               if (_restockStatus[item] == true) {
                 itemsToRestock[item] = quantity;
+                print('✅ Will restock: ${item.title} x$quantity');
+              } else {
+                print('⚠️ Will NOT restock: ${item.title} x$quantity');
               }
             });
+
+            print('Items to restock: ${itemsToRestock.length}');
 
             final result = PartialRefundResult(
               itemsToRefund: itemsToRefund,
               reason: _refundReasonController.text.trim(),
               totalRefundAmount: _totalRefundAmount,
-              itemsToRestock: itemsToRestock, // <-- FIX 2: Corrected parenthesis
+              itemsToRestock: itemsToRestock,
             );
+
+            // Reset error state on successful submission
+            setState(() => _showReasonError = false);
+
+            print('✅ Closing dialog with result');
             Navigator.pop(context, result);
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),

@@ -38,6 +38,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   void initState() {
     super.initState();
     // Initialize controllers with store values
+    // Initialize controllers with store values
     _storeNameController = TextEditingController(text: widget.store.storeName);
     _ownerNameController = TextEditingController(text: widget.store.ownerName);
     _phoneController = TextEditingController(text: widget.store.phone);

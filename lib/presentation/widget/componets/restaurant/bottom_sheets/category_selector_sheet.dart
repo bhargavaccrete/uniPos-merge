@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
-import '../../../../../data/models/restaurant/db/database/hive_db.dart';
+import '../../../../../core/di/service_locator.dart';
 import '../componets/Button.dart';
 import 'package:unipos/util/color.dart';
 /// Result from category selection
@@ -69,8 +69,8 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   }
 
   Future<void> _loadData() async {
-    final categories = await HiveBoxes.getAllCategories();
-    final items = await itemsBoxes.getAllItems();
+    final categories = categoryStore.categories.toList();
+    final items = itemStore.items.toList();
 
     setState(() {
       _categories = categories;
@@ -105,7 +105,7 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
     );
 
     if (confirm == true) {
-      await HiveBoxes.deleteCategory(category.id);
+      await categoryStore.deleteCategory(category.id);
       _loadData();
     }
   }

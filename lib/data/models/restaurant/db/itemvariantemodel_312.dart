@@ -19,6 +19,7 @@ class ItemVariante extends HiveObject {
   ItemVariante({
     required this.variantId,
     required this.price,
+
     this.trackInventory,
     this.stockQuantity
   });

@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/daywisebytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/monthwisebytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/thisweekbytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/todaybytop.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/yearwisebytop.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
 import 'package:unipos/util/color.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 
@@ -25,9 +18,6 @@ class TodaybyTop extends StatefulWidget {
 }
 
 class _TodaybyTopState extends State<TodaybyTop> {
-  List<Map<String, dynamic>> _topSellingItems = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -35,24 +25,26 @@ class _TodaybyTopState extends State<TodaybyTop> {
   }
 
   Future<void> _loadTopSellingItems() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      // Get all past orders for today
-      final allOrders = await HivePastOrder.getAllPastOrderModel();
-      final today = DateTime.now();
+  List<Map<String, dynamic>> _calculateTopSellingItems() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final today = DateTime.now();
 
-      // Filter orders for today only
-      final todayOrders = allOrders.where((order) {
-        if (order.orderAt == null) return false;
-        final orderDate = order.orderAt!;
-        return orderDate.year == today.year &&
-            orderDate.month == today.month &&
-            orderDate.day == today.day;
-      }).toList();
+    // Filter orders for today only
+    final todayOrders = allOrders.where((order) {
+      if (order.orderAt == null) return false;
+      final orderDate = order.orderAt!;
+      return orderDate.year == today.year &&
+          orderDate.month == today.month &&
+          orderDate.day == today.day;
+    }).toList();
 
-      // Calculate item sales with refund handling
-      Map<String, Map<String, dynamic>> itemSales = {};
+    // Calculate item sales with refund handling
+    Map<String, Map<String, dynamic>> itemSales = {};
 
       for (var order in todayOrders) {
         // Skip fully refunded orders
@@ -97,14 +89,7 @@ class _TodaybyTopState extends State<TodaybyTop> {
       final sortedItems = itemSales.values.toList()
         ..sort((a, b) => (b['quantity'] as int).compareTo(a['quantity'] as int));
 
-      setState(() {
-        _topSellingItems = sortedItems;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading top selling items: $e');
-      setState(() => _isLoading = false);
-    }
+      return sortedItems;
   }
 
   @override
@@ -114,9 +99,15 @@ class _TodaybyTopState extends State<TodaybyTop> {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     return Scaffold(
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+
+          final topSellingItems = _calculateTopSellingItems();
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -146,7 +137,7 @@ class _TodaybyTopState extends State<TodaybyTop> {
                     ],
                   )),
               SizedBox(height: 25),
-              if (_topSellingItems.isEmpty)
+              if (topSellingItems.isEmpty)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -239,7 +230,7 @@ class _TodaybyTopState extends State<TodaybyTop> {
                                     GoogleFonts.poppins(fontSize: 14),
                                     textAlign: TextAlign.center))),
                       ],
-                      rows: _topSellingItems.map((item) {
+                      rows: topSellingItems.map((item) {
                         return DataRow(
                           cells: [
                             DataCell(
@@ -275,7 +266,8 @@ class _TodaybyTopState extends State<TodaybyTop> {
                 )
             ],
           ),
-        ),
+        ));
+        },
       ),
     );
   }

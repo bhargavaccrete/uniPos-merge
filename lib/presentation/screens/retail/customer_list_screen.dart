@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-
 import 'package:uuid/uuid.dart';
 
+import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import 'customer_detail_screen.dart';
 class CustomerListScreen extends StatefulWidget {

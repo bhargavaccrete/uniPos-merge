@@ -3,12 +3,13 @@
 // In SalesByCategory.dart, make sure your imports look like this at the top
 
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 
 // --- YOUR IMPORTS ---
 
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 
@@ -27,9 +28,6 @@ class SalesbyCategory extends StatefulWidget {
 class _SalesbyCategoryState extends State<SalesbyCategory> {
   // State Variables
   String _selectedFilter = "Today";
-  bool _isLoading = true;
-  List<CategoryReportData> _categoryReportList = [];
-  late Box<pastOrderModel> _ordersBox;
 
   // State for Custom Date Range
   DateTime? _startDate;
@@ -38,36 +36,35 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
   @override
   void initState() {
     super.initState();
-    // Use addPostFrameCallback to prevent jank on startup
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initAndLoadData();
-    });
+    // Load data from stores
+    _initAndLoadData();
   }
 
   @override
   void didUpdateWidget(covariant SalesbyCategory oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Reload data when returning to this screen
-    _updateReportData();
+    _loadData();
   }
 
   Future<void> _initAndLoadData() async {
-    _ordersBox = await Hive.openBox<pastOrderModel>('pastorderBox');
-    _updateReportData();
+    // Load from stores instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+    await itemStore.loadItems();
+    await categoryStore.loadCategories();
   }
 
-  void _updateReportData() {
-    if (!mounted) return;
-    setState(() { _isLoading = true; });
+  Future<void> _loadData() async {
+    // Reload from stores
+    await pastOrderStore.loadPastOrders();
+    await itemStore.loadItems();
+    await categoryStore.loadCategories();
+  }
 
-    final allOrders = _ordersBox.values.toList();
-    final reportData = _generateCategoryWiseReport(allOrders, _selectedFilter, _startDate, _endDate);
-
-    if (!mounted) return;
-    setState(() {
-      _categoryReportList = reportData;
-      _isLoading = false;
-    });
+  List<CategoryReportData> _getReportData() {
+    // Get data from stores
+    final allOrders = pastOrderStore.pastOrders.toList();
+    return _generateCategoryWiseReport(allOrders, _selectedFilter, _startDate, _endDate);
   }
 
   Future<void> _showCustomDateRangePicker() async {
@@ -77,26 +74,22 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
       lastDate: DateTime.now(),
       initialDateRange: _startDate != null && _endDate != null
           ? DateTimeRange(start: _startDate!, end: _endDate!)
-
           : null,
     );
 
     if (picked != null) {
       if (!mounted) return;
       setState(() {
-
         _startDate = picked.start;
         _endDate = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
         _selectedFilter = "Custom";
       });
-      _updateReportData();
     }
   }
 
   void _onFilterSelected(String title) {
     if (title == "Custom") {
       _showCustomDateRangePicker();
-
     } else {
       if (!mounted) return;
       setState(() {
@@ -104,20 +97,16 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
         _startDate = null;
         _endDate = null;
       });
-      _updateReportData();
     }
   }
 
-  Widget _getBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_categoryReportList.isEmpty) {
+  Widget _getBody(List<CategoryReportData> reportData) {
+    if (reportData.isEmpty) {
       return const Center(child: Text("No sales data for this period."));
     }
 
     // Always show the SAME display widget, just with the new, updated data.
-    return CategoryReportView(reportData: _categoryReportList,);
+    return CategoryReportView(reportData: reportData);
   }
 
   String get customDateRangeText {
@@ -140,31 +129,39 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Text('Sales By Category', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
-            // const SizedBox(height: 10),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _filterButton("Today"),
-                  _filterButton("This Week"),
-                  _filterButton("Month"),
-                  _filterButton("Year"),
-                  _filterButton(customDateRangeText, isCustom: true),
-                ],
-              ),
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading || itemStore.isLoading || categoryStore.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final reportData = _getReportData();
+
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _filterButton("Today"),
+                      _filterButton("This Week"),
+                      _filterButton("Month"),
+                      _filterButton("Year"),
+                      _filterButton(customDateRangeText, isCustom: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: _getBody(reportData),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: _getBody(),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -199,16 +196,13 @@ class _SalesbyCategoryState extends State<SalesbyCategory> {
     final filteredOrders = _filterOrders(allOrders, period, startDate, endDate);
     final Map<String, CategoryReportData> categorySummary = {};
 
-    // Build fast lookups once
-    final itemBox = Hive.box<Items>('itemBoxs');
-    final categoryBox = Hive.box<Category>('categories');
-
+    // Build fast lookups from stores
     final Map<String, String> categoryNameById = {
-      for (final c in categoryBox.values) c.id: c.name.trim(),
+      for (final c in categoryStore.categories) c.id: c.name.trim(),
     };
 
     final Map<String, String> itemIdToCategoryName = {
-      for (final it in itemBox.values)
+      for (final it in itemStore.items)
         it.id: (categoryNameById[it.categoryOfItem] ?? 'Uncategorized'),
     };
 

@@ -1,12 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -15,7 +13,6 @@ import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
-
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../widget/componets/restaurant/componets/custom_category.dart';
@@ -36,44 +33,14 @@ class _CategoryTabState extends State<CategoryTab> {
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
   bool isActive = true;
+  Map<String, bool> toggleState = {};
 
 
-
-
-  Map<String , List<Items>> categoryItemsMap = {};
-
-  Map<String , bool>  toggleState = {};
-
-  Future<void> loadCategoriesAndItems ()async {
-    // Box is already opened during app startup in HiveInit
-    final categoryBox = Hive.box<Category>('categories');
-    final itemBox = await itemsBoxes.getItemBox();
-
-    final allCategories = categoryBox.values.toList();
-    final allItems = itemBox.values.toList();
-
-
-    //group items by categoryid
-    final Map<String, List<Items>> tempMap = {};
-    for(var category in allCategories){
-      tempMap[category.id] = allItems
-          .where((item)=> item.categoryOfItem == category.id)
-          .toList();
-    }
-    setState(() {
-      categorieshive = allCategories;
-      categoryItemsMap = tempMap;
-    });
-  }
 
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    // _loadCategories();
-    loadHive();
-    loadCategoriesAndItems();
   }
 
   // function to open bottom sheet
@@ -181,28 +148,16 @@ class _CategoryTabState extends State<CategoryTab> {
         id: const Uuid().v4(),
         name: _categoryController.text.trim());
 
-    await HiveBoxes.addCategory(newcategory);
-    await loadHive();
+    await categoryStore.addCategory(newcategory);
     _clearImage();
     Navigator.pop(context);
 
 // _clearImage();
   }
 
-  List<Category> categorieshive = [];
-
-  /// to load hive data
-  Future<void> loadHive() async {
-    final box = await HiveBoxes.getCategory();
-    setState(() {
-      categorieshive = box.values.toList();
-    });
-  }
-
   /// delete category
   void _deleteCategoryhive(dynamic id) async {
-    await HiveBoxes.deleteCategory(id);
-    await loadHive();
+    await categoryStore.deleteCategory(id);
   }
 
   // void _addcategory (){
@@ -268,9 +223,13 @@ class _CategoryTabState extends State<CategoryTab> {
               ),
               // Spacer(),
 
-              Column(
+              Observer(
+                builder: (_) {
+                  final categories = categoryStore.categories.toList();
+                  final allItems = itemStore.items.toList();
+                  return Column(
                 children: [
-                  categorieshive.isEmpty
+                  categories.isEmpty
                       ? Container(
                     height:
                     ResponsiveHelper.responsiveHeight(context, 0.6),
@@ -304,12 +263,12 @@ class _CategoryTabState extends State<CategoryTab> {
                     width: ResponsiveHelper.maxContentWidth(context),
 
                     child: ListView.builder(
-                        itemCount: categorieshive.length,
+                        itemCount: categories.length,
                         itemBuilder: (context, index) {
-                          var category = categorieshive[index];
+                          var category = categories[index];
 
                           // final cat = categoriesitem[index];
-                          final items = categoryItemsMap[category.id] ?? [];
+                          final items = allItems.where((item) => item.categoryOfItem == category.id).toList();
 
                           toggleState.putIfAbsent(category.id ,()=>  true);
                           return Card(
@@ -325,8 +284,7 @@ class _CategoryTabState extends State<CategoryTab> {
                                     // _selectedImage != null
                                     //     ?Image.file(_selectedImage!, height:50,width: 50,)
                                     // : Icon(Icons.image,size: 50,color: Colors.grey,),
-                                    // itemCount: items.length.toString(),
-                                    itemCount:items.length.toString() ?? '0',
+                                    itemCount: items.length.toString(),
                                     title: category.name,
                                     isActive: toggleState[category.id]?? false,
                                     // 🔍 AUDIT TRAIL: Pass audit trail data to widget
@@ -340,7 +298,9 @@ class _CategoryTabState extends State<CategoryTab> {
                                             title: Text('Delete Category'),
                                             content: Text("Are you sure want to delete this category and all its items?"),
                                             actions: [
-                                              TextButton(onPressed: (){},
+                                              TextButton(onPressed: (){
+                                                Navigator.pop(context);
+                                              },
                                                 child: Text("Cancel"),),
                                               TextButton(onPressed: (){
                                                 _deleteCategoryhive(category.id);
@@ -367,8 +327,7 @@ class _CategoryTabState extends State<CategoryTab> {
                                     // },
                                     onEdit: () async {
                                       List<Category> categoryList =
-                                      await HiveBoxes
-                                          .getAllCategories();
+                                      categoryStore.categories.toList();
 
                                       if (categoryList.isNotEmpty) {
                                         final result =
@@ -384,11 +343,8 @@ class _CategoryTabState extends State<CategoryTab> {
                                         );
 
                                         if (result == true) {
-                                          // Refresh the list
-                                          setState(() {
-                                            loadHive();
-                                            // Optionally re-fetch the data
-                                          });
+                                          // Data automatically refreshes via MobX Observer
+                                          // No manual refresh needed
                                         }
                                       } else {
 
@@ -413,7 +369,8 @@ class _CategoryTabState extends State<CategoryTab> {
                         }),
                   )
                 ],
-              ),
+              );
+                }),
               // Button  Add Category
               CommonButton(
 

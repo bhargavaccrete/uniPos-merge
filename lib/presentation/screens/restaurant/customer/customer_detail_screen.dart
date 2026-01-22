@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_customer.dart';
-import 'package:unipos/util/color.dart';
 import 'add_edit_customer_screen.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
@@ -26,8 +25,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     _customer = widget.customer;
   }
 
-  void _refreshCustomerData() {
-    final updatedCustomer = HiveCustomer.getCustomerById(_customer.customerId);
+  Future<void> _refreshCustomerData() async {
+    final updatedCustomer = await restaurantCustomerStore.getCustomerById(_customer.customerId);
     if (updatedCustomer != null) {
       setState(() {
         _customer = updatedCustomer;
@@ -43,8 +42,19 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       ),
     );
 
-    if (result == true) {
-      _refreshCustomerData();
+    if (result == 'updated') {
+      await _refreshCustomerData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Customer updated successfully',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 
@@ -89,18 +99,20 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     if (result == true && pointsController.text.isNotEmpty) {
       final points = int.tryParse(pointsController.text);
       if (points != null && points > 0) {
-        await HiveCustomer.addLoyaltyPoints(_customer.customerId, points);
-        _refreshCustomerData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '$points loyalty points added',
-                style: GoogleFonts.poppins(),
+        final success = await restaurantCustomerStore.addLoyaltyPoints(_customer.customerId, points);
+        if (success) {
+          await _refreshCustomerData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '$points loyalty points added',
+                  style: GoogleFonts.poppins(),
+                ),
+                backgroundColor: Colors.green,
               ),
-              backgroundColor: Colors.green,
-            ),
-          );
+            );
+          }
         }
       }
     }
@@ -135,18 +147,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
 
     if (confirm == true) {
-      await HiveCustomer.deleteCustomer(_customer.customerId);
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Customer deleted successfully',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+      final success = await restaurantCustomerStore.deleteCustomer(_customer.customerId);
+      if (mounted && success) {
+        Navigator.pop(context, 'deleted');
       }
     }
   }

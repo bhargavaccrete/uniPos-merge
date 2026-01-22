@@ -2,20 +2,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
-import '../../../../constants/restaurant/color.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
-import '../../../../data/models/restaurant/db/database/hive_db.dart';
-import '../../../../data/models/restaurant/db/database/hive_pastorder.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/cart_calculation_service.dart';
+import '../../../../core/di/service_locator.dart';
 import '../util/restaurant_print_helper.dart';
 import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/util/color.dart';
 class Orderdetails extends StatefulWidget {
   final pastOrderModel? Order;
   const Orderdetails({super.key, this.Order});
@@ -682,126 +679,75 @@ class _OrderdetailsState extends State<Orderdetails> {
   }
 
   Future<void> _showRefundDialog(BuildContext context) async {
-    if (currentOrder.orderAt == null) {
-      NotificationService.instance.showInfo('Order time is missing. Cannot process refund.');
-      return;
-    }
-    final minutePassed = DateTime.now().difference(currentOrder.orderAt!).inMinutes;
-    if (minutePassed > 60) {
-      NotificationService.instance.showInfo('Refund window (60 minutes) has passed.');
+    print('🔔 Refund button clicked');
+
+    // Validate refund eligibility using store
+    final eligibilityError = pastOrderStore.validateRefundEligibility(currentOrder);
+    if (eligibilityError != null) {
+      print('❌ $eligibilityError');
+      NotificationService.instance.showInfo(eligibilityError);
       return;
     }
 
+    // Get refundable items and remaining amount using store
+    final refundableItems = pastOrderStore.getRefundableItems(currentOrder);
+    final remainingTotal = pastOrderStore.getRemainingRefundableAmount(currentOrder);
+
+    print('📝 Refundable items: ${refundableItems.length}');
+    print('💰 Remaining refundable total: $remainingTotal');
+    print('📋 Opening refund dialog...');
+
+    // Calculate GST rate for dialog
     final subTotal = currentOrder.subTotal ?? 0;
     final gstAmount = currentOrder.gstAmount ?? 0;
     final gstRate = (subTotal > 0) ? (gstAmount / subTotal) : 0.0;
-
-    final refundableItems = currentOrder.items?.where((item) {
-      final originalQty = item.quantity ?? 0;
-      final alreadyRefunded = item.refundedQuantity ?? 0;
-      return originalQty > alreadyRefunded;
-    }).toList() ?? [];
-
-    if (refundableItems.isEmpty) {
-      NotificationService.instance.showError('All items in this order have already been refunded.');
-      return;
-    }
-
-    // Calculate remaining order total (original - already refunded)
-    final originalTotal = currentOrder.totalPrice ?? 0.0;
-    final alreadyRefunded = currentOrder.refundAmount ?? 0.0;
-    final remainingTotal = originalTotal - alreadyRefunded;
 
     final result = await showDialog<PartialRefundResult>(
       context: context,
       builder: (ctx) => PartialRefundDialog(
         orderItems: refundableItems,
-        allOrderItems: currentOrder.items ?? [], // Pass ALL items for discount calculation
+        allOrderItems: currentOrder.items ?? [],
         orderGstRate: gstRate,
-        orderTotalPrice: remainingTotal, // Pass remaining amount that can be refunded
-        orderDiscount: currentOrder.Discount ?? 0.0, // Pass the order-level discount
-        orderSubTotal: currentOrder.subTotal ?? 0.0, // Pass the subtotal
+        orderTotalPrice: remainingTotal,
+        orderDiscount: currentOrder.Discount ?? 0.0,
+        orderSubTotal: currentOrder.subTotal ?? 0.0,
       ),
     );
 
+    print('🔙 Dialog closed');
     if (result != null) {
+      print('✅ Result received, processing refund...');
       await _processPartialRefund(result);
+    } else {
+      print('❌ Dialog was cancelled (result is null)');
     }
   }
 
   Future<void> _processPartialRefund(PartialRefundResult result) async {
-    try {
-      final List<CartItem> updatedItems = List<CartItem>.from(currentOrder.items ?? []);
+    // Use PastOrderStore to handle all business logic
+    final updatedOrder = await pastOrderStore.processRefund(
+      order: currentOrder,
+      refundResult: result,
+    );
 
-      result.itemsToRefund.forEach((itemToRefund, quantityToRefund) {
-        final index = updatedItems.indexWhere((item) =>
-        item.id == itemToRefund.id &&
-            item.productId == itemToRefund.productId &&
-            item.variantName == itemToRefund.variantName);
-        if (index != -1) {
-          final currentItem = updatedItems[index];
-          final newRefundedQuantity = (currentItem.refundedQuantity ?? 0) + quantityToRefund;
-          updatedItems[index] = currentItem.copyWith(refundedQuantity: newRefundedQuantity);
-        }
-      });
-
-      bool allItemsRefunded = updatedItems.every((item) {
-        final originalQty = item.quantity ?? 0;
-        final refundedQty = item.refundedQuantity ?? 0;
-        return refundedQty >= originalQty;
-      });
-
-      final newStatus = allItemsRefunded ? 'FULLY_REFUNDED' : 'PARTIALLY_REFUNDED';
-
-      final updatedOrder = currentOrder.copyWith(
-        items: updatedItems,
-        orderStatus: newStatus,
-        refundAmount: (currentOrder.refundAmount ?? 0) + result.totalRefundAmount,
-        refundReason: (currentOrder.refundReason ?? '') + '\n[${DateTime.now().toLocal().toString().substring(0, 16)}] ${result.reason}',
-        refundedAt: DateTime.now(),
-      );
-
-      await HivePastOrder.updateOrder(updatedOrder);
-
-      // Process stock restoration for items marked for restocking
-      await _restoreItemStock(result.itemsToRestock);
-
+    if (updatedOrder != null) {
+      // Update UI state
       setState(() => currentOrder = updatedOrder);
-      NotificationService.instance.showSuccess('Partial refund processed successfully');
-    } catch (e) {
-      NotificationService.instance.showError('Failed to process refund: $e');
+
+      // Show success message
+      NotificationService.instance.showSuccess(
+        'Refund processed: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(result.totalRefundAmount)}'
+      );
+    } else {
+      // Error message already set by store
+      NotificationService.instance.showError(
+        pastOrderStore.errorMessage ?? 'Failed to process refund'
+      );
     }
   }
 
-  Future<void> _restoreItemStock(Map<CartItem, int> itemsToRestock) async {
-    try {
-      for (final entry in itemsToRestock.entries) {
-        final cartItem = entry.key;
-        final restockQuantity = entry.value;
-
-        if (cartItem.productId.isEmpty || restockQuantity <= 0) continue;
-
-        // Get the current item from the database
-        final itemBox = await itemsBoxes.getItemBox();
-        final existingItem = itemBox.get(cartItem.productId);
-
-        if (existingItem != null && existingItem.trackInventory) {
-          // Update the stock quantity
-          final updatedItem = existingItem.copyWith(
-            stockQuantity: existingItem.stockQuantity + restockQuantity,
-          );
-
-          // Save the updated item back to the database
-          await itemsBoxes.updateItem(updatedItem);
-
-          print('Stock restored: $restockQuantity units added to ${existingItem.name}. New stock: ${updatedItem.stockQuantity}');
-        }
-      }
-    } catch (e) {
-      print('Error restoring stock: $e');
-      NotificationService.instance.showError('Failed to restore some item stock: $e');
-    }
-  }
+  // Business logic has been moved to RefundService and InventoryService
+  // UI should only handle user interactions and display
 
   Future<void> _deleteOrder(BuildContext context) async {
     // Show dialog to get void reason
@@ -868,25 +814,23 @@ class _OrderdetailsState extends State<Orderdetails> {
       return;
     }
 
-    try {
-      // Update order status to VOIDED instead of deleting
-      final voidedOrder = currentOrder.copyWith(
-        orderStatus: 'VOIDED',
-        refundReason: reasonController.text.isNotEmpty
-            ? 'VOIDED: ${reasonController.text}'
-            : 'VOIDED: No reason provided',
-        refundedAt: DateTime.now(),
-      );
+    // Use PastOrderStore to void the order
+    final voidedOrder = await pastOrderStore.voidOrder(
+      order: currentOrder,
+      reason: reasonController.text,
+    );
 
-      await HivePastOrder.updateOrder(voidedOrder);
+    reasonController.dispose();
 
-      reasonController.dispose();
+    if (voidedOrder != null) {
+      setState(() => currentOrder = voidedOrder);
 
       NotificationService.instance.showSuccess('Order voided successfully');
       if (mounted) Navigator.pop(context, true); // Return true to refresh parent
-    } catch (e) {
-      reasonController.dispose();
-      NotificationService.instance.showError('Failed to void order: $e');
+    } else {
+      NotificationService.instance.showError(
+        pastOrderStore.errorMessage ?? 'Failed to void order'
+      );
     }
   }
 }

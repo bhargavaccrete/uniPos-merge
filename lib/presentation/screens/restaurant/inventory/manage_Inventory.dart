@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import 'package:hive_flutter/adapters.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
-import 'package:unipos/presentation/screens/restaurant/inventory/stockHistoy.dart';
 import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
-import '../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
-import '../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 
@@ -30,16 +25,14 @@ class _ManageInventoryState extends State<ManageInventory> {
 
   final Map<String, TextEditingController> _stockControllers = {};
   final Map<String, bool> _expandedCategories = {};
-  Map<String, VariantModel> _variantCache = {};
 
   @override
   void initState() {
     super.initState();
-    _loadVariants();
+    _loadData();
   }
 
   @override
-
   void dispose() {
     for (var controller in _stockControllers.values) {
       controller.dispose();
@@ -47,19 +40,22 @@ class _ManageInventoryState extends State<ManageInventory> {
     super.dispose();
   }
 
-  Future<void> _loadVariants() async {
-    try {
-      final variants = await HiveVariante.getAllVariante();
-      setState(() {
-        _variantCache = {for (var variant in variants) variant.id: variant};
-      });
-    } catch (e) {
-      print('Error loading variants: $e');
-    }
+  Future<void> _loadData() async {
+    await categoryStore.loadCategories();
+    await itemStore.loadItems();
+    await variantStore.loadVariants();
   }
 
   String _getVariantName(String variantId) {
-    return _variantCache[variantId]?.name ?? 'Unknown Variant';
+    try {
+      final variant = variantStore.variants.firstWhere(
+        (v) => v.id == variantId,
+        orElse: () => variantStore.variants.first,
+      );
+      return variant.name;
+    } catch (e) {
+      return 'Unknown Variant';
+    }
   }
 
   TextEditingController _getStockController(String key) {
@@ -128,9 +124,10 @@ class _ManageInventoryState extends State<ManageInventory> {
 
       controller.clear();
 
-      // Force UI refresh
+      // Reload items to update UI
+      await itemStore.loadItems();
+
       if (mounted) {
-        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -226,9 +223,10 @@ class _ManageInventoryState extends State<ManageInventory> {
 
       controller.clear();
 
-      // Force UI refresh
+      // Reload items to update UI
+      await itemStore.loadItems();
+
       if (mounted) {
-        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -557,13 +555,13 @@ class _ManageInventoryState extends State<ManageInventory> {
                         width: width * 0.42,
                         height: height * 0.05,
                         onTap: () {
-                       /*   Navigator.push(
+                          /*   Navigator.push(
                               context,
                               MaterialPageRoute(
                                   builder: (context) => StockHistory()));
 
                        */
-                       Navigator.pushNamed(context,RouteNames.restaurantStockHistory);
+                          Navigator.pushNamed(context,RouteNames.restaurantStockHistory);
 
                         },
                         child: Text(
@@ -608,14 +606,13 @@ class _ManageInventoryState extends State<ManageInventory> {
             color: Colors.grey,
           ),
           Expanded(
-            child: ValueListenableBuilder(
-              valueListenable: Hive.box<Category>('categories').listenable(),
-              builder: (context, categoryBox, _) {
-                return ValueListenableBuilder(
-                  valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-                  builder: (context, itemBox, _) {
-                    final categories = categoryBox.values.toList();
-                    final items = itemBox.values.toList();
+            child: Observer(
+              builder: (context) {
+
+
+
+                final categories = categoryStore.categories.toList();
+                final items = itemStore.items.toList();
 
                     // Check if there are any items with inventory tracking enabled
                     final inventoryItems = items.where((item) => item.trackInventory == true).toList();
@@ -715,8 +712,6 @@ class _ManageInventoryState extends State<ManageInventory> {
                         );
                       },
                     );
-                  },
-                );
               },
             ),
           ),

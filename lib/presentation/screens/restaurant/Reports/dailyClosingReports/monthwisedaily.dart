@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -27,8 +27,6 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
 
   String dropDownValue1 = 'January';
   int dropdownvalue2 = 2025;
-  bool _isLoading = false;
-  List<EndOfDayReport> _reports = [];
 
   Map<String, double> _orderTypeTotals = {};
   Map<String, int> _orderTypeCounts = {};
@@ -48,35 +46,18 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
   }
 
   Future<void> _loadMonthData() async {
-    setState(() {
-      _isLoading = true;
-    });
+    // Load from eodStore instead of direct Hive access
+    await eodStore.loadEODReports();
+  }
 
-    try {
-      final monthIndex = monthitem.indexOf(dropDownValue1) + 1;
-      final year = dropdownvalue2;
+  List<EndOfDayReport> _getMonthReports() {
+    final monthIndex = monthitem.indexOf(dropDownValue1) + 1;
+    final year = dropdownvalue2;
 
-      // Get all EOD reports
-      final allReports = await HiveEOD.getAllEODReports();
-
-      // Filter reports for selected month and year
-      final monthReports = allReports.where((report) {
-        return report.date.year == year && report.date.month == monthIndex;
-      }).toList();
-
-      // Aggregate data
-      _aggregateReports(monthReports);
-
-      setState(() {
-        _reports = monthReports;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print('Error loading month data: $e');
-    }
+    // Filter reports from store for selected month and year
+    return eodStore.eodReports.where((report) {
+      return report.date.year == year && report.date.month == monthIndex;
+    }).toList();
   }
 
   void _aggregateReports(List<EndOfDayReport> reports) {
@@ -117,9 +98,16 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
     final width = MediaQuery.of(context).size.width * 1;
 
     return Scaffold(
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (eodStore.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final _reports = _getMonthReports();
+          _aggregateReports(_reports);
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -302,7 +290,8 @@ class _MonthWisebyDailyState extends State<MonthWisebyDaily> {
               ],
             ],
           ),
-        ),
+        ));
+        },
       ),
     );
   }

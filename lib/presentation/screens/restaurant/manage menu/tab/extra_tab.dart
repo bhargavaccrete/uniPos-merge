@@ -1,22 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
-
 import '../../../../../presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/common/currency_helper.dart';
-
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 
 
@@ -48,8 +44,7 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   void _loadAvailableVariants() {
-    final variantBox = Hive.box<VariantModel>('variante');
-    _availableVariants = variantBox.values.toList();
+    _availableVariants = variantStore.variants.toList();
   }
 
   @override
@@ -81,10 +76,9 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildExtrasList(Size size) {
-    return ValueListenableBuilder(
-      valueListenable: Hive.box<Extramodel>('extra').listenable(),
-      builder: (context, Box<Extramodel> extraBox, _) {
-        final allExtras = extraBox.values.toList();
+    return Observer(
+      builder: (_) {
+        final allExtras = extraStore.extras.toList();
 
         if (allExtras.isEmpty) {
           return _buildEmptyState(size);
@@ -646,9 +640,8 @@ class _ExtraTabState extends State<ExtraTab> {
 
     try {
       if (editingIndex != null) {
-        // Get the current extra from ValueListenableBuilder data
-        final box = Hive.box<Extramodel>('extra');
-        final allExtras = box.values.toList();
+        // Get the current extra from store
+        final allExtras = extraStore.extras.toList();
         final currentExtra = allExtras[editingIndex!];
 
         final updatedExtra = Extramodel(
@@ -656,13 +649,13 @@ class _ExtraTabState extends State<ExtraTab> {
           Ename: trimmedName,
           topping: currentExtra.topping, // Preserve existing toppings
         );
-        await HiveExtra.updateExtra(updatedExtra);
+        await extraStore.updateExtra(updatedExtra);
       } else {
         final newExtra = Extramodel(
           Id: const Uuid().v4(),
           Ename: trimmedName,
         );
-        await HiveExtra.addextra(newExtra);
+        await extraStore.addExtra(newExtra);
       }
 
       _extrasController.clear();
@@ -710,9 +703,9 @@ class _ExtraTabState extends State<ExtraTab> {
 
     try {
       if (editingToppingIndex != null) {
-        await HiveExtra.updateToppingInExtra(extra.Id, editingToppingIndex!, topping);
+        await extraStore.updateTopping(extra.Id, editingToppingIndex!, topping);
       } else {
-        await HiveExtra.addToppingToExtra(extra.Id, topping);
+        await extraStore.addTopping(extra.Id, topping);
       }
 
       editingToppingIndex = null;
@@ -730,7 +723,7 @@ class _ExtraTabState extends State<ExtraTab> {
 
   Future<void> _deleteTopping(Extramodel extra, int toppingIndex) async {
     try {
-      await HiveExtra.removeToppingFromExtra(extra.Id, toppingIndex);
+      await extraStore.removeTopping(extra.Id, toppingIndex);
     } catch (e) {
       NotificationService.instance.showError(
         'Error: $e',
@@ -805,7 +798,7 @@ class _ExtraTabState extends State<ExtraTab> {
 
   Future<void> _deleteExtra(Extramodel extra) async {
     try {
-      await HiveExtra.deleteExtra(extra);
+      await extraStore.deleteExtra(extra.Id);
       Navigator.pop(context);
     } catch (e) {
       Navigator.pop(context);

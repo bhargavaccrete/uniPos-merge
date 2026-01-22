@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 class MonthWisebyTop extends StatefulWidget {
@@ -16,8 +15,6 @@ class MonthWisebyTop extends StatefulWidget {
 }
 
 class _MonthWisebyTopState extends State<MonthWisebyTop> {
-  List<Map<String, dynamic>> _topSellingItems = [];
-  bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
 
   @override
@@ -52,31 +49,33 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
       setState(() {
         _selectedDate = picked;
       });
-      _loadTopSellingItems();
+      await _loadTopSellingItems();
     }
   }
 
   Future<void> _loadTopSellingItems() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      // Get all past orders
-      final allOrders = await HivePastOrder.getAllPastOrderModel();
+  List<Map<String, dynamic>> _calculateTopSellingItems() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
 
-      // Calculate start and end of selected month
-      final monthStart = DateTime(_selectedDate.year, _selectedDate.month, 1);
-      final monthEnd = DateTime(_selectedDate.year, _selectedDate.month + 1, 0, 23, 59, 59);
+    // Calculate start and end of selected month
+    final monthStart = DateTime(_selectedDate.year, _selectedDate.month, 1);
+    final monthEnd = DateTime(_selectedDate.year, _selectedDate.month + 1, 0, 23, 59, 59);
 
-      // Filter orders for selected month
-      final monthOrders = allOrders.where((order) {
-        if (order.orderAt == null) return false;
-        final orderDate = order.orderAt!;
-        return orderDate.isAfter(monthStart.subtract(Duration(seconds: 1))) &&
-            orderDate.isBefore(monthEnd.add(Duration(seconds: 1)));
-      }).toList();
+    // Filter orders for selected month
+    final monthOrders = allOrders.where((order) {
+      if (order.orderAt == null) return false;
+      final orderDate = order.orderAt!;
+      return orderDate.isAfter(monthStart.subtract(Duration(seconds: 1))) &&
+          orderDate.isBefore(monthEnd.add(Duration(seconds: 1)));
+    }).toList();
 
-      // Calculate item sales with refund handling
-      Map<String, Map<String, dynamic>> itemSales = {};
+    // Calculate item sales with refund handling
+    Map<String, Map<String, dynamic>> itemSales = {};
 
       for (var order in monthOrders) {
         // Skip fully refunded orders
@@ -121,14 +120,7 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
       final sortedItems = itemSales.values.toList()
         ..sort((a, b) => (b['quantity'] as int).compareTo(a['quantity'] as int));
 
-      setState(() {
-        _topSellingItems = sortedItems;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading top selling items: $e');
-      setState(() => _isLoading = false);
-    }
+      return sortedItems;
   }
 
   @override
@@ -138,9 +130,15 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
     final monthYearDisplay = DateFormat('MMMM yyyy').format(_selectedDate);
 
     return Scaffold(
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+
+          final topSellingItems = _calculateTopSellingItems();
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -231,7 +229,7 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
                 ),
               ),
               SizedBox(height: 25),
-              if (_topSellingItems.isEmpty)
+              if (topSellingItems.isEmpty)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -331,7 +329,7 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
                         ),
                       ),
                     ],
-                    rows: _topSellingItems.map((item) {
+                    rows: topSellingItems.map((item) {
                       return DataRow(
                         cells: [
                           DataCell(
@@ -379,7 +377,8 @@ class _MonthWisebyTopState extends State<MonthWisebyTop> {
                 )
             ],
           ),
-        ),
+        ));
+        },
       ),
     );
   }

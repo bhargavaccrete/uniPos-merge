@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
@@ -72,24 +70,23 @@ class _ChoiceTabState extends State<ChoiceTab> {
     editingChoice = null;
     Navigator.pop(context);
 
-    // Save to Hive after modal is closed to avoid widget tree conflicts
+    // Save to store after modal is closed to avoid widget tree conflicts
     if (isEditing && editId != null) {
       final updateChoice = ChoicesModel(
         id: editId,
         name: trimmedName,
         choiceOption: option,
       );
-      await HiveChoice.updateChoice(updateChoice);
+      await choiceStore.updateChoice(updateChoice);
     } else {
       final newchoice = ChoicesModel(id: Uuid().v4(), name: trimmedName, choiceOption: option);
-      await HiveChoice.addChoice(newchoice);
+      await choiceStore.addChoice(newchoice);
     }
-    // ValueListenableBuilder will auto-update the list
   }
 
   // delete
   Future<void> _delete(ChoicesModel choice) async {
-    await HiveChoice.deleteChoice(choice);
+    await choiceStore.deleteChoice(choice.id);
     Navigator.pop(context);
 
   }
@@ -115,10 +112,9 @@ class _ChoiceTabState extends State<ChoiceTab> {
 
           child: Column(
             children: [
-              ValueListenableBuilder(
-                  valueListenable: Hive.box<ChoicesModel>('choice').listenable(),
-                  builder: (context, Box<ChoicesModel> choicebox, _) {
-                    final allchoice = choicebox.values.toList();
+              Observer(
+                  builder: (_) {
+                    final allchoice = choiceStore.choices.toList();
 
                     if (allchoice.isEmpty) {
                       return Container(

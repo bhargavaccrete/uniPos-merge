@@ -1,23 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart' show EdititemScreen;
 import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
-
 import '../../../../../util/restaurant/images.dart';
 import 'package:unipos/util/common/currency_helper.dart';
-
-import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 
 
 class ItemsTab extends StatefulWidget {
@@ -51,7 +46,7 @@ class _AllTabState extends State<ItemsTab> {
   }
 
   void _deleteItem(String id) async {
-    await itemsBoxes.deleteItem(id);
+    await itemStore.deleteItem(id);
   }
 
   // List<Items> editItems = [];
@@ -79,14 +74,10 @@ class _AllTabState extends State<ItemsTab> {
     return Scaffold(
       body: Column(
         children: [
-          ValueListenableBuilder(
-              valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-              builder: (context, Box<Items> itemBox, _) {
-                final allItem = itemBox.values.toList();
-
-                return ValueListenableBuilder(
-                    valueListenable: Hive.box<Category>('categories').listenable(),
-                    builder: (context, Box<Category> categorybox, _) {
+          Observer(
+              builder: (_) {
+                final allItem = itemStore.items.toList();
+                final categorybox = categoryStore.categories;
                       if (allItem.isEmpty) {
                         return Container(
                           // color: Colors.red,
@@ -111,7 +102,7 @@ class _AllTabState extends State<ItemsTab> {
                             itemCount: allItem.length,
                             itemBuilder: (context, index) {
                               final item = allItem[index];
-                              final categoryName = categorybox.values
+                              final categoryName = categorybox
                                   .firstWhere((cat) => cat.id == item.categoryOfItem, orElse: () => Category(id: '', name: 'Unknown'))
                                   .name;
 
@@ -156,13 +147,7 @@ class _AllTabState extends State<ItemsTab> {
                                           inactiveTrackColor: Colors.grey.shade400,
                                           value: item.isEnabled,
                                           onChanged: (bool value)async {
-                                            item.isEnabled = value;
-
-                                            await item.save();
-                                            // setState(() {
-                                            //   // isToggled = value;
-                                            //   toggleState[item.id] = value;
-                                            // });
+                                            await itemStore.toggleItemStatus(item.id);
                                           },
                                         ),
                                       )
@@ -269,7 +254,6 @@ class _AllTabState extends State<ItemsTab> {
                               );
                             }),
                       );
-                    });
               }),
           BottomsheetMenu(
             // width: width * 0.5,

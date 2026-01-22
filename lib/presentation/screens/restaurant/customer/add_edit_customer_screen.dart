@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_customer.dart';
 
 class AddEditCustomerScreen extends StatefulWidget {
   final RestaurantCustomer? customer;
@@ -69,22 +68,14 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
           updatedAt: DateTime.now().toIso8601String(),
         );
 
-        await HiveCustomer.updateCustomer(updatedCustomer);
+        final success = await restaurantCustomerStore.updateCustomer(updatedCustomer);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Customer updated successfully',
-                style: GoogleFonts.poppins(),
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
+          Navigator.pop(context, success ? 'updated' : false);
         }
       } else {
         // Check if phone already exists
-        final existingCustomer = HiveCustomer.getCustomerByPhone(
+        final existingCustomer = await restaurantCustomerStore.getCustomerByPhone(
           _phoneController.text.trim(),
         );
 
@@ -119,26 +110,17 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
               : _notesController.text.trim(),
         );
 
-        await HiveCustomer.addCustomer(newCustomer);
+        final success = await restaurantCustomerStore.addCustomer(newCustomer);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Customer added successfully',
-                style: GoogleFonts.poppins(),
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
+          Navigator.pop(context, success ? 'added' : false);
         }
-      }
-
-      if (mounted) {
-        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

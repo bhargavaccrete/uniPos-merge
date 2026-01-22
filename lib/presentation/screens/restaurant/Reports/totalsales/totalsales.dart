@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -152,10 +153,10 @@ class _SalesDataViewState extends State<SalesDataView> {
     }
   }
 
-  void _loadDataAndFilter() {
-    // Reload data from Hive box every time to ensure we have the latest data
-    final orderBox = Hive.box<pastOrderModel>('pastorderBox');
-    _allOrders = orderBox.values.toList();
+  Future<void> _loadDataAndFilter() async {
+    // Load data from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+    _allOrders = pastOrderStore.pastOrders.toList();
     _fetchAndFilterData();
   }
 

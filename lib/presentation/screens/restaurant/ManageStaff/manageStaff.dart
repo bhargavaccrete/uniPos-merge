@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_staff.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
@@ -23,7 +23,9 @@ class _manageStaffState extends State<manageStaff> {
   @override
   void initState() {
     super.initState();
-    loadHIveStaff();
+    // loadHIveStaff();
+  staffStore.loadStaff();
+
   }
 
   TextEditingController userNameController = TextEditingController();
@@ -36,8 +38,7 @@ class _manageStaffState extends State<manageStaff> {
   TextEditingController searchController = TextEditingController();
 
   String selectedrole = 'Select Role';
-  List<StaffModel> staffList = [];
-  List<StaffModel> filteredStaffList = [];
+  String searchQuery = '';
   final _formKey = GlobalKey<FormState>();
 
 // In _StaffFormDialogState
@@ -63,45 +64,48 @@ class _manageStaffState extends State<manageStaff> {
         pinNo: pinNoController.text.trim(),
         createdAt: DateTime.now()
     );
-    await StaffBox.addStaff(newstaff);
-    await loadHIveStaff();
+    await staffStore.addStaff(newstaff);
     _clear();
   }
 
-  Future<void>loadHIveStaff()async{
-    final staffbox = await StaffBox.getStaffBox();
-    final allstaff =  staffbox.values.toList();
-    allstaff.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    // Fix null safety for existing records without isActive field
-    for (var staff in allstaff) {
-      if (staff.isActive == null) {
-        final updatedStaff = staff.copyWith(isActive: true);
-        await StaffBox.updateStaff(updatedStaff);
-      }
-    }
-
-    setState(() {
-      staffList = allstaff;
-      filteredStaffList = allstaff;
-    });
-  }
+  // Future<void>loadHIveStaff()async{
+  //   // final staffbox = await staffStore.();
+  //   final allstaff =  staffStore.staff.toList();
+  //   allstaff.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  //
+  //   // Fix null safety for existing records without isActive field
+  //   for (var staff in allstaff) {
+  //     if (staff.isActive == null) {
+  //       final updatedStaff = staff.copyWith(isActive: true);
+  //       await staffStore.updateStaff(updatedStaff);
+  //     }
+  //   }
+  //
+  //   setState(() {
+  //     staffList = allstaff;
+  //     filteredStaffList = allstaff;
+  //   });
+  // }
 
   void _searchStaff(String query) {
     setState(() {
-      if (query.isEmpty) {
-        filteredStaffList = staffList;
-      } else {
-        filteredStaffList = staffList.where((staff) {
-          final searchLower = query.toLowerCase();
-          return staff.userName.toLowerCase().contains(searchLower) ||
-              staff.firstName.toLowerCase().contains(searchLower) ||
-              staff.lastName.toLowerCase().contains(searchLower) ||
-              staff.emailId.toLowerCase().contains(searchLower) ||
-              staff.mobileNo.contains(searchLower);
-        }).toList();
-      }
+      searchQuery = query;
     });
+  }
+
+  List<StaffModel> _getFilteredStaff() {
+    final allStaff = staffStore.staff.toList();
+    if (searchQuery.isEmpty) {
+      return allStaff;
+    }
+    final searchLower = searchQuery.toLowerCase();
+    return allStaff.where((staff) {
+      return staff.userName.toLowerCase().contains(searchLower) ||
+          staff.firstName.toLowerCase().contains(searchLower) ||
+          staff.lastName.toLowerCase().contains(searchLower) ||
+          staff.emailId.toLowerCase().contains(searchLower) ||
+          staff.mobileNo.contains(searchLower);
+    }).toList();
   }
 
   void _clear (){
@@ -116,13 +120,11 @@ class _manageStaffState extends State<manageStaff> {
   }
 
   Future<void> _updateStaff(StaffModel staff) async {
-    await StaffBox.updateStaff(staff);
-    await loadHIveStaff();
+    await staffStore.updateStaff(staff);
   }
 
   void _deleteStaff(String id )async{
-    await StaffBox.deleteStaff(id);
-    await loadHIveStaff();
+    await staffStore.deleteStaff(id);
   }
 
 
@@ -436,11 +438,35 @@ class _manageStaffState extends State<manageStaff> {
             // staffList.isEmpty?
             //     Icon(Icons.hourglass_empty):
             Expanded(
-              child: ListView.builder(
-                  itemCount: filteredStaffList.length,
-                  itemBuilder: (context , index){
+              child: Observer(
+                builder: (_) {
+                  final filteredStaff = _getFilteredStaff();
 
-                    final staff = filteredStaffList[index];
+                  if (staffStore.isLoading) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+
+                  if (filteredStaff.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            searchQuery.isEmpty ? 'No staff members yet' : 'No staff found',
+                            style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                      itemCount: filteredStaff.length,
+                      itemBuilder: (context , index){
+
+                        final staff = filteredStaff[index];
                     return Slidable(
                       key: ValueKey(staff.id),
                       endActionPane: ActionPane(
@@ -847,6 +873,8 @@ class _manageStaffState extends State<manageStaff> {
                         ),
                       ),
                     );}
+                  );
+                },
               ),
             ),
           ],

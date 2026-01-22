@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
 class CustomeDaily extends StatefulWidget {
@@ -19,8 +17,6 @@ class CustomeDaily extends StatefulWidget {
 class _CustomeDailyState extends State<CustomeDaily> {
   DateTime? _fromDate;
   DateTime? _toDate;
-  bool _isLoading = false;
-  List<EndOfDayReport> _reports = [];
 
   Map<String, double> _orderTypeTotals = {};
   Map<String, int> _orderTypeCounts = {};
@@ -65,54 +61,44 @@ class _CustomeDailyState extends State<CustomeDaily> {
   Future<void> _loadCustomData() async {
     if (_fromDate == null || _toDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select both From and To dates')),
+        const SnackBar(content: Text('Please select both From and To dates')),
       );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    // Load from eodStore instead of direct Hive access
+    await eodStore.loadEODReports();
 
-    try {
-      // Get all EOD reports
-      final allReports = await HiveEOD.getAllEODReports();
+    // Trigger rebuild to show updated data
+    setState(() {});
+  }
 
-      // Filter reports for date range
-      final rangeReports = allReports.where((report) {
-        final reportDate = DateTime(
-          report.date.year,
-          report.date.month,
-          report.date.day,
-        );
-        final fromDate = DateTime(
-          _fromDate!.year,
-          _fromDate!.month,
-          _fromDate!.day,
-        );
-        final toDate = DateTime(
-          _toDate!.year,
-          _toDate!.month,
-          _toDate!.day,
-        );
-
-        return (reportDate.isAfter(fromDate) || reportDate.isAtSameMomentAs(fromDate)) &&
-            (reportDate.isBefore(toDate) || reportDate.isAtSameMomentAs(toDate));
-      }).toList();
-
-      // Aggregate data
-      _aggregateReports(rangeReports);
-
-      setState(() {
-        _reports = rangeReports;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print('Error loading custom range data: $e');
+  List<EndOfDayReport> _getCustomReports() {
+    if (_fromDate == null || _toDate == null) {
+      return [];
     }
+
+    // Filter reports from store for date range
+    return eodStore.eodReports.where((report) {
+      final reportDate = DateTime(
+        report.date.year,
+        report.date.month,
+        report.date.day,
+      );
+      final fromDate = DateTime(
+        _fromDate!.year,
+        _fromDate!.month,
+        _fromDate!.day,
+      );
+      final toDate = DateTime(
+        _toDate!.year,
+        _toDate!.month,
+        _toDate!.day,
+      );
+
+      return (reportDate.isAfter(fromDate) || reportDate.isAtSameMomentAs(fromDate)) &&
+          (reportDate.isBefore(toDate) || reportDate.isAtSameMomentAs(toDate));
+    }).toList();
   }
 
   void _aggregateReports(List<EndOfDayReport> reports) {
@@ -153,9 +139,16 @@ class _CustomeDailyState extends State<CustomeDaily> {
     final width = MediaQuery.of(context).size.width * 1;
 
     return Scaffold(
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (eodStore.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final _reports = _getCustomReports();
+          _aggregateReports(_reports);
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -321,7 +314,8 @@ class _CustomeDailyState extends State<CustomeDaily> {
               ],
             ],
           ),
-        ),
+        ));
+        },
       ),
     );
   }

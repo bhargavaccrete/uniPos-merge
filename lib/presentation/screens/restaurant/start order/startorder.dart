@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../constants/restaurant/color.dart';
-import '../../../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../util/color.dart';
 import '../../../widget/componets/restaurant/componets/drawer.dart';
@@ -25,31 +25,56 @@ class Startorder extends StatefulWidget {
 class _StartorderState extends State<Startorder>
     with SingleTickerProviderStateMixin {
   late TabController tabController;
-
-  // --- STATE FOR MANAGING THE CURRENT ORDER ---
-  List<CartItem> _currentCartItems = [];
   String? _tableIdForCurrentSession;
-  double get _totalPrice => _currentCartItems.fold(0.0, (sum, item) => sum + item.totalPrice);
 
   @override
   void initState() {
     super.initState();
     tabController = TabController(length: 3, vsync: this);
-    tabController.addListener(() {
-      setState(() {});
-    });
+
     // Initialize state based on what was passed to the widget
     if (widget.existingOrder != null) {
-      _currentCartItems = List.from(widget.existingOrder!.items);
       _tableIdForCurrentSession = widget.existingOrder!.tableNo;
     } else if (widget.newOrderForTableId != null) {
       _tableIdForCurrentSession = widget.newOrderForTableId;
       tabController.index = 0; // Default to menu for a new order
     }
 
+    // Listen to tab changes - refresh data when switching tabs
     tabController.addListener(() {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        _refreshCurrentTab();
+      }
     });
+
+    // Initial load
+    _refreshCurrentTab();
+  }
+
+  void _refreshCurrentTab() {
+    print('🔄 Refreshing tab ${tabController.index}');
+    // Refresh menu/cart data when switching to menu tab
+    if (tabController.index == 0) {
+      categoryStore.loadCategories();
+      itemStore.loadItems();
+      restaurantCartStore.loadCartItems();
+    }
+    // Refresh orders when switching to orders tab
+    else if (tabController.index == 1) {
+      orderStore.loadOrders();
+    }
+    // Refresh tables when switching to tables tab
+    else if (tabController.index == 2) {
+      tableStore.loadTables();
+      orderStore.loadOrders(); // CRITICAL: Need orders to find active order for table
+    }
+  }
+
+  @override
+  void dispose() {
+    tabController.dispose();
+    super.dispose();
   }
 
   Widget _buildTabButton(int index, IconData icon, String label, bool isTablet) {
@@ -357,7 +382,14 @@ class _StartorderState extends State<Startorder>
           Expanded(
             child: TabBarView(
               controller: tabController,
-              children: [ MenuScreen(tableIdForNewOrder:_tableIdForCurrentSession,isForAddingItem: widget.isForAddingItem ?? false,), Order(), const TableScreen()],
+              children: [
+                MenuScreen(
+                  tableIdForNewOrder:_tableIdForCurrentSession,
+                  isForAddingItem: widget.isForAddingItem ?? false,
+                ),
+                Order(),
+                const TableScreen()
+              ],
             ),
           ),
         ],

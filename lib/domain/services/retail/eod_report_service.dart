@@ -90,9 +90,22 @@ class EODReportService {
     final customersWithCredit = await customerStoreRestail.getCustomersWithCredit();
     final totalOutstanding = await saleStore.getTotalDueAmount();
 
-    // Cash Drawer Summary
+    // Expenses for the day
+    await expenseStore.loadExpenses();
+    final allExpenses = expenseStore.expenses;
+    final dayExpenses = allExpenses.where((expense) {
+      return (expense.dateandTime.isAfter(startOfDay) || expense.dateandTime.isAtSameMomentAs(startOfDay)) &&
+          (expense.dateandTime.isBefore(endOfDay) || expense.dateandTime.isAtSameMomentAs(endOfDay));
+    }).toList();
+
+    final totalExpenses = dayExpenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
+    final cashExpenses = dayExpenses
+        .where((expense) => expense.paymentType?.toLowerCase().trim() == 'cash')
+        .fold<double>(0.0, (sum, expense) => sum + expense.amount);
+
+    // Cash Drawer Summary (subtract cash expenses from cash in drawer)
     final openingBalance = 0.0; // This should be stored/retrieved from settings
-    final cashInDrawer = openingBalance + cashSales + cashCollections;
+    final cashInDrawer = openingBalance + cashSales + cashCollections - cashExpenses;
 
     return EODReport(
       date: reportDate,
@@ -122,6 +135,9 @@ class EODReportService {
       // Cash Drawer
       openingBalance: openingBalance,
       cashInDrawer: cashInDrawer,
+      // Expenses
+      totalExpenses: totalExpenses,
+      cashExpenses: cashExpenses,
       // Outstanding Summary
       customersWithDue: customersWithCredit.length,
       totalOutstanding: totalOutstanding,
@@ -164,6 +180,10 @@ class EODReport {
   final double openingBalance;
   final double cashInDrawer;
 
+  // Expenses
+  final double totalExpenses;
+  final double cashExpenses;
+
   // Outstanding Summary
   final int customersWithDue;
   final double totalOutstanding;
@@ -193,6 +213,8 @@ class EODReport {
     required this.profitMargin,
     required this.openingBalance,
     required this.cashInDrawer,
+    required this.totalExpenses,
+    required this.cashExpenses,
     required this.customersWithDue,
     required this.totalOutstanding,
     required this.customersWithCredit,
@@ -223,6 +245,8 @@ class EODReport {
       'profitMargin': profitMargin,
       'openingBalance': openingBalance,
       'cashInDrawer': cashInDrawer,
+      'totalExpenses': totalExpenses,
+      'cashExpenses': cashExpenses,
       'customersWithDue': customersWithDue,
       'totalOutstanding': totalOutstanding,
     };

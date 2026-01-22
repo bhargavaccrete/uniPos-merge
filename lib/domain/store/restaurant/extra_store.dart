@@ -10,7 +10,9 @@ class ExtraStore = _ExtraStore with _$ExtraStore;
 abstract class _ExtraStore with Store {
   final ExtraRepository _repository;
 
-  _ExtraStore(this._repository);
+  _ExtraStore(this._repository) {
+    loadExtras();
+  }
 
   @observable
   ObservableList<Extramodel> extras = ObservableList<Extramodel>();
@@ -45,8 +47,10 @@ abstract class _ExtraStore with Store {
       errorMessage = null;
       final loadedExtras = await _repository.getAllExtras();
       extras = ObservableList.of(loadedExtras);
+      print('✅ ExtraStore: Loaded ${extras.length} extras');
     } catch (e) {
       errorMessage = 'Failed to load extras: $e';
+      print('❌ ExtraStore: Error loading extras - $e');
     } finally {
       isLoading = false;
     }
@@ -60,11 +64,14 @@ abstract class _ExtraStore with Store {
   @action
   Future<bool> addExtra(Extramodel extra) async {
     try {
+      print('📝 ExtraStore: Adding extra "${extra.Ename}" with ID: ${extra.Id}');
       await _repository.addExtra(extra);
       extras.add(extra);
+      print('✅ ExtraStore: Added successfully. Total extras now: ${extras.length}');
       return true;
     } catch (e) {
       errorMessage = 'Failed to add extra: $e';
+      print('❌ ExtraStore: Failed to add extra - $e');
       return false;
     }
   }

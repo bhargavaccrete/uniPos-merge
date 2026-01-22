@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_eod.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/util/color.dart';
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -17,8 +16,6 @@ class DayWisebyDaily extends StatefulWidget {
 
 class _DayWisebyDailyState extends State<DayWisebyDaily> {
   DateTime? _fromDate;
-  EndOfDayReport? _report;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -28,24 +25,21 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
   }
 
   Future<void> _loadReport() async {
-    if (_fromDate == null) return;
+    // Load from eodStore instead of direct Hive access
+    await eodStore.loadEODReports();
+  }
 
-    setState(() {
-      _isLoading = true;
-    });
+  EndOfDayReport? _getReportForDate() {
+    if (_fromDate == null) return null;
 
-    try {
-      final report = await HiveEOD.getEODByDate(_fromDate!);
-      setState(() {
-        _report = report;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print('Error loading EOD report: $e');
-    }
+    // Filter reports from store for the selected date
+    final reports = eodStore.eodReports.where((report) {
+      return report.date.year == _fromDate!.year &&
+          report.date.month == _fromDate!.month &&
+          report.date.day == _fromDate!.day;
+    }).toList();
+
+    return reports.isNotEmpty ? reports.first : null;
   }
 
   Future<void> _pickDate(BuildContext context) async {
@@ -68,9 +62,15 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
     final width = MediaQuery.of(context).size.width * 1;
 
     return Scaffold(
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (eodStore.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final _report = _getReportForDate();
+
+          return SingleChildScrollView(
         child: Container(
           width: double.infinity,
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -156,7 +156,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
               SizedBox(height: 25),
               if (_report != null) ...[
                 Text(
-                  'Total Sales : ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_report!.totalSales)}',
+                  'Total Sales : ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_report.totalSales)}',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(
                     fontSize: 18,
@@ -164,11 +164,11 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                   ),
                 ),
                 SizedBox(height: 20),
-                _buildOrderTable(width),
+                _buildOrderTable(width, _report),
                 SizedBox(height: 30),
-                _buildPaymentTable(width),
+                _buildPaymentTable(width, _report),
                 SizedBox(height: 30),
-                _buildExpenseSection(width),
+                _buildExpenseSection(width, _report),
               ] else ...[
                 Center(
                   child: Padding(
@@ -186,12 +186,13 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
               ],
             ],
           ),
-        ),
+        ));
+        },
       ),
     );
   }
 
-  Widget _buildOrderTable(double width) {
+  Widget _buildOrderTable(double width, EndOfDayReport report) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -242,7 +243,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
             ],
           ),
         ),
-        ..._report!.orderSummaries.map((order) {
+        ...report.orderSummaries.map((order) {
           return Container(
             width: width,
             decoration: BoxDecoration(
@@ -285,7 +286,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
     );
   }
 
-  Widget _buildPaymentTable(double width) {
+  Widget _buildPaymentTable(double width, EndOfDayReport report) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -324,7 +325,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
             ],
           ),
         ),
-        ..._report!.paymentSummaries.map((payment) {
+        ...report.paymentSummaries.map((payment) {
           return Container(
             width: width,
             decoration: BoxDecoration(
@@ -358,7 +359,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
     );
   }
 
-  Widget _buildExpenseSection(double width) {
+  Widget _buildExpenseSection(double width, EndOfDayReport report) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -383,7 +384,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                 ),
               ),
               Text(
-                '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.totalExpenses)}',
+                '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(report.totalExpenses)}',
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                   fontSize: 16,
@@ -414,7 +415,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13),
                   ),
                   Text(
-                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.openingBalance)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(report.openingBalance)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
@@ -430,7 +431,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13),
                   ),
                   Text(
-                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.totalSales)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(report.totalSales)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
@@ -446,7 +447,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 13, color: Colors.red[700]),
                   ),
                   Text(
-                    '- ${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.totalExpenses)}',
+                    '- ${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(report.totalExpenses)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.red[700]),
                   ),
@@ -462,7 +463,7 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
                     style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   Text(
-                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(_report!.closingBalance)}',
+                    '${CurrencyHelper.currentSymbol} ${DecimalSettings.formatAmount(report.closingBalance)}',
                     textScaler: TextScaler.linear(1),
                     style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blue[800]),
                   ),

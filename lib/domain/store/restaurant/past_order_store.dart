@@ -1,6 +1,8 @@
 import 'package:mobx/mobx.dart';
+import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../data/repositories/restaurant/past_order_repository.dart';
+import '../../services/restaurant/refund_service.dart';
 
 part 'past_order_store.g.dart';
 
@@ -250,5 +252,89 @@ abstract class _PastOrderStore with Store {
   @action
   void clearError() {
     errorMessage = null;
+  }
+
+  // ==================== REFUND OPERATIONS ====================
+  // Business logic delegated to RefundService
+
+  /// Process a refund for an order
+  /// Handles both partial and full refunds with stock restoration
+  @action
+  Future<pastOrderModel?> processRefund({
+    required pastOrderModel order,
+    required PartialRefundResult refundResult,
+  }) async {
+    try {
+      isLoading = true;
+      errorMessage = null;
+
+      // Delegate to RefundService for business logic
+      final updatedOrder = await RefundService.processRefund(
+        order: order,
+        refundResult: refundResult,
+      );
+
+      // Update local state
+      final index = pastOrders.indexWhere((o) => o.id == updatedOrder.id);
+      if (index != -1) {
+        pastOrders[index] = updatedOrder;
+      }
+
+      return updatedOrder;
+    } catch (e) {
+      errorMessage = 'Failed to process refund: $e';
+      print('❌ PastOrderStore: Error processing refund: $e');
+      return null;
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  /// Validate if an order can be refunded
+  /// Returns error message if not eligible, null if eligible
+  String? validateRefundEligibility(pastOrderModel order) {
+    return RefundService.validateRefundEligibility(order);
+  }
+
+  /// Get list of items that can be refunded from an order
+  List<CartItem> getRefundableItems(pastOrderModel order) {
+    return RefundService.getRefundableItems(order);
+  }
+
+  /// Calculate remaining amount that can be refunded
+  double getRemainingRefundableAmount(pastOrderModel order) {
+    return RefundService.getRemainingRefundableAmount(order);
+  }
+
+  /// Void an order (mark as cancelled/voided)
+  @action
+  Future<pastOrderModel?> voidOrder({
+    required pastOrderModel order,
+    required String reason,
+  }) async {
+    try {
+      isLoading = true;
+      errorMessage = null;
+
+      // Delegate to RefundService
+      final voidedOrder = await RefundService.voidOrder(
+        order: order,
+        reason: reason,
+      );
+
+      // Update local state
+      final index = pastOrders.indexWhere((o) => o.id == voidedOrder.id);
+      if (index != -1) {
+        pastOrders[index] = voidedOrder;
+      }
+
+      return voidedOrder;
+    } catch (e) {
+      errorMessage = 'Failed to void order: $e';
+      print('❌ PastOrderStore: Error voiding order: $e');
+      return null;
+    } finally {
+      isLoading = false;
+    }
   }
 }

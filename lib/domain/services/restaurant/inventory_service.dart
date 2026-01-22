@@ -1,13 +1,13 @@
 
-import 'package:hive_flutter/hive_flutter.dart';
-
+import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
-import '../../../data/models/restaurant/db/variantmodel_305.dart';
 class InventoryService {
   static Future<void> deductStockForOrder(List<CartItem> cartItems) async {
     print('🔍 InventoryService: Starting stock deduction for ${cartItems.length} items');
-    final itemBox = Hive.box<Items>('itemBoxs');
+    await itemStore.loadItems();
+    await variantStore.loadVariants(); // Load variants for variant name lookup
+    final items = itemStore.items;
 
     for (final cartItem in cartItems) {
       print('🔍 Processing cart item: ${cartItem.title} (ID: ${cartItem.id}), Quantity: ${cartItem.quantity}');
@@ -15,14 +15,14 @@ class InventoryService {
         // Try to find by ID first
         Items? item;
         try {
-          item = itemBox.values.firstWhere(
+          item = items.firstWhere(
                 (item) => item.id == cartItem.id,
           );
         } catch (e) {
           // If not found by ID, try to find by name
           print('🔍 Item not found by ID, searching by name: ${cartItem.title}');
           try {
-            item = itemBox.values.firstWhere(
+            item = items.firstWhere(
                   (item) => item.name.toLowerCase().trim() == cartItem.title.toLowerCase().trim(),
             );
             print('🔍 Found item by name: ${item.name} (ID: ${item.id})');
@@ -110,27 +110,13 @@ class InventoryService {
 
   static String _getVariantName(String variantId) {
     try {
-      // Try to get the box if it's already open, otherwise open it
-      Box<VariantModel> variantBox;
-      if (Hive.isBoxOpen('variante')) {
-        variantBox = Hive.box<VariantModel>('variante');
-      } else {
-        // This shouldn't happen in normal flow since the box should already be open
-        print('⚠️ WARNING: Variant box was not open, opening it now');
-        return 'Unknown Variant'; // Return early to avoid opening issues
-      }
+      final variant = variantStore.variants.firstWhere(
+        (v) => v.id == variantId,
+        orElse: () => variantStore.variants.first,
+      );
 
-      print('🔍 DEBUG: Looking for variant ID "$variantId" in box with ${variantBox.length} items');
-
-      // Debug: print all items in the box
-      for (var key in variantBox.keys) {
-        final variant = variantBox.get(key);
-        print('🔍 DEBUG: Box item - Key: "$key", Name: "${variant?.name}", Type: ${variant.runtimeType}');
-      }
-
-      final variant = variantBox.get(variantId);
-      print('🔍 DEBUG: Found variant for ID "$variantId": ${variant?.name ?? "null"}');
-      return variant?.name ?? 'Unknown Variant';
+      print('🔍 DEBUG: Found variant for ID \"$variantId\": ${variant.name}');
+      return variant.name;
     } catch (e) {
       print('🔍 DEBUG: Error in _getVariantName: $e');
       return 'Unknown Variant';
@@ -140,7 +126,8 @@ class InventoryService {
   // Stock checking before placing order: checkStockAvailability
   static Future<bool> checkStockAvailability(List<CartItem> cartItems) async {
     print('🔍 InventoryService: Starting stock availability check for ${cartItems.length} items');
-    final itemBox = Hive.box<Items>('itemBoxs');
+    await itemStore.loadItems();
+    final items = itemStore.items;
 
     // Group cart items by item name and variant to calculate total quantities
     Map<String, Map<String?, int>> itemVariantTotals = {};
@@ -167,7 +154,7 @@ class InventoryService {
       // Find the inventory item
       Items? item;
       try {
-        item = itemBox.values.firstWhere(
+        item = items.firstWhere(
               (invItem) => invItem.name.toLowerCase().trim() == itemKey,
         );
       } catch (e) {
@@ -340,6 +327,123 @@ class InventoryService {
       // Default: assume it's already in the same unit as inventory
       print('⚠️ Unknown unit in weight display: $weightDisplay, using value as-is: $numericValue');
       return numericValue;
+    }
+  }
+
+  /// Restore stock for refunded items
+  /// Used when processing refunds and items need to be added back to inventory
+  static Future<void> restoreStockForRefund(Map<CartItem, int> itemsToRestock) async {
+    try {
+      print('📦 InventoryService: Starting stock restoration for ${itemsToRestock.length} items');
+      await itemStore.loadItems();
+      await variantStore.loadVariants();
+
+      for (final entry in itemsToRestock.entries) {
+        final cartItem = entry.key;
+        final restockQuantity = entry.value;
+
+        if (restockQuantity <= 0) {
+          print('⚠️ Skipping ${cartItem.title}: quantity is 0');
+          continue;
+        }
+
+        print('🔄 Restoring stock for: ${cartItem.title}, Quantity: $restockQuantity');
+
+        // Find the item - try by productId first, then by name
+        Items? existingItem;
+
+        // Try to find by productId if it exists and is not empty
+        if (cartItem.productId.isNotEmpty) {
+          try {
+            existingItem = itemStore.items.firstWhere(
+              (item) => item.id == cartItem.productId,
+            );
+            print('✅ Found item by productId: ${existingItem.name}');
+          } catch (e) {
+            print('⚠️ productId not found, trying by name...');
+          }
+        }
+
+        // If not found by productId, try by name
+        if (existingItem == null) {
+          try {
+            existingItem = itemStore.items.firstWhere(
+              (item) => item.name.toLowerCase().trim() == cartItem.title.toLowerCase().trim(),
+            );
+            print('✅ Found item by name: ${existingItem.name}');
+          } catch (e2) {
+            print('❌ Item not found for restocking: ${cartItem.title}');
+            continue;
+          }
+        }
+
+        if (!existingItem.trackInventory) {
+          print('⚠️ Item ${cartItem.title} does not track inventory - skipping restock');
+          continue;
+        }
+
+        // Handle variant items
+        if (cartItem.variantName != null && existingItem.variant != null) {
+          print('🔍 Item has variant: ${cartItem.variantName}');
+          await _restoreVariantStock(existingItem, cartItem, restockQuantity);
+        } else {
+          // Handle regular items (non-variant)
+          double quantityToRestore = restockQuantity.toDouble();
+
+          // For weight-based items, parse the weight from weightDisplay
+          if (existingItem.isSoldByWeight && cartItem.weightDisplay != null) {
+            quantityToRestore = _parseWeightFromDisplay(cartItem.weightDisplay!);
+            print('🔍 Weight-based item detected. Parsed weight: $quantityToRestore');
+          }
+
+          await _restoreItemStock(existingItem, quantityToRestore);
+        }
+      }
+
+      // Reload items to reflect changes in UI
+      await itemStore.loadItems();
+
+      print('✅ InventoryService: Stock restoration completed');
+    } catch (e, stackTrace) {
+      print('❌ InventoryService: Error restoring stock: $e');
+      print('Stack trace: $stackTrace');
+      rethrow; // Rethrow so caller can handle
+    }
+  }
+
+  /// Restore stock for a regular item (non-variant)
+  static Future<void> _restoreItemStock(Items item, double quantity) async {
+    final oldStock = item.stockQuantity;
+    item.stockQuantity = oldStock + quantity;
+    await item.save();
+
+    print('✅ Stock restored: ${item.name}, Old: $oldStock, New: ${item.stockQuantity}');
+  }
+
+  /// Restore stock for a variant item
+  static Future<void> _restoreVariantStock(Items item, CartItem cartItem, int quantity) async {
+    if (item.variant == null) {
+      print('❌ Item ${item.name} has no variants');
+      return;
+    }
+
+    bool variantFound = false;
+    for (var variant in item.variant!) {
+      final variantName = _getVariantName(variant.variantId);
+      if (variantName == cartItem.variantName) {
+        // Restore variant stock
+        final oldStock = variant.stockQuantity ?? 0;
+        variant.stockQuantity = oldStock + quantity;
+        await item.save();
+
+        print('✅ Variant stock restored: ${cartItem.variantName}, Old: $oldStock, New: ${variant.stockQuantity}');
+        variantFound = true;
+        break;
+      }
+    }
+
+    if (!variantFound) {
+      print('❌ Variant ${cartItem.variantName} not found for item ${item.name}');
     }
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -10,8 +9,6 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
-
-import '../../../../../data/models/restaurant/db/database/hive_variante.dart';
 
 
 class VariantTab extends StatefulWidget {
@@ -53,25 +50,20 @@ class _VariantTabState extends State<VariantTab> {
       final updateVariante = VariantModel(
           id: editingVariante!.id,
           name: trimmedName);
-      await HiveVariante.updateVariante(updateVariante);
+      await variantStore.updateVariant(updateVariante);
     } else {
       final newvariante = VariantModel(id: Uuid().v4(), name: trimmedName);
-      await HiveVariante.addVariante(newvariante);
+      await variantStore.addVariant(newvariante);
     }
-
-    // ADD THESE TWO LINES TO CHECK THE BOX IMMEDIATELY AFTER SAVING
-    final variantBox = Hive.box<VariantModel>('variante');
-    print("--- VARIANT TAB: Box contents immediately after saving: ${variantBox.values.map((v) => v.name).toList()} ---");
 
     VariantController.clear();
     editingVariante = null;
 
-    // await loadHive();
     Navigator.pop(context);
   }
 
   Future<void> _delete(String id) async {
-    await HiveVariante.deleteVariante(id);
+    await variantStore.deleteVariant(id);
     Navigator.pop(context);
   }
 
@@ -87,10 +79,9 @@ class _VariantTabState extends State<VariantTab> {
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
             children: [
-              ValueListenableBuilder(
-                  valueListenable: Hive.box<VariantModel>('variante').listenable(),
-                  builder: (context, Box<VariantModel> variantebox, _) {
-                    final allvariante = variantebox.values.toList();
+              Observer(
+                  builder: (_) {
+                    final allvariante = variantStore.variants.toList();
 
                     if (allvariante.isEmpty) {
                       return Container(

@@ -169,11 +169,10 @@ abstract class _ItemStore with Store {
 
       await _repository.updateItem(item);
 
-      // Update in local list
-      final index = items.indexWhere((i) => i.id == item.id);
-      if (index != -1) {
-        items[index] = item;
-      }
+      // Force reload to ensure MobX detects changes
+      // This is necessary because items are Hive objects and modifying them
+      // in place doesn't trigger MobX observers properly
+      await loadItems();
 
       return true;
     } catch (e) {

@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/expensel_316.dart';
-import '../../../../data/models/restaurant/db/expensemodel_315.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -23,8 +21,6 @@ class ViewExpense extends StatefulWidget {
 class _ViewExpenseState extends State<ViewExpense> {
   DateTime? _fromDatee;
   DateTime? _toDate;
-  List<Expense> filteredExpenses = [];
-  List<Expense> allExpenses = [];
 
   @override
   void initState() {
@@ -32,35 +28,23 @@ class _ViewExpenseState extends State<ViewExpense> {
     _loadExpenses();
   }
 
-  void _loadExpenses() async {
-    final expenses = await HiveExpenceL.getAllItems();
-    setState(() {
-      allExpenses = expenses;
-      filteredExpenses = expenses;
-    });
+  Future<void> _loadExpenses() async {
+    await expenseStore.loadExpenses();
+    await expenseCategoryStore.loadCategories();
   }
 
   void _filterExpenses() {
-    if (_fromDatee != null && _toDate != null) {
-      setState(() {
-        filteredExpenses = allExpenses.where((expense) {
-          return expense.dateandTime.isAfter(_fromDatee!.subtract(Duration(days: 1))) &&
-              expense.dateandTime.isBefore(_toDate!.add(Duration(days: 1)));
-        }).toList();
-      });
-    } else {
-      setState(() {
-        filteredExpenses = allExpenses;
-      });
-    }
+    expenseStore.setDateRange(_fromDatee, _toDate);
   }
 
   String _getCategoryName(String? categoryId) {
     if (categoryId == null) return 'No Category';
     try {
-      final box = HiveExpenseCat.getECategory();
-      final category = box.get(categoryId);
-      return category?.name ?? 'Unknown Category';
+      final category = expenseCategoryStore.categories.firstWhere(
+        (cat) => cat.id == categoryId,
+        orElse: () => expenseCategoryStore.categories.first,
+      );
+      return category.name;
     } catch (e) {
       return 'Unknown Category';
     }
@@ -197,10 +181,9 @@ class _ViewExpenseState extends State<ViewExpense> {
                       style: GoogleFonts.poppins(fontSize: 16),
                     ),
                     SizedBox(height: 8),
-                    ValueListenableBuilder(
-                      valueListenable: HiveExpenseCat.getECategory().listenable(),
-                      builder: (context, Box<ExpenseCategory> box, _) {
-                        final categories = box.values.where((cat) => cat.isEnabled).toList();
+                    Observer(
+                      builder: (context) {
+                        final categories = expenseCategoryStore.enabledCategories;
                         return Container(
                           padding: EdgeInsets.all(8),
                           width: double.infinity,
@@ -215,7 +198,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                                 'Select Category',
                                 style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
                               ),
-                              items: categories.map((ExpenseCategory category) {
+                              items: categories.map((category) {
                                 return DropdownMenuItem<String>(
                                   value: category.id,
                                   child: Text(
@@ -290,7 +273,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                             bordercircular: 0,
                             height: 50,
                             onTap: () async {
-                              await HiveExpenceL.deleteItem(expense.id);
+                              await expenseStore.deleteExpense(expense.id);
                               Navigator.pop(context);
                               _loadExpenses();
                               NotificationService.instance.showSuccess('Expense deleted successfully');
@@ -319,7 +302,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                                   reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
                                   paymentType: selectedPaymentType,
                                 );
-                                await HiveExpenceL.updateItem(updatedExpense);
+                                await expenseStore.updateExpense(updatedExpense);
                                 Navigator.pop(context);
                                 _loadExpenses();
                                 NotificationService.instance.showSuccess('Expense updated successfully');
@@ -465,8 +448,8 @@ class _ViewExpenseState extends State<ViewExpense> {
                     setState(() {
                       _fromDatee = null;
                       _toDate = null;
-                      filteredExpenses = allExpenses;
                     });
+                    expenseStore.clearDateFilter();
                   },
                   child: Text(
                     'Clear Filter',
@@ -480,92 +463,100 @@ class _ViewExpenseState extends State<ViewExpense> {
             ),
             SizedBox(height: 15),
             Expanded(
-              child: filteredExpenses.isEmpty
-                  ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.receipt_long_outlined,
-                      size: 80,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No expenses found',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-                  : ListView.builder(
-                itemCount: filteredExpenses.length,
-                itemBuilder: (context, index) {
-                  final expense = filteredExpenses[index];
-                  return Card(
-                    margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.primary,
-                        child: Icon(
-                          Icons.account_balance_wallet,
-                          color: Colors.white,
-                        ),
-                      ),
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Observer(
+                builder: (context) {
+                  final filteredExpenses = expenseStore.filteredExpenses;
+
+                  if (filteredExpenses.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            _getCategoryName(expense.categoryOfExpense),
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: 80,
+                            color: Colors.grey,
                           ),
+                          SizedBox(height: 16),
                           Text(
-                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
+                            'No expenses found',
                             style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            DateFormat('dd MMM yyyy').format(expense.dateandTime),
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          if (expense.reason != null && expense.reason!.isNotEmpty)
-                            Text(
-                              expense.reason!,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          Text(
-                            expense.paymentType ?? 'Cash',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.blue,
+                              fontSize: 18,
+                              color: Colors.grey,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                      onTap: () => _showEditExpenseBottomSheet(expense),
-                    ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    itemCount: filteredExpenses.length,
+                    itemBuilder: (context, index) {
+                      final expense = filteredExpenses[index];
+                      return Card(
+                        margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary,
+                            child: Icon(
+                              Icons.account_balance_wallet,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _getCategoryName(expense.categoryOfExpense),
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat('dd MMM yyyy').format(expense.dateandTime),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              if (expense.reason != null && expense.reason!.isNotEmpty)
+                                Text(
+                                  expense.reason!,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              Text(
+                                expense.paymentType ?? 'Cash',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () => _showEditExpenseBottomSheet(expense),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

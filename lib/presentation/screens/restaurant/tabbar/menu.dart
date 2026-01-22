@@ -1,15 +1,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/adapters.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
-
+import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
-import '../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
@@ -35,10 +32,6 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
 
-  bool isCartShow = false;
-  double totalPrice = 0.0;
-  List<CartItem> cartItemsList = [];
-  List<Items> itemsList = [];
   String? activeCategory;
   String query = '';
   final TextEditingController _searchController = TextEditingController();
@@ -46,16 +39,13 @@ class _MenuScreenState extends State<MenuScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   final FocusNode _codehereFocusNode = FocusNode();
   final Map<String, GlobalKey> _categoryKeys = {};
+  bool _isLoadingData = false;
 
 
   @override
   void initState() {
     super.initState();
-    loadCartItems();
-
-    if (widget.tableIdForNewOrder != null) {
-      _storeSelectedTable(widget.tableIdForNewOrder!);
-    }
+    _loadData();
 
     _searchController.addListener((){
       setState(() {
@@ -88,16 +78,29 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
+  Future<void> _loadData() async {
+    // Prevent concurrent loads
+    if (_isLoadingData) return;
+
+    _isLoadingData = true;
+    try {
+      print('📥 MenuScreen: Loading data...');
+      await Future.wait([
+        categoryStore.loadCategories(),
+        itemStore.loadItems(),
+        restaurantCartStore.loadCartItems(),
+      ]);
+      print('✅ MenuScreen: Data loaded - ${categoryStore.categories.length} categories, ${itemStore.items.length} items');
+    } finally {
+      _isLoadingData = false;
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
-  }
-
-  void _storeSelectedTable(String tableId) async {
-    final appBox = Hive.box('app_state');
-    await appBox.put('selected_table_for_new_order', tableId);
   }
 
   Future<void> _handleItemTap(Items item) async {
@@ -114,8 +117,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final bool hasChoice = item.choiceIds != null && item.choiceIds!.isNotEmpty;
     String? categoryName;
     try {
-      final categoryBox = Hive.box<Category>(HiveBoxNames.restaurantCategories);
-      final category = categoryBox.values.firstWhere((cat) => cat.id == item.categoryOfItem);
+      final category = categoryStore.categories.firstWhere((cat) => cat.id == item.categoryOfItem);
       categoryName = category.name;
     } catch (e) {
       print("Could not find category for item: ${item.name}. Defaulting to 'Uncategorized'");
@@ -170,15 +172,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Future<void> _addItemToCart(CartItem cartItem) async {
     try {
-      final result = await HiveCart.addToCart(cartItem);
+      final result = await restaurantCartStore.addToCart(cartItem);
 
       if (result['success'] == true) {
-        await loadCartItems();
-
-        setState(() {
-          isCartShow = true;
-        });
-
         if (mounted) {
           NotificationService.instance.showSuccess(
             '${cartItem.title} added to cart',
@@ -201,25 +197,42 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
-  Future<void> loadCartItems() async {
-    try {
-      final items = await HiveCart.getAllCartItems();
-      setState(() {
-        cartItemsList = items;
-        totalPrice = items.fold(0.0, (sum, item) => sum + item.totalPrice);
-        isCartShow = items.isNotEmpty;
-      });
-    } catch (e) {
-      print('Error loading cart items: $e');
-    }
-  }
-
   String _formatStockDisplay(Items item) {
     if (!item.trackInventory) return '';
 
+    final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
+
+    // For items with variants, show variant availability status
+    if (item.variant != null && item.variant!.isNotEmpty) {
+      int inStockCount = 0;
+      int totalVariants = item.variant!.length;
+
+      for (var variant in item.variant!) {
+        final variantStock = variant.stockQuantity ?? 0;
+        if (variantStock > 0) {
+          inStockCount++;
+        }
+      }
+
+      if (inStockCount == 0) {
+        // All variants out of stock
+        if (allowOrderWhenOutOfStock) {
+          return 'Order Available';
+        } else {
+          return 'Out of Stock';
+        }
+      } else if (inStockCount == totalVariants) {
+        // All variants in stock
+        return 'All Variants Available';
+      } else {
+        // Some variants in stock
+        return '$inStockCount/$totalVariants Variants';
+      }
+    }
+
+    // For regular items without variants, show base stock
     final stock = item.stockQuantity;
     final unit = item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs');
-    final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
 
     if (stock <= 0) {
       if (allowOrderWhenOutOfStock) {
@@ -249,9 +262,34 @@ class _MenuScreenState extends State<MenuScreen> {
   StockStatus _getStockStatus(Items item) {
     if (!item.trackInventory) return StockStatus.notTracked;
 
-    final stock = item.stockQuantity;
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
 
+    // For items with variants, check if at least one variant has stock
+    if (item.variant != null && item.variant!.isNotEmpty) {
+      bool hasAnyVariantInStock = false;
+
+      for (var variant in item.variant!) {
+        final variantStock = variant.stockQuantity ?? 0;
+        if (variantStock > 0) {
+          hasAnyVariantInStock = true;
+          break;
+        }
+      }
+
+      if (hasAnyVariantInStock) {
+        return StockStatus.inStock;
+      } else {
+        // All variants are out of stock
+        if (allowOrderWhenOutOfStock) {
+          return StockStatus.orderAvailable;
+        } else {
+          return StockStatus.outOfStock;
+        }
+      }
+    }
+
+    // For regular items without variants, check base stock
+    final stock = item.stockQuantity;
     if (stock <= 0) {
       if (allowOrderWhenOutOfStock) {
         return StockStatus.orderAvailable;
@@ -271,10 +309,9 @@ class _MenuScreenState extends State<MenuScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return ValueListenableBuilder(
-          valueListenable: Hive.box<Category>('categories').listenable(),
-          builder: (context, categorys, _) {
-            final allCategories = categorys.values.toList();
+        return Observer(
+          builder: (_) {
+            final allCategories = categoryStore.categories;
 
             return Container(
               padding: EdgeInsets.symmetric(vertical: 20),
@@ -377,14 +414,38 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      floatingActionButton: isTablet ? null : Padding(
-        padding: EdgeInsets.only(bottom: isCartShow ? 80 : 0),
-        child: FloatingActionButton(
-          onPressed: _showCategoryJumpSheet,
-          backgroundColor: AppColors.primary,
-          elevation: 6,
-          child: Icon(Icons.category, color: Colors.white, size: 28),
-        ),
+      floatingActionButton: isTablet ? null : Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Refresh button for debugging
+          FloatingActionButton(
+            mini: true,
+            heroTag: 'refresh',
+            onPressed: () {
+              print('🔄 Manual refresh triggered');
+              _isLoadingData = false; // Reset flag
+              _loadData();
+            },
+            backgroundColor: AppColors.success,
+            child: Icon(Icons.refresh, color: Colors.white, size: 20),
+          ),
+          SizedBox(height: 10),
+          Observer(
+            builder: (_) {
+              final hasItems = restaurantCartStore.cartItems.isNotEmpty;
+              return Padding(
+                padding: EdgeInsets.only(bottom: hasItems ? 80 : 0),
+                child: FloatingActionButton(
+                  heroTag: 'category',
+                  onPressed: _showCategoryJumpSheet,
+                  backgroundColor: AppColors.primary,
+                  elevation: 6,
+                  child: Icon(Icons.category, color: Colors.white, size: 28),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: isTablet ? _buildTabletLayout(context, size) : _buildMobileLayout(context, size),
     );
@@ -396,9 +457,12 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Stack(
         children: [
-          Padding(
-            padding: EdgeInsets.only(top: 10, bottom: isCartShow ? 80 : 0),
-            child: Column(
+          Observer(
+            builder: (_) {
+              final hasItems = restaurantCartStore.cartItems.isNotEmpty;
+              return Padding(
+                padding: EdgeInsets.only(top: 10, bottom: hasItems ? 80 : 0),
+                child: Column(
               children: [
                 // Search text field
                 Padding(
@@ -471,10 +535,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
                 // Collapsible Category Sections
                 Expanded(
-                  child: ValueListenableBuilder(
-                    valueListenable: Hive.box<Category>('categories').listenable(),
-                    builder: (context, categorys, _) {
-                      final allCategories = categorys.values.toList();
+                  child: Observer(
+                    builder: (_) {
+                      final allCategories = categoryStore.categories;
 
                       if (allCategories.isEmpty) {
                         return Center(
@@ -492,13 +555,10 @@ class _MenuScreenState extends State<MenuScreen> {
                         );
                       }
 
-                      return ValueListenableBuilder(
-                        valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-                        builder: (context, itemBox, _) {
-                          final allItems = itemBox.values.toList();
-                          final visibleItems = allItems.where((item) => item.isEnabled).toList();
+                      final allItems = itemStore.items;
+                      final visibleItems = allItems.where((item) => item.isEnabled).toList();
 
-                          return ListView.builder(
+                      return ListView.builder(
                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             itemCount: allCategories.length,
                             itemBuilder: (context, index) {
@@ -597,23 +657,26 @@ class _MenuScreenState extends State<MenuScreen> {
                               );
                             },
                           );
-                        },
-                      );
                     },
                   ),
                 ),
               ],
-            ),
+            ));
+            },
           ),
 
           // Fixed Cart Bar at Bottom
-          if (isCartShow)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildCartBar(context, size),
-            ),
+          Observer(
+            builder: (_) {
+              if (restaurantCartStore.cartItems.isEmpty) return SizedBox.shrink();
+              return Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: _buildCartBar(context, size),
+              );
+            },
+          ),
         ],
       );
   }
@@ -625,10 +688,9 @@ class _MenuScreenState extends State<MenuScreen> {
         Container(
           width: 200,
           color: AppColors.white,
-          child: ValueListenableBuilder(
-            valueListenable: Hive.box<Category>('categories').listenable(),
-            builder: (context, categorys, _) {
-              final allCategories = categorys.values.toList();
+          child: Observer(
+            builder: (_) {
+              final allCategories = categoryStore.categories;
               return Column(
                 children: [
                   // Search Bar
@@ -692,12 +754,14 @@ class _MenuScreenState extends State<MenuScreen> {
         Expanded(
           child: Stack(
             children: [
-              Padding(
-                padding: EdgeInsets.only(bottom: isCartShow ? 80 : 16),
-                child: ValueListenableBuilder(
-                  valueListenable: Hive.box<Items>('itemBoxs').listenable(),
-                  builder: (context, itemBox, _) {
-                    final allItems = itemBox.values.toList();
+              Observer(
+                builder: (_) {
+                  final hasItems = restaurantCartStore.cartItems.isNotEmpty;
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: hasItems ? 80 : 16),
+                    child: Observer(
+                  builder: (_) {
+                    final allItems = itemStore.items;
                     var filteredItems = allItems.where((item) => item.isEnabled).toList();
 
                     // Filter by category
@@ -743,17 +807,22 @@ class _MenuScreenState extends State<MenuScreen> {
                       },
                     );
                   },
-                ),
+                  ));
+                },
               ),
 
               // Fixed Cart Bar at Bottom
-              if (isCartShow)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: _buildCartBar(context, size),
-                ),
+              Observer(
+                builder: (_) {
+                  if (restaurantCartStore.cartItems.isEmpty) return SizedBox.shrink();
+                  return Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: _buildCartBar(context, size),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -919,29 +988,34 @@ class _MenuScreenState extends State<MenuScreen> {
           children: [
             Expanded(
               flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Total',
-                    textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  Text(
-                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalPrice)}',
-                    textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              child: Observer(
+                builder: (_) {
+                  final total = restaurantCartStore.cartItems.fold(0.0, (sum, item) => sum + item.totalPrice);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Total',
+                        textScaler: TextScaler.linear(1),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      Text(
+                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(total)}',
+                        textScaler: TextScaler.linear(1),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             SizedBox(width: 10),
@@ -955,7 +1029,6 @@ class _MenuScreenState extends State<MenuScreen> {
                   if (widget.isForAddingItem == true) {
                     Navigator.pop(context);
                   } else {
-                    final appBox = Hive.box('app_state');
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -964,8 +1037,7 @@ class _MenuScreenState extends State<MenuScreen> {
                         ),
                       ),
                     );
-                    appBox.delete('selected_table_for_new_order');
-                    await loadCartItems();
+                    // Cart items automatically update via MobX reactivity
                   }
                 },
                 child: Row(

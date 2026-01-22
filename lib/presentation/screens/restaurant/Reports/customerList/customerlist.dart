@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/color.dart';
 class CustomerListReport extends StatefulWidget {
   const CustomerListReport({super.key});
 
@@ -13,9 +12,6 @@ class CustomerListReport extends StatefulWidget {
 }
 
 class _CustomerListReportState extends State<CustomerListReport> {
-  List<CustomerData> _customers = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -23,48 +19,39 @@ class _CustomerListReportState extends State<CustomerListReport> {
   }
 
   Future<void> _loadCustomers() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      final orderBox = Hive.box<pastOrderModel>('pastorderBox');
-      final allOrders = orderBox.values.toList();
+  List<CustomerData> _calculateCustomers() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
 
-      // Create a map to track unique customers with their phone numbers
-      final Map<String, String?> customerMap = {};
+    // Create a map to track unique customers with their phone numbers
+    final Map<String, String?> customerMap = {};
 
-      for (final order in allOrders) {
-        final customerName = order.customerName.trim();
-        if (customerName.isNotEmpty) {
-          // Store customer name and try to extract phone if available from remark or other field
-          if (!customerMap.containsKey(customerName)) {
-            customerMap[customerName] = null; // Placeholder for phone number
-          }
+    for (final order in allOrders) {
+      final customerName = order.customerName.trim();
+      if (customerName.isNotEmpty) {
+        // Store customer name and try to extract phone if available from remark or other field
+        if (!customerMap.containsKey(customerName)) {
+          customerMap[customerName] = null; // Placeholder for phone number
         }
       }
-
-      // Convert to list
-      final List<CustomerData> customers = [];
-      int index = 1;
-      for (final entry in customerMap.entries) {
-        customers.add(CustomerData(
-          srNo: index++,
-          name: entry.key,
-          mobile: entry.value ?? '-',
-        ));
-      }
-
-      setState(() {
-        _customers = customers;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading customers: $e')),
-        );
-      }
     }
+
+    // Convert to list
+    final List<CustomerData> customers = [];
+    int index = 1;
+    for (final entry in customerMap.entries) {
+      customers.add(CustomerData(
+        srNo: index++,
+        name: entry.key,
+        mobile: entry.value ?? '-',
+      ));
+    }
+
+    return customers;
   }
 
   @override
@@ -90,9 +77,15 @@ class _CustomerListReportState extends State<CustomerListReport> {
               color: Colors.white,
             )),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+
+          final customers = _calculateCustomers();
+
+          return SingleChildScrollView(
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 child: Column(
@@ -102,7 +95,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Total Customers: ${_customers.length}',
+                          'Total Customers: ${customers.length}',
                           textScaler: TextScaler.linear(1),
                           style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600, fontSize: 16),
@@ -146,7 +139,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
 
                     SizedBox(height: 25),
 
-                    if (_customers.isEmpty)
+                    if (customers.isEmpty)
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.all(40.0),
@@ -228,7 +221,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
                                           style: GoogleFonts.poppins(fontSize: 14),
                                         )))
                               ],
-                              rows: _customers
+                              rows: customers
                                   .map((customer) => DataRow(
                                         cells: [
                                           DataCell(
@@ -263,7 +256,9 @@ class _CustomerListReportState extends State<CustomerListReport> {
                   ],
                 ),
               ),
-            ),
+            );
+        },
+      ),
     );
   }
 }

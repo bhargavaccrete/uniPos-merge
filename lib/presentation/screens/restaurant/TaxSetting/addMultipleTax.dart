@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
-import '../../../../data/models/restaurant/db/database/hive_tax.dart';
-import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -23,20 +20,20 @@ class Addtax extends StatefulWidget {
 class _AddtaxState extends State<Addtax> {
   bool _ischecked1 = false;
 
-
   final TextEditingController _taxNameController = TextEditingController();
   final TextEditingController _taxNumberController = TextEditingController();
 
-
-
-
+  @override
+  void initState() {
+    super.initState();
+    taxStore.loadTaxes();
+  }
 
   @override
   void dispose() {
-    // TODO: implement dispose
-    super.dispose();
     _taxNumberController.dispose();
     _taxNameController.dispose();
+    super.dispose();
   }
 
   void _clearControllers(){
@@ -55,42 +52,53 @@ class _AddtaxState extends State<Addtax> {
       return ;
     }
 
+    bool success;
     if(existingTax != null){
-      existingTax.taxname = taxName;
-      existingTax.taxperecentage = taxPercentage;
-      await TaxBox.updateTax(existingTax);
+      final updatedTax = Tax(
+        id: existingTax.id,
+        taxname: taxName,
+        taxperecentage: taxPercentage,
+      );
+      success = await taxStore.updateTax(updatedTax);
     }else {
       final newTax = Tax(
         id: Uuid().v4(),
         taxname: taxName,
         taxperecentage: taxPercentage,
       );
-      await TaxBox.addTax(newTax);
+      success = await taxStore.addTax(newTax);
 
       // Apply tax to all items if checkbox is checked
-      if(_ischecked1) {
+      if(_ischecked1 && success) {
         await _applyTaxToAllItems(taxPercentage);
       }
     }
-    _clearControllers();
-    setState(() {
-      _ischecked1 = false;
-    });
-    Navigator.pop(context);
+
+    if(success) {
+      _clearControllers();
+      setState(() {
+        _ischecked1 = false;
+      });
+      if(mounted) {
+        Navigator.pop(context);
+      }
+    }
   }
 
 
-  void _delete(String id)async{
-    await TaxBox.deleteTax(id);
-    Navigator.pop(context);
+  Future<void> _delete(String id)async{
+    final success = await taxStore.deleteTax(id);
+    if(success && mounted) {
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _applyTaxToAllItems(double taxPercentage) async {
-    final itemBox = Hive.box<Items>('itemBoxs');
     final rate = taxPercentage / 100.0;
 
-    for (final item in itemBox.values) {
+    for (final item in itemStore.items) {
       item.applyTax(rate);
+      await itemStore.updateItem(item);
     }
 
     NotificationService.instance.showInfo(
@@ -121,140 +129,131 @@ class _AddtaxState extends State<Addtax> {
               children: [
 
                 Container(
-                  // color: Colors.red,
                   width: width * 0.9,
                   height: height * 0.6,
-                  child:
-                  FutureBuilder<Box<Tax>>(
-                      future: Future.value(TaxBox.getTaxBox()),
-                      builder: (context, snapshot){
-                        if (!snapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
+                  child: Observer(
+                    builder: (context) {
+                      if (taxStore.isLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                        final allTax = snapshot.data!.values.toList();
+                      final allTax = taxStore.taxes;
 
-                        if (allTax.isEmpty) {
-                          return Column(
-                            children: [
-                              Container(
-                                height: height * 0.1,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10.0),
-                                    border: Border.all(color: Colors.grey)),
-                                child: ListTile(
-                                  leading: Icon(Icons.calculate, size: 50),
-                                  title: Text(
-                                    "Add Tax to your items",
-                                    style: TextStyle(
-                                        color: Colors.orange,
-                                        fontSize: 20.0,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Text(
-                                    "You have not configured any taxes yet.",
-                                    style: TextStyle(
-                                        color: Colors.blueGrey[200], fontSize: 15.0),
-                                  ),
+                      if (allTax.isEmpty) {
+                        return Column(
+                          children: [
+                            Container(
+                              height: height * 0.1,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                  border: Border.all(color: Colors.grey)),
+                              child: ListTile(
+                                leading: Icon(Icons.calculate, size: 50),
+                                title: Text(
+                                  "Add Tax to your items",
+                                  style: TextStyle(
+                                      color: Colors.orange,
+                                      fontSize: 20.0,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Text(
+                                  "You have not configured any taxes yet.",
+                                  style: TextStyle(
+                                      color: Colors.blueGrey[200], fontSize: 15.0),
                                 ),
                               ),
-                              SizedBox(height: 20),
-                              Image.asset(
-                                'assets/images/taximage.png',
-                                height: height * 0.5,
-                              ),
-                              SizedBox(height: 25),
-                            ],
-                          );
-                        }
+                            ),
+                            SizedBox(height: 20),
+                            Image.asset(
+                              'assets/images/taximage.png',
+                              height: height * 0.5,
+                            ),
+                            SizedBox(height: 25),
+                          ],
+                        );
+                      }
 
-
-                        return Container(
-                          width: 200,
-                          height: 100,
-                          child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: allTax.length,
-                              itemBuilder: (context,index){
-                                final tax = allTax[index];
-                                return Card(
-                                  elevation: 5,
-                                  child: Container(
-                                    padding: EdgeInsets.all(10),
-                                    width: width,
-                                    height: height * 0.2,
-                                    child: Column(
-                                      children: [
-
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Text('TaxName:',style: GoogleFonts.poppins(color: Colors.deepOrange,fontWeight: FontWeight.w500),),
-                                                SizedBox(width: 5),
-                                                Text(tax.taxname,style: GoogleFonts.poppins(color: Colors.black,fontWeight: FontWeight.w500)),
-                                              ],
-                                            ),
-
-                                            Row(
-                                              children: [
-                                                InkWell(
-                                                  onTap: (){
-                                                    _model(height, width,existingTax: tax);
-                                                  },
-                                                  child: Container(
-                                                      padding: EdgeInsets.all(5),
-                                                      decoration: BoxDecoration(color: Colors.grey.shade200),
-                                                      child: Icon(Icons.edit,color: Colors.grey.shade500,)),
-                                                ),
-                                                SizedBox(width: 5,),
-                                                InkWell(
-                                                  onTap: ()=> _showDeleteConfirmation(context, height, width, tax.id),
-                                                  child: Container(
-                                                    padding: EdgeInsets.all(5),
-                                                    decoration: BoxDecoration(color: Colors.red),
-                                                    child:Icon(Icons.delete,color: Colors.white,),),
-                                                )
-                                              ],
-                                            )
-                                          ],
-                                        ),
-                                        RichText(
-                                          text: TextSpan(
-                                            style: GoogleFonts.poppins(color: Colors.black, fontSize: 16),
-                                            children: [
-                                              TextSpan(text: 'Tax Rate: ', style: TextStyle(color: Colors.deepOrange)),
-                                              TextSpan(text: '${tax.taxperecentage}%'),
-                                            ],
-                                          ),
-                                        ),
-
-                                        SizedBox(height: 20,),
-
-                                        CommonButton(
-
-                                            bordercircular: 5,
-                                            width: width * 0.7,
-                                            height:  height * 0.06,
-                                            onTap: (){
-
-                                              // TODO: Navigate to the item selection screen
-                                              Navigator.push(context, MaterialPageRoute(builder: (_) => ApplyTaxScreen(taxToApply: tax,)));
-
-
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: allTax.length,
+                        itemBuilder: (context, index) {
+                          final tax = allTax[index];
+                          return Card(
+                            elevation: 5,
+                            child: Container(
+                              padding: EdgeInsets.all(10),
+                              width: width,
+                              height: height * 0.2,
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text('TaxName:', style: GoogleFonts.poppins(color: Colors.deepOrange, fontWeight: FontWeight.w500)),
+                                          SizedBox(width: 5),
+                                          Text(tax.taxname, style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w500)),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          InkWell(
+                                            onTap: () {
+                                              _model(height, width, existingTax: tax);
                                             },
-                                            child:Text('Apply Tax on items',style: GoogleFonts.poppins(color: Colors.white,fontSize: 14),))
-
+                                            child: Container(
+                                              padding: EdgeInsets.all(5),
+                                              decoration: BoxDecoration(color: Colors.grey.shade200),
+                                              child: Icon(Icons.edit, color: Colors.grey.shade500),
+                                            ),
+                                          ),
+                                          SizedBox(width: 5),
+                                          InkWell(
+                                            onTap: () => _showDeleteConfirmation(context, height, width, tax.id),
+                                            child: Container(
+                                              padding: EdgeInsets.all(5),
+                                              decoration: BoxDecoration(color: Colors.red),
+                                              child: Icon(Icons.delete, color: Colors.white),
+                                            ),
+                                          )
+                                        ],
+                                      )
+                                    ],
+                                  ),
+                                  RichText(
+                                    text: TextSpan(
+                                      style: GoogleFonts.poppins(color: Colors.black, fontSize: 16),
+                                      children: [
+                                        TextSpan(text: 'Tax Rate: ', style: TextStyle(color: Colors.deepOrange)),
+                                        TextSpan(text: '${tax.taxperecentage}%'),
                                       ],
                                     ),
                                   ),
-                                );
-                              }),
-                        );
-
-                      }),
+                                  SizedBox(height: 20),
+                                  CommonButton(
+                                    bordercircular: 5,
+                                    width: width * 0.7,
+                                    height: height * 0.06,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ApplyTaxScreen(taxToApply: tax),
+                                        ),
+                                      );
+                                    },
+                                    child: Text('Apply Tax on items', style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+                                  )
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
 
 

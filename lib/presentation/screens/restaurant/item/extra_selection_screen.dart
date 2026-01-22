@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
@@ -9,7 +8,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 
 class ExtraSelectionScreen extends StatefulWidget {
   final List<String> selectedExtraIds;
@@ -35,9 +34,8 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   }
 
   void _loadExtras() {
-    final extraBox = Hive.box<Extramodel>('extra');
     setState(() {
-      availableExtras = extraBox.values.toList();
+      availableExtras = extraStore.extras.toList();
     });
   }
 
@@ -323,8 +321,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   void _showAddExtraDialog() {
     final extraNameController = TextEditingController();
     // Load variants for "Contains Size" feature
-    final variantBox = Hive.box<VariantModel>('variante');
-    final availableVariants = variantBox.values.toList();
+    final availableVariants = variantStore.variants.toList();
 
     // Data structure to hold topping inputs including variant prices
     final List<Map<String, dynamic>> toppingData = [
@@ -692,8 +689,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       topping: toppings,
                     );
 
-                    final extraBox = Hive.box<Extramodel>('extra');
-                    await extraBox.put(newExtra.Id, newExtra);
+                    await extraStore.addExtra(newExtra);
 
                     // Unfocus keyboard first
                     FocusScope.of(context).unfocus();

@@ -552,7 +552,12 @@ abstract class _OrderStore with Store {
       return orders.firstWhere(
         (order) =>
             order.tableNo == tableId &&
-            (order.status == 'Processing' || order.status == 'Cooking'),
+            (order.status == 'Processing' ||
+             order.status == 'Cooking' ||
+             order.status == 'Ready' ||
+             order.status == 'Running' ||
+             order.status == 'Reserved' ||
+             order.status == 'Served'),
       );
     } catch (e) {
       return null;

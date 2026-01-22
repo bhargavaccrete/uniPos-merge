@@ -2,7 +2,6 @@
 class CashDenominations {
   // Standard Indian currency denominations (notes and coins)
   static const List<double> notes = [
-    2000,
     500,
     200,
     100,
@@ -19,7 +18,6 @@ class CashDenominations {
   ];
 
   static const List<double> all = [
-    2000,
     500,
     200,
     100,

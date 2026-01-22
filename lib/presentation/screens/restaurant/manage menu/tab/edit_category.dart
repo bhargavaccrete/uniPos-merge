@@ -5,10 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
-import 'package:unipos/util/color.dart';
 class EditCategory extends StatefulWidget {
   final Category category;
   const EditCategory({super.key, required this.category,});
@@ -103,23 +101,25 @@ class _EditCategoryState extends State<EditCategory> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     nameController = TextEditingController(text: widget.category.name);
-    // _selectedImage = widget.category.imagePath.;
-    // saveChanges();
+
+    // Load existing image if it exists
+    if (widget.category.imagePath != null && widget.category.imagePath!.isNotEmpty) {
+      _selectedImage = File(widget.category.imagePath!);
+    }
   }
 
   void saveChanges()async{
     final updateCategory = widget.category.copyWith(
         name: nameController.text,
-        imagePath: _selectedImage != null ? _selectedImage!.path: null
+        imagePath: _selectedImage != null ? _selectedImage!.path : widget.category.imagePath
     );
 
     // 🔍 AUDIT TRAIL: Track this category edit
     AuditTrailHelper.trackEdit(updateCategory, editedBy: 'Admin'); // TODO: Replace 'Admin' with actual logged-in user
 
-    await HiveBoxes.updateCategory(updateCategory);
+    await categoryStore.updateCategory(updateCategory);
     Navigator.pop(context, true);
 
   }

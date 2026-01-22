@@ -1,7 +1,8 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/thisweek.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/today.dart';
@@ -17,14 +18,11 @@ class Salesbyitem extends StatefulWidget {
 class _SalesbyitemState extends State<Salesbyitem> {
   // State Variables
   String _selectedFilter = "Today";
-  bool _isLoading = true;
-  List<ItemReportData> _itemReportList = [];
-  late Box<pastOrderModel> _ordersBox;
 
   @override
   void initState() {
     super.initState();
-    // Open the Hive box and run the initial report
+    // Load data from pastOrderStore
     _initAndLoadData();
   }
 
@@ -32,36 +30,22 @@ class _SalesbyitemState extends State<Salesbyitem> {
   void didUpdateWidget(covariant Salesbyitem oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Reload data when returning to this screen
-    _updateReportData();
+    _loadData();
   }
 
   Future<void> _initAndLoadData() async {
-    // Box is already opened during app startup in HiveInit
-    _ordersBox = Hive.box<pastOrderModel>('pastorderBox');
-    _updateReportData();
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
   }
 
-  void _updateReportData() {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _loadData() async {
+    // Reload from pastOrderStore
+    await pastOrderStore.loadPastOrders();
+  }
 
-    // Always reload from Hive to get latest data including refunds
-    final allOrders = _ordersBox.values.toList();
-
-
-    // --- START DEBUGGING ---
-    print("---------------------------------");
-    print("Checking data for filter: $_selectedFilter");
-    print("Total orders found in Hive box: ${allOrders.length}");
-
-    if (allOrders.isNotEmpty) {
-      // Check the date of the very first order in the box
-      print("Date of first order: ${allOrders.first.orderAt}");
-      // Check if the first order has items in it
-      print("Number of items in first order: ${allOrders.first.items.length}");
-    }
-
+  List<ItemReportData> _getReportData() {
+    // Get data from pastOrderStore
+    final allOrders = pastOrderStore.pastOrders.toList();
 
     // Map the UI filter string to the logic string
     String periodLogicString;
@@ -81,49 +65,37 @@ class _SalesbyitemState extends State<Salesbyitem> {
         break;
     }
 
-    // Generate the report data using the functions we created
-    final reportData = generateItemWiseReport(allOrders, periodLogicString);
-
-    // Update the state with the new data
-    setState(() {
-      _itemReportList = reportData;
-      _isLoading = false;
-    });
+    // Generate and return the report data
+    return generateItemWiseReport(allOrders, periodLogicString);
   }
 
   // When a filter button is tapped
   void _onFilterSelected(String title) {
     setState(() {
       _selectedFilter = title;
-      // Re-run the report logic with the new filter
-      _updateReportData();
     });
   }
 
-  Widget _getBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_itemReportList.isEmpty) {
+  Widget _getBody(List<ItemReportData> reportData) {
+    if (reportData.isEmpty) {
       return const Center(child: Text("No sales data for this period."));
     }
 
     // Pass the calculated data to the appropriate child widget
     switch (_selectedFilter) {
       case "Today":
-        return TodayByItem(reportData: _itemReportList);
+        return TodayByItem(reportData: reportData);
       case "This Week":
-        return ThisWeekItems(reportData: _itemReportList);
+        return ThisWeekItems(reportData: reportData);
     // case "Day Wise":
-    //   return DayWiseItem(reportData: _itemReportList); // This will need a date picker
+    //   return DayWiseItem(reportData: reportData); // This will need a date picker
     // case "Month Wise Sales":
-    //   return MonthWiseItem(reportData: _itemReportList);
+    //   return MonthWiseItem(reportData: reportData);
     // case "Year Wise":
-    //   return YearWiseItem(reportData: _itemReportList);
+    //   return YearWiseItem(reportData: reportData);
       default:
       // By default, show today's data or a placeholder
-        return TodayByItem(reportData: _itemReportList);
+        return TodayByItem(reportData: reportData);
     }
   }
 
@@ -139,33 +111,41 @@ class _SalesbyitemState extends State<Salesbyitem> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Text('Sales By Items', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500)),
-            // const SizedBox(height: 8),
-            // Filter Buttons Row
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _filterButton("Today"),
-                  // _filterButton("Day Wise"), // Needs separate logic
-                  _filterButton("This Week"),
-                  _filterButton("Month Wise Sales"),
-                  _filterButton("Year Wise"),
-                ],
-              ),
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final reportData = _getReportData();
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Filter Buttons Row
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _filterButton("Today"),
+                      // _filterButton("Day Wise"), // Needs separate logic
+                      _filterButton("This Week"),
+                      _filterButton("Month Wise Sales"),
+                      _filterButton("Year Wise"),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Body of the report
+                Expanded(
+                  child: _getBody(reportData),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            // Body of the report
-            Expanded(
-              child: _getBody(),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

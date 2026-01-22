@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'test_data_generator.dart';
+import '../../../../../../core/di/service_locator.dart';
 
 class TestDataScreen extends StatefulWidget {
   const TestDataScreen({super.key});
@@ -30,6 +31,11 @@ class _TestDataScreenState extends State<TestDataScreen> {
         items: _itemCount,
         withImages: _includeImages,
       );
+
+      // CRITICAL: Refresh all stores after generating data
+      print('🔄 Test data generated, refreshing all stores...');
+      await refreshAllRestaurantStores();
+      print('✅ Stores refreshed successfully');
 
       setState(() {
         _isLoading = false;
@@ -89,6 +95,11 @@ class _TestDataScreenState extends State<TestDataScreen> {
 
     try {
       await TestDataGenerator.clearAllData();
+
+      // CRITICAL: Refresh all stores after clearing data
+      print('🔄 Data cleared, refreshing all stores...');
+      await refreshAllRestaurantStores();
+      print('✅ Stores refreshed successfully');
 
       setState(() {
         _isLoading = false;

@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
 import 'package:unipos/util/color.dart';
-
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
-import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/order_settings.dart';
-import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 
@@ -99,13 +91,12 @@ class _CartScreenState extends State<CartScreen>
   Future<void> _initializeCart() async {
     // Add these lines for debugging
     print("--- Placing Order ---");
-    // print("Is Dine In? ${widget.isDineIn}");
     print("Selected Table No: ${widget.selectedTableNo}");
 
     // Priority 1: If widget has existing order
     if (widget.existingOrder != null) {
       if(_isIntalizedLoad){
-        await HiveCart.clearCart();
+        await restaurantCartStore.clearCart();
         _isIntalizedLoad =false;
       }
 
@@ -119,33 +110,11 @@ class _CartScreenState extends State<CartScreen>
       return;
     }
 
-    // Priority 2: Restore persisted state
-    final appBox = Hive.box('app_state');
-    final bool persistedExisting =
-    appBox.get('is_existing_order', defaultValue: false);
-
-    if (persistedExisting) {
-      final String? persistedTableId = appBox.get('existing_order_table');
-      if (persistedTableId != null) {
-        final existingOrder =
-        await HiveOrders.getActiveOrderByTableId(persistedTableId);
-        if (existingOrder != null && mounted) {
-          setState(() {
-            _activeList = existingOrder.items;
-            isExistingOrder = true;
-            selectedFilter = 'Dine In';
-            tableNo = existingOrder.tableNo;
-          });
-          return;
-        }
-      }
-    }
-
-    // Priority 3: Fresh cart
-    final newCartItems = await HiveCart.getAllCartItems();
+    // Priority 2: Fresh cart - load from store
+    await restaurantCartStore.loadCartItems();
     if (mounted) {
       setState(() {
-        _newlyAddedList = newCartItems;
+        _newlyAddedList = restaurantCartStore.cartItems.toList();
         isExistingOrder = false;
         tableNo = widget.selectedTableNo;
         if (tableNo != null) selectedFilter = 'Dine In';
@@ -156,8 +125,8 @@ class _CartScreenState extends State<CartScreen>
   /// ------------------- CART HELPERS ------------------- ///
   Future<void> loadCartItems() async {
     try {
-      final items = await HiveCart.getAllCartItems();
-      if (mounted) setState(() => _newlyAddedList = items);
+      await restaurantCartStore.loadCartItems();
+      if (mounted) setState(() => _newlyAddedList = restaurantCartStore.cartItems.toList());
     } catch (e) {
       debugPrint('Error loading cart: $e');
       _showSnackBar('Error loading cart items', isError: true);
@@ -166,7 +135,7 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> clearCart() async {
     try {
-      await HiveCart.clearCart();
+      await restaurantCartStore.clearCart();
       await loadCartItems();
       _showSnackBar('Cart cleared');
     } catch (e) {
@@ -192,6 +161,18 @@ class _CartScreenState extends State<CartScreen>
     // );
   }
 
+  String _getVariantName(String variantId) {
+    try {
+      final variant = variantStore.variants.firstWhere(
+        (v) => v.id == variantId,
+        orElse: () => variantStore.variants.first,
+      );
+      return variant.name;
+    } catch (e) {
+      return 'Unknown Variant';
+    }
+  }
+
   /// ------------------- UI HELPERS ------------------- ///
   Widget _buildTakeaway({
     required bool isDineIn,
@@ -207,104 +188,61 @@ class _CartScreenState extends State<CartScreen>
       isdelivery: isDelivery,
       cartItems: _combinedList,
       onAddtoCart: (item) async {
-        final result = await HiveCart.addToCart(item);
+        final result = await restaurantCartStore.addToCart(item);
         if (result['success'] == true) {
           await loadCartItems();
         } else {
           // Show stock limitation error
           if (mounted) {
-
-
-            NotificationService.instance.showInfo(
+            NotificationService.instance.showError(
               result['message'] ?? 'Cannot add item to cart',
             );
-
-            // ScaffoldMessenger.of(context).showSnackBar(
-            //   SnackBar(
-            //     content: Text(result['message'] ?? 'Cannot add item to cart'),
-            //     backgroundColor: Colors.red,
-            //     duration: Duration(seconds: 3),
-            //   ),
-            // );
           }
         }
       },
       onIncreseQty: (item) async {
         // Check stock availability before increasing quantity
-        // Box is already opened during app startup in HiveInit
-        final itemBox = Hive.box<Items>('itemBoxs');
         Items? inventoryItem;
 
         try {
-          inventoryItem = itemBox.values.firstWhere(
-                (invItem) => invItem.id == item.id,
+          inventoryItem = itemStore.items.firstWhere(
+                (invItem) => invItem.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
           );
         } catch (e) {
-          // Try to find by name if not found by ID
-          try {
-            inventoryItem = itemBox.values.firstWhere(
-                  (invItem) => invItem.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
-            );
-          } catch (e2) {
-            // Item not found, allow increase (no inventory tracking)
-            await HiveCart.updateQuantity(item.id, item.quantity + 1);
-            await loadCartItems();
-            return;
-          }
+          // Item not found, allow increase (no inventory tracking)
+          await restaurantCartStore.updateQuantity(item.id, item.quantity + 1);
+          await loadCartItems();
+          return;
         }
 
         // Check if inventory tracking is enabled and stock is available
-        if (inventoryItem != null && inventoryItem.trackInventory) {
+        if (inventoryItem.trackInventory) {
           if (!inventoryItem.allowOrderWhenOutOfStock) {
-            // Check stock availability
             final requestedQuantity = item.quantity + 1;
 
             if (item.variantName != null && inventoryItem.variant != null) {
-              // Check variant stock
+              // Check variant stock - use stockQuantity directly from ItemVariante
               try {
-                final variantBox = Hive.box<VariantModel>('variante');
                 final variant = inventoryItem.variant!.firstWhere(
-                      (v) => variantBox.get(v.variantId)?.name == item.variantName,
+                      (v) => _getVariantName(v.variantId) == item.variantName,
                 );
                 final availableStock = variant.stockQuantity ?? 0;
 
                 if (availableStock < requestedQuantity) {
-                  // Show error message
-                  NotificationService.instance.showInfo(
-                    'Only $availableStock ${item.title} (${item.variantName}) available in stock',
+                  NotificationService.instance.showError(
+                    'Only ${availableStock.toInt()} ${item.title} (${item.variantName}) available in stock',
                   );
-
-
-                  // ScaffoldMessenger.of(context).showSnackBar(
-                  //   SnackBar(
-                  //     content: Text('Only $availableStock ${item.title} (${item.variantName}) available in stock'),
-                  //     backgroundColor: Colors.red,
-                  //     duration: Duration(seconds: 2),
-                  //   ),
-                  // );
                   return;
                 }
               } catch (e) {
                 print('Error checking variant stock: $e');
               }
             } else {
-              // Check regular item stock
+              // Check regular item stock - use stockQuantity directly from Items
               if (inventoryItem.stockQuantity < requestedQuantity) {
-                // Show error message
-
-                NotificationService.instance.showInfo(
+                NotificationService.instance.showError(
                     'Only ${inventoryItem.stockQuantity.toInt()} ${item.title} available in stock'
                 );
-
-
-
-                // ScaffoldMessenger.of(context).showSnackBar(
-                //   SnackBar(
-                //     content: Text('Only ${inventoryItem.stockQuantity.toInt()} ${item.title} available in stock'),
-                //     backgroundColor: Colors.red,
-                //     duration: Duration(seconds: 2),
-                //   ),
-                // );
                 return;
               }
             }
@@ -312,14 +250,14 @@ class _CartScreenState extends State<CartScreen>
         }
 
         // If all checks pass, update quantity
-        await HiveCart.updateQuantity(item.id, item.quantity + 1);
+        await restaurantCartStore.updateQuantity(item.id, item.quantity + 1);
         await loadCartItems();
       },
       onDecreseQty: (item) async {
         if (item.quantity > 1) {
-          await HiveCart.updateQuantity(item.id, item.quantity - 1);
+          await restaurantCartStore.updateQuantity(item.id, item.quantity - 1);
         } else {
-          await HiveCart.removeFromCart(item.id);
+          await restaurantCartStore.removeFromCart(item.id);
         }
         await loadCartItems();
       },
@@ -657,15 +595,15 @@ class _CartScreenState extends State<CartScreen>
                                   print('Order ID: ${widget.existingOrder!.id}');
 
                                   final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
-                                  await HiveOrders.updateOrder(updatedOrder);
+                                  await orderStore.updateOrder(updatedOrder);
                                   print('✅ Order updated in database');
 
                                   if (oldTableNo != null && oldTableNo.isNotEmpty) {
-                                    await HiveTables.updateTableStatus(oldTableNo, 'Available');
+                                    await tableStore.updateTableStatus(oldTableNo, 'Available');
                                     print('✅ Old table ($oldTableNo) set to Available');
                                   }
 
-                                  await HiveTables.updateTableStatus(
+                                  await tableStore.updateTableStatus(
                                     result,
                                     'Cooking',
                                     total: updatedOrder.totalPrice,
@@ -859,7 +797,8 @@ class _CartScreenState extends State<CartScreen>
     if (widget.existingOrder == null) return;
 
     // Get all active orders with their table numbers
-    final allOrders = await HiveOrders.getAllOrder();
+    await orderStore.loadOrders();
+    final allOrders = orderStore.orders;
     final activeOrders = allOrders.where((order) =>
     (order.status == 'Cooking' || order.status == 'Processing') &&
         (order.isPaid == null || order.isPaid == false) && // Exclude paid orders
@@ -1094,16 +1033,16 @@ class _CartScreenState extends State<CartScreen>
       );
 
       // 6. Update the main order in database
-      await HiveOrders.updateOrder(mergedOrder);
+      await orderStore.updateOrder(mergedOrder);
       print('✅ Merged order updated in database');
 
       // 7. Delete the source order
-      await HiveOrders.deleteOrder(sourceOrder.id);
+      await orderStore.deleteOrder(sourceOrder.id);
       print('✅ Source order deleted');
 
       // 8. Update table statuses
       // Target table keeps cooking status with updated total
-      await HiveTables.updateTableStatus(
+      await tableStore.updateTableStatus(
         widget.existingOrder!.tableNo!,
         'Cooking',
         total: newTotal,
@@ -1112,7 +1051,7 @@ class _CartScreenState extends State<CartScreen>
       );
 
       // Source table becomes available
-      await HiveTables.updateTableStatus(sourceOrder.tableNo!, 'Available');
+      await tableStore.updateTableStatus(sourceOrder.tableNo!, 'Available');
       print('✅ Table statuses updated');
 
       // 9. Update local state

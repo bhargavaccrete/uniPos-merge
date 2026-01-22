@@ -2,11 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/util/color.dart';
 
 import '../../../../core/di/service_locator.dart';
@@ -41,6 +37,7 @@ class _ActiveorderState extends State<Activeorder> {
   @override
   void initState() {
     super.initState();
+    orderStore.loadOrders();
     _initializeWebSocket();
   }
 
@@ -172,11 +169,7 @@ class _ActiveorderState extends State<Activeorder> {
 
     // Only delete if the user confirmed
     if (shouldDelete == true) {
-      await HiveOrders.deleteOrder(orderId);
-      // setState(() {
-      //   // Refresh the FutureBuilder by getting the updated list of orders
-      //   // _ordersFuture = HiveOrders.getAllOrder();
-      // });
+      await orderStore.deleteOrder(orderId);
     }
   }
 
@@ -393,11 +386,11 @@ class _ActiveorderState extends State<Activeorder> {
         kotStatuses: updatedKotStatuses,
         status: overallStatus,
       );
-      await HiveOrders.updateOrder(updatedOrder);
+      await orderStore.updateOrder(updatedOrder);
 
       // Update table status to match order status
       if (order.tableNo != null && order.tableNo!.isNotEmpty) {
-        await HiveTables.updateTableStatus(
+        await tableStore.updateTableStatus(
           order.tableNo!,
           overallStatus,
           total: order.totalPrice,
@@ -476,16 +469,13 @@ class _ActiveorderState extends State<Activeorder> {
   Future<void> _updateOrderStatus(OrderModel order, String newStatus) async {
     // Create an updated version of the order
     final updatedOrder = order.copyWith(status: newStatus);
-    // Save the change to the Hive database
-    await HiveOrders.updateOrder(updatedOrder);
-    // Refresh the screen to show the new color
-    // _refreshOrders();
+    // Save the change to the store
+    await orderStore.updateOrder(updatedOrder);
     print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} status updated to $newStatus.");
   }
 
 // ACTION 2: Moves the order to the past orders box
   Future<void> _moveOrderToPast(OrderModel order) async {
-    // NOTE: This assumes you have a `pastOrderModel` and `HivePastOrder` setup.
     // Create a past order record from the active order
     final pastOrder = pastOrderModel(
       id: order.id,
@@ -502,16 +492,15 @@ class _ActiveorderState extends State<Activeorder> {
       // ✅ KOT tracking - REQUIRED
       kotNumbers: order.kotNumbers,
       kotBoundaries: order.kotBoundaries, // KOT boundaries for grouping items
-      // ... copy other relevant fields
     );
 
     // Add to past orders and delete from active orders
-    await HivePastOrder.addOrder(pastOrder);
-    await HiveOrders.deleteOrder(order.id);
-    await HiveTables.updateTableStatus(order.tableNo!, 'Available');
+    await pastOrderStore.addOrder(pastOrder);
+    await orderStore.deleteOrder(order.id);
+    if (order.tableNo != null && order.tableNo!.isNotEmpty) {
+      await tableStore.updateTableStatus(order.tableNo!, 'Available');
+    }
 
-    // Refresh the screen to remove the card
-    // _refreshOrders();
     print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} moved to past orders.");
   }
 
@@ -573,11 +562,14 @@ class _ActiveorderState extends State<Activeorder> {
 
           // Orders List
           Expanded(
-            child: ValueListenableBuilder(
-              valueListenable: Hive.box<OrderModel>('orderBox').listenable(),
-              builder: (context, orders, _) {
+            child: Observer(
+              builder: (_) {
+                if (orderStore.isLoading && orderStore.orders.isEmpty) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
                 // Show all orders except 'Served' orders that are already paid
-                final activeOrders = orders.values
+                final activeOrders = orderStore.orders
                     .where((order) =>
                         order.status != 'Served' ||
                         (order.status == 'Served' && order.paymentStatus != 'Paid'))
