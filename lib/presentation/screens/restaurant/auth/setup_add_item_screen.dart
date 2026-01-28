@@ -7,9 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -19,11 +18,11 @@ import 'package:unipos/presentation/screens/restaurant/auth/category_management_
 import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
+/// Uses store pattern for reactive state management
 class SetupAddItemScreen extends StatefulWidget {
   final VoidCallback? onNext;
   final VoidCallback? onPrevious;
@@ -113,9 +112,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Future<void> _loadItemCount() async {
     try {
-      final itemBox = await itemsBoxes.getItemBox();
+      await itemStore.loadItems();
       setState(() {
-        _totalItemsInDatabase = itemBox.length;
+        _totalItemsInDatabase = itemStore.items.length;
       });
     } catch (e) {
       // Ignore errors during count
@@ -126,9 +125,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Future<void> _loadTaxes() async {
     try {
-      final taxes = await TaxBox.getAllTax();
+      await taxStore.loadTaxes();
       setState(() {
-        _availableTaxes = taxes;
+        _availableTaxes = taxStore.taxes.toList();
       });
     } catch (e) {
       print('Error loading taxes: $e');
@@ -323,10 +322,12 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     if (_selectedTaxId == null) return 0.0;
 
     try {
-      final taxBox = await TaxBox.getTaxBox();
-      final tax = taxBox.get(_selectedTaxId!);
+      final tax = _availableTaxes.firstWhere(
+        (t) => t.id == _selectedTaxId,
+        orElse: () => Tax(id: '', taxname: '', taxperecentage: 0),
+      );
 
-      if (tax != null && tax.taxperecentage != null) {
+      if (tax.id.isNotEmpty && tax.taxperecentage != null) {
         final taxRate = tax.taxperecentage!;
         print('📊 Tax rate: $taxRate% (${tax.taxname})');
         return taxRate / 100; // Convert percentage to decimal (5% -> 0.05)
@@ -479,35 +480,46 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         editCount: 0,
       );
 
-      // Save to Hive
-      final itemBox = await itemsBoxes.getItemBox();
-      await itemBox.put(item.id, item);
-      await itemBox.flush();
-      await itemBox.compact();
+      // Save using store
+      final success = await itemStore.addItem(item);
 
       // Close loading
       if (mounted) Navigator.pop(context);
 
-      // Show success
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Item "${item.name}" added successfully!',
-            style: GoogleFonts.poppins(color: Colors.white),
+      if (success) {
+        // Show success
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Item "${item.name}" added successfully!',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
           ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        );
 
-      // Reset form
-      _resetForm();
+        // Reset form
+        _resetForm();
 
-      // Increment counters
-      setState(() {
-        _itemsAdded++;
-        _totalItemsInDatabase++;
-      });
+        // Increment counters
+        setState(() {
+          _itemsAdded++;
+          _totalItemsInDatabase++;
+        });
+      } else {
+        // Show error from store
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error saving item: ${itemStore.errorMessage ?? "Unknown error"}',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
       // Close loading
       if (mounted) Navigator.pop(context);

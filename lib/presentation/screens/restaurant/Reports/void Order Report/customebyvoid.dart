@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
@@ -18,11 +19,57 @@ class CustomByVoid extends StatefulWidget {
 class _CustomByVoidState extends State<CustomByVoid> {
   DateTime? _fromDate;
   DateTime? _toDate;
-  
-  bool _isLoading = false;
-  List<pastOrderModel> _voidOrders = [];
-  double _totalVoidAmount = 0.0;
-  int _totalVoidCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVoidOrders();
+  }
+
+  Future<void> _loadVoidOrders() async {
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
+
+  List<pastOrderModel> _calculateVoidOrders() {
+    if (_fromDate == null || _toDate == null) {
+      return [];
+    }
+
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+
+    // Normalize dates
+    final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+    final end = DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59);
+
+    final voidOrdersList = allOrders.where((order) {
+      // Check if order is voided/cancelled
+      if (order.orderStatus == null) return false;
+      if (!(order.orderStatus!.toUpperCase().contains('VOID') ||
+           order.orderStatus!.toUpperCase().contains('CANCEL'))) {
+        return false;
+      }
+
+      // Check Date Range
+      if (order.orderAt == null) return false;
+      return order.orderAt!.isAfter(start.subtract(Duration(seconds: 1))) &&
+          order.orderAt!.isBefore(end.add(Duration(seconds: 1)));
+    }).toList();
+
+    return voidOrdersList;
+  }
+
+  Map<String, dynamic> _calculateTotals(List<pastOrderModel> voidOrders) {
+    double totalAmount = 0.0;
+    for (final order in voidOrders) {
+      totalAmount += order.totalPrice;
+    }
+    return {
+      'amount': totalAmount,
+      'count': voidOrders.length,
+    };
+  }
 
   Future<void> _pickFromDate(BuildContext context) async {
     DateTime? pickedDate = await showDatePicker(
@@ -56,64 +103,23 @@ class _CustomByVoidState extends State<CustomByVoid> {
     }
   }
 
-  Future<void> _loadVoidOrders() async {
-    if (_fromDate == null || _toDate == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select both From and To dates')),
-        );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final orderBox = Hive.box<pastOrderModel>('pastorderBox');
-      
-      // Normalize dates
-      final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-      final end = DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59);
-
-      final List<pastOrderModel> voidOrdersList = [];
-      double totalAmount = 0.0;
-
-      for (final order in orderBox.values) {
-        // Check if order is voided/cancelled
-        if (order.orderStatus != null &&
-            (order.orderStatus!.toUpperCase().contains('VOID') ||
-             order.orderStatus!.toUpperCase().contains('CANCEL'))) {
-
-          // Check Date Range
-          if (order.orderAt != null &&
-              order.orderAt!.isAfter(start.subtract(Duration(seconds: 1))) && // Inclusive start
-              order.orderAt!.isBefore(end.add(Duration(seconds: 1)))) { // Inclusive end
-            voidOrdersList.add(order);
-            totalAmount += order.totalPrice;
-          }
-        }
-      }
-
-      setState(() {
-        _voidOrders = voidOrdersList;
-        _totalVoidAmount = totalAmount;
-        _totalVoidCount = voidOrdersList.length;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading void orders: $e')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final voidOrders = _calculateVoidOrders();
+          final totals = _calculateTotals(voidOrders);
+          final totalVoidAmount = totals['amount'] as double;
+          final totalVoidCount = totals['count'] as int;
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
@@ -160,16 +166,22 @@ class _CustomByVoidState extends State<CustomByVoid> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       InkWell(
-                        onTap: _loadVoidOrders,
+                        onTap: () {
+                          if (_fromDate == null || _toDate == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Please select both From and To dates')),
+                            );
+                            return;
+                          }
+                          setState(() {}); // Trigger rebuild to refresh data
+                        },
                         child: Container(
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
                               color: AppColors.primary,
                               borderRadius: BorderRadius.circular(50)
                           ),
-                          child: _isLoading 
-                          ? SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Icon(
+                          child: Icon(
                             Icons.search,
                             size: 25,
                             color: Colors.white,
@@ -242,7 +254,7 @@ class _CustomByVoidState extends State<CustomByVoid> {
 
               // Total Amount
               Text(
-                " Total Void Order Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalVoidAmount)} ",
+                " Total Void Order Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(totalVoidAmount)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -251,7 +263,7 @@ class _CustomByVoidState extends State<CustomByVoid> {
 
               // Total Count
               Text(
-                " Total Void Order Count = $_totalVoidCount ",
+                " Total Void Order Count = $totalVoidCount ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -395,7 +407,7 @@ class _CustomByVoidState extends State<CustomByVoid> {
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],
-                    rows: _voidOrders.map((order) {
+                    rows: voidOrders.map((order) {
                       return DataRow(cells: [
                         DataCell(Center(
                             child: Text(
@@ -426,6 +438,8 @@ class _CustomByVoidState extends State<CustomByVoid> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

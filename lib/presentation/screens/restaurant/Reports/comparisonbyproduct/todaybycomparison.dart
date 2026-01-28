@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
@@ -12,9 +13,6 @@ class TodayByComparison extends StatefulWidget {
 }
 
 class _TodayByComparisonState extends State<TodayByComparison> {
-  bool _isLoading = true;
-  List<ProductComparisonData> _productComparisons = [];
-
   @override
   void initState() {
     super.initState();
@@ -22,75 +20,73 @@ class _TodayByComparisonState extends State<TodayByComparison> {
   }
 
   Future<void> _loadComparisonData() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      final orderBox = Hive.box<pastOrderModel>('pastorderBox');
-      final now = DateTime.now();
+  List<ProductComparisonData> _calculateComparisonData() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final now = DateTime.now();
 
-      // Today
-      final todayStart = DateTime(now.year, now.month, now.day);
-      final todayEnd = todayStart.add(Duration(days: 1));
+    // Today
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayEnd = todayStart.add(Duration(days: 1));
 
-      // Yesterday
-      final yesterdayStart = todayStart.subtract(Duration(days: 1));
-      final yesterdayEnd = todayStart;
+    // Yesterday
+    final yesterdayStart = todayStart.subtract(Duration(days: 1));
+    final yesterdayEnd = todayStart;
 
-      // Maps to store quantities per item
-      Map<String, int> todayQuantities = {};
-      Map<String, int> yesterdayQuantities = {};
+    // Maps to store quantities per item
+    Map<String, int> todayQuantities = {};
+    Map<String, int> yesterdayQuantities = {};
 
-      for (final order in orderBox.values) {
-        if (order.orderStatus == 'FULLY_REFUNDED') continue;
-        if (order.orderAt == null) continue;
+    for (final order in allOrders) {
+      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      if (order.orderAt == null) continue;
 
-        // Check if today
-        if (order.orderAt!.isAfter(todayStart) && order.orderAt!.isBefore(todayEnd)) {
-          for (final item in order.items) {
-            todayQuantities[item.title] = (todayQuantities[item.title] ?? 0) + item.quantity.toInt();
-          }
-        }
-        // Check if yesterday
-        else if (order.orderAt!.isAfter(yesterdayStart) && order.orderAt!.isBefore(yesterdayEnd)) {
-          for (final item in order.items) {
-            yesterdayQuantities[item.title] = (yesterdayQuantities[item.title] ?? 0) + item.quantity.toInt();
+      // Check if today
+      if (order.orderAt!.isAfter(todayStart) && order.orderAt!.isBefore(todayEnd)) {
+        for (final item in order.items) {
+          final effectiveQty = (item.quantity ?? 0) - (item.refundedQuantity ?? 0);
+          if (effectiveQty > 0) {
+            todayQuantities[item.title] = (todayQuantities[item.title] ?? 0) + effectiveQty;
           }
         }
       }
-
-      // Combine all unique products
-      final allProducts = {...todayQuantities.keys, ...yesterdayQuantities.keys};
-
-      // Build comparison list
-      final List<ProductComparisonData> comparisonList = [];
-      for (final productName in allProducts) {
-        final todayQty = todayQuantities[productName] ?? 0;
-        final yesterdayQty = yesterdayQuantities[productName] ?? 0;
-        final difference = todayQty - yesterdayQty;
-
-        comparisonList.add(ProductComparisonData(
-          productName: productName,
-          previousPeriodQty: yesterdayQty,
-          currentPeriodQty: todayQty,
-          difference: difference,
-        ));
-      }
-
-      // Sort by current period quantity (descending)
-      comparisonList.sort((a, b) => b.currentPeriodQty.compareTo(a.currentPeriodQty));
-
-      setState(() {
-        _productComparisons = comparisonList;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading comparison: $e')),
-        );
+      // Check if yesterday
+      else if (order.orderAt!.isAfter(yesterdayStart) && order.orderAt!.isBefore(yesterdayEnd)) {
+        for (final item in order.items) {
+          final effectiveQty = (item.quantity ?? 0) - (item.refundedQuantity ?? 0);
+          if (effectiveQty > 0) {
+            yesterdayQuantities[item.title] = (yesterdayQuantities[item.title] ?? 0) + effectiveQty;
+          }
+        }
       }
     }
+
+    // Combine all unique products
+    final allProducts = {...todayQuantities.keys, ...yesterdayQuantities.keys};
+
+    // Build comparison list
+    final List<ProductComparisonData> comparisonList = [];
+    for (final productName in allProducts) {
+      final todayQty = todayQuantities[productName] ?? 0;
+      final yesterdayQty = yesterdayQuantities[productName] ?? 0;
+      final difference = todayQty - yesterdayQty;
+
+      comparisonList.add(ProductComparisonData(
+        productName: productName,
+        previousPeriodQty: yesterdayQty,
+        currentPeriodQty: todayQty,
+        difference: difference,
+      ));
+    }
+
+    // Sort by current period quantity (descending)
+    comparisonList.sort((a, b) => b.currentPeriodQty.compareTo(a.currentPeriodQty));
+
+    return comparisonList;
   }
 
   @override
@@ -98,12 +94,16 @@ class _TodayByComparisonState extends State<TodayByComparison> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
 
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator());
-    }
-
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final productComparisons = _calculateComparisonData();
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -132,7 +132,7 @@ class _TodayByComparisonState extends State<TodayByComparison> {
 
               SizedBox(height: 25),
 
-              if (_productComparisons.isEmpty)
+              if (productComparisons.isEmpty)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(40.0),
@@ -144,7 +144,7 @@ class _TodayByComparisonState extends State<TodayByComparison> {
                   ),
                 ),
 
-              if (_productComparisons.isNotEmpty)
+              if (productComparisons.isNotEmpty)
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
@@ -212,7 +212,7 @@ class _TodayByComparisonState extends State<TodayByComparison> {
                                     style: GoogleFonts.poppins(fontSize: 14),
                                     textAlign: TextAlign.center))),
                       ],
-                      rows: _productComparisons.map((data) {
+                      rows: productComparisons.map((data) {
                         Color differenceColor = data.difference > 0
                             ? Colors.green
                             : data.difference < 0
@@ -243,6 +243,8 @@ class _TodayByComparisonState extends State<TodayByComparison> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

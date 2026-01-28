@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 class TodayByRefund extends StatefulWidget {
@@ -17,9 +16,6 @@ class TodayByRefund extends StatefulWidget {
 }
 
 class _TodayByRefundState extends State<TodayByRefund> {
-  List<pastOrderModel> _refundedOrders = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -27,35 +23,41 @@ class _TodayByRefundState extends State<TodayByRefund> {
   }
 
   Future<void> _loadRefundedOrders() async {
-    setState(() => _isLoading = true);
-    try {
-      final allOrders = await HivePastOrder.getAllPastOrderModel();
-      final today = DateTime.now();
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-      final filteredOrders = allOrders.where((order) {
-        if (order.refundedAt == null) return false;
-        final refundDate = order.refundedAt!;
-        return refundDate.year == today.year &&
-            refundDate.month == today.month &&
-            refundDate.day == today.day;
-      }).toList();
+  List<pastOrderModel> _calculateRefundedOrders() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final today = DateTime.now();
 
-      setState(() {
-        _refundedOrders = filteredOrders;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+    final filteredOrders = allOrders.where((order) {
+      if (order.refundedAt == null) return false;
+      final refundDate = order.refundedAt!;
+      return refundDate.year == today.year &&
+          refundDate.month == today.month &&
+          refundDate.day == today.day;
+    }).toList();
+
+    return filteredOrders;
   }
 
   @override
   Widget build(BuildContext context) {
-
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
+
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final refundedOrders = _calculateRefundedOrders();
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
           child:Column(
@@ -78,9 +80,7 @@ class _TodayByRefundState extends State<TodayByRefund> {
 
               SizedBox(height: 25,),
 
-              _isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : _refundedOrders.isEmpty
+              refundedOrders.isEmpty
                   ? Center(
                 child: Padding(
                   padding: EdgeInsets.all(20),
@@ -200,7 +200,7 @@ class _TodayByRefundState extends State<TodayByRefund> {
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],
-                    rows: _refundedOrders.map((order) {
+                    rows: refundedOrders.map((order) {
                       final dateStr = order.refundedAt != null
                           ? DateFormat('dd/MM/yyyy').format(order.refundedAt!)
                           : '-';
@@ -252,6 +252,8 @@ class _TodayByRefundState extends State<TodayByRefund> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

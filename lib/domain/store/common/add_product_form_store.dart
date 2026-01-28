@@ -637,7 +637,7 @@ abstract class _AddProductFormStore with Store {
       createdTime: DateTime.now(),
     );
 
-    await itemsBoxes.addItem(item);
+    await itemStore.addItem(item);
   }
 
   // ==================== RESET ====================

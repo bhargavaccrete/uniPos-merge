@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/adapters.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
-import 'dart:typed_data';
 
 import '../core/config/app_config.dart';
 import '../core/di/service_locator.dart';
-import '../data/models/restaurant/db/database/hive_tax.dart';
-import '../data/models/restaurant/db/taxmodel_314.dart';
 import '../data/models/retail/hive_model/attribute_model_219.dart';
 import '../data/models/retail/hive_model/attribute_value_model_220.dart';
 import '../data/models/retail/hive_model/variante_model_201.dart';
@@ -25,17 +20,9 @@ import '../util/responsive.dart';
 import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
-import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
-import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback? onNext;
@@ -337,8 +324,9 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   Future<bool> _updateRestaurantItem() async {
     try {
-      // Get all items from Hive
-      final allItems = await itemsBoxes.getAllItems();
+      // Get all items from store
+      await itemStore.loadItems();
+      final allItems = itemStore.items.toList();
 
       // Get the existing item to preserve fields not in the form
       final existingItem = allItems.firstWhere(
@@ -381,7 +369,7 @@ class _AddProductScreenState extends State<AddProductScreen>
       );
 
       // Update item in database
-      await itemsBoxes.updateItem(updatedItem);
+      await itemStore.updateItem(updatedItem);
 
       return true;
     } catch (e) {
@@ -842,50 +830,53 @@ class _AddProductScreenState extends State<AddProductScreen>
         },
       );
     } else {
-      // Restaurant mode - use synchronous box access
-      final categoryBox = HiveBoxes.getCategory();
-      final categories = categoryBox.values.toList();
-      final categoryIds = categories.map((c) => c.id).toList();
+      // Restaurant mode - use category store
+      return Observer(
+        builder: (_) {
+          final categories = categoryStore.categories.toList();
+          final categoryIds = categories.map((c) => c.id).toList();
 
-      // Ensure selected value is valid
-      final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
-          ? _formStore.selectedCategoryId
-          : null;
+          // Ensure selected value is valid
+          final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
+              ? _formStore.selectedCategoryId
+              : null;
 
-      return InkWell(
-        onTap: () async {
-          // Show category selector bottom sheet
-          final result = await CategorySelectorSheet.show(
-            context,
-            selectedCategoryId: selectedValue,
-            onAddCategory: () async {
-              Navigator.pop(context);
-              await AddCategoryDialog.show(context);
+          return InkWell(
+            onTap: () async {
+              // Show category selector bottom sheet
+              final result = await CategorySelectorSheet.show(
+                context,
+                selectedCategoryId: selectedValue,
+                onAddCategory: () async {
+                  Navigator.pop(context);
+                  await AddCategoryDialog.show(context);
+                },
+              );
+
+              if (result != null) {
+                setState(() {
+                  _formStore.setSelectedCategoryId(result.id);
+                });
+              }
             },
-          );
-
-          if (result != null) {
-            setState(() {
-              _formStore.setSelectedCategoryId(result.id);
-            });
-          }
-        },
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: 'Category*',
-            prefixIcon: const Icon(Icons.category, color: AppColors.primary),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            suffixIcon: const Icon(Icons.arrow_drop_down),
-          ),
-          child: Text(
-            selectedValue != null && categories.isNotEmpty
-                ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
-                : 'Select or Add Category',
-            style: TextStyle(
-              color: selectedValue != null ? Colors.black : Colors.grey[600],
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Category*',
+                prefixIcon: const Icon(Icons.category, color: AppColors.primary),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                suffixIcon: const Icon(Icons.arrow_drop_down),
+              ),
+              child: Text(
+                selectedValue != null && categories.isNotEmpty
+                    ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
+                    : 'Select or Add Category',
+                style: TextStyle(
+                  color: selectedValue != null ? Colors.black : Colors.grey[600],
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
     }
   }
@@ -929,9 +920,8 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildRestaurantTaxDropdown() {
-    // Use synchronous box access since boxes are already open
-    final taxBox = TaxBox.getTaxBox();
-    final taxes = taxBox.values.toList();
+    // Use tax store to access taxes
+    final taxes = taxStore.taxes.toList();
 
     List<Map<String, String>> taxRates = [
       {'id': '', 'name': 'No Tax', 'rate': '0'},
@@ -1982,10 +1972,9 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildChoiceGroupsSelector() {
-    return FutureBuilder<List<ChoicesModel>>(
-      future: HiveChoice.getAllChoice(),
-      builder: (context, snapshot) {
-        final choices = snapshot.data ?? [];
+    return Observer(
+      builder: (context) {
+        final choices = choiceStore.choices.toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2031,10 +2020,9 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildExtraGroupsSelector() {
-    return FutureBuilder<List<Extramodel>>(
-      future: HiveExtra.getAllExtra(),
-      builder: (context, snapshot) {
-        final extras = snapshot.data ?? [];
+    return Observer(
+      builder: (context) {
+        final extras = extraStore.extras.toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2952,23 +2940,21 @@ class _AddProductScreenState extends State<AddProductScreen>
         ),
         child: Column(
           children: [
-            FutureBuilder<List<Items>>(
-              future: itemsBoxes.getAllItems(),
-              builder: (context, snapshot) {
-                final items = snapshot.data ?? [];
+            Observer(
+              builder: (context) {
+                final items = itemStore.items.toList();
                 final filteredItems = _getFilteredRestaurantItems(items);
                 return _buildListHeader(filteredItems.length, 'Items');
               },
             ),
             Expanded(
-              child: FutureBuilder<List<Items>>(
-                future: itemsBoxes.getAllItems(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
+              child: Observer(
+                builder: (context) {
+                  if (itemStore.isLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final items = snapshot.data!;
+                  final items = itemStore.items.toList();
                   final filteredItems = _getFilteredRestaurantItems(items);
 
                   if (filteredItems.isEmpty) {
@@ -3018,8 +3004,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                               value: item.isEnabled,
                               onChanged: (_) async {
                                 final updatedItem = item.copyWith(isEnabled: !item.isEnabled);
-                                await itemsBoxes.updateItem(updatedItem);
-                                setState(() {});
+                                await itemStore.updateItem(updatedItem);
                               },
                               activeColor: AppColors.success,
                             ),
@@ -3030,8 +3015,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                             IconButton(
                               icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
                               onPressed: () async {
-                                await itemsBoxes.deleteItem(item.id);
-                                setState(() {});
+                                await itemStore.deleteItem(item.id);
                               },
                             ),
                           ],
@@ -3099,8 +3083,9 @@ class _AddProductScreenState extends State<AddProductScreen>
                           if (AppConfig.isRetail) {
                             await _showRetailFilterDialog();
                           } else {
-                            // For restaurant, we need to get items first
-                            final items = await itemsBoxes.getAllItems();
+                            // For restaurant, get items from store
+                            await itemStore.loadItems();
+                            final items = itemStore.items.toList();
                             await _showRestaurantFilterDialog(items);
                           }
                         },

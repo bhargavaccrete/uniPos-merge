@@ -97,10 +97,10 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
       ),
       body: Observer(builder: (_){
         if(pastOrderStore.isLoading){
-          Center(child: CircularProgressIndicator(color: AppColors.primary));
+          return Center(child: CircularProgressIndicator(color: AppColors.primary));
         }
-        final _data = _calculateComparisonData();
-     return   SingleChildScrollView(
+        final data = _calculateComparisonData();
+        return SingleChildScrollView(
         child: Container(
         padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         child: Column(
@@ -127,7 +127,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         children: [
         Expanded(
         child: Text(
-        '${_data?.currentPeriod ?? ""} vs ${_data?.previousPeriod ?? ""}',
+        '${data.currentPeriod} vs ${data.previousPeriod}',
         textScaler: TextScaler.linear(1),
         style: GoogleFonts.poppins(
         fontWeight: FontWeight.w500,
@@ -215,7 +215,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         ),
         ),
         child: Text(
-        "${_data!.previousPeriod}",
+        "${data.previousPeriod}",
         textAlign: TextAlign.center,
         textScaler: TextScaler.linear(1),
         style: GoogleFonts.poppins(
@@ -235,7 +235,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         ),
         ),
         child: Text(
-        '${_data!.currentPeriod}',
+        '${data.currentPeriod}',
         textAlign: TextAlign.center,
         textScaler: TextScaler.linear(1),
         style: GoogleFonts.poppins(
@@ -256,7 +256,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         DataCell(
         Center(
         child: Text(
-        _data!.previousOrders.toString(),
+        data.previousOrders.toString(),
         style:
         GoogleFonts.poppins(fontSize: 13),
         )),
@@ -264,7 +264,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         DataCell(
         Center(
         child: Text(
-        _data!.currentOrders.toString(),
+        data.currentOrders.toString(),
         style: GoogleFonts.poppins(
         fontSize: 13,
         fontWeight: FontWeight.w600,
@@ -285,7 +285,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         DataCell(
         Center(
         child: Text(
-        DecimalSettings.formatAmount(_data!.previousAmount),
+        DecimalSettings.formatAmount(data.previousAmount),
         style:
         GoogleFonts.poppins(fontSize: 13),
         )),
@@ -293,7 +293,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         DataCell(
         Center(
         child: Text(
-        DecimalSettings.formatAmount(_data!.currentAmount),
+        DecimalSettings.formatAmount(data.currentAmount),
         style: GoogleFonts.poppins(
         fontSize: 13,
         fontWeight: FontWeight.w600,
@@ -319,14 +319,14 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         Center(
         child: Text(
         _calculateGrowth(
-        _data!.previousAmount,
-        _data!.currentAmount),
+        data.previousAmount,
+        data.currentAmount),
         style: GoogleFonts.poppins(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: _getGrowthColor(
-        _data!.previousAmount,
-        _data!.currentAmount),
+        data.previousAmount,
+        data.currentAmount),
         ),
         )),
         ),

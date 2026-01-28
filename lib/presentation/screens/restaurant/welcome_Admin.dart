@@ -29,11 +29,21 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     final isDayStarted = await DayManagementService.isDayStarted();
     if (!isDayStarted && mounted) {
       // Show opening balance dialog
-      await showDialog(
+      final balance = await showDialog<double>(
         context: context,
         barrierDismissible: false,
         builder: (context) => const OpeningBalanceDialog(),
       );
+
+      // Show success message if balance was set
+      if (balance != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 

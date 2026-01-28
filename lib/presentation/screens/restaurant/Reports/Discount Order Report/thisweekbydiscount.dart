@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import 'package:unipos/util/common/currency_helper.dart';
@@ -17,10 +17,6 @@ class WeekByDiscount extends StatefulWidget {
 }
 
 class _WeekByDiscountState extends State<WeekByDiscount> {
-  List<pastOrderModel> _discountedOrders = [];
-  double _totalDiscountAmount = 0.0;
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -28,53 +24,46 @@ class _WeekByDiscountState extends State<WeekByDiscount> {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      final box = Hive.box<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
-      final now = DateTime.now();
-      
-      // Calculate start of the week (assuming Monday is start)
-      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-      final startOfWeekMidnight = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-      final endOfWeekMidnight = startOfWeekMidnight.add(Duration(days: 7));
+  List<pastOrderModel> _calculateDiscountedOrders() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final now = DateTime.now();
 
-      final allOrders = box.values.toList();
-      final weekOrders = allOrders.where((order) {
-        if (order.orderAt == null) return false;
-        // Exclude refunded and voided orders
-        final status = order.orderStatus?.toUpperCase() ?? '';
-        if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
+    // Calculate start of the week (assuming Monday is start)
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeekMidnight = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    final endOfWeekMidnight = startOfWeekMidnight.add(Duration(days: 7));
 
-        return order.orderAt!.isAfter(startOfWeekMidnight) &&
-            order.orderAt!.isBefore(endOfWeekMidnight);
-      }).toList();
+    final weekOrders = allOrders.where((order) {
+      if (order.orderAt == null) return false;
+      // Exclude refunded and voided orders
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
 
-      final discountedOrders = weekOrders.where((order) {
-        return (order.Discount ?? 0) > 0;
-      }).toList();
+      return order.orderAt!.isAfter(startOfWeekMidnight) &&
+          order.orderAt!.isBefore(endOfWeekMidnight);
+    }).toList();
 
-      // Sort by date descending (newest first)
-      discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
+    final discountedOrders = weekOrders.where((order) {
+      return (order.Discount ?? 0) > 0;
+    }).toList();
 
-      double totalDiscount = 0.0;
-      for (var order in discountedOrders) {
-        totalDiscount += (order.Discount ?? 0.0);
-      }
+    // Sort by date descending (newest first)
+    discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
 
-      setState(() {
-        _discountedOrders = discountedOrders;
-        _totalDiscountAmount = totalDiscount;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print("Error loading discount data: $e");
+    return discountedOrders;
+  }
+
+  double _calculateTotalDiscount(List<pastOrderModel> orders) {
+    double totalDiscount = 0.0;
+    for (var order in orders) {
+      totalDiscount += (order.Discount ?? 0.0);
     }
+    return totalDiscount;
   }
 
   @override
@@ -82,9 +71,16 @@ class _WeekByDiscountState extends State<WeekByDiscount> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final discountedOrders = _calculateDiscountedOrders();
+          final totalDiscountAmount = _calculateTotalDiscount(discountedOrders);
+
+          return SingleChildScrollView(
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 child: Column(
@@ -120,14 +116,14 @@ class _WeekByDiscountState extends State<WeekByDiscount> {
                     ),
 
                     Text(
-                      " Total Discount Amount Week (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalDiscountAmount)} ",
+                      " Total Discount Amount Week (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(totalDiscountAmount)} ",
                       textScaler: TextScaler.linear(1),
                       style: GoogleFonts.poppins(
                           fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                     SizedBox(height: 25),
                     Text(
-                      " Total Discount Order Count = ${_discountedOrders.length} ",
+                      " Total Discount Order Count = ${discountedOrders.length} ",
                       textScaler: TextScaler.linear(1),
                       style: GoogleFonts.poppins(
                           fontSize: 14, fontWeight: FontWeight.w600),
@@ -256,7 +252,7 @@ class _WeekByDiscountState extends State<WeekByDiscount> {
                                         style: GoogleFonts.poppins(fontSize: 14),
                                         textAlign: TextAlign.center))),
                           ],
-                          rows: _discountedOrders.map((order) {
+                          rows: discountedOrders.map((order) {
                             return DataRow(cells: [
                               DataCell(Text(
                                 order.orderAt != null
@@ -314,8 +310,9 @@ class _WeekByDiscountState extends State<WeekByDiscount> {
                   ],
                 ),
               ),
-            ),
+            );
+        },
+      ),
     );
   }
 }
-

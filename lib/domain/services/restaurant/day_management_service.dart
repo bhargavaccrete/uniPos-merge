@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:flutter/foundation.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/core/di/service_locator.dart';
 
 class DayManagementService {
   static const String _boxName = 'dayManagementBox';
@@ -22,11 +23,32 @@ class DayManagementService {
   static Future<void> setOpeningBalance(double balance) async {
     final box = _getBox();
     final now = DateTime.now();
+
+    debugPrint('🆕 Starting new day...');
+    debugPrint('   Opening balance: $balance');
+    debugPrint('   Timestamp: $now');
+
     await box.put(_openingBalanceKey, balance);
     await box.put(_dayStartedKey, true);
     await box.put(_lastDayDateKey, now.toIso8601String());
     await box.put(_dayStartTimestampKey, now.toIso8601String()); // Store exact start timestamp
-    debugPrint('Opening balance set to: $balance at $now');
+
+    // Clear the last EOD completion date when starting a new day
+    // This ensures End Day screen shows data for the new day
+    final prefs = await SharedPreferences.getInstance();
+
+    // Check if last_eod_date exists before removal
+    final existingEODDate = prefs.getString('last_eod_date');
+    debugPrint('   Existing last_eod_date before removal: $existingEODDate');
+
+    final removed = await prefs.remove('last_eod_date');
+    debugPrint('   Cleared last_eod_date: $removed');
+
+    // Verify it was actually removed
+    final afterRemoval = prefs.getString('last_eod_date');
+    debugPrint('   last_eod_date after removal: $afterRemoval (should be null)');
+
+    debugPrint('✅ New day started successfully!');
   }
 
   /// Get the current opening balance
@@ -67,7 +89,7 @@ class DayManagementService {
     await box.delete(_dayStartTimestampKey); // Clear the day start timestamp
 
     // Reset daily bill number counter
-    await HiveOrders.resetDailyBillNumber();
+    await orderStore.resetDailyBillNumber();
 
     debugPrint('Day reset - opening balance cleared, bill counter reset');
   }

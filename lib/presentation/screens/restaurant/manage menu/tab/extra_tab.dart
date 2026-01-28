@@ -15,7 +15,6 @@ import 'package:uuid/uuid.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 
-
 class ExtraTab extends StatefulWidget {
   const ExtraTab({super.key});
 
@@ -31,7 +30,9 @@ class _ExtraTabState extends State<ExtraTab> {
   final _priceController = TextEditingController();
   final _minimumController = TextEditingController();
   final _maximumController = TextEditingController();
+  final _searchController = TextEditingController();
 
+  String query = '';
   bool isveg = false, hasSize = false;
   Map<String, TextEditingController> _variantPriceControllers = {};
   List<VariantModel> _availableVariants = [];
@@ -41,6 +42,11 @@ class _ExtraTabState extends State<ExtraTab> {
   void initState() {
     super.initState();
     _loadAvailableVariants();
+    _searchController.addListener(() {
+      setState(() {
+        query = _searchController.text;
+      });
+    });
   }
 
   void _loadAvailableVariants() {
@@ -54,235 +60,11 @@ class _ExtraTabState extends State<ExtraTab> {
     _priceController.dispose();
     _minimumController.dispose();
     _maximumController.dispose();
+    _searchController.dispose();
     _variantPriceControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          children: [
-            Expanded(child: _buildExtrasList(size)),
-            _buildAddButton(size),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExtrasList(Size size) {
-    return Observer(
-      builder: (_) {
-        final allExtras = extraStore.extras.toList();
-
-        if (allExtras.isEmpty) {
-          return _buildEmptyState(size);
-        }
-
-        return ListView.builder(
-          itemCount: allExtras.length,
-          itemBuilder: (context, index) => _buildExtraCard(allExtras[index], index, size),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState(Size size) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Lottie.asset(
-            AppImages.notfoundanimation,
-            height: size.height * 0.3,
-          ),
-          Text(
-            'No Extras Found',
-            style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExtraCard(Extramodel extra, int index, Size size) {
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            title: Text(
-              extra.Ename,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Colors.green.shade700,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            trailing: _buildActionButtons(extra, index),
-          ),
-          const Divider(),
-          _buildToppingsList(extra, index),
-          _buildAddToppingButton(size, extra, index),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(Extramodel extra, int index) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildIconButton(
-          Icons.edit,
-          Colors.grey.shade300,
-              () => _openExtraBottomSheet(extra: extra, index: index),
-        ),
-        const SizedBox(width: 5),
-        _buildIconButton(
-          Icons.delete,
-          Colors.red,
-              () => _showDeleteDialog(extra),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIconButton(IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(1),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: Icon(
-          icon,
-          color: color == Colors.red ? Colors.white : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToppingsList(Extramodel extra, int extraIndex) {
-    if (extra.topping?.isEmpty ?? true) return const SizedBox();
-
-    return Column(
-      children: extra.topping!.asMap().entries.map((entry) {
-        final toppingIndex = entry.key;
-        final topping = entry.value;
-
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.grey.shade50,
-          ),
-          child: Row(
-            children: [
-              Checkbox(value: true, onChanged: null),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(topping.name, style: const TextStyle(fontSize: 16)),
-                    Text(
-                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.green,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: topping.isveg ? Colors.green : Colors.red,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  topping.isveg ? 'Veg' : 'Non-Veg',
-                  style: const TextStyle(color: Colors.white, fontSize: 10),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => _openToppingBottomSheet(
-                  extra: extra,
-                  toppingIndex: toppingIndex,
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Icon(Icons.edit, color: Colors.grey),
-                ),
-              ),
-              InkWell(
-                onTap: () => _deleteTopping(extra, toppingIndex),
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Icon(Icons.delete, color: Colors.red),
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildAddToppingButton(Size size, Extramodel extra, int index) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: CommonButton(
-        width: size.width * 0.8,
-        height: size.height * 0.06,
-        bordercircular: 5,
-        bordercolor: AppColors.primary,
-        bgcolor: Colors.white,
-        onTap: () => _openToppingBottomSheet(extra: extra),
-        child: Text(
-          'Add Topping Names',
-          style: GoogleFonts.poppins(color: AppColors.primary),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddButton(Size size) {
-    return CommonButton(
-      bordercircular: 30,
-      width: size.width * 0.5,
-      height: size.height * 0.06,
-      onTap: _openExtraBottomSheet,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Icon(Icons.add),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            'Add Extras',
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Bottom Sheet Methods
   void _openExtraBottomSheet({Extramodel? extra, int? index}) {
     if (extra != null) {
       _extrasController.text = extra.Ename;
@@ -299,6 +81,9 @@ class _ExtraTabState extends State<ExtraTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -309,27 +94,80 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildExtraBottomSheet() {
-    final size = MediaQuery.of(context).size;
-
     return Container(
-      height: size.height * 0.35,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _buildSheetHeader(
-            editingIndex == null ? 'Add Extras Category' : 'Edit Extra Category',
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.star, color: AppColors.primary),
+              ),
+              SizedBox(width: 12),
+              Text(
+                editingIndex == null ? 'Add Extra Category' : 'Edit Extra Category',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          _buildTextField(_extrasController, "Extra Category Name (English)"),
-          const SizedBox(height: 20),
-          CommonButton(
-            bordercircular: 10,
-            height: size.height * 0.05,
-            width: size.width * 0.5,
-            onTap: _addOrEditExtra,
-            child: Text(
-              editingIndex == null ? 'Add' : 'Update',
-              style: GoogleFonts.poppins(color: Colors.white),
+          Divider(height: 30),
+          TextField(
+            controller: _extrasController,
+            style: GoogleFonts.poppins(fontSize: 14),
+            decoration: InputDecoration(
+              labelText: "Extra Category Name",
+              labelStyle: GoogleFonts.poppins(color: Colors.grey),
+              prefixIcon: Icon(Icons.edit, color: AppColors.primary),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _addOrEditExtra,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    editingIndex == null
+                        ? Icons.add_circle_outline
+                        : Icons.check_circle_outline,
+                    color: Colors.white,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    editingIndex == null ? 'Add' : 'Update',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -346,7 +184,6 @@ class _ExtraTabState extends State<ExtraTab> {
       hasSize = topping.isContainSize ?? false;
       editingToppingIndex = toppingIndex;
 
-      // Setup variant price controllers and selected variants
       _variantPriceControllers.clear();
       _selectedVariants.clear();
       if (hasSize && topping.variantPrices != null) {
@@ -354,8 +191,8 @@ class _ExtraTabState extends State<ExtraTab> {
           if (topping.variantPrices!.containsKey(variant.id)) {
             _selectedVariants.add(variant.id);
             _variantPriceControllers[variant.id] = TextEditingController(
-                text: topping.variantPrices![variant.id]?.toString() ?? topping.price.toString()
-            );
+                text: topping.variantPrices![variant.id]?.toString() ??
+                    topping.price.toString());
           }
         }
       }
@@ -372,6 +209,9 @@ class _ExtraTabState extends State<ExtraTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -382,33 +222,208 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildToppingBottomSheet(Extramodel extra) {
-    final size = MediaQuery.of(context).size;
-
     return StatefulBuilder(
       builder: (context, setModalState) => Container(
-        height: size.height * 0.6,
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
         child: SingleChildScrollView(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSheetHeader('Add Topping'),
-              const SizedBox(height: 10),
-              _buildExtraCategoryInfo(extra.Ename),
-              const SizedBox(height: 15),
-              _buildTextField(_toppingController, "Topping Name"),
-              const SizedBox(height: 15),
-              _buildVegNonVegSelector(setModalState),
-              _buildCheckboxRow(setModalState),
-              if (!hasSize) _buildTextField(_priceController, "Add Price"),
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.local_pizza, color: AppColors.primary),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Add Topping',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'To: ${extra.Ename}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Divider(height: 30),
+
+              // Topping Name
+              TextField(
+                controller: _toppingController,
+                style: GoogleFonts.poppins(fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: "Topping Name",
+                  labelStyle: GoogleFonts.poppins(color: Colors.grey),
+                  prefixIcon: Icon(Icons.edit, color: AppColors.primary),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                ),
+              ),
+              SizedBox(height: 15),
+
+              // Veg/Non-Veg Selector
+              Text(
+                'Type',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildVegOption(true, setModalState),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: _buildVegOption(false, setModalState),
+                  ),
+                ],
+              ),
+              SizedBox(height: 15),
+
+              // Contains Size Checkbox
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: hasSize,
+                      activeColor: AppColors.primary,
+                      onChanged: (value) {
+                        setModalState(() {
+                          hasSize = value!;
+                          if (hasSize) {
+                            _variantPriceControllers.clear();
+                            _selectedVariants.clear();
+                            for (var variant in _availableVariants) {
+                              _variantPriceControllers[variant.id] =
+                                  TextEditingController(
+                                      text: _priceController.text.isEmpty
+                                          ? '0'
+                                          : _priceController.text);
+                            }
+                          } else {
+                            _variantPriceControllers.values
+                                .forEach((controller) => controller.dispose());
+                            _variantPriceControllers.clear();
+                            _selectedVariants.clear();
+                          }
+                        });
+                      },
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Contains Size',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            'Enable if this topping has different sizes',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 15),
+
+              // Price Field or Variant Prices
+              if (!hasSize)
+                TextField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  style: GoogleFonts.poppins(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: "Price",
+                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
+                    prefixIcon: Icon(Icons.currency_rupee, color: AppColors.primary),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+
               if (hasSize) _buildVariantPricesSection(setModalState),
-              const SizedBox(height: 20),
-              CommonButton(
-                width: size.width * 0.4,
-                height: size.height * 0.05,
-                onTap: () => _saveTopping(extra),
-                child: Text(
-                  'Save',
-                  style: GoogleFonts.poppins(color: Colors.white),
+
+              SizedBox(height: 20),
+
+              // Save Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => _saveTopping(extra),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_outline, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        'Save Topping',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -418,110 +433,54 @@ class _ExtraTabState extends State<ExtraTab> {
     );
   }
 
-  Widget _buildSheetHeader(String title) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500),
-        ),
-        InkWell(
-          onTap: () => Navigator.pop(context),
-          child: const Icon(Icons.cancel, color: Colors.grey),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        labelStyle: GoogleFonts.poppins(color: Colors.grey),
-        border: const OutlineInputBorder(),
-        labelText: label,
-      ),
-    );
-  }
-
-  Widget _buildExtraCategoryInfo(String categoryName) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: RichText(
-        text: TextSpan(
-          text: 'Extra Category: ',
-          style: GoogleFonts.poppins(color: Colors.grey, fontSize: 16),
-          children: [
-            TextSpan(
-              text: categoryName,
-              style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 16),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVegNonVegSelector(StateSetter setModalState) {
-    return Row(
-      children: [
-        Expanded(child: _buildVegOption(true, setModalState)),
-        const SizedBox(width: 10),
-        Expanded(child: _buildVegOption(false, setModalState)),
-      ],
-    );
-  }
-
   Widget _buildVegOption(bool isVegOption, StateSetter setModalState) {
-    final size = MediaQuery.of(context).size;
     final isSelected = isveg == isVegOption;
 
     return InkWell(
       onTap: () => setModalState(() => isveg = isVegOption),
       child: Container(
-        alignment: Alignment.center,
-        height: size.height * 0.06,
-        padding: const EdgeInsets.all(5),
+        padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: isSelected ? AppColors.primary : Colors.grey),
-          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.grey.shade300,
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? AppColors.primary.withOpacity(0.05) : Colors.white,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
+              padding: EdgeInsets.all(2),
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: isVegOption ? Colors.green : Colors.red),
+                border: Border.all(
+                  color: isVegOption ? Colors.green : Colors.red,
+                  width: 2,
+                ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.circle,
                 color: isVegOption ? Colors.green : Colors.red,
-                size: 20,
+                size: 14,
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Text(
               isVegOption ? 'Veg' : 'Non-Veg',
-              style: GoogleFonts.poppins(fontSize: 14),
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
             ),
             if (isSelected) ...[
-              const SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 20,
-                ),
+              SizedBox(width: 8),
+              Icon(
+                Icons.check_circle,
+                color: AppColors.primary,
+                size: 18,
               ),
             ],
           ],
@@ -530,124 +489,132 @@ class _ExtraTabState extends State<ExtraTab> {
     );
   }
 
-  Widget _buildCheckboxRow(StateSetter setModalState) {
-    return Row(
-      children: [
-        Checkbox(
-          value: hasSize,
-          onChanged: (value) {
-            setModalState(() {
-              hasSize = value!;
-              if (hasSize) {
-                // Initialize variant price controllers when hasSize is enabled
-                _variantPriceControllers.clear();
-                _selectedVariants.clear();
-                for (var variant in _availableVariants) {
-                  _variantPriceControllers[variant.id] = TextEditingController(
-                      text: _priceController.text.isEmpty ? '0' : _priceController.text
-                  );
-                }
-              } else {
-                // Clear variant price controllers when hasSize is disabled
-                _variantPriceControllers.values.forEach((controller) => controller.dispose());
-                _variantPriceControllers.clear();
-                _selectedVariants.clear();
-              }
-            });
-          },
-        ),
-        Text('Contains Size', style: GoogleFonts.poppins(fontSize: 14)),
-      ],
-    );
-  }
-
   Widget _buildVariantPricesSection(StateSetter setModalState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(
-            'Select Sizes and Set Prices:',
-            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tune, size: 18, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text(
+                'Size-based Pricing',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
-        ),
-        ..._availableVariants.map((variant) {
-          final isSelected = _selectedVariants.contains(variant.id);
-          final controller = _variantPriceControllers[variant.id];
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Row(
-              children: [
-                Checkbox(
-                  value: isSelected,
-                  onChanged: (bool? value) {
-                    setModalState(() {
-                      if (value == true) {
-                        _selectedVariants.add(variant.id);
-                        _variantPriceControllers[variant.id] = TextEditingController(
-                            text: _priceController.text.isEmpty ? '0' : _priceController.text
-                        );
-                      } else {
-                        _selectedVariants.remove(variant.id);
-                        _variantPriceControllers[variant.id]?.dispose();
-                        _variantPriceControllers.remove(variant.id);
-                      }
-                    });
-                  },
-                  activeColor: AppColors.primary,
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    variant.name,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: isSelected ? Colors.black : Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: controller,
-                    enabled: isSelected,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      border: const OutlineInputBorder(),
-                      labelText: 'Price',
-                      labelStyle: GoogleFonts.poppins(fontSize: 12),
-                      prefixText: CurrencyHelper.currentSymbol,
-                      filled: !isSelected,
-                      fillColor: !isSelected ? Colors.grey.shade100 : null,
-                    ),
-                  ),
-                ),
-              ],
+          SizedBox(height: 4),
+          Text(
+            'Select sizes and set prices for each',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: Colors.grey.shade600,
             ),
-          );
-        }).toList(),
-      ],
+          ),
+          SizedBox(height: 12),
+          ..._availableVariants.map((variant) {
+            final isSelected = _selectedVariants.contains(variant.id);
+            final controller = _variantPriceControllers[variant.id];
+            return Container(
+              margin: EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : Colors.grey.shade200,
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: isSelected,
+                    activeColor: AppColors.primary,
+                    onChanged: (bool? value) {
+                      setModalState(() {
+                        if (value == true) {
+                          _selectedVariants.add(variant.id);
+                          _variantPriceControllers[variant.id] =
+                              TextEditingController(
+                                  text: _priceController.text.isEmpty
+                                      ? '0'
+                                      : _priceController.text);
+                        } else {
+                          _selectedVariants.remove(variant.id);
+                          _variantPriceControllers[variant.id]?.dispose();
+                          _variantPriceControllers.remove(variant.id);
+                        }
+                      });
+                    },
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      variant.name,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected ? Colors.black87 : Colors.grey,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: controller,
+                      enabled: isSelected,
+                      keyboardType: TextInputType.number,
+                      style: GoogleFonts.poppins(fontSize: 14),
+                      decoration: InputDecoration(
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        labelText: 'Price',
+                        labelStyle: GoogleFonts.poppins(fontSize: 12),
+                        prefixText: CurrencyHelper.currentSymbol,
+                        filled: !isSelected,
+                        fillColor: !isSelected ? Colors.grey.shade100 : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
     );
   }
 
-  // Action Methods
   Future<void> _addOrEditExtra() async {
     final trimmedName = _extrasController.text.trim();
     if (trimmedName.isEmpty) return;
 
     try {
       if (editingIndex != null) {
-        // Get the current extra from store
         final allExtras = extraStore.extras.toList();
         final currentExtra = allExtras[editingIndex!];
 
         final updatedExtra = Extramodel(
           Id: currentExtra.Id,
           Ename: trimmedName,
-          topping: currentExtra.topping, // Preserve existing toppings
+          topping: currentExtra.topping,
         );
         await extraStore.updateExtra(updatedExtra);
       } else {
@@ -662,22 +629,13 @@ class _ExtraTabState extends State<ExtraTab> {
       editingIndex = null;
       Navigator.pop(context);
     } catch (e) {
-      // Handle error - show snackbar or dialog
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Error: $e')),
-      // );
-      NotificationService.instance.showError(
-        'Error: $e',
-      );
-
-
+      NotificationService.instance.showError('Error: $e');
     }
   }
 
   Future<void> _saveTopping(Extramodel extra) async {
     if (_toppingController.text.trim().isEmpty) return;
 
-    // Prepare variant prices if hasSize is true
     Map<String, double>? variantPrices;
     double basePrice = 0.0;
 
@@ -686,7 +644,6 @@ class _ExtraTabState extends State<ExtraTab> {
       for (var entry in _variantPriceControllers.entries) {
         final price = double.tryParse(entry.value.text) ?? 0.0;
         variantPrices[entry.key] = price;
-        // Use the first variant price as base price
         if (basePrice == 0.0) basePrice = price;
       }
     } else {
@@ -711,13 +668,7 @@ class _ExtraTabState extends State<ExtraTab> {
       editingToppingIndex = null;
       Navigator.pop(context);
     } catch (e) {
-      NotificationService.instance.showError(
-        'Error: $e',
-      );
-
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Error: $e')),
-      // );
+      NotificationService.instance.showError('Error: $e');
     }
   }
 
@@ -725,90 +676,681 @@ class _ExtraTabState extends State<ExtraTab> {
     try {
       await extraStore.removeTopping(extra.Id, toppingIndex);
     } catch (e) {
-      NotificationService.instance.showError(
-        'Error: $e',
-      );
-
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Error: $e')),
-      // );
+      NotificationService.instance.showError('Error: $e');
     }
   }
 
-  void _showDeleteDialog(Extramodel extra) {
-    final size = MediaQuery.of(context).size;
-
-    showModalBottomSheet(
+  Future<void> _deleteExtra(Extramodel extra) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => Container(
-        height: size.height * 0.4,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
           children: [
-            Icon(Icons.delete, size: 80, color: AppColors.primary),
-            const SizedBox(height: 15),
-            Text(
-              'Delete Extra',
-              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500),
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('Delete Extra',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete this extra?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Are you sure you want to delete this extra?',
-              style: GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: CommonButton(
-                    bordercircular: 8,
-                    height: 45,
-                    bordercolor: Colors.grey,
-                    bgcolor: Colors.white,
-                    onTap: () => Navigator.pop(context),
-                    child: Text(
-                      'Cancel',
-                      style: GoogleFonts.poppins(color: Colors.grey),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: CommonButton(
-                    bordercircular: 8,
-                    height: 45,
-                    bordercolor: Colors.red,
-                    bgcolor: Colors.red,
-                    onTap: () => _deleteExtra(extra),
-                    child: Text(
-                      'Delete',
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                  ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await extraStore.deleteExtra(extra.Id);
+      } catch (e) {
+        NotificationService.instance.showError('Error deleting extra: $e');
+      }
+    }
+  }
+
+  int _getGridColumns(double width) {
+    if (width > 1200) return 3;
+    else if (width > 800) return 2;
+    else return 2;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: Column(
+        children: [
+          // Modern Search Bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
-          ],
-        ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: TextField(
+                controller: _searchController,
+                style: GoogleFonts.poppins(fontSize: 14),
+                decoration: InputDecoration(
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  hintText: 'Search extras...',
+                  hintStyle: GoogleFonts.poppins(
+                    color: Colors.grey.shade500,
+                    fontSize: 14,
+                  ),
+                  prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
+                  suffixIcon: query.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: Colors.grey, size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ),
+
+          // Extras List
+          Expanded(
+            child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
+          ),
+
+          // Add Extra Button
+          _buildAddButton(),
+        ],
       ),
     );
   }
 
-  Future<void> _deleteExtra(Extramodel extra) async {
-    try {
-      await extraStore.deleteExtra(extra.Id);
-      Navigator.pop(context);
-    } catch (e) {
-      Navigator.pop(context);
-      NotificationService.instance.showError(
-        'Error deleting extra: $e',
-      );
+  Widget _buildMobileLayout(Size size) {
+    return Observer(
+      builder: (_) {
+        final filteredExtras = _getFilteredExtras();
 
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Error deleting extra: $e')),
-      // );
-    }
+        if (filteredExtras.isEmpty) {
+          return _buildEmptyState(size.height);
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.all(16),
+          itemCount: filteredExtras.length,
+          itemBuilder: (context, index) {
+            final extra = filteredExtras[index];
+            return _buildMobileExtraCard(extra, index);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTabletLayout(Size size) {
+    return Observer(
+      builder: (_) {
+        final filteredExtras = _getFilteredExtras();
+
+        if (filteredExtras.isEmpty) {
+          return _buildEmptyState(size.height);
+        }
+
+        return GridView.builder(
+          padding: EdgeInsets.all(24),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _getGridColumns(size.width),
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.85,
+          ),
+          itemCount: filteredExtras.length,
+          itemBuilder: (context, index) {
+            final extra = filteredExtras[index];
+            return _buildGridExtraCard(extra, index);
+          },
+        );
+      },
+    );
+  }
+
+  List<Extramodel> _getFilteredExtras() {
+    final allExtras = extraStore.extras.toList();
+    return query.isEmpty
+        ? allExtras
+        : allExtras.where((extra) {
+            final name = extra.Ename.toLowerCase();
+            final queryLower = query.toLowerCase();
+            return name.contains(queryLower);
+          }).toList();
+  }
+
+  Widget _buildEmptyState(double height) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset(AppImages.notfoundanimation, height: height * 0.25),
+          SizedBox(height: 16),
+          Text(
+            query.isEmpty ? 'No Extras Found' : 'No matching extras',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          if (query.isEmpty)
+            Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Add extras to enhance your menu',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileExtraCard(Extramodel extra, int index) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          // Extra Header
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.star, color: Colors.green.shade700, size: 24),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        extra.Ename,
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.local_pizza, size: 12, color: AppColors.primary),
+                            SizedBox(width: 4),
+                            Text(
+                              '${extra.topping?.length ?? 0} toppings',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => _openExtraBottomSheet(extra: extra, index: index),
+                      child: Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => _deleteExtra(extra),
+                      child: Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Toppings List (Mobile)
+          if (extra.topping != null && extra.topping!.isNotEmpty)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+              ),
+              child: Column(
+                children: extra.topping!.asMap().entries.map((entry) {
+                  final toppingIndex = entry.key;
+                  final topping = entry.value;
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 8),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: topping.isveg ? Colors.green : Colors.red,
+                              width: 2,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.circle,
+                            color: topping.isveg ? Colors.green : Colors.red,
+                            size: 10,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                topping.name,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () =>
+                              _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex),
+                          child: Container(
+                            padding: EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(Icons.edit, color: Colors.blue, size: 16),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        InkWell(
+                          onTap: () => _deleteTopping(extra, toppingIndex),
+                          child: Container(
+                            padding: EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(Icons.delete, color: Colors.red, size: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+          // Add Topping Button
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: InkWell(
+              onTap: () => _openToppingBottomSheet(extra: extra),
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.primary, width: 2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Add Topping',
+                      style: GoogleFonts.poppins(
+                        color: AppColors.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridExtraCard(Extramodel extra, int index) {
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.star, color: Colors.green.shade700, size: 20),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            extra.Ename,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green.shade700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 4),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${extra.topping?.length ?? 0} toppings',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Toppings Preview (Grid)
+          if (extra.topping != null && extra.topping!.isNotEmpty)
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 14),
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListView(
+                  children: [
+                    ...extra.topping!.take(3).map((topping) {
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(1.5),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: topping.isveg ? Colors.green : Colors.red,
+                                  width: 1.5,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.circle,
+                                color: topping.isveg ? Colors.green : Colors.red,
+                                size: 7,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                topping.name,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    if (extra.topping!.length > 3)
+                      Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          '+${extra.topping!.length - 3} more',
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            color: Colors.grey.shade500,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Action Buttons
+          Padding(
+            padding: EdgeInsets.all(14),
+            child: Column(
+              children: [
+                InkWell(
+                  onTap: () => _openToppingBottomSheet(extra: extra),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.primary, width: 1.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add, color: AppColors.primary, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Add Topping',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _openExtraBottomSheet(extra: extra, index: index),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _deleteExtra(extra),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddButton() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: ElevatedButton(
+          onPressed: _openExtraBottomSheet,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.add, color: AppColors.primary, size: 20),
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Add Extra',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

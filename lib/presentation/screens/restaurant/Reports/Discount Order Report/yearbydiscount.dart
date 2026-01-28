@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -32,10 +32,6 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
   ];
   int dropdownvalue2 = 2026;
 
-  List<pastOrderModel> _discountedOrders = [];
-  double _totalDiscountAmount = 0.0;
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
@@ -48,51 +44,44 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      final box = Hive.box<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
-      
-      int year = dropdownvalue2;
-      final startOfYear = DateTime(year, 1, 1);
-      final endOfYear = DateTime(year + 1, 1, 1);
+  List<pastOrderModel> _calculateDiscountedOrders() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
 
-      final allOrders = box.values.toList();
-      final yearOrders = allOrders.where((order) {
-        if (order.orderAt == null) return false;
-        // Exclude refunded and voided orders
-        final status = order.orderStatus?.toUpperCase() ?? '';
-        if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
+    int year = dropdownvalue2;
+    final startOfYear = DateTime(year, 1, 1);
+    final endOfYear = DateTime(year + 1, 1, 1);
 
-        return order.orderAt!.isAfter(startOfYear.subtract(Duration(seconds: 1))) &&
-            order.orderAt!.isBefore(endOfYear);
-      }).toList();
+    final yearOrders = allOrders.where((order) {
+      if (order.orderAt == null) return false;
+      // Exclude refunded and voided orders
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
 
-      final discountedOrders = yearOrders.where((order) {
-        return (order.Discount ?? 0) > 0;
-      }).toList();
+      return order.orderAt!.isAfter(startOfYear.subtract(Duration(seconds: 1))) &&
+          order.orderAt!.isBefore(endOfYear);
+    }).toList();
 
-      // Sort by date descending (newest first)
-      discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
+    final discountedOrders = yearOrders.where((order) {
+      return (order.Discount ?? 0) > 0;
+    }).toList();
 
-      double totalDiscount = 0.0;
-      for (var order in discountedOrders) {
-        totalDiscount += (order.Discount ?? 0.0);
-      }
+    // Sort by date descending (newest first)
+    discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
 
-      setState(() {
-        _discountedOrders = discountedOrders;
-        _totalDiscountAmount = totalDiscount;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print("Error loading discount data: $e");
+    return discountedOrders;
+  }
+
+  double _calculateTotalDiscount(List<pastOrderModel> orders) {
+    double totalDiscount = 0.0;
+    for (var order in orders) {
+      totalDiscount += (order.Discount ?? 0.0);
     }
+    return totalDiscount;
   }
 
   @override
@@ -100,7 +89,16 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final discountedOrders = _calculateDiscountedOrders();
+          final totalDiscountAmount = _calculateTotalDiscount(discountedOrders);
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -148,7 +146,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                     width: 10,
                   ),
                   InkWell(
-                    onTap: _loadData,
+                    onTap: () => setState(() {}), // Trigger rebuild to refresh data
                     child: Container(
                         padding: EdgeInsets.all(5),
                         decoration: BoxDecoration(
@@ -194,14 +192,14 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
               ),
 
               Text(
-                " Total Discount Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalDiscountAmount)} ",
+                " Total Discount Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(totalDiscountAmount)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 10),
               Text(
-                " Total Discount Order Count = ${_discountedOrders.length} ",
+                " Total Discount Order Count = ${discountedOrders.length} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -211,9 +209,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                 height: 25,
               ),
 
-              _isLoading 
-              ? Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+              SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                     headingRowHeight: 50,
@@ -332,7 +328,7 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],
-                    rows: _discountedOrders.map((order) {
+                    rows: discountedOrders.map((order) {
                             return DataRow(cells: [
                               DataCell(Text(
                                 order.orderAt != null
@@ -390,6 +386,8 @@ class _YearWisebyDiscountState extends State<YearWisebyDiscount> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

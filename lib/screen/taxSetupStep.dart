@@ -74,7 +74,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     try {
       // Only load from restaurant tax database if in restaurant mode
       if (AppConfig.isRestaurant) {
-        final existingTaxes = await TaxBox.getAllTax();
+        final existingTaxes = await taxStore.taxes.toList();
         if (existingTaxes.isNotEmpty && _taxes.isEmpty) {
           setState(() {
             _taxes = existingTaxes.map((tax) {
@@ -104,7 +104,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
       print('💾 Saving ${_taxes.length} taxes to restaurant database...');
 
       // Get existing taxes from database
-      final existingTaxes = await TaxBox.getAllTax();
+      final existingTaxes = await taxStore.taxes.toList();
 
       // Create a map of existing taxes by name for quick lookup
       final existingTaxMap = <String, Tax>{};
@@ -119,7 +119,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
         if (existingTax != null) {
           // Update existing tax
           existingTax.taxperecentage = taxItem.rate;
-          await TaxBox.updateTax(existingTax);
+          await taxStore.updateTax(existingTax);
           print('🔄 Updated tax: ${existingTax.taxname} (${existingTax.taxperecentage}%)');
         } else {
           // Create new tax
@@ -128,7 +128,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
             taxname: taxItem.name,
             taxperecentage: taxItem.rate,
           );
-          await TaxBox.addTax(tax);
+          await taxStore.addTax(tax);
           print('✅ Created tax: ${tax.taxname} (${tax.taxperecentage}%)');
         }
       }

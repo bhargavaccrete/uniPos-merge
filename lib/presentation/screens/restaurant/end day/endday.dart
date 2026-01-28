@@ -5,7 +5,6 @@ import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/domain/services/restaurant/data_clear_service.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
@@ -13,9 +12,6 @@ import 'package:unipos/domain/services/restaurant/eod_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/color.dart';
-import '../../../../data/models/restaurant/db/database/hive_cart.dart';
-import '../../../../data/models/restaurant/db/database/hive_pastorder.dart';
 
 class EndDayDrawer extends StatefulWidget {
   const EndDayDrawer({super.key});
@@ -72,13 +68,26 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
       print('✅ All boxes reported as open, attempting to access data...');
 
-      // Check if there are any past orders (transactions) to display
-      print('📦 Fetching past orders...');
-      final pastOrders = await HivePastOrder.getAllPastOrderModel();
-      print('✅ Got ${pastOrders.length} past orders');
+      // Check if EOD was completed after the current day started
+      // This is more robust than checking if EOD was completed "today"
+      final lastEODDate = await _getLastEODDate();
+      final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
+      final today = DateTime.now();
 
-      // If there are no past orders, show empty state
-      if (pastOrders.isEmpty) {
+      print('🔍 Last EOD date: $lastEODDate');
+      print('🔍 Day start timestamp: $dayStartTimestamp');
+      print('🔍 Today date: $today');
+
+      // If EOD was completed AFTER the current day was started, the day has been closed
+      final isEODCompletedAfterDayStart = lastEODDate != null &&
+          dayStartTimestamp != null &&
+          lastEODDate.isAfter(dayStartTimestamp);
+
+      print('🔍 Is EOD completed after day start: $isEODCompletedAfterDayStart');
+
+      if (isEODCompletedAfterDayStart) {
+        // EOD was completed for the current active day, show empty state
+        print('ℹ️ EOD already completed for the current day - showing empty state');
         setState(() {
           _currentReport = null;
           openingBalance = 0.0;
@@ -88,6 +97,29 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         });
         return;
       }
+
+      // Check if the day has been started
+      final dayStarted = await DayManagementService.isDayStarted();
+      print('🔍 Day started: $dayStarted');
+
+      if (!dayStarted) {
+        // Day hasn't been started, show empty state
+        print('ℹ️ Day not started - showing empty state');
+        setState(() {
+          _currentReport = null;
+          openingBalance = 0.0;
+          expectedCash = 0.0;
+          totalExpenses = 0.0;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Load past orders (don't check if empty - let EOD report handle filtering by date)
+      print('📦 Fetching past orders...');
+      await pastOrderStore.loadPastOrders();
+      final pastOrders = pastOrderStore.pastOrders.toList();
+      print('✅ Got ${pastOrders.length} past orders in total');
 
       // 1) Get opening balance
       print('📊 Getting opening balance...');
@@ -149,7 +181,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
 
     // Check if there are any active orders remaining
-    final activeOrders = await HiveOrders.getAllOrder();
+    await orderStore.loadOrders();
+    final activeOrders = orderStore.orders.toList();
     if (activeOrders.isNotEmpty) {
       // Show warning dialog asking user to clear active orders
       final shouldProceed = await _showActiveOrdersWarning(activeOrders.length);
@@ -289,25 +322,40 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   Future<void> _clearAllData() async {
-    // Import the data clear service
-    final pastOrders = await HivePastOrder.getAllPastOrderModel();
+    // Load and delete all past orders
+    await pastOrderStore.loadPastOrders();
+    final pastOrders = pastOrderStore.pastOrders.toList();
     for (final order in pastOrders) {
-      await HivePastOrder.deleteOrder(order.id);
+      await pastOrderStore.deleteOrder(order.id);
     }
 
-    // Clear active orders
-    final activeOrders = await HiveOrders.getAllOrder();
+    // Load and delete all active orders
+    await orderStore.loadOrders();
+    final activeOrders = orderStore.orders.toList();
     for (final order in activeOrders) {
-      await HiveOrders.deleteOrder(order.id);
+      await orderStore.deleteOrder(order.id);
     }
 
-    // Clear cart
-    await HiveCart.clearCart();
+    // Clear cart using store
+    await restaurantCartStore.clearCart();
   }
 
   Future<void> _markDayCompleted() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_eod_date', DateTime.now().toIso8601String());
+  }
+
+  Future<DateTime?> _getLastEODDate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dateStr = prefs.getString('last_eod_date');
+      if (dateStr != null) {
+        return DateTime.parse(dateStr);
+      }
+    } catch (e) {
+      debugPrint('Error getting last EOD date: $e');
+    }
+    return null;
   }
 
   void _showError(String message) {

@@ -70,10 +70,11 @@ import 'package:unipos/domain/store/restaurant/company_store.dart';
 import 'package:unipos/domain/store/restaurant/eod_store.dart';
 import 'package:unipos/domain/store/restaurant/appStore.dart';
 
-import '../../data/repositories/restaurant/customer_repository.dart';
-import '../../data/repositories/restaurant/variant_repository.dart';
-import '../../domain/store/restaurant/cart_store.dart';
-import '../../domain/store/restaurant/customer_store.dart';
+// Type aliases for convenience getters (to avoid prefixing with 'restaurant.')
+typedef CartStoreRes = restaurant.CartStoreRes;
+typedef CustomerStoreRes = restaurant.CustomerStoreRes;
+typedef CustomerRepositoryRes = restaurant.CustomerRepositoryRes;
+typedef VariantRepositoryRes = restaurant.VariantRepositoryRes;
 
 final locator = GetIt.instance;
 
@@ -296,10 +297,22 @@ Future<void> resetLocator() async {
   await setupServiceLocator();
 }
 
+// ==================== MODE-AWARE CONVENIENCE GETTERS ====================
+
+/// Mode-aware cart store getter - works for both retail and restaurant
+dynamic get cartStore {
+  if (AppConfig.isRetail) {
+    return locator<retail.CartStore>();
+  } else if (AppConfig.isRestaurant) {
+    return locator<restaurant.CartStoreRes>();
+  }
+  throw Exception('Business mode not set - cannot access cart store');
+}
+
 // ==================== RETAIL CONVENIENCE GETTERS ====================
 
 /// Retail Stores
-retail.CartStore get cartStore => locator<retail.CartStore>();
+retail.CartStore get retailCartStore => locator<retail.CartStore>();
 ProductStore get productStore => locator<ProductStore>();
 SaleStore get saleStore => locator<SaleStore>();
 CustomerStoreRetail get customerStoreRestail => locator<CustomerStoreRetail>();

@@ -5,14 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 
 /// Category Management Screen
 /// Allows users to view, add, edit, and delete categories with images
+/// Uses store pattern for reactive state management
 class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({Key? key}) : super(key: key);
 
@@ -35,16 +35,17 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final categoryBox = await HiveBoxes.getCategory();
-      final itemBox = await itemsBoxes.getItemBox();
+      // Load data from stores
+      await categoryStore.loadCategories();
+      await itemStore.loadItems();
 
-      // Load categories
-      _categories = categoryBox.values.toList();
+      // Get categories from store
+      _categories = categoryStore.categories.toList();
 
       // Count items per category
       _itemCounts.clear();
       for (final category in _categories) {
-        final count = itemBox.values.where((item) => item.categoryOfItem == category.id).length;
+        final count = itemStore.items.where((item) => item.categoryOfItem == category.id).length;
         _itemCounts[category.id] = count;
       }
     } catch (e) {
@@ -159,20 +160,30 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
     if (confirm == true) {
       try {
-        final categoryBox = await HiveBoxes.getCategory();
-        await categoryBox.delete(category.id);
-        await categoryBox.flush();
+        final success = await categoryStore.deleteCategory(category.id);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Category "${category.name}" deleted',
-              style: GoogleFonts.poppins(color: Colors.white),
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Category "${category.name}" deleted',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.red,
-          ),
-        );
-        _loadCategories();
+          );
+          _loadCategories();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error deleting category: ${categoryStore.errorMessage ?? "Unknown error"}',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -485,15 +496,34 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
           editCount: _isEditing ? widget.existingCategory!.editCount + 1 : 0,
         );
 
-        final categoryBox = await HiveBoxes.getCategory();
-        await categoryBox.put(category.id, category);
-        await categoryBox.flush();
+        // Save using store
+        final bool success;
+        if (_isEditing) {
+          success = await categoryStore.updateCategory(category);
+        } else {
+          success = await categoryStore.addCategory(category);
+        }
 
         // Close loading
         if (mounted) Navigator.pop(context);
 
-        // Return result
-        if (mounted) Navigator.pop(context, category);
+        if (success) {
+          // Return result
+          if (mounted) Navigator.pop(context, category);
+        } else {
+          // Show error
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Error saving category: ${categoryStore.errorMessage ?? "Unknown error"}',
+                  style: GoogleFonts.poppins(color: Colors.white),
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       } catch (e) {
         // Close loading
         if (mounted) Navigator.pop(context);

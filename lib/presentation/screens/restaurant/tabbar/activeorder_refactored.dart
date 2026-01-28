@@ -457,13 +457,13 @@ class _ActiveOrderRefactoredState extends State<ActiveOrderRefactored> {
         kotBoundaries: order.kotBoundaries,
       );
 
-      await HivePastOrder.addOrder(pastOrder);
+      await pastOrderStore.addOrder(pastOrder);
 
       // ✅ Delete using OrderStore
       final success = await orderStore.deleteOrder(order.id);
 
       if (success) {
-        await HiveTables.updateTableStatus(order.tableNo!, 'Available');
+        await tableStore.updateTableStatus(order.tableNo!, 'Available');
         print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} moved to past orders.");
         NotificationService.instance.showSuccess('Order completed and moved to history');
       }

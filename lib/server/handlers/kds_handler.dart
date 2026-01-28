@@ -2,14 +2,15 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import '../models/kds_order_dto.dart';
 import '../models/order_status.dart';
-import '../../data/models/restaurant/db/database/hive_order.dart';
 import '../../data/models/restaurant/db/ordermodel_309.dart';
 import '../websocket.dart';
+import '../../core/di/service_locator.dart';
 
 Future<Response> getKdsOrdersHandler(Request request) async {
   try {
-    // Fetch all orders from Hive
-    final orders = await HiveOrders.getAllOrder();
+    // Fetch all orders from store
+    await orderStore.loadOrders();
+    final orders = orderStore.orders.toList();
 
     // Filter for active orders (not completed/cancelled)
     final activeOrders = orders.where((order) =>
@@ -122,7 +123,8 @@ Future<Response> updateKdsStatusHandler(Request request, String id) async {
     }
 
     // Fetch all orders to find the one to update
-    final orders = await HiveOrders.getAllOrder();
+    await orderStore.loadOrders();
+    final orders = orderStore.orders.toList();
     final orderToUpdate = orders.firstWhere(
       (order) => order.id == id,
       orElse: () => throw Exception('Order not found'),
@@ -150,7 +152,7 @@ Future<Response> updateKdsStatusHandler(Request request, String id) async {
 
     // Update the order
     final updatedOrder = orderToUpdate.copyWith(status: orderStatus);
-    await HiveOrders.updateOrder(updatedOrder);
+    await orderStore.updateOrder(updatedOrder);
 
     print('✅ Order $id status updated to: $orderStatus');
 
@@ -206,7 +208,8 @@ Future<Response> updateKotStatusHandler(Request request, String id, String kotNu
     }
 
     // Fetch all orders to find the one to update
-    final orders = await HiveOrders.getAllOrder();
+    await orderStore.loadOrders();
+    final orders = orderStore.orders.toList();
     final orderToUpdate = orders.firstWhere(
       (order) => order.id == id,
       orElse: () => throw Exception('Order not found'),
@@ -252,7 +255,7 @@ Future<Response> updateKotStatusHandler(Request request, String id, String kotNu
       kotStatuses: updatedKotStatuses,
       status: overallStatus,
     );
-    await HiveOrders.updateOrder(updatedOrder);
+    await orderStore.updateOrder(updatedOrder);
 
     print('✅ KOT #$kotNumber status updated to: $kotStatus');
     print('📊 Overall order status: $overallStatus');

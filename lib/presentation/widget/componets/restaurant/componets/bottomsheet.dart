@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_item_sheet.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
-import 'Button.dart';
 
 // Re-export the SellingMethod enum for backward compatibility
 
@@ -23,38 +21,61 @@ class BottomsheetMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CommonButton(
-      bordercircular: 25,
-      width: width ?? ResponsiveHelper.responsiveWidth(context, 0.5),
-      height: height ?? ResponsiveHelper.responsiveHeight(context, 0.06),
-      onTap: () {
-        AddItemSheet.show(
-          context,
-          onCategorySelected: onCategorySelected,
-          onItemAdded: () {
-            // Item was added successfully
-          },
-        );
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: const Icon(Icons.add),
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
           ),
-          const SizedBox(width: 5),
-          Text(
-            'Add items',
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
-            ),
-          )
         ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: ElevatedButton(
+          onPressed: () {
+            AddItemSheet.show(
+              context,
+              onCategorySelected: onCategorySelected,
+              onItemAdded: () {
+                // Item was added successfully
+              },
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF1976D2), // AppColors.primary
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.add, color: Color(0xFF1976D2), size: 20),
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Add Item',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

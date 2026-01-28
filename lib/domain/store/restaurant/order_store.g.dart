@@ -424,6 +424,15 @@ mixin _$OrderStore on _OrderStore, Store {
     return _$getNextBillNumberAsyncAction.run(() => super.getNextBillNumber());
   }
 
+  late final _$resetDailyBillNumberAsyncAction =
+      AsyncAction('_OrderStore.resetDailyBillNumber', context: context);
+
+  @override
+  Future<void> resetDailyBillNumber() {
+    return _$resetDailyBillNumberAsyncAction
+        .run(() => super.resetDailyBillNumber());
+  }
+
   late final _$getNextOrderNumberAsyncAction =
       AsyncAction('_OrderStore.getNextOrderNumber', context: context);
 

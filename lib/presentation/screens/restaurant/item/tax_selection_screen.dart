@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
 class TaxSelectionScreen extends StatefulWidget {
   final String? selectedTaxId;
   final double? currentTaxRate;
@@ -36,9 +34,9 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
   }
 
   void _loadTaxes() async {
-    final taxBox = await TaxBox.getTaxBox();
+    await taxStore.loadTaxes();
     setState(() {
-      availableTaxes = taxBox.values.toList();
+      availableTaxes = taxStore.taxes.toList();
     });
   }
 
@@ -335,7 +333,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
               );
 
               // Save the tax
-              await TaxBox.addTax(newTax);
+              await taxStore.addTax(newTax);
 
               // Unfocus keyboard
               FocusScope.of(context).unfocus();
@@ -415,7 +413,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
     );
 
     if (confirm == true) {
-      await TaxBox.deleteTax(taxId);
+      await taxStore.deleteTax(taxId);
       if (selectedTaxId == taxId) {
         setState(() {
           selectedTaxId = null;

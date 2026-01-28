@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 
 import '../../../../../constants/restaurant/color.dart';
@@ -20,11 +21,6 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
   List<int> yearitem = [];
   int dropdownvalue2 = 2025 ;
 
-  bool _isLoading = false;
-  List<pastOrderModel> _voidOrders = [];
-  double _totalVoidAmount = 0.0;
-  int _totalVoidCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -32,49 +28,45 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
     // Generate years dynamically: Current year down to 20 years ago
     yearitem = List.generate(20, (index) => now.year - index);
     dropdownvalue2 = now.year;
-    
+
     _loadVoidOrders();
   }
 
   Future<void> _loadVoidOrders() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      final orderBox = Hive.box<pastOrderModel>('pastorderBox');
-      final selectedYear = dropdownvalue2;
+  List<pastOrderModel> _calculateVoidOrders() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final selectedYear = dropdownvalue2;
 
-      final List<pastOrderModel> voidOrdersList = [];
-      double totalAmount = 0.0;
-
-      for (final order in orderBox.values) {
-        // Check if order is voided/cancelled
-        if (order.orderStatus != null &&
-            (order.orderStatus!.toUpperCase().contains('VOID') ||
-             order.orderStatus!.toUpperCase().contains('CANCEL'))) {
-
-          // Check Year
-          if (order.orderAt != null &&
-              order.orderAt!.year == selectedYear) {
-            voidOrdersList.add(order);
-            totalAmount += order.totalPrice;
-          }
-        }
+    final voidOrdersList = allOrders.where((order) {
+      // Check if order is voided/cancelled
+      if (order.orderStatus == null) return false;
+      if (!(order.orderStatus!.toUpperCase().contains('VOID') ||
+           order.orderStatus!.toUpperCase().contains('CANCEL'))) {
+        return false;
       }
 
-      setState(() {
-        _voidOrders = voidOrdersList;
-        _totalVoidAmount = totalAmount;
-        _totalVoidCount = voidOrdersList.length;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading void orders: $e')),
-        );
-      }
+      // Check Year
+      if (order.orderAt == null) return false;
+      return order.orderAt!.year == selectedYear;
+    }).toList();
+
+    return voidOrdersList;
+  }
+
+  Map<String, dynamic> _calculateTotals(List<pastOrderModel> voidOrders) {
+    double totalAmount = 0.0;
+    for (final order in voidOrders) {
+      totalAmount += order.totalPrice;
     }
+    return {
+      'amount': totalAmount,
+      'count': voidOrders.length,
+    };
   }
 
 
@@ -89,7 +81,18 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
         .size
         .width * 1;
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final voidOrders = _calculateVoidOrders();
+          final totals = _calculateTotals(voidOrders);
+          final totalVoidAmount = totals['amount'] as double;
+          final totalVoidCount = totals['count'] as int;
+
+          return SingleChildScrollView(
         child:Container(
           padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
           child: Column(
@@ -128,7 +131,7 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
                   ),
                   SizedBox(width: 10,),
                   InkWell(
-                    onTap: _loadVoidOrders,
+                    onTap: () => setState(() {}), // Trigger rebuild to refresh data
                     child: Container(
                       // width: width ,
                         padding: EdgeInsets.all(5),
@@ -138,9 +141,7 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
                         ),
                         // alignment: Alignment.bottomCenter,
                         // height: height * 0.06,'
-                        child: _isLoading 
-                        ? SizedBox(width: 25, height: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Icon(Icons.search,size: 25,color: Colors.white,)),
+                        child: Icon(Icons.search,size: 25,color: Colors.white,)),
                   ),
 
                 ],
@@ -165,7 +166,7 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
 
                // Total Amount
               Text(
-                " Total Void Order Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalVoidAmount)} ",
+                " Total Void Order Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(totalVoidAmount)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -174,7 +175,7 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
 
               // Total Count
               Text(
-                " Total Void Order Count = $_totalVoidCount ",
+                " Total Void Order Count = $totalVoidCount ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -325,7 +326,7 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],
-                    rows: _voidOrders.map((order) {
+                    rows: voidOrders.map((order) {
                       return DataRow(cells: [
                         DataCell(Center(
                             child: Text(
@@ -356,6 +357,8 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

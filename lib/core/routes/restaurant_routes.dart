@@ -12,7 +12,6 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbyCategory/s
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/salesbytop.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/void%20Order%20Report/voidOrderReport.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/data_generator_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/order.dart';
@@ -28,14 +27,9 @@ import 'package:unipos/screen/setupWizardScreen.dart';
 // Restaurant - Auth
 import 'package:unipos/presentation/screens/restaurant/auth/restaurant_login.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/admin_login.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/cashier_waiter.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/Singup.dart';
-import 'package:unipos/presentation/screens/restaurant/AuthSelectionScreen.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/support.dart';
 
 // Restaurant - Home & Dashboard
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:unipos/presentation/screens/restaurant/dashboard.dart';
 
 // Restaurant - Orders
 import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
@@ -111,6 +105,7 @@ import 'package:unipos/presentation/screens/restaurant/customiztion/customizatio
 import '../../presentation/screens/restaurant/Reports/customer list by revenue/customerlistbyrevenue.dart';
 import '../../presentation/screens/restaurant/Reports/customerList/customerlist.dart';
 import '../../presentation/screens/restaurant/Reports/expenseReport/expensereport.dart';
+import '../../presentation/screens/restaurant/Reports/void Order Report/voidOrderReport.dart';
 import '../../presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
 
 class RestaurantRoutes {
@@ -193,10 +188,11 @@ class RestaurantRoutes {
     RouteNames.restaurantReportsComparisionByYear: (_) =>  ComparisonByYear(),
     RouteNames.restaurantReportsComparisionByProduct: (_) =>  ComparisonByProduct(),
     RouteNames.restaurantReportsRefundDetails: (_) =>  RefundDetails(),
-    RouteNames.restaurantReportsVoidOrderReport: (_) =>  DiscountOrderReport(),
+    RouteNames.restaurantReportsDiscountOrderReport: (_) =>  DiscountOrderReport(),
     RouteNames.restaurantReportsPosOrder: (_) =>  Posenddayreport(),
     RouteNames.restaurantReportsCustomerListByRevenue: (_) =>  CustomerListByRevenue(),
     RouteNames.restaurantReportsExpense: (_) =>  ExpenseReport(),
+    RouteNames.restaurantReportsVoidOrderReport: (_) =>  VoidOrderReport(),
     // RouteNames.restaurantReportsPerformanceStatistics: (_) =>  PerformanceStatisticsReport(),
 
 

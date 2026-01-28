@@ -568,6 +568,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   CustomMenu(
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context)=> Posenddayreport()));
+                      // Navigator.pushNamed(context, RouteNames.restaurantReportsDiscountOrderReport )
 
                     },
                     icons: Icons.list_alt,

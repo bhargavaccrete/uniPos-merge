@@ -2,13 +2,8 @@ import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_Table.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_cart.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_order.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_pastorder.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
@@ -934,7 +929,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
       }
 
-      await HiveTables.updateTableStatus(widget.tableid!, 'Available');
+      await tableStore.updateTableStatus(widget.tableid!, 'Available');
       // _showSnackBar('Order Completed Successfully!');
 
       NotificationService.instance.showSuccess(
@@ -959,7 +954,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // CartCalculationService handles tax extraction for tax-inclusive mode
 
     // Generate daily bill number for completed order
-    final int billNumber = await HiveOrders.getNextBillNumber();
+    final int billNumber = await orderStore.getNextBillNumber();
     print('✅ Bill number generated: $billNumber');
 
     final pastOrder = pastOrderModel(
@@ -981,8 +976,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
           activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
     );
-    await HivePastOrder.addOrder(pastOrder);
-    await HiveOrders.deleteOrder(activeModel.id);
+    await pastOrderStore.addOrder(pastOrder);
+    await orderStore.deleteOrder(activeModel.id);
 
     return billNumber; // Return the generated bill number
   }
@@ -994,14 +989,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // Note: calculations.subtotal is already the base price (without tax)
     // CartCalculationService handles tax extraction for tax-inclusive mode
 
-    final int newKotNumber = await HiveOrders.getNextKotNumber();
+    final int newKotNumber = await orderStore.getNextKotNumber();
     final String newId = Uuid().v4();
     final List<CartItem> orderItems = widget.cartitems ?? [];
 
     // Check if this is a "Settle & Print" operation (immediate completion)
     if (widget.isSettle == true) {
       // Generate bill number for immediate settlement
-      final int billNumber = await HiveOrders.getNextBillNumber();
+      final int billNumber = await orderStore.getNextBillNumber();
       print('✅ Bill number generated for settle & print: $billNumber');
 
       // Create completed order directly (skip active orders)
@@ -1026,14 +1021,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
       try {
-        await HivePastOrder.addOrder(pastOrder);
+        await pastOrderStore.addOrder(pastOrder);
 
         // Update customer stats if customer is linked
         if (selectedCustomer != null) {
           await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
         }
 
-        await HiveCart.clearCart();
+        await restaurantCartStore.clearCart();
 
         NotificationService.instance.showSuccess(
           'Order Settled Successfully',
@@ -1081,7 +1076,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       customerId: selectedCustomer?.customerId, // Link to customer
     );
     try {
-      await HiveOrders.addOrder(newOrder);
+      await orderStore.addOrder(newOrder);
 
       // Update customer stats if customer is linked
       if (selectedCustomer != null) {
@@ -1089,7 +1084,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       }
 
       if (widget.tableid != null && widget.tableid!.isNotEmpty) {
-        await HiveTables.updateTableStatus(
+        await tableStore.updateTableStatus(
           widget.tableid!,
           'Running',
           total: newOrder.totalPrice,
@@ -1101,7 +1096,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         'New Order Placed Successfully',
       );
 
-      await HiveCart.clearCart();
+      await restaurantCartStore.clearCart();
 
       // Show success dialog with print option
       await _showOrderSuccessDialog(newOrder, calculations);
@@ -1263,7 +1258,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   Future<void> clearCart() async {
     try {
-      await HiveCart.clearCart();
+      await restaurantCartStore.clearCart();
       if (mounted) {
         NotificationService.instance.showInfo(
           'Cart cleared',

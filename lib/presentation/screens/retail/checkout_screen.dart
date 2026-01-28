@@ -256,7 +256,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final variant = await productStore.getVariantById(item.variantId);
       if (variant != null) {
         final newStock = variant.stockQty - item.qty;
-        final finalStock = newStock < 0 ? 0 : newStock;
+        final finalStock = (newStock < 0 ? 0 : newStock).toInt();
         await productStore.updateVariantStock(item.variantId, finalStock);
       }
     }
@@ -345,7 +345,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (variant != null) {
           final newStock = variant.stockQty - item.qty;
           // Ensure stock doesn't go negative
-          final finalStock = newStock < 0 ? 0 : newStock;
+          final finalStock = (newStock < 0 ? 0 : newStock).toInt();
           await productStore.updateVariantStock(
             item.variantId,
             finalStock,

@@ -52,22 +52,22 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
     });
 
     try {
+      // Save reference to navigator before async call
+      final navigator = Navigator.of(context);
+
       await DayManagementService.setOpeningBalance(balance);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop(true);
+        // Use the saved navigator reference instead of context
+        navigator.pop(balance);
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorText = 'Error saving opening balance: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorText = 'Error saving opening balance: $e';
+        });
+      }
     }
   }
 
@@ -149,10 +149,13 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
           if (!_isLoading)
             TextButton(
               onPressed: () async {
+                // Save reference to navigator before async call
+                final navigator = Navigator.of(context);
+
                 // Set opening balance to 0 and continue
                 await DayManagementService.setOpeningBalance(0.0);
-                if (context.mounted) {
-                  Navigator.of(context).pop(true);
+                if (mounted) {
+                  navigator.pop(0.0);
                 }
               },
               child: Text(

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
-
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -15,11 +15,6 @@ class WeekByVoid extends StatefulWidget {
 }
 
 class _WeekByVoidState extends State<WeekByVoid> {
-  bool _isLoading = true;
-  List<pastOrderModel> _voidOrders = [];
-  double _totalVoidAmount = 0.0;
-  int _totalVoidCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -27,51 +22,45 @@ class _WeekByVoidState extends State<WeekByVoid> {
   }
 
   Future<void> _loadVoidOrders() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      final orderBox = Hive.box<pastOrderModel>('pastorderBox');
-      final now = DateTime.now();
-      
-      // Calculate start of week (Monday)
-      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-      final weekStart = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-      // End of week (Next Monday)
-      final weekEnd = weekStart.add(Duration(days: 7));
+  Map<String, dynamic> _calculateVoidOrders() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final now = DateTime.now();
 
-      final List<pastOrderModel> voidOrdersList = [];
-      double totalAmount = 0.0;
+    // Calculate start of week (Monday)
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final weekStart = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    // End of week (Next Monday)
+    final weekEnd = weekStart.add(Duration(days: 7));
 
-      for (final order in orderBox.values) {
-        // Check if order is voided/cancelled
-        if (order.orderStatus != null &&
-            (order.orderStatus!.toUpperCase().contains('VOID') ||
-             order.orderStatus!.toUpperCase().contains('CANCEL'))) {
+    final List<pastOrderModel> voidOrdersList = [];
+    double totalAmount = 0.0;
 
-          // Check if it's within the week
-          if (order.orderAt != null &&
-              order.orderAt!.isAfter(weekStart) &&
-              order.orderAt!.isBefore(weekEnd)) {
-            voidOrdersList.add(order);
-            totalAmount += order.totalPrice;
-          }
+    for (final order in allOrders) {
+      // Check if order is voided/cancelled
+      if (order.orderStatus != null &&
+          (order.orderStatus!.toUpperCase().contains('VOID') ||
+           order.orderStatus!.toUpperCase().contains('CANCEL'))) {
+
+        // Check if it's within the week
+        if (order.orderAt != null &&
+            order.orderAt!.isAfter(weekStart) &&
+            order.orderAt!.isBefore(weekEnd)) {
+          voidOrdersList.add(order);
+          totalAmount += order.totalPrice;
         }
       }
-
-      setState(() {
-        _voidOrders = voidOrdersList;
-        _totalVoidAmount = totalAmount;
-        _totalVoidCount = voidOrdersList.length;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading void orders: $e')),
-        );
-      }
     }
+
+    return {
+      'orders': voidOrdersList,
+      'totalAmount': totalAmount,
+      'totalCount': voidOrdersList.length,
+    };
   }
 
   @override
@@ -79,12 +68,19 @@ class _WeekByVoidState extends State<WeekByVoid> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
 
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator());
-    }
-
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final voidData = _calculateVoidOrders();
+          final voidOrders = voidData['orders'] as List<pastOrderModel>;
+          final totalVoidAmount = voidData['totalAmount'] as double;
+          final totalVoidCount = voidData['totalCount'] as int;
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
@@ -116,14 +112,14 @@ class _WeekByVoidState extends State<WeekByVoid> {
               ),
 
               Text(
-                " Total Void Order Amount Week (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalVoidAmount)} ",
+                " Total Void Order Amount Week (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(totalVoidAmount)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 25),
               Text(
-                " Total Void Order Count = $_totalVoidCount ",
+                " Total Void Order Count = $totalVoidCount ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -263,7 +259,7 @@ class _WeekByVoidState extends State<WeekByVoid> {
                               Text('Status', textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
                     ],
-                    rows: _voidOrders.map((order) {
+                    rows: voidOrders.map((order) {
                       return DataRow(cells: [
                         DataCell(Center(
                             child: Text(
@@ -292,6 +288,8 @@ class _WeekByVoidState extends State<WeekByVoid> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

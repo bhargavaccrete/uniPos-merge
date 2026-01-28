@@ -4,10 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
-import '../../../../../data/models/restaurant/db/database/hive_order.dart' show HiveOrders;
-import '../../../../../data/models/restaurant/db/database/hive_cart.dart' show HiveCart;
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
@@ -17,7 +14,6 @@ import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
-import '../../../../../data/models/restaurant/db/database/hive_customer.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
@@ -651,14 +647,14 @@ class _TakeawayState extends State<Takeaway> {
       print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
       print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
 
-      await HiveCustomer.updateCustomerVisit(
+      await restaurantCustomerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
         pointsToAdd: 10, // Award 10 points per order
       );
 
       // Verify the update
-      final updatedCustomer = HiveCustomer.getCustomerById(customer.customerId);
+      final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
       if (updatedCustomer != null) {
         print('✅ Customer stats updated successfully!');
         print('✅ New visits: ${updatedCustomer.totalVisites}, New points: ${updatedCustomer.loyaltyPoints}');
@@ -686,7 +682,7 @@ class _TakeawayState extends State<Takeaway> {
   Future<void> _placeOrder() async {
     final plainItems  = widget.cartItems.map((w)=> w.item).toList();
     final gstDetails = _calculateGst(plainItems);
-    final int newKotNumber = await HiveOrders.getNextKotNumber();
+    final int newKotNumber = await orderStore.getNextKotNumber();
     final neworder = OrderModel(
       id: Uuid().v4(),
       customerName: nameController.text,
@@ -760,10 +756,10 @@ class _TakeawayState extends State<Takeaway> {
       return; // Stop order placement
     }
 
-    final int newKotNumber = await HiveOrders.getNextKotNumber();
+    final int newKotNumber = await orderStore.getNextKotNumber();
 
     // Generate daily order number
-    final int orderNumber = await HiveOrders.getNextOrderNumber();
+    final int orderNumber = await orderStore.getNextOrderNumber();
 
     final neworder = OrderModel(
       id: Uuid().v4(),
@@ -903,7 +899,7 @@ class _TakeawayState extends State<Takeaway> {
 
       if (hasNewItems) {
         // Generate a new KOT for the newly added items
-        newKotNumber = await HiveOrders.getNextKotNumber();
+        newKotNumber = await orderStore.getNextKotNumber();
         updatedKotNumbers.add(newKotNumber);
         updatedKotBoundaries.add(newItemCount); // Add boundary at new item count
 
@@ -1504,16 +1500,19 @@ class _TakeawayState extends State<Takeaway> {
                                 BorderColor: AppColors.primary,
                                 HintColor: AppColors.primary,
                                 obsecureText: false,
-                                onChanged: (value) {
-                                  setDialogState(() {
-                                    if (value.isEmpty) {
+                                onChanged: (value) async {
+                                  if (value.isEmpty) {
+                                    setDialogState(() {
                                       showNameSuggestions = false;
                                       nameSuggestions = [];
-                                    } else {
-                                      nameSuggestions = HiveCustomer.searchCustomers(value);
+                                    });
+                                  } else {
+                                    final results = await restaurantCustomerStore.searchCustomers(value);
+                                    setDialogState(() {
+                                      nameSuggestions = results;
                                       showNameSuggestions = nameSuggestions.isNotEmpty;
-                                    }
-                                  });
+                                    });
+                                  }
                                 },
                               ),
 
@@ -1616,16 +1615,19 @@ class _TakeawayState extends State<Takeaway> {
                                 BorderColor: AppColors.primary,
                                 HintColor: AppColors.primary,
                                 obsecureText: false,
-                                onChanged: (value) {
-                                  setDialogState(() {
-                                    if (value.isEmpty) {
+                                onChanged: (value) async {
+                                  if (value.isEmpty) {
+                                    setDialogState(() {
                                       showPhoneSuggestions = false;
                                       phoneSuggestions = [];
-                                    } else {
-                                      phoneSuggestions = HiveCustomer.searchCustomers(value);
+                                    });
+                                  } else {
+                                    final results = await restaurantCustomerStore.searchCustomers(value);
+                                    setDialogState(() {
+                                      phoneSuggestions = results;
                                       showPhoneSuggestions = phoneSuggestions.isNotEmpty;
-                                    }
-                                  });
+                                    });
+                                  }
                                 },
                               ),
 
@@ -1889,7 +1891,7 @@ class _TakeawayState extends State<Takeaway> {
     subTotal: activeModel.subTotal,
       );
 
-    await HivePastOrder.addOrder(pastOrder);
+    await pastOrderStore.addOrder(pastOrder);
     // print("✅ Order saved to past orders history with GST: ${gstDetails['totalGstAmount']}");
 
 
@@ -1909,7 +1911,7 @@ class _TakeawayState extends State<Takeaway> {
     print("--- Completing order KOT #${activeModel.kotNumber} ---");
 
     // Generate daily bill number for completed order
-    final int billNumber = await HiveOrders.getNextBillNumber();
+    final int billNumber = await orderStore.getNextBillNumber();
     print('✅ Bill number generated: $billNumber');
 
     // Directly convert the active order to a past order.
@@ -1942,7 +1944,7 @@ class _TakeawayState extends State<Takeaway> {
   Future<void>  _qucikSettleNewOrder( double gtotal , CartCalculationService calculations) async {
     final plainItems  = widget.cartItems.map((w)=> w.item).toList();
 
-    final int newKotNumber = await HiveOrders.getNextKotNumber();
+    final int newKotNumber = await orderStore.getNextKotNumber();
     // Step 1: Calculate the GST amount from the cart items first.
     final gstDetails = _calculateGst(plainItems);
     final double gstAmount = gstDetails['totalGstAmount'] ?? 0;
@@ -2008,10 +2010,10 @@ class _TakeawayState extends State<Takeaway> {
     }
 
     // No need for a temporary OrderModel. We create the final pastOrderModel directly.
-    final int quickSettleKotNumber = await HiveOrders.getNextKotNumber();
+    final int quickSettleKotNumber = await orderStore.getNextKotNumber();
 
     // Generate daily bill number for quick settle
-    final int billNumber = await HiveOrders.getNextBillNumber();
+    final int billNumber = await orderStore.getNextBillNumber();
     print('✅ Bill number generated for quick settle: $billNumber');
 
     final pastOrder = pastOrderModel(

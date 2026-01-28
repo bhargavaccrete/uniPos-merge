@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
@@ -11,7 +9,6 @@ import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart'
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
-import '../../../../../data/models/restaurant/db/database/hive_pastorder.dart';
 
 class YearWisebyRefund extends StatefulWidget {
   const YearWisebyRefund({super.key});
@@ -35,9 +32,6 @@ class _YearWisebyRefundState extends State<YearWisebyRefund> {
   ];
   dynamic dropdownvalue2 = 2025;
 
-  List<pastOrderModel> _refundedOrders = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
@@ -45,25 +39,22 @@ class _YearWisebyRefundState extends State<YearWisebyRefund> {
   }
 
   Future<void> _loadRefundedOrders() async {
-    setState(() {
-      _isLoading = true;
-    });
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    final allOrders = await HivePastOrder.getAllPastOrderModel();
+  List<pastOrderModel> _calculateRefundedOrders() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
 
     final selectedYear = dropdownvalue2;
 
     final filteredOrders = allOrders.where((order) {
-      if (order.isRefunded == true && order.refundedAt != null) {
-        return order.refundedAt!.year == selectedYear;
-      }
-      return false;
+      if (order.refundedAt == null) return false;
+      return order.refundedAt!.year == selectedYear;
     }).toList();
 
-    setState(() {
-      _refundedOrders = filteredOrders;
-      _isLoading = false;
-    });
+    return filteredOrders;
   }
 
   @override
@@ -71,7 +62,15 @@ class _YearWisebyRefundState extends State<YearWisebyRefund> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final refundedOrders = _calculateRefundedOrders();
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -281,11 +280,9 @@ class _YearWisebyRefundState extends State<YearWisebyRefund> {
                                 style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
                   ],
 
-                  rows: _isLoading
+                  rows: refundedOrders.isEmpty
                       ? []
-                      : _refundedOrders.isEmpty
-                      ? []
-                      : _refundedOrders.map((order) {
+                      : refundedOrders.map((order) {
                     String reason = '';
                     if (order.refundReason != null && order.refundReason!.isNotEmpty) {
                       final lines = order.refundReason!.split('\n');
@@ -374,15 +371,7 @@ class _YearWisebyRefundState extends State<YearWisebyRefund> {
                 ),
               ),
 
-              if (_isLoading)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  ),
-                ),
-
-              if (!_isLoading && _refundedOrders.isEmpty)
+              if (refundedOrders.isEmpty)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -466,6 +455,8 @@ class _YearWisebyRefundState extends State<YearWisebyRefund> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

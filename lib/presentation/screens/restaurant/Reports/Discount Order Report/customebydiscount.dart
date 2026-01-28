@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import 'package:unipos/util/common/currency_helper.dart';
@@ -22,67 +21,55 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
   DateTime? _fromDate;
   DateTime? _toDate;
 
-  List<pastOrderModel> _discountedOrders = [];
-  double _totalDiscountAmount = 0.0;
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
+    _loadData();
   }
 
   Future<void> _loadData() async {
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
+
+  List<pastOrderModel> _calculateDiscountedOrders() {
     if (_fromDate == null || _toDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Please select both Start and End dates")));
-      return;
+      return [];
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
 
-    try {
-      final box = Hive.box<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
-      
-      // Normalize dates to include full days
-      final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-      final end = DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(Duration(days: 1));
+    // Normalize dates to include full days
+    final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+    final end = DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(Duration(days: 1));
 
-      final allOrders = box.values.toList();
-      final rangeOrders = allOrders.where((order) {
-        if (order.orderAt == null) return false;
-        // Exclude refunded and voided orders
-        final status = order.orderStatus?.toUpperCase() ?? '';
-        if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
+    final rangeOrders = allOrders.where((order) {
+      if (order.orderAt == null) return false;
+      // Exclude refunded and voided orders
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
 
-        return order.orderAt!.isAfter(start) &&
-            order.orderAt!.isBefore(end);
-      }).toList();
+      return order.orderAt!.isAfter(start) &&
+          order.orderAt!.isBefore(end);
+    }).toList();
 
-      final discountedOrders = rangeOrders.where((order) {
-        return (order.Discount ?? 0) > 0;
-      }).toList();
+    final discountedOrders = rangeOrders.where((order) {
+      return (order.Discount ?? 0) > 0;
+    }).toList();
 
-      // Sort by date descending (newest first)
-      discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
+    // Sort by date descending (newest first)
+    discountedOrders.sort((a, b) => b.orderAt!.compareTo(a.orderAt!));
 
-      double totalDiscount = 0.0;
-      for (var order in discountedOrders) {
-        totalDiscount += (order.Discount ?? 0.0);
-      }
+    return discountedOrders;
+  }
 
-      setState(() {
-        _discountedOrders = discountedOrders;
-        _totalDiscountAmount = totalDiscount;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      print("Error loading discount data: $e");
+  double _calculateTotalDiscount(List<pastOrderModel> orders) {
+    double totalDiscount = 0.0;
+    for (var order in orders) {
+      totalDiscount += (order.Discount ?? 0.0);
     }
+    return totalDiscount;
   }
 
   // Function to  pick "From Date"
@@ -123,7 +110,16 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final discountedOrders = _calculateDiscountedOrders();
+          final totalDiscountAmount = _calculateTotalDiscount(discountedOrders);
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
@@ -213,7 +209,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                       ),
                       SizedBox(width: 10),
                       InkWell(
-                        onTap: _loadData,
+                        onTap: () => setState(() {}), // Trigger rebuild to refresh data
                         child: Container(
                           padding: EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -264,14 +260,14 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
               ),
 
               Text(
-                " Total Discount Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalDiscountAmount)} ",
+                " Total Discount Amount (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(totalDiscountAmount)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
               ),
               SizedBox(height: 10),
               Text(
-                " Total Discount Order Count = ${_discountedOrders.length} ",
+                " Total Discount Order Count = ${discountedOrders.length} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -281,9 +277,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                 height: 25,
               ),
 
-              _isLoading 
-              ? Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+              SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                     headingRowHeight: 50,
@@ -393,7 +387,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],
-                    rows: _discountedOrders.map((order) {
+                    rows: discountedOrders.map((order) {
                             return DataRow(cells: [
                               DataCell(Text(
                                 order.orderAt != null
@@ -451,6 +445,8 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }

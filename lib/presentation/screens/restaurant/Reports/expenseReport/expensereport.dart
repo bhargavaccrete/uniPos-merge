@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -104,110 +104,77 @@ class ExpenseDataView extends StatefulWidget {
 class _ExpenseDataViewState extends State<ExpenseDataView> {
   DateTime? _customStartDate;
   DateTime? _customEndDate;
-  List<Expense> _expenses = [];
-  Map<String, String> _categoryNames = {}; // Map of category ID to name
-  bool _isLoading = true;
-  double _totalExpenses = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _loadCategoriesAndExpenses();
+    _loadData();
   }
 
-  Future<void> _loadCategoriesAndExpenses() async {
-    setState(() => _isLoading = true);
-
-    try {
-      // First, load all expense categories to map IDs to names
-      final categories = await HiveExpenseCat.getAllECategory();
-      final categoryMap = <String, String>{};
-      for (var category in categories) {
-        categoryMap[category.id] = category.name;
-      }
-
-      setState(() {
-        _categoryNames = categoryMap;
-      });
-
-      // Then load expenses
-      await _loadExpenses();
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading categories: $e')),
-        );
-      }
-    }
+  Future<void> _loadData() async {
+    // Load from stores instead of direct Hive access
+    await expenseCategoryStore.loadCategories();
+    await expenseStore.loadExpenses();
   }
 
-  Future<void> _loadExpenses() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final allExpenses = await HiveExpenceL.getAllItems();
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-
-      List<Expense> filtered = [];
-
-      switch (widget.period) {
-        case TimePeriod.Today:
-          filtered = allExpenses.where((expense) {
-            final expenseDate = DateTime(
-              expense.dateandTime.year,
-              expense.dateandTime.month,
-              expense.dateandTime.day,
-            );
-            return expenseDate.isAtSameMomentAs(today);
-          }).toList();
-          break;
-
-        case TimePeriod.Month:
-        // Group by month - for now show current month, can be enhanced
-          filtered = allExpenses.where((expense) {
-            return expense.dateandTime.year == now.year &&
-                expense.dateandTime.month == now.month;
-          }).toList();
-          break;
-
-        case TimePeriod.Year:
-        // Group by year - for now show current year
-          filtered = allExpenses.where((expense) {
-            return expense.dateandTime.year == now.year;
-          }).toList();
-          break;
-
-        case TimePeriod.Custom:
-          if (_customStartDate != null && _customEndDate != null) {
-            filtered = allExpenses.where((expense) {
-              return expense.dateandTime.isAfter(_customStartDate!) &&
-                  expense.dateandTime.isBefore(_customEndDate!.add(const Duration(days: 1)));
-            }).toList();
-          }
-          break;
-      }
-
-      // Sort by date descending
-      filtered.sort((a, b) => b.dateandTime.compareTo(a.dateandTime));
-
-      // Calculate total
-      final total = filtered.fold<double>(0.0, (sum, expense) => sum + expense.amount);
-
-      setState(() {
-        _expenses = filtered;
-        _totalExpenses = total;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading expenses: $e')),
-        );
-      }
+  Map<String, String> _getCategoryNames() {
+    final categoryMap = <String, String>{};
+    for (var category in expenseCategoryStore.categories) {
+      categoryMap[category.id] = category.name;
     }
+    return categoryMap;
+  }
+
+  List<Expense> _getFilteredExpenses() {
+    final allExpenses = expenseStore.expenses.toList();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    List<Expense> filtered = [];
+
+    switch (widget.period) {
+      case TimePeriod.Today:
+        filtered = allExpenses.where((expense) {
+          final expenseDate = DateTime(
+            expense.dateandTime.year,
+            expense.dateandTime.month,
+            expense.dateandTime.day,
+          );
+          return expenseDate.isAtSameMomentAs(today);
+        }).toList();
+        break;
+
+      case TimePeriod.Month:
+        filtered = allExpenses.where((expense) {
+          return expense.dateandTime.year == now.year &&
+              expense.dateandTime.month == now.month;
+        }).toList();
+        break;
+
+      case TimePeriod.Year:
+        filtered = allExpenses.where((expense) {
+          return expense.dateandTime.year == now.year;
+        }).toList();
+        break;
+
+      case TimePeriod.Custom:
+        if (_customStartDate != null && _customEndDate != null) {
+          filtered = allExpenses.where((expense) {
+            return expense.dateandTime.isAfter(_customStartDate!) &&
+                expense.dateandTime.isBefore(_customEndDate!.add(const Duration(days: 1)));
+          }).toList();
+        }
+        break;
+    }
+
+    // Sort by date descending
+    filtered.sort((a, b) => b.dateandTime.compareTo(a.dateandTime));
+
+    return filtered;
+  }
+
+  double _calculateTotal(List<Expense> expenses) {
+    return expenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
   }
 
   Future<void> _pickDateRange() async {
@@ -230,15 +197,16 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
         _customStartDate = picked.start;
         _customEndDate = picked.end;
       });
-      _loadExpenses();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.period == TimePeriod.Custom &&
-        (_customStartDate == null || _customEndDate == null)) {
-      return Center(
+    return Observer(
+      builder: (_) {
+        if (widget.period == TimePeriod.Custom &&
+            (_customStartDate == null || _customEndDate == null)) {
+          return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -264,11 +232,15 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
       );
     }
 
-    if (_isLoading) {
+    if (expenseStore.isLoading || expenseCategoryStore.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_expenses.isEmpty) {
+    final expenses = _getFilteredExpenses();
+    final totalExpenses = _calculateTotal(expenses);
+    final categoryNames = _getCategoryNames();
+
+    if (expenses.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -308,7 +280,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalExpenses)}',
                       style: GoogleFonts.poppins(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -324,7 +296,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${_expenses.length} items',
+                    '${expenses.length} items',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -391,9 +363,9 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
         // Expense List
         Expanded(
           child: ListView.builder(
-            itemCount: _expenses.length,
+            itemCount: expenses.length,
             itemBuilder: (context, index) {
-              final expense = _expenses[index];
+              final expense = expenses[index];
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 elevation: 1,
@@ -411,7 +383,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
+                                  categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
                                   style: GoogleFonts.poppins(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -481,6 +453,8 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
           ),
         ),
       ],
+    );
+      },
     );
   }
 }

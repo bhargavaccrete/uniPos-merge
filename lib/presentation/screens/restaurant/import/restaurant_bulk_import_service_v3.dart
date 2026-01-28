@@ -3,10 +3,9 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
@@ -15,10 +14,6 @@ import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
 import 'package:uuid/uuid.dart';
 
 /// 🚀 Enhanced Restaurant Bulk Import Service V3
@@ -28,6 +23,7 @@ import 'package:uuid/uuid.dart';
 /// - ✅ In-memory caching for performance
 /// - ✅ Image URL download support
 /// - ✅ Progress callback support
+/// - ✅ Uses store pattern for reactive state management
 class RestaurantBulkImportServiceV3 {
   // Progress callback
   final void Function(int current, int total, String message)? onProgress;
@@ -352,10 +348,9 @@ class RestaurantBulkImportServiceV3 {
       onProgress?.call((currentStep / totalSteps * 100).toInt(), 100, 'Importing item variants...');
       await _importItemVariants(allSheets[SHEET_ITEM_VARIANTS], result);
 
-      // Step 4: Flush all boxes
-      onProgress?.call(95, 100, 'Saving to database...');
-      await _flushAllBoxes();
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Step 4: Refresh all stores
+      onProgress?.call(95, 100, 'Refreshing stores...');
+      await refreshAllRestaurantStores();
 
       result.success = result.errors.isEmpty;
       onProgress?.call(100, 100, 'Import complete!');
@@ -371,13 +366,14 @@ class RestaurantBulkImportServiceV3 {
     }
   }
 
-  /// Load all data into in-memory caches
+  /// Load all data into in-memory caches using stores
   Future<void> _loadAllCaches() async {
     print('📂 Loading caches...');
 
     try {
       // Load categories
-      final categories = await HiveBoxes.getAllCategories();
+      await categoryStore.loadCategories();
+      final categories = categoryStore.categories;
       _categoryCache = {for (var cat in categories) cat.id: cat};
       _categoryByNameCache = {for (var cat in categories) cat.name.toLowerCase(): cat};
       print('✅ Cached ${categories.length} categories');
@@ -388,7 +384,8 @@ class RestaurantBulkImportServiceV3 {
 
     try {
       // Load choices
-      final choices = await HiveChoice.getAllChoice();
+      await choiceStore.loadChoices();
+      final choices = choiceStore.choices;
       _choiceCache = {for (var choice in choices) choice.id: choice};
       print('✅ Cached ${choices.length} choices');
     } catch (e) {
@@ -397,7 +394,8 @@ class RestaurantBulkImportServiceV3 {
 
     try {
       // Load extras
-      final extras = await HiveExtra.getAllExtra();
+      await extraStore.loadExtras();
+      final extras = extraStore.extras;
       _extraCache = {for (var extra in extras) extra.Id: extra};
       print('✅ Cached ${extras.length} extras');
     } catch (e) {
@@ -406,7 +404,8 @@ class RestaurantBulkImportServiceV3 {
 
     try {
       // Load variants
-      final variants = await HiveVariante.getAllVariante();
+      await variantStore.loadVariants();
+      final variants = variantStore.variants;
       _variantCache = {for (var variant in variants) variant.id: variant};
       print('✅ Cached ${variants.length} variants');
     } catch (e) {
@@ -489,7 +488,7 @@ class RestaurantBulkImportServiceV3 {
       editCount: 0,
     );
 
-    await HiveBoxes.addCategory(newCategory);
+    await categoryStore.addCategory(newCategory);
 
     // Update caches
     _categoryCache[newCategory.id] = newCategory;
@@ -568,10 +567,12 @@ class RestaurantBulkImportServiceV3 {
           editCount: 0,
         );
 
-        await HiveBoxes.addCategory(category);
-        _categoryCache[id] = category;
-        _categoryByNameCache[name.toLowerCase()] = category;
-        result.categoriesImported++;
+        final success = await categoryStore.addCategory(category);
+        if (success) {
+          _categoryCache[id] = category;
+          _categoryByNameCache[name.toLowerCase()] = category;
+          result.categoriesImported++;
+        }
       } catch (e) {
         result.errors.add('Row ${i + 1} in Categories: $e');
       }
@@ -600,9 +601,11 @@ class RestaurantBulkImportServiceV3 {
           createdTime: DateTime.now(),
         );
 
-        await HiveVariante.addVariante(variant);
-        _variantCache[id] = variant;
-        result.variantsImported++;
+        final success = await variantStore.addVariant(variant);
+        if (success) {
+          _variantCache[id] = variant;
+          result.variantsImported++;
+        }
       } catch (e) {
         result.errors.add('Row ${i + 1} in Variants: $e');
       }
@@ -634,9 +637,11 @@ class RestaurantBulkImportServiceV3 {
           createdTime: DateTime.now(),
         );
 
-        await HiveExtra.addextra(extra);
-        _extraCache[id] = extra;
-        result.extrasImported++;
+        final success = await extraStore.addExtra(extra);
+        if (success) {
+          _extraCache[id] = extra;
+          result.extrasImported++;
+        }
       } catch (e) {
         result.errors.add('Row ${i + 1} in Extras: $e');
       }
@@ -715,7 +720,7 @@ class RestaurantBulkImportServiceV3 {
         }
 
         var updatedExtra = extra.copyWith(topping: toppings);
-        await HiveExtra.updateExtra(updatedExtra);
+        await extraStore.updateExtra(updatedExtra);
         _extraCache[extraId] = updatedExtra;
       } catch (e) {
         result.errors.add('Error importing toppings for extra $extraId: $e');
@@ -745,9 +750,11 @@ class RestaurantBulkImportServiceV3 {
           createdTime: DateTime.now(),
         );
 
-        await HiveChoice.addChoice(choice);
-        _choiceCache[id] = choice;
-        result.choicesImported++;
+        final success = await choiceStore.addChoice(choice);
+        if (success) {
+          _choiceCache[id] = choice;
+          result.choicesImported++;
+        }
       } catch (e) {
         result.errors.add('Row ${i + 1} in Choices: $e');
       }
@@ -794,7 +801,7 @@ class RestaurantBulkImportServiceV3 {
         }
 
         var updatedChoice = choice.copyWith(option: options);
-        await HiveChoice.updateChoice(updatedChoice);
+        await choiceStore.updateChoice(updatedChoice);
         _choiceCache[choiceId] = updatedChoice;
       } catch (e) {
         result.errors.add('Error importing options for choice $choiceId: $e');
@@ -905,8 +912,10 @@ class RestaurantBulkImportServiceV3 {
           editCount: 0,
         );
 
-        await itemsBoxes.addItem(item);
-        result.itemsImported++;
+        final success = await itemStore.addItem(item);
+        if (success) {
+          result.itemsImported++;
+        }
 
         // Progress update
         if (i % 10 == 0) {
@@ -934,7 +943,8 @@ class RestaurantBulkImportServiceV3 {
       variantGroups[itemName]!.add(row);
     }
 
-    final allItems = await itemsBoxes.getAllItems();
+    await itemStore.loadItems();
+    final allItems = itemStore.items;
 
     for (var itemName in variantGroups.keys) {
       try {
@@ -969,44 +979,10 @@ class RestaurantBulkImportServiceV3 {
         }
 
         var updatedItem = item.copyWith(variant: variants);
-        await itemsBoxes.updateItem(updatedItem);
+        await itemStore.updateItem(updatedItem);
       } catch (e) {
         result.errors.add('Error importing variants for item $itemName: $e');
       }
-    }
-  }
-
-  Future<void> _flushAllBoxes() async {
-    try {
-      print('📦 Flushing Hive boxes...');
-
-      final categoryBox = HiveBoxes.getCategory();
-      final itemBox = itemsBoxes.getItemBox();
-      final variantBox = HiveVariante.getVariante();
-      final extraBox = HiveExtra.getextra();
-      final choiceBox = HiveChoice.getchoice();
-
-      await categoryBox.flush();
-      await itemBox.flush();
-      await variantBox.flush();
-      await extraBox.flush();
-      await choiceBox.flush();
-
-      await categoryBox.compact();
-      await itemBox.compact();
-      await variantBox.compact();
-      await extraBox.compact();
-      await choiceBox.compact();
-
-      await categoryBox.flush();
-      await itemBox.flush();
-      await variantBox.flush();
-      await extraBox.flush();
-      await choiceBox.flush();
-
-      print('✅ All boxes flushed');
-    } catch (e) {
-      print('⚠️ Error flushing boxes: $e');
     }
   }
 

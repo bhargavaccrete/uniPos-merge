@@ -1,3 +1,4 @@
+/*
 import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -310,7 +311,9 @@ class RestaurantBulkImportService {
             orElse: () => null as dynamic,
           );
           if (extra != null) ids.add(extra.Id);
-        } catch (e) { /* ignore */ }
+        } catch (e) { */
+/* ignore *//*
+ }
       }
     } else {
       final allChoices = await HiveChoice.getAllChoice();
@@ -321,9 +324,11 @@ class RestaurantBulkImportService {
             orElse: () => null as dynamic,
           );
           if (choice != null) ids.add(choice.id);
-        } catch (e) { /* ignore */ }
+        } catch (e) { */
+/* ignore *//*
+ }
       }
     }
     return ids;
   }
-}
+}*/

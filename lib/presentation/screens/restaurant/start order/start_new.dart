@@ -1,3 +1,4 @@
+/*
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1613,6 +1614,7 @@ class _PastOrdersContentState extends State<_PastOrdersContent> {
     if (picked != null) setState(() => _dateRange = picked);
   }
 
+*/
 /*
   Future<void> _openBox() async {
     try {
@@ -1626,7 +1628,8 @@ class _PastOrdersContentState extends State<_PastOrdersContent> {
       if (mounted) setState(() { _isLoading = false; _error = e.toString(); });
     }
   }
-*/
+*//*
+
 
   @override
   Widget build(BuildContext context) {
@@ -2576,4 +2579,4 @@ class _CategoryNavigator extends StatelessWidget {
       ),
     );
   }
-}
+}*/

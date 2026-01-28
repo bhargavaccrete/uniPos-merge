@@ -18,15 +18,35 @@ class EODService {
     await pastOrderStore.loadPastOrders();
     final pastOrders = pastOrderStore.pastOrders.toList();
 
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    // Get the day start timestamp - CRITICAL for filtering orders after "Start Day" was clicked
+    final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
 
-    // Get ALL orders for the day
+    // Determine the start time for filtering:
+    // - If day was started with a timestamp, use that exact time
+    // - Otherwise, fall back to start of day (00:00:00)
+    final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
+    final endTime = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+    print('📅 EOD Report Date Range: $startTime to $endTime');
+    print('📅 Day Start Timestamp: $dayStartTimestamp');
+    print('📦 Total past orders in system: ${pastOrders.length}');
+
+    // Get ALL orders for the day AFTER day was started
     final allDayOrders = pastOrders.where((order) {
       return order.orderAt != null &&
-          order.orderAt!.isAfter(startOfDay) &&
-          order.orderAt!.isBefore(endOfDay);
+          order.orderAt!.isAfter(startTime) &&
+          order.orderAt!.isBefore(endTime);
     }).toList();
+
+    print('✅ Orders filtered for current day session: ${allDayOrders.length}');
+    if (allDayOrders.isNotEmpty) {
+      print('🔍 Sample order timestamps:');
+      for (var i = 0; i < allDayOrders.length && i < 3; i++) {
+        print('   Order ${i + 1}: ${allDayOrders[i].orderAt}');
+      }
+    } else if (dayStartTimestamp != null) {
+      print('ℹ️ No orders found after day start time: $dayStartTimestamp');
+    }
 
     // Separate fully refunded and voided orders from active orders for reporting
     final activeDayOrders = allDayOrders.where((order) {
@@ -60,12 +80,15 @@ class EODService {
     final totalOrderCount = activeDayOrders.length; // Count only active orders
 
     // Calculate expenses for the day using expense store
+    // Use the same start time as orders filtering for consistency
     await expenseStore.loadExpenses();
     final allExpenses = expenseStore.expenses;
     final dayExpenses = allExpenses.where((expense) {
-      return (expense.dateandTime.isAfter(startOfDay) || expense.dateandTime.isAtSameMomentAs(startOfDay)) &&
-          (expense.dateandTime.isBefore(endOfDay) || expense.dateandTime.isAtSameMomentAs(endOfDay));
+      return (expense.dateandTime.isAfter(startTime) || expense.dateandTime.isAtSameMomentAs(startTime)) &&
+          (expense.dateandTime.isBefore(endTime) || expense.dateandTime.isAtSameMomentAs(endTime));
     }).toList();
+
+    print('✅ Found ${dayExpenses.length} expenses after day start');
 
     // Calculate total expenses (all payment types) for P&L reporting
     final totalExpenses = dayExpenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);

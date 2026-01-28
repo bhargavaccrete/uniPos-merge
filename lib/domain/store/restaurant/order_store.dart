@@ -413,6 +413,16 @@ abstract class _OrderStore with Store {
   }
 
   @action
+  Future<void> resetDailyBillNumber() async {
+    try {
+      await _repository.resetDailyBillNumber();
+    } catch (e) {
+      errorMessage = 'Failed to reset daily bill number: $e';
+      print('Error resetting daily bill number: $e');
+    }
+  }
+
+  @action
   Future<int> getNextOrderNumber() async {
     try {
       return await _repository.getNextOrderNumber();

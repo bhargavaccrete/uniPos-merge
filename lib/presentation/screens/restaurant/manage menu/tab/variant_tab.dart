@@ -10,7 +10,6 @@ import 'package:unipos/util/images.dart';
 import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 
-
 class VariantTab extends StatefulWidget {
   const VariantTab({super.key});
 
@@ -19,489 +18,551 @@ class VariantTab extends StatefulWidget {
 }
 
 class _VariantTabState extends State<VariantTab> {
-  TextEditingController VariantController = TextEditingController();
-
-  // List<VariantModel> variantsList = [];
-
+  TextEditingController variantController = TextEditingController();
+  TextEditingController searchController = TextEditingController();
+  String query = '';
   VariantModel? editingVariante;
+
+  @override
+  void initState() {
+    super.initState();
+    searchController.addListener(() {
+      setState(() {
+        query = searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    variantController.dispose();
+    searchController.dispose();
+    super.dispose();
+  }
 
   void openBottomSheet({VariantModel? variante}) {
     if (variante != null) {
-      print("Before set: ${VariantController.text}");
-      VariantController.text = variante.name;
-      editingVariante =variante;
-      print("After set: ${VariantController.text}");
+      variantController.text = variante.name;
+      editingVariante = variante;
     } else {
-      VariantController.clear();
+      variantController.clear();
       editingVariante = null;
     }
+
     showModalBottomSheet(
-        context: context,
-        builder: (context) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom), child: showMOdel()));
+      isScrollControlled: true,
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: _buildBottomSheet(),
+      ),
+    );
+  }
+
+  Widget _buildBottomSheet() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.tune, color: AppColors.primary),
+              ),
+              SizedBox(width: 12),
+              Text(
+                editingVariante == null ? 'Add Variant' : 'Edit Variant',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          Divider(height: 30),
+          TextField(
+            controller: variantController,
+            style: GoogleFonts.poppins(fontSize: 14),
+            decoration: InputDecoration(
+              labelText: "Variant Name",
+              labelStyle: GoogleFonts.poppins(color: Colors.grey),
+              prefixIcon: Icon(Icons.edit, color: AppColors.primary),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _addOrEditVariante,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    editingVariante == null ? Icons.add_circle_outline : Icons.check_circle_outline,
+                    color: Colors.white,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    editingVariante == null ? 'Add Variant' : 'Update Variant',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _addOrEditVariante() async {
-    final trimmedName = VariantController.text.trim();
-
-    //   Do Not proceed if input is empty
+    final trimmedName = variantController.text.trim();
     if (trimmedName.isEmpty) return;
 
     if (editingVariante != null) {
-      final updateVariante = VariantModel(
-          id: editingVariante!.id,
-          name: trimmedName);
+      final updateVariante = VariantModel(id: editingVariante!.id, name: trimmedName);
       await variantStore.updateVariant(updateVariante);
     } else {
       final newvariante = VariantModel(id: Uuid().v4(), name: trimmedName);
       await variantStore.addVariant(newvariante);
     }
 
-    VariantController.clear();
+    variantController.clear();
     editingVariante = null;
-
     Navigator.pop(context);
   }
 
   Future<void> _delete(String id) async {
-    await variantStore.deleteVariant(id);
-    Navigator.pop(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('Delete Variant', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete this variant?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await variantStore.deleteVariant(id);
+    }
   }
 
+  int _getGridColumns(double width) {
+    if (width > 1200) return 5;
+    else if (width > 900) return 4;
+    else return 3;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Column(
-            children: [
-              Observer(
-                  builder: (_) {
-                    final allvariante = variantStore.variants.toList();
-
-                    if (allvariante.isEmpty) {
-                      return Container(
-                        height: height * 0.7,
-                        width: width,
-                        // color: Colors.green,
-                        // color: Colors.red,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // SizedBox(height: 50,),
-                            Lottie.asset(AppImages.notfoundanimation, height: height * 0.3),
-
-                            Text(
-                              'No Variant Found',
-                              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w500),
-                            )
-                          ],
-                        ),
-                      );
-                    }
-
-                    return Container(
-                      height: height * 0.7,
-                      child: ListView.builder(
-                          itemCount: allvariante.length,
-                          itemBuilder: (context, index) {
-                            final variante = allvariante[index];
-                            return Card(
-                              color: Colors.white,
-                              child: ListTile(
-                                title: Text(
-                                  variante.name,
-                                  style: GoogleFonts.poppins(fontSize: 16),
-                                ),
-                                // trailing:
-                                trailing: Container(
-                                  width: 60,
-                                  child: Row(
-                                    children: [
-                                      InkWell(
-                                          onTap: () => openBottomSheet(variante: variante),
-                                          child: Container(
-                                              padding: EdgeInsets.all(1),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey,
-                                                borderRadius: BorderRadius.circular(5),
-                                                // shape:BoxShape.circle,
-                                              ),
-                                              child: Icon(Icons.edit))),
-                                      SizedBox(
-                                        width: 5,
-                                      ),
-                                      InkWell(
-                                          onTap: () {
-                                            showModalBottomSheet(
-                                                context: context,
-                                                builder: (context) {
-                                                  return Container(
-                                                    height: height * 0.4,
-                                                    width: double.infinity,
-                                                    child: Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.delete,
-                                                          size: 100,
-                                                          color: AppColors.primary,
-                                                        ),
-                                                        SizedBox(
-                                                          height: 10,
-                                                        ),
-                                                        Text(
-                                                          'Delete Variant',
-                                                          style: GoogleFonts.poppins(
-                                                            fontSize: 16,
-                                                          ),
-                                                        ),
-                                                        SizedBox(
-                                                          height: 5,
-                                                        ),
-                                                        Text(
-                                                          'Are you sure you want to Delete this Variante',
-                                                          style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                                        ),
-                                                        SizedBox(
-                                                          height: 10,
-                                                        ),
-                                                        Container(
-                                                          padding: EdgeInsets.all(10),
-                                                          child: Row(
-                                                            children: [
-                                                              Expanded(
-                                                                child: CommonButton(
-                                                                    bordercircular: 5,
-                                                                    height: 40,
-                                                                    width: 30,
-                                                                    bordercolor: Colors.grey,
-                                                                    bgcolor: Colors.white,
-                                                                    onTap: () {
-                                                                      Navigator.pop(context);
-                                                                    },
-                                                                    child: Text('Cancel')),
-                                                              ),
-                                                              SizedBox(
-                                                                width: 10,
-                                                              ),
-                                                              Expanded(
-                                                                child: CommonButton(
-                                                                    bordercircular: 5,
-                                                                    height: 40,
-                                                                    width: 30,
-                                                                    bordercolor: Colors.red,
-                                                                    bgcolor: Colors.red,
-                                                                    onTap: () {
-                                                                      _delete(variante.id);
-                                                                    },
-                                                                    child: Text(
-                                                                      'Delete',
-                                                                      style: GoogleFonts.poppins(color: Colors.white),
-                                                                    )),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        )
-                                                      ],
-                                                    ),
-                                                  );
-                                                });
-                                            // setState(() {
-                                            //   variants.removeAt(index);
-                                            // });
-                                          },
-                                          child: Container(
-                                              padding: EdgeInsets.all(1),
-                                              decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(5)),
-                                              child: Icon(Icons.delete, color: Colors.white)))
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                    );
-                  }),
-
-              /* variantsList.isEmpty
-                  ? Container(
-                      height: height * 0.7,
-                      width: width,
-                      // color: Colors.green,
-                      // color: Colors.red,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // SizedBox(height: 50,),
-                          Lottie.asset(
-                              'assets/animation/notfoundanimation.json',
-                              height: height * 0.3),
-
-                          Text(
-                            'No Variant Found',
-                            style: GoogleFonts.poppins(
-                                fontSize: 20, fontWeight: FontWeight.w500),
-                          )
-                        ],
-                      ),
-                    )
-                  : Container(
-                      height: height * 0.7,
-                      child:
-                      ListView.builder(
-                          itemCount: variantsList.length,
-                          itemBuilder: (context, index) {
-                            return Card(
-
-                              color: Colors.white,
-                              child: ListTile(
-
-                                title: Text(
-                                  variantsList[index].name,
-                                  style: GoogleFonts.poppins(fontSize: 16),
-                                ),
-                                // trailing:
-                                trailing: Container(
-                                  width: 60,
-                                  child: Row(
-                                    children: [
-                                      InkWell(
-                                          onTap: () =>
-                                              openBottomSheet(index: index),
-                                          child: Container(
-                                              padding: EdgeInsets.all(1),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey,
-                                                borderRadius:
-                                                    BorderRadius.circular(5),
-                                                // shape:BoxShape.circle,
-                                              ),
-                                              child: Icon(Icons.edit))),
-                                      SizedBox(
-                                        width: 5,
-                                      ),
-                                      InkWell(
-                                          onTap: () {
-                                            showModalBottomSheet(
-                                                context: context,
-                                                builder: (context) {
-                                                  return Container(
-                                                    height: height * 0.4,
-                                                    width: double.infinity,
-                                                    child: Column(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        Icon(
-                                                          Icons.delete,
-                                                          size: 100,
-                                                          color: AppColors.primary,
-                                                        ),
-                                                        SizedBox(
-                                                          height: 10,
-                                                        ),
-                                                        Text(
-                                                          'Delete Variant',
-                                                          style: GoogleFonts
-                                                              .poppins(
-                                                            fontSize: 16,
-                                                          ),
-                                                        ),
-                                                        SizedBox(
-                                                          height: 5,
-                                                        ),
-                                                        Text(
-                                                          'Are you sure you want to Delete this Variante',
-                                                          style: GoogleFonts
-                                                              .poppins(
-                                                                  color: Colors
-                                                                      .grey,
-                                                                  fontSize: 12),
-                                                        ),
-                                                        SizedBox(
-                                                          height: 10,
-                                                        ),
-                                                        Container(
-                                                          padding:
-                                                              EdgeInsets.all(
-                                                                  10),
-                                                          child: Row(
-                                                            children: [
-                                                              Expanded(
-                                                                child:
-                                                                    CommonButton(
-                                                                        bordercircular:
-                                                                            5,
-                                                                        height:
-                                                                            40,
-                                                                        width:
-                                                                            30,
-                                                                        bordercolor:
-                                                                            Colors
-                                                                                .grey,
-                                                                        bgcolor:
-                                                                            Colors
-                                                                                .white,
-                                                                        onTap:
-                                                                            () {
-                                                                          Navigator.pop(
-                                                                              context);
-                                                                        },
-                                                                        child: Text(
-                                                                            'Cancel')),
-                                                              ),
-                                                              SizedBox(
-                                                                width: 10,
-                                                              ),
-                                                              Expanded(
-                                                                child:
-                                                                    CommonButton(
-                                                                        bordercircular:
-                                                                            5,
-                                                                        height:
-                                                                            40,
-                                                                        width:
-                                                                            30,
-                                                                        bordercolor:
-                                                                            Colors
-                                                                                .red,
-                                                                        bgcolor:
-                                                                            Colors
-                                                                                .red,
-                                                                        onTap:
-                                                                            () {
-                                                                          _delete(
-                                                                              index);
-                                                                        },
-                                                                        child:
-                                                                            Text(
-                                                                          'Delete',
-                                                                          style:
-                                                                              GoogleFonts.poppins(color: Colors.white),
-                                                                        )),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        )
-                                                      ],
-                                                    ),
-                                                  );
-                                                });
-                                            // setState(() {
-                                            //   variants.removeAt(index);
-                                            // });
-                                          },
-                                          child: Container(
-                                              padding: EdgeInsets.all(1),
-                                              decoration: BoxDecoration(
-                                                  color: Colors.red,
-                                                  borderRadius:
-                                                      BorderRadius.circular(5)),
-                                              child: Icon(Icons.delete,
-                                                  color: Colors.white)))
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                    ),*/
-              Container(
-                alignment: Alignment.center,
-                child: CommonButton(
-                    width: width * 0.5,
-                    height: height * 0.06,
-                    onTap: () => openBottomSheet(),
-
-                    // showModalBottomSheet(context: context,
-                    //     builder: (BuildContext context){
-                    //       return showMOdel(isEditing);
-                    //     });
-
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          child: Icon(Icons.add),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-                        ),
-                        SizedBox(
-                          width: 5,
-                        ),
-                        Text(
-                          'Add Variante',
-                          style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
+      backgroundColor: Colors.grey.shade50,
+      body: Column(
+        children: [
+          // Modern Search Bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: TextField(
+                controller: searchController,
+                style: GoogleFonts.poppins(fontSize: 14),
+                decoration: InputDecoration(
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  hintText: 'Search variants...',
+                  hintStyle: GoogleFonts.poppins(
+                    color: Colors.grey.shade500,
+                    fontSize: 14,
+                  ),
+                  prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
+                  suffixIcon: query.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: Colors.grey, size: 20),
+                          onPressed: () {
+                            searchController.clear();
+                          },
                         )
-                      ],
-                    )),
-              )
+                      : null,
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ),
+
+          // Variants List
+          Expanded(
+            child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
+          ),
+
+          // Add Variant Button
+          _buildAddButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(Size size) {
+    return Observer(
+      builder: (_) {
+        final filteredVariants = _getFilteredVariants();
+
+        if (filteredVariants.isEmpty) {
+          return _buildEmptyState(size.height);
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.all(16),
+          itemCount: filteredVariants.length,
+          itemBuilder: (context, index) {
+            final variante = filteredVariants[index];
+            return _buildVariantCard(variante, isGrid: false);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTabletLayout(Size size) {
+    return Observer(
+      builder: (_) {
+        final filteredVariants = _getFilteredVariants();
+
+        if (filteredVariants.isEmpty) {
+          return _buildEmptyState(size.height);
+        }
+
+        return GridView.builder(
+          padding: EdgeInsets.all(24),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _getGridColumns(size.width),
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 1.2,
+          ),
+          itemCount: filteredVariants.length,
+          itemBuilder: (context, index) {
+            final variante = filteredVariants[index];
+            return _buildVariantCard(variante, isGrid: true);
+          },
+        );
+      },
+    );
+  }
+
+  List<VariantModel> _getFilteredVariants() {
+    final allvariante = variantStore.variants.toList();
+    return query.isEmpty
+        ? allvariante
+        : allvariante.where((variant) {
+            final name = variant.name.toLowerCase();
+            final queryLower = query.toLowerCase();
+            return name.contains(queryLower);
+          }).toList();
+  }
+
+  Widget _buildEmptyState(double height) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset(AppImages.notfoundanimation, height: height * 0.25),
+          SizedBox(height: 16),
+          Text(
+            query.isEmpty ? 'No Variants Found' : 'No matching variants',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          if (query.isEmpty)
+            Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Add variants to customize your items',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVariantCard(VariantModel variante, {required bool isGrid}) {
+    if (isGrid) {
+      return Card(
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.tune,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                variante.name,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => openBottomSheet(variante: variante),
+                      child: Container(
+                        padding: EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _delete(variante.id),
+                      child: Container(
+                        padding: EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 16,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.tune,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                variante.name,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () => openBottomSheet(variante: variante),
+                  child: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _delete(variante.id),
+                  child: Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget showMOdel() {
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
-
-    return SingleChildScrollView(
-      child: Container(
+  Widget _buildAddButton() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SizedBox(
         width: double.infinity,
-        height: height * 0.3,
-        padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Container(
-              // color: Colors.red,
-              width: width * 0.9,
-              child: Text(
-                editingVariante == null ? 'Add Variant' : 'Edit Variant',
-                textScaler: TextScaler.linear(1),
-                textAlign: TextAlign.start,
-                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w400),
+        height: 50,
+        child: ElevatedButton(
+          onPressed: () => openBottomSheet(),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.add, color: AppColors.primary, size: 20),
               ),
-            ),
-            SizedBox(
-              height: 25,
-            ),
-            Container(
-              height: height * 0.05,
-              child: TextField(
-                controller: VariantController,
-                decoration: InputDecoration(
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(2)),
-                  labelStyle: GoogleFonts.poppins(
-                    color: Colors.grey,
-                  ),
-                  border: OutlineInputBorder(),
-                  labelText: "Variant Name (English)",
+              SizedBox(width: 10),
+              Text(
+                'Add Variant',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-            SizedBox(
-              height: 25,
-            ),
-            CommonButton(
-                height: height * 0.06,
-                width: width * 0.6,
-                onTap: () {
-                  _addOrEditVariante();
-                },
-                child: Center(
-                    child: Text(
-                      editingVariante == null ? 'Add' : 'update',
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    )))
-          ],
+            ],
+          ),
         ),
       ),
     );

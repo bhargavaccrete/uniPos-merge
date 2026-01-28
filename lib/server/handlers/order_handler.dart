@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import '../websocket.dart';
 import '../../data/models/restaurant/db/database/hive_order.dart';
 import '../../data/models/restaurant/db/ordermodel_309.dart';
@@ -14,7 +15,7 @@ Future<Response> createOrderHandler(Request request) async {
     final orderId = DateTime.now().millisecondsSinceEpoch.toString();
 
     // Get next KOT number
-    final kotNumber = await HiveOrders.getNextKotNumber();
+    final kotNumber = await orderStore.getNextKotNumber();
 
     // Parse cart items from request
     final items = (data['items'] as List<dynamic>?)
@@ -39,7 +40,7 @@ Future<Response> createOrderHandler(Request request) async {
     );
 
     // Save order to Hive
-    await HiveOrders.addOrder(order);
+    await orderStore.addOrder(order);
 
     // Notify kitchen via WebSocket
     broadcastEvent({

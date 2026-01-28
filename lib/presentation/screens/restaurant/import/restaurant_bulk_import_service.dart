@@ -14,16 +14,12 @@ import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_db.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_choice.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_extra.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_variante.dart';
-import 'package:uuid/uuid.dart';
 
 /// Improved Restaurant Bulk Import Service
 /// Supports multi-sheet Excel import with full model coverage
+/// Uses store pattern via service locator for reactive state management
 class RestaurantBulkImportService {
-  // No need for store instances - using Hive directly
+  // Access stores via service locator convenience getters
 
   // Sheet names
   static const String SHEET_CATEGORIES = 'Categories';
@@ -334,8 +330,8 @@ class RestaurantBulkImportService {
       // Ensure all data is loaded with individual try-catch
       try {
         print('📂 Loading categories...');
-        final categories = await HiveBoxes.getAllCategories();
-        print('✅ Categories loaded: ${categories.length}');
+        await categoryStore.loadCategories();
+        print('✅ Categories loaded: ${categoryStore.categories.length}');
       } catch (e) {
         print('⚠️ Error loading categories: $e');
         result.warnings.add('Could not load existing categories: $e');
@@ -343,8 +339,8 @@ class RestaurantBulkImportService {
 
       try {
         print('📂 Loading choices...');
-        final choices = await HiveChoice.getAllChoice();
-        print('✅ Choices loaded: ${choices.length}');
+        await choiceStore.loadChoices();
+        print('✅ Choices loaded: ${choiceStore.choices.length}');
       } catch (e) {
         print('⚠️ Error loading choices: $e');
         result.warnings.add('Could not load existing choices: $e');
@@ -352,8 +348,8 @@ class RestaurantBulkImportService {
 
       try {
         print('📂 Loading extras...');
-        final extras = await HiveExtra.getAllExtra();
-        print('✅ Extras loaded: ${extras.length}');
+        await extraStore.loadExtras();
+        print('✅ Extras loaded: ${extraStore.extras.length}');
       } catch (e) {
         print('⚠️ Error loading extras: $e');
         result.warnings.add('Could not load existing extras: $e');
@@ -361,8 +357,8 @@ class RestaurantBulkImportService {
 
       try {
         print('📂 Loading items...');
-        final items = await itemsBoxes.getAllItems();
-        print('✅ Items loaded: ${items.length}');
+        await itemStore.loadItems();
+        print('✅ Items loaded: ${itemStore.items.length}');
       } catch (e) {
         print('⚠️ Error loading items: $e');
         result.warnings.add('Could not load existing items: $e');
@@ -403,13 +399,10 @@ class RestaurantBulkImportService {
       await _importItemVariants(allSheets[SHEET_ITEM_VARIANTS], result);
       print('✅ Item variants imported: ${result.itemVariantsImported}');
 
-      // 🔄 Force Hive to notify listeners by flushing all boxes
-      print('🔄 Flushing Hive boxes to trigger UI updates...');
-      await _flushAllBoxes();
-
-      // Add a delay to ensure all listeners process the changes
-      await Future.delayed(const Duration(milliseconds: 300));
-      print('✅ Hive boxes flushed and listeners notified');
+      // 🔄 Refresh all stores to ensure UI updates
+      print('🔄 Refreshing all restaurant stores to trigger UI updates...');
+      await refreshAllRestaurantStores();
+      print('✅ All stores refreshed and UI notified');
 
       result.success = result.errors.isEmpty;
       print('✅ Import process complete! Success: ${result.success}');
@@ -437,8 +430,7 @@ class RestaurantBulkImportService {
         String imagePath = _getValue(row, 2);
 
         // Check if already exists
-        final allCategories = await HiveBoxes.getAllCategories();
-        var existing = allCategories.where((c) => c.id == id).firstOrNull;
+        var existing = categoryStore.categories.where((c) => c.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Category $id already exists, skipping');
           continue;
@@ -451,8 +443,8 @@ class RestaurantBulkImportService {
           createdTime: DateTime.now(),
         );
 
-        await HiveBoxes.addCategory(category);
-        imported++;
+        final success = await categoryStore.addCategory(category);
+        if (success) imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Categories: $e');
       }
@@ -473,8 +465,7 @@ class RestaurantBulkImportService {
         String name = _getValue(row, 1);
 
         // Check if already exists
-        final allVariants = await HiveVariante.getAllVariante();
-        var existing = allVariants.where((v) => v.id == id).firstOrNull;
+        var existing = variantStore.variants.where((v) => v.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Variant $id already exists, skipping');
           continue;
@@ -486,8 +477,8 @@ class RestaurantBulkImportService {
           createdTime: DateTime.now(),
         );
 
-        await HiveVariante.addVariante(variant);
-        imported++;
+        final success = await variantStore.addVariant(variant);
+        if (success) imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Variants: $e');
       }
@@ -511,8 +502,7 @@ class RestaurantBulkImportService {
         int? maximum = _getInt(row, 4);
 
         // Check if already exists
-        final allExtras = await HiveExtra.getAllExtra();
-        var existing = allExtras.where((e) => e.Id == id).firstOrNull;
+        var existing = extraStore.extras.where((e) => e.Id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Extra $id already exists, skipping');
           continue;
@@ -528,8 +518,8 @@ class RestaurantBulkImportService {
           createdTime: DateTime.now(),
         );
 
-        await HiveExtra.addextra(extra);
-        imported++;
+        final success = await extraStore.addExtra(extra);
+        if (success) imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Extras: $e');
       }
@@ -565,8 +555,7 @@ class RestaurantBulkImportService {
     for (var extraId in toppingGroups.keys) {
       try {
         // Find the extra
-        final allExtras = await HiveExtra.getAllExtra();
-        var extra = allExtras.where((e) => e.Id == extraId).firstOrNull;
+        var extra = extraStore.extras.where((e) => e.Id == extraId).firstOrNull;
         if (extra == null) {
           result.errors.add('Extra $extraId not found for toppings');
           continue;
@@ -597,8 +586,7 @@ class RestaurantBulkImportService {
                 variantPrices[variantId] = variantPrice;
 
                 // Get variant model
-                final allVariants = await HiveVariante.getAllVariante();
-                var variantModel = allVariants
+                var variantModel = variantStore.variants
                     .where((v) => v.id == variantId)
                     .firstOrNull;
                 if (variantModel != null && !variantModels.any((v) => v.id == variantId)) {
@@ -624,7 +612,7 @@ class RestaurantBulkImportService {
 
         // Update extra with new toppings
         var updatedExtra = extra.copyWith(topping: toppings);
-        await HiveExtra.updateExtra(updatedExtra);
+        await extraStore.updateExtra(updatedExtra);
 
       } catch (e) {
         result.errors.add('Error importing toppings for extra $extraId: $e');
@@ -646,8 +634,7 @@ class RestaurantBulkImportService {
         String name = _getValue(row, 1);
 
         // Check if already exists
-        final allChoices = await HiveChoice.getAllChoice();
-        var existing = allChoices.where((c) => c.id == id).firstOrNull;
+        var existing = choiceStore.choices.where((c) => c.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Choice $id already exists, skipping');
           continue;
@@ -660,8 +647,8 @@ class RestaurantBulkImportService {
           createdTime: DateTime.now(),
         );
 
-        await HiveChoice.addChoice(choice);
-        imported++;
+        final success = await choiceStore.addChoice(choice);
+        if (success) imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Choices: $e');
       }
@@ -692,8 +679,7 @@ class RestaurantBulkImportService {
     for (var choiceId in optionGroups.keys) {
       try {
         // Find the choice
-        final allChoices = await HiveChoice.getAllChoice();
-        var choice = allChoices.where((c) => c.id == choiceId).firstOrNull;
+        var choice = choiceStore.choices.where((c) => c.id == choiceId).firstOrNull;
         if (choice == null) {
           result.errors.add('Choice $choiceId not found for options');
           continue;
@@ -718,7 +704,7 @@ class RestaurantBulkImportService {
 
         // Update choice with new options
         var updatedChoice = choice.copyWith(option: options);
-        await HiveChoice.updateChoice(updatedChoice);
+        await choiceStore.updateChoice(updatedChoice);
 
       } catch (e) {
         result.errors.add('Error importing options for choice $choiceId: $e');
@@ -755,8 +741,7 @@ class RestaurantBulkImportService {
         String imagePath = _getValue(row, 16);
 
         // Check if already exists
-        final allItems = await itemsBoxes.getAllItems();
-        var existing = allItems.where((item) => item.id == id).firstOrNull;
+        var existing = itemStore.items.where((item) => item.id == id).firstOrNull;
         if (existing != null) {
           result.warnings.add('Item $id already exists, skipping');
           continue;
@@ -805,8 +790,8 @@ class RestaurantBulkImportService {
           lastEditedTime: DateTime.now(),
         );
 
-        await itemsBoxes.addItem(item);
-        imported++;
+        final success = await itemStore.addItem(item);
+        if (success) imported++;
       } catch (e) {
         result.errors.add('Row ${i + 1} in Items: $e');
       }
@@ -837,8 +822,7 @@ class RestaurantBulkImportService {
     for (var itemId in variantGroups.keys) {
       try {
         // Find the item
-        final allItems = await itemsBoxes.getAllItems();
-        var item = allItems.where((i) => i.id == itemId).firstOrNull;
+        var item = itemStore.items.where((i) => i.id == itemId).firstOrNull;
         if (item == null) {
           result.errors.add('Item $itemId not found for variants');
           continue;
@@ -867,7 +851,7 @@ class RestaurantBulkImportService {
 
         // Update item with variants
         var updatedItem = item.copyWith(variant: variants);
-        await itemsBoxes.updateItem(updatedItem);
+        await itemStore.updateItem(updatedItem);
 
       } catch (e) {
         result.errors.add('Error importing variants for item $itemId: $e');
@@ -905,45 +889,6 @@ class RestaurantBulkImportService {
     return defaultValue;
   }
 
-  /// Flush and compact all Hive boxes to ensure listeners are notified
-  Future<void> _flushAllBoxes() async {
-    try {
-      print('📦 Opening and compacting boxes to trigger UI updates...');
-
-      // Get all boxes
-      final categoryBox = await HiveBoxes.getCategory();
-      final itemBox = await itemsBoxes.getItemBox();
-      final variantBox = await HiveVariante.getVariante();
-      final extraBox = await HiveExtra.getextra();
-      final choiceBox = await HiveChoice.getchoice();
-
-      // Flush all boxes to write to disk
-      await categoryBox.flush();
-      await itemBox.flush();
-      await variantBox.flush();
-      await extraBox.flush();
-      await choiceBox.flush();
-
-      // Compact boxes to reorganize and trigger deep listeners
-      await categoryBox.compact();
-      await itemBox.compact();
-      await variantBox.compact();
-      await extraBox.compact();
-      await choiceBox.compact();
-
-      // Final flush after compact
-      await categoryBox.flush();
-      await itemBox.flush();
-      await variantBox.flush();
-      await extraBox.flush();
-      await choiceBox.flush();
-
-      print('✅ All boxes flushed and compacted');
-    } catch (e) {
-      print('⚠️ Error flushing boxes: $e');
-      // Don't throw - this is just to ensure UI updates
-    }
-  }
 }
 
 /// Result class for import operation

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
-
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -15,11 +15,6 @@ class TodayByVoid extends StatefulWidget {
 }
 
 class _TodayByVoidState extends State<TodayByVoid> {
-  bool _isLoading = true;
-  List<pastOrderModel> _voidOrders = [];
-  double _totalVoidAmount = 0.0;
-  int _totalVoidCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -27,47 +22,41 @@ class _TodayByVoidState extends State<TodayByVoid> {
   }
 
   Future<void> _loadVoidOrders() async {
-    setState(() => _isLoading = true);
+    // Load from pastOrderStore instead of direct Hive access
+    await pastOrderStore.loadPastOrders();
+  }
 
-    try {
-      final orderBox = Hive.box<pastOrderModel>('pastorderBox');
-      final now = DateTime.now();
-      final todayStart = DateTime(now.year, now.month, now.day);
-      final todayEnd = todayStart.add(Duration(days: 1));
+  Map<String, dynamic> _calculateVoidOrders() {
+    // Get all past orders from store
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayEnd = todayStart.add(Duration(days: 1));
 
-      final List<pastOrderModel> voidOrdersList = [];
-      double totalAmount = 0.0;
+    final List<pastOrderModel> voidOrdersList = [];
+    double totalAmount = 0.0;
 
-      for (final order in orderBox.values) {
-        // Check if order is voided/cancelled
-        if (order.orderStatus != null &&
-            (order.orderStatus!.toUpperCase().contains('VOID') ||
-             order.orderStatus!.toUpperCase().contains('CANCEL'))) {
+    for (final order in allOrders) {
+      // Check if order is voided/cancelled
+      if (order.orderStatus != null &&
+          (order.orderStatus!.toUpperCase().contains('VOID') ||
+           order.orderStatus!.toUpperCase().contains('CANCEL'))) {
 
-          // Check if it's today
-          if (order.orderAt != null &&
-              order.orderAt!.isAfter(todayStart) &&
-              order.orderAt!.isBefore(todayEnd)) {
-            voidOrdersList.add(order);
-            totalAmount += (order.totalPrice ?? 0.0);
-          }
+        // Check if it's today
+        if (order.orderAt != null &&
+            order.orderAt!.isAfter(todayStart) &&
+            order.orderAt!.isBefore(todayEnd)) {
+          voidOrdersList.add(order);
+          totalAmount += (order.totalPrice ?? 0.0);
         }
       }
-
-      setState(() {
-        _voidOrders = voidOrdersList;
-        _totalVoidAmount = totalAmount;
-        _totalVoidCount = voidOrdersList.length;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading void orders: $e')),
-        );
-      }
     }
+
+    return {
+      'orders': voidOrdersList,
+      'totalAmount': totalAmount,
+      'totalCount': voidOrdersList.length,
+    };
   }
 
   @override
@@ -75,12 +64,19 @@ class _TodayByVoidState extends State<TodayByVoid> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
 
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator());
-    }
-
     return Scaffold(
-      body: SingleChildScrollView(
+      body: Observer(
+        builder: (_) {
+          if (pastOrderStore.isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final voidData = _calculateVoidOrders();
+          final voidOrders = voidData['orders'] as List<pastOrderModel>;
+          final totalVoidAmount = voidData['totalAmount'] as double;
+          final totalVoidCount = voidData['totalCount'] as int;
+
+          return SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
@@ -112,7 +108,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
 
               // Total Amount
               Text(
-                " Total Void Order Amount Today (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(_totalVoidAmount)} ",
+                " Total Void Order Amount Today (${CurrencyHelper.currentSymbol}) = ${DecimalSettings.formatAmount(totalVoidAmount)} ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -121,7 +117,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
 
               // Total Count
               Text(
-                " Total Void Order Count = $_totalVoidCount ",
+                " Total Void Order Count = $totalVoidCount ",
                 textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(
                     fontSize: 14, fontWeight: FontWeight.w600),
@@ -251,7 +247,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
                                   Text('Status', textScaler: TextScaler.linear(1),
                                       style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center))),
                     ],
-                    rows: _voidOrders.map((order) {
+                    rows: voidOrders.map((order) {
                       return DataRow(cells: [
                         DataCell(Center(
                             child: Text(
@@ -280,6 +276,8 @@ class _TodayByVoidState extends State<TodayByVoid> {
             ],
           ),
         ),
+      );
+        },
       ),
     );
   }
