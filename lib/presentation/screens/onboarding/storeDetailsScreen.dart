@@ -37,16 +37,41 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   @override
   void initState() {
     super.initState();
-    // Initialize controllers with store values
-    // Initialize controllers with store values
-    _storeNameController = TextEditingController(text: widget.store.storeName);
-    _ownerNameController = TextEditingController(text: widget.store.ownerName);
-    _phoneController = TextEditingController(text: widget.store.phone);
-    _emailController = TextEditingController(text: widget.store.email);
-    _addressController = TextEditingController(text: widget.store.address);
-    _gstController = TextEditingController(text: widget.store.gstin);
-    _panController = TextEditingController(text: widget.store.pan);
+    _initializeControllers();
   }
+
+  // Helper function to get non-empty value or default
+  String getValue(String? storeValue, String defaultValue) {
+    return (storeValue != null && storeValue.isNotEmpty)
+        ? storeValue
+        : defaultValue;
+  }
+
+  void _initializeControllers() {
+    // Initialize controllers with store values or defaults
+    _storeNameController = TextEditingController(
+      text: getValue(widget.store.storeName, 'Green Apple')
+    );
+    _ownerNameController = TextEditingController(
+      text: getValue(widget.store.ownerName, 'Bhargav')
+    );
+    _phoneController = TextEditingController(
+      text: getValue(widget.store.phone, '7845963574')
+    );
+    _emailController = TextEditingController(
+      text: getValue(widget.store.email, 'info@apple.com')
+    );
+    _addressController = TextEditingController(
+      text: getValue(widget.store.address, 'Inocicity, Gandhinnagar')
+    );
+    _gstController = TextEditingController(
+      text: getValue(widget.store.gstin, 'GVFU415151YVBF')
+    );
+    _panController = TextEditingController(
+      text: getValue(widget.store.pan, 'FU415151YVBF')
+    );
+  }
+
 
   @override
   void dispose() {
