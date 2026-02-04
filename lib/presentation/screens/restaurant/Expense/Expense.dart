@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/addexpence.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/viewexpense.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -43,63 +44,179 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   // }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
 
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Icon(Icons.person_2_outlined,size: 30,),
-                Text('Admin',style: GoogleFonts.poppins(),)
+    return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
+      drawer: DrawerManage(issync: false, isDelete: false, islogout: false),
+      body: Column(
+        children: [
+          // Header
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  Builder(
+                    builder: (context) {
+                      return GestureDetector(
+                        onTap: () => Scaffold.of(context).openDrawer(),
+                        child: Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.menu, color: AppColors.white, size: 24),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Expense Management',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          selectedFilter,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(isTablet ? 10 : 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.person,
+                      size: isTablet ? 22 : 20,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-      drawer: DrawerManage(issync: false, isDelete: false, islogout: false),
-      body: Container(
-        padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
-        child:  Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Text Expense
-            Text('Expense',style: GoogleFonts.poppins(fontSize: 18,fontWeight: FontWeight.w600),),
 
-            SizedBox(height: 10,),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Tabs Section
+          Container(
+            color: AppColors.white,
+            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            child: Row(
               children: [
-
-
-                Filterbutton(
-                    borderc: 0,
-                    title: "Add Expense",
-                    selectedFilter: selectedFilter,
-                    onpressed: (){
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
                       setState(() {
                         selectedFilter = "Add Expense";
                       });
-                    }),
-                SizedBox(width:20),
-                Filterbutton(
-                    borderc: 0,
-                    title: "View Expense",
-                    selectedFilter: selectedFilter,
-                    onpressed: (){
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: selectedFilter == "Add Expense" ? AppColors.primary : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selectedFilter == "Add Expense" ? AppColors.primary : AppColors.divider,
+                          width: selectedFilter == "Add Expense" ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_circle_rounded,
+                            size: 20,
+                            color: selectedFilter == "Add Expense" ? AppColors.white : AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Add Expense',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: selectedFilter == "Add Expense" ? AppColors.white : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
                       setState(() {
                         selectedFilter = "View Expense";
                       });
-                    })
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: selectedFilter == "View Expense" ? AppColors.primary : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selectedFilter == "View Expense" ? AppColors.primary : AppColors.divider,
+                          width: selectedFilter == "View Expense" ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.list_alt_rounded,
+                            size: 20,
+                            color: selectedFilter == "View Expense" ? AppColors.white : AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'View Expense',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: selectedFilter == "View Expense" ? AppColors.white : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
-            Divider(),
-            Expanded(child: _getBody())
+          ),
 
-
-          ],
-        ),
+          // Body
+          Expanded(child: _getBody()),
+        ],
       ),
     );
   }

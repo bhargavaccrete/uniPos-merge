@@ -6,6 +6,7 @@ import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
+import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/core/di/service_locator.dart';
 
@@ -275,7 +276,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
               bgcolor: Colors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
@@ -292,7 +293,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                 Navigator.pop(context, selectedChoiceIds.toList());
               },
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               child: Text(
                 'Save',
                 style: GoogleFonts.poppins(

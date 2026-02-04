@@ -126,21 +126,64 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Customer', style: GoogleFonts.poppins()),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.warning_rounded,
+                color: Colors.red,
+                size: 24,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Delete Customer?',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
         content: Text(
-          'Are you sure you want to delete ${customer.name ?? 'this customer'}?',
-          style: GoogleFonts.poppins(),
+          'Are you sure you want to delete ${customer.name ?? 'this customer'}? This action cannot be undone.',
+          style: GoogleFonts.poppins(fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins()),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+              ),
+            ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             child: Text(
               'Delete',
-              style: GoogleFonts.poppins(color: Colors.red),
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -152,10 +195,17 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       if (mounted && success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Customer deleted successfully',
-              style: GoogleFonts.poppins(),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  'Customer deleted successfully',
+                  style: GoogleFonts.poppins(),
+                ),
+              ],
             ),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -170,18 +220,30 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black87),
         title: Text(
           'Customers',
           style: GoogleFonts.poppins(
+            fontSize: isTablet ? 22 : 20,
             fontWeight: FontWeight.w600,
+            color: Colors.black87,
           ),
         ),
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.sort),
+            icon: Icon(Icons.sort_rounded, color: Colors.black87),
             tooltip: 'Sort by',
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             onSelected: (value) {
               setState(() {
                 sortBy = value;
@@ -194,13 +256,16 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   children: [
                     Icon(
                       Icons.sort_by_alpha,
+                      size: 20,
                       color: sortBy == 'name' ? AppColors.primary : Colors.grey,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Text(
                       'Name',
                       style: GoogleFonts.poppins(
-                        color: sortBy == 'name' ? AppColors.primary : null,
+                        fontSize: 14,
+                        color: sortBy == 'name' ? AppColors.primary : Colors.black87,
+                        fontWeight: sortBy == 'name' ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -211,14 +276,17 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.people,
+                      Icons.people_rounded,
+                      size: 20,
                       color: sortBy == 'visits' ? AppColors.primary : Colors.grey,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Text(
                       'Visits',
                       style: GoogleFonts.poppins(
-                        color: sortBy == 'visits' ? AppColors.primary : null,
+                        fontSize: 14,
+                        color: sortBy == 'visits' ? AppColors.primary : Colors.black87,
+                        fontWeight: sortBy == 'visits' ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -229,14 +297,17 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.stars,
+                      Icons.stars_rounded,
+                      size: 20,
                       color: sortBy == 'points' ? AppColors.primary : Colors.grey,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Text(
                       'Points',
                       style: GoogleFonts.poppins(
-                        color: sortBy == 'points' ? AppColors.primary : null,
+                        fontSize: 14,
+                        color: sortBy == 'points' ? AppColors.primary : Colors.black87,
+                        fontWeight: sortBy == 'points' ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -244,35 +315,81 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               ),
             ],
           ),
+          SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _searchCustomers,
-              decoration: InputDecoration(
-                hintText: 'Search by name or phone',
-                hintStyle: GoogleFonts.poppins(),
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    _searchCustomers('');
-                  },
-                )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // Search Bar & Add Button Section
+          Container(
+            color: Colors.white,
+            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  onChanged: _searchCustomers,
+                  style: GoogleFonts.poppins(
+                    fontSize: isTablet ? 15 : 14,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or phone...',
+                    hintStyle: GoogleFonts.poppins(
+                      fontSize: isTablet ? 15 : 14,
+                      color: Colors.grey.shade500,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary,
+                      size: isTablet ? 24 : 22,
+                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, size: isTablet ? 22 : 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchCustomers('');
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: isTablet ? 16 : 12,
+                    ),
+                  ),
                 ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
+                SizedBox(height: isTablet ? 16 : 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: isTablet ? 50 : 46,
+                  child: ElevatedButton.icon(
+                    onPressed: _navigateToAddCustomer,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: Icon(Icons.person_add_rounded, size: isTablet ? 22 : 20),
+                    label: Text(
+                      'Add New Customer',
+                      style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 16 : 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -282,38 +399,53 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               final customers = restaurantCustomerStore.customers;
               if (customers.isEmpty) return const SizedBox.shrink();
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              return Container(
+                margin: EdgeInsets.all(isTablet ? 20 : 16),
+                padding: EdgeInsets.all(isTablet ? 20 : 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Row(
                   children: [
                     Expanded(
                       child: _buildStatCard(
                         'Total',
                         customers.length.toString(),
-                        Icons.people,
+                        Icons.people_rounded,
                         Colors.blue,
+                        isTablet,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isTablet ? 16 : 12),
                     Expanded(
                       child: _buildStatCard(
                         'Visits',
                         customers
                             .fold(0, (sum, c) => sum + c.totalVisites)
                             .toString(),
-                        Icons.calendar_today,
+                        Icons.calendar_today_rounded,
                         Colors.green,
+                        isTablet,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isTablet ? 16 : 12),
                     Expanded(
                       child: _buildStatCard(
                         'Points',
                         customers
                             .fold(0, (sum, c) => sum + c.loyaltyPoints)
                             .toString(),
-                        Icons.star,
+                        Icons.stars_rounded,
                         Colors.orange,
+                        isTablet,
                       ),
                     ),
                   ],
@@ -322,14 +454,16 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             },
           ),
 
-          const SizedBox(height: 16),
-
           // Customer List
           Expanded(
             child: Observer(
               builder: (context) {
                 if (restaurantCustomerStore.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                    ),
+                  );
                 }
 
                 final filteredCustomers = _getSortedCustomers(
@@ -342,30 +476,31 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.person_off_outlined,
-                          size: 80,
-                          color: Colors.grey[400],
+                          Icons.people_outline_rounded,
+                          size: isTablet ? 80 : 64,
+                          color: Colors.grey.shade400,
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: isTablet ? 20 : 16),
                         Text(
                           _searchController.text.isEmpty
                               ? 'No customers yet'
                               : 'No customers found',
                           style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            color: Colors.grey[600],
+                            fontSize: isTablet ? 18 : 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade600,
                           ),
                         ),
-                        if (_searchController.text.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              'Add your first customer',
-                              style: GoogleFonts.poppins(
-                                color: Colors.grey[500],
-                              ),
+                        if (_searchController.text.isEmpty) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            'Add your first customer to get started',
+                            style: GoogleFonts.poppins(
+                              fontSize: isTablet ? 14 : 13,
+                              color: Colors.grey.shade500,
                             ),
                           ),
+                        ],
                       ],
                     ),
                   );
@@ -373,10 +508,10 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
                 return ListView.builder(
                   itemCount: filteredCustomers.length,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.all(isTablet ? 20 : 16),
                   itemBuilder: (context, index) {
                     final customer = filteredCustomers[index];
-                    return _buildCustomerCard(customer);
+                    return _buildCustomerCard(customer, isTablet);
                   },
                 );
               },
@@ -384,208 +519,257 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _navigateToAddCustomer,
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.person_add, color: Colors.white),
-        label: Text(
-          'Add Customer',
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isTablet) {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(isTablet ? 12 : 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: isTablet ? 28 : 24,
+          ),
+        ),
+        SizedBox(height: isTablet ? 10 : 8),
+        Text(
+          value,
           style: GoogleFonts.poppins(
-            color: Colors.white,
+            fontSize: isTablet ? 22 : 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: isTablet ? 13 : 12,
+            color: Colors.grey.shade700,
             fontWeight: FontWeight.w500,
           ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildCustomerCard(RestaurantCustomer customer, bool isTablet) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: isTablet ? 12 : 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.grey[700],
-            ),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildCustomerCard(RestaurantCustomer customer) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        onTap: () => _navigateToCustomerDetail(customer),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: AppColors.primary.withOpacity(0.2),
-                child: Text(
-                  customer.name?.isNotEmpty == true
-                      ? customer.name![0].toUpperCase()
-                      : '?',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _navigateToCustomerDetail(customer),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: EdgeInsets.all(isTablet ? 16 : 14),
+            child: Row(
+              children: [
+                // Avatar
+                Container(
+                  width: isTablet ? 56 : 50,
+                  height: isTablet ? 56 : 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // Customer Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      customer.name ?? 'Unknown',
+                  child: Center(
+                    child: Text(
+                      customer.name?.isNotEmpty == true
+                          ? customer.name![0].toUpperCase()
+                          : '?',
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: isTablet ? 24 : 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    if (customer.phone != null)
+                  ),
+                ),
+                SizedBox(width: isTablet ? 16 : 12),
+
+                // Customer Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        customer.name ?? 'Unknown',
+                        style: GoogleFonts.poppins(
+                          fontSize: isTablet ? 16 : 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      if (customer.phone != null)
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.phone_rounded,
+                              size: isTablet ? 15 : 14,
+                              color: Colors.grey.shade600,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              customer.phone!,
+                              style: GoogleFonts.poppins(
+                                fontSize: isTablet ? 14 : 13,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      SizedBox(height: 6),
                       Row(
                         children: [
-                          Icon(Icons.phone, size: 14, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            customer.phone!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                            ),
+                          _buildInfoChip(
+                            Icons.restaurant_rounded,
+                            '${customer.totalVisites} visits',
+                            Colors.blue,
+                            isTablet,
+                          ),
+                          SizedBox(width: 8),
+                          _buildInfoChip(
+                            Icons.stars_rounded,
+                            '${customer.loyaltyPoints} pts',
+                            Colors.orange,
+                            isTablet,
                           ),
                         ],
                       ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        _buildInfoChip(
-                          Icons.restaurant,
-                          '${customer.totalVisites} visits',
-                          Colors.blue,
+                    ],
+                  ),
+                ),
+
+                // Actions
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => _navigateToCustomerDetail(customer),
+                      icon: Icon(Icons.visibility_rounded),
+                      color: Colors.blue,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        color: Colors.grey.shade700,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'edit':
+                            _navigateToEditCustomer(customer);
+                            break;
+                          case 'delete':
+                            _deleteCustomer(customer);
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.edit_rounded,
+                                size: 20,
+                                color: Colors.orange,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Edit',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        _buildInfoChip(
-                          Icons.stars,
-                          '${customer.loyaltyPoints} pts',
-                          Colors.orange,
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_rounded,
+                                size: 20,
+                                color: Colors.red,
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Delete',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
-              ),
-
-              // Actions
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'view':
-                      _navigateToCustomerDetail(customer);
-                      break;
-                    case 'edit':
-                      _navigateToEditCustomer(customer);
-                      break;
-                    case 'delete':
-                      _deleteCustomer(customer);
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'view',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.visibility),
-                        const SizedBox(width: 8),
-                        Text('View Details', style: GoogleFonts.poppins()),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.edit),
-                        const SizedBox(width: 8),
-                        Text('Edit', style: GoogleFonts.poppins()),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.delete, color: Colors.red),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Delete',
-                          style: GoogleFonts.poppins(color: Colors.red),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String label, Color color) {
+  Widget _buildInfoChip(IconData icon, String label, Color color, bool isTablet) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: isTablet ? 10 : 8,
+        vertical: isTablet ? 5 : 4,
+      ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
+          Icon(
+            icon,
+            size: isTablet ? 15 : 14,
+            color: color,
+          ),
+          SizedBox(width: 4),
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 12,
+              fontSize: isTablet ? 12 : 11,
               color: color,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

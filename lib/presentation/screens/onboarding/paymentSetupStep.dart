@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/stores/payment_method_store.dart';
-import '../util/color.dart';
+import '../../../util/color.dart';
 
 /// Payment Setup Step - Setup Wizard Version
 /// Matches the design pattern of BusinessTypeStep and TaxSetupStep

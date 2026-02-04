@@ -5,7 +5,6 @@ import 'package:unipos/presentation/screens/restaurant/auth/admin_login.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
 
 import '../../../../util/color.dart';
 

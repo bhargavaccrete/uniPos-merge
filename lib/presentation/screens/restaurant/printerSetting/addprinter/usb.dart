@@ -9,7 +9,7 @@ import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
+
 
 class Usb extends StatelessWidget {
   const Usb({super.key});

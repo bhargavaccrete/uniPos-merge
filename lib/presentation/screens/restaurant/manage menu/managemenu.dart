@@ -194,7 +194,7 @@ class _ManagemenuState extends State<Managemenu>
           ),
         ],
       ),
-      drawer: DrawerManage(islogout: true, isDelete: true, issync: false),
+      drawer: DrawerManage(islogout: true, isDelete: false, issync: false),
       body: Column(
         children: [
           // Modern Tab Bar

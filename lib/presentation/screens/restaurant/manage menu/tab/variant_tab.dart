@@ -7,7 +7,6 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 
 class VariantTab extends StatefulWidget {

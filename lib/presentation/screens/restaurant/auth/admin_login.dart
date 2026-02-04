@@ -6,8 +6,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 import '../welcome_Admin.dart';
 
@@ -36,10 +35,9 @@ class _AdminLoginState extends State<AdminLogin> {
           width: width,
           height: height,
           // color: Colors.red,
-          padding: ResponsiveHelper.responsiveSymmetricPadding(context,
-              horizontalPercent: 0.03,
-              verticalPercent: 0.01
-
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.width(context, 0.03),
+            vertical: AppResponsive.height(context, 0.01),
           ),
           // color: Color(0xff1C3F6FF),
           child: Form(
@@ -51,11 +49,11 @@ class _AdminLoginState extends State<AdminLogin> {
                 Container(
                   // color: Colors.red,
                   alignment: Alignment.bottomCenter,
-                  width: ResponsiveHelper.responsiveWidth(context, 0.5) ,
-                  height: ResponsiveHelper.responsiveHeight(context, 0.20),
+                  width: AppResponsive.width(context, 0.5) ,
+                  height: AppResponsive.height(context, 0.20),
                   child: Image.asset(AppImages.logo),
                 ),
-                SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                SizedBox(height: AppResponsive.height(context, 0.02),
                 ),
                 // text Admin
                 Text('Admin Login',
@@ -63,7 +61,7 @@ class _AdminLoginState extends State<AdminLogin> {
 
                     style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
 
-                SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.05),),
+                SizedBox(height: AppResponsive.height(context, 0.05),),
 
                 // password
                 Container(
@@ -72,13 +70,13 @@ class _AdminLoginState extends State<AdminLogin> {
                   child: Text(
                     'Password',
                     style: GoogleFonts.poppins(
-                        fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                        fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
                         fontWeight: FontWeight.w600),
                   ),
                 ),
 
                 SizedBox(
-                  height: ResponsiveHelper.responsiveHeight(context, 0.01),
+                  height: AppResponsive.height(context, 0.01),
                 ),
 
                 // Textform
@@ -115,7 +113,7 @@ class _AdminLoginState extends State<AdminLogin> {
                 ),
 
                 SizedBox(
-                  height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                  height: AppResponsive.height(context, 0.02),
                 ),
 
                 // Login button
@@ -130,14 +128,14 @@ class _AdminLoginState extends State<AdminLogin> {
                       child: Text(
                         'Login',
                         style: GoogleFonts.poppins(color: Colors.white,
-                            fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                            fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
                             fontWeight: FontWeight.w400),
                       )),
-                  height: ResponsiveHelper.responsiveHeight(context, 0.065),
+                  height: AppResponsive.height(context, 0.065),
                 ),
 
                 SizedBox(
-                  height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                  height: AppResponsive.height(context, 0.02),
 
                 ),
                 // Text pass
@@ -146,19 +144,19 @@ class _AdminLoginState extends State<AdminLogin> {
                         text: 'Default Password for Admin is ',
 
                         style: GoogleFonts.poppins(
-                            fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                            fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
                             color: Colors.grey.shade700),
                         children: [
                           TextSpan(
                             text: '123456',
                             style: GoogleFonts.poppins(
-                                fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                                fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
                                 color: AppColors.primary, fontWeight: FontWeight.bold, letterSpacing: 1),
                           )
                         ])),
 
                 SizedBox(
-                  height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                  height: AppResponsive.height(context, 0.02),
                 ),
                 // back button
 
@@ -172,7 +170,7 @@ class _AdminLoginState extends State<AdminLogin> {
                       child: Text(
                         'Back',
                         style: GoogleFonts.poppins(
-                          fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                          fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
                           fontWeight: FontWeight.w600,
                           color: AppColors.primary,
                         ),

@@ -4,8 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../constants/restaurant/color.dart';
-import '../../../../util/restaurant/images.dart';
-import '../../../../util/restaurant/responsive_helper.dart';
+import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import '../welcome_Admin.dart';
@@ -122,10 +121,9 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
           child: Container(
             width: width,
             height: height * 0.95,
-            padding: ResponsiveHelper.responsiveSymmetricPadding(
-              context,
-              horizontalPercent: 0.05,
-              verticalPercent: 0.02,
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.width(context, 0.05),
+              vertical: AppResponsive.height(context, 0.02),
             ),
             child: Form(
               key: _formkey,
@@ -135,35 +133,35 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                   // Logo
                   Container(
                     alignment: Alignment.center,
-                    width: ResponsiveHelper.responsiveWidth(context, 0.5),
-                    height: ResponsiveHelper.responsiveHeight(context, 0.20),
+                    width: AppResponsive.width(context, 0.5),
+                    height: AppResponsive.height(context, 0.20),
                     child: Image.asset(AppImages.logo),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.02)),
+                  SizedBox(height: AppResponsive.height(context, 0.02)),
 
                   // Title
                   Text(
                     'Restaurant Admin',
                     style: GoogleFonts.poppins(
-                      fontSize: ResponsiveHelper.responsiveTextSize(context, 24),
+                      fontSize: AppResponsive.getValue(context, mobile: 24.0, tablet: 26.4, desktop: 28.8),
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                     ),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.01)),
+                  SizedBox(height: AppResponsive.height(context, 0.01)),
 
                   Text(
                     'Login to Continue',
                     style: GoogleFonts.poppins(
-                      fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
+                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
                       fontWeight: FontWeight.w400,
                       color: Colors.grey.shade600,
                     ),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.05)),
+                  SizedBox(height: AppResponsive.height(context, 0.05)),
 
                   // Error Message
                   if (_errorMessage != null) ...[
@@ -184,14 +182,14 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                               _errorMessage!,
                               style: GoogleFonts.poppins(
                                 color: Colors.red.shade700,
-                                fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                                fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.02)),
+                    SizedBox(height: AppResponsive.height(context, 0.02)),
                   ],
 
                   // Username Label
@@ -201,13 +199,13 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     child: Text(
                       'Username',
                       style: GoogleFonts.poppins(
-                        fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
+                        fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.01)),
+                  SizedBox(height: AppResponsive.height(context, 0.01)),
 
                   // Username Field
                   SizedBox(
@@ -226,7 +224,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     ),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.02)),
+                  SizedBox(height: AppResponsive.height(context, 0.02)),
 
                   // Password Label
                   Container(
@@ -235,13 +233,13 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     child: Text(
                       'Password',
                       style: GoogleFonts.poppins(
-                        fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
+                        fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.01)),
+                  SizedBox(height: AppResponsive.height(context, 0.01)),
 
                   // Password Field
                   SizedBox(
@@ -273,12 +271,12 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     ),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.04)),
+                  SizedBox(height: AppResponsive.height(context, 0.04)),
 
                   // Login Button
                   CommonButton(
                     width: width,
-                    height: ResponsiveHelper.responsiveHeight(context, 0.065),
+                    height: AppResponsive.height(context, 0.065),
                     onTap: _isLoading ? () {} : _handleLogin,
                     bgcolor: _isLoading ? Colors.grey : AppColors.primary,
                     child: _isLoading
@@ -295,14 +293,14 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                               'Login',
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
-                                fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+                                fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
                   ),
 
-                  SizedBox(height: ResponsiveHelper.responsiveHeight(context, 0.03)),
+                  SizedBox(height: AppResponsive.height(context, 0.03)),
 
                   // Default Credentials Info
                   Container(
@@ -321,14 +319,14 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                             text: TextSpan(
                               text: 'Default credentials: ',
                               style: GoogleFonts.poppins(
-                                fontSize: ResponsiveHelper.responsiveTextSize(context, 13),
+                                fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.3, desktop: 15.6),
                                 color: Colors.blue.shade700,
                               ),
                               children: [
                                 TextSpan(
                                   text: 'admin / 123456',
                                   style: GoogleFonts.poppins(
-                                    fontSize: ResponsiveHelper.responsiveTextSize(context, 13),
+                                    fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.3, desktop: 15.6),
                                     color: Colors.blue.shade900,
                                     fontWeight: FontWeight.bold,
                                   ),

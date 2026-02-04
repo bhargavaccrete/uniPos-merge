@@ -102,244 +102,336 @@ class _AddexpenceState extends State<Addexpence> {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    final height = size.height;
+    final width = size.width;
+
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       body: SingleChildScrollView(
-        child: Container(
-          // color: Colors.red,
-          // padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Add Expense',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600, fontSize: 16)),
-                  CommonButton(
-                      bordercircular: 0,
-                      bgcolor: Colors.white,
-                      bordercolor: AppColors.primary,
-                      width: width * 0.5,
-                      height: height * 0.05,
-                      onTap: () {
-                        // Navigator.push(context, MaterialPageRoute(builder: (context)=> ManageCategory()));
-
-                      Navigator.pushNamed(context, RouteNames.restaurantExpenseCategory);
-
-                        },
-                      child: Text('Manage Category',
-                          textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(color: AppColors.primary)))
-                ],
-              ),
-              SizedBox(
-                height: 10,
-              ),
-              Divider(),
-              // date and amount
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Date',
-                          textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            // fontWeight: FontWeight.w500
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 15),
-                        InkWell(
-                          onTap: () {
-                            _pickedDate(context);
-                          },
-                          child: Container(
-                            width: width * 0.45,
-                            height: height * 0.07,
-                            decoration: BoxDecoration(
-                                border: Border.all(color: AppColors.primary)),
-                            child: Center(
-                                child: Text(
-                                  _dateselect == null
-                                      ? "Select Date"
-                                      : "${_dateselect!.day}/${_dateselect!.month}/${_dateselect!.year}",
-                                  textAlign: TextAlign.start,
-                                  style: GoogleFonts.poppins(
-                                      color: Colors.grey,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600),
-                                )),
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Amount (${CurrencyHelper.currentSymbol})',
-                          textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            // fontWeight: FontWeight.w400
-                          ),
-                          textAlign: TextAlign.start,
-                        ),
-                        SizedBox(height: 15),
-                        Container(
-                          width: width * 0.45,
-                          height: height * 0.07,
-                          child: CommonTextForm(
-                            controller: _amountController,
-                            borderc: 0,
-                            obsecureText: false,
-                            hintText: "Enter Amount",
-                            BorderColor: AppColors.primary,
-                            HintColor: Colors.grey,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              // category select
-              SizedBox(height: 20),
-              Text("Category",
-                  textScaler: TextScaler.linear(1),
+        padding: EdgeInsets.all(isTablet ? 20 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Manage Category Button
+            Container(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, RouteNames.restaurantExpenseCategory);
+                },
+                icon: Icon(Icons.category_rounded, size: isTablet ? 20 : 18),
+                label: Text(
+                  'Manage Categories',
                   style: GoogleFonts.poppins(
-                    fontSize: 18,
-                  )),
-              SizedBox(height: 10),
-              Observer(
-                builder: (context) {
-                  final categories = expenseCategoryStore.enabledCategories;
+                    fontSize: isTablet ? 16 : 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(color: AppColors.primary, width: 2),
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
+            // Form Container
+            Container(
+              padding: EdgeInsets.all(isTablet ? 24 : 20),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Date and Amount Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Date',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            GestureDetector(
+                              onTap: () => _pickedDate(context),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceLight,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _dateselect != null ? AppColors.primary : AppColors.divider,
+                                    width: _dateselect != null ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: 18,
+                                      color: _dateselect != null ? AppColors.primary : AppColors.textSecondary,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _dateselect == null
+                                            ? "Select Date"
+                                            : "${_dateselect!.day}/${_dateselect!.month}/${_dateselect!.year}",
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: _dateselect != null ? AppColors.textPrimary : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Amount (${CurrencyHelper.currentSymbol})',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            TextField(
+                              controller: _amountController,
+                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              style: GoogleFonts.poppins(fontSize: 15),
+                              decoration: InputDecoration(
+                                hintText: 'Enter amount',
+                                hintStyle: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade400,
+                                ),
+                                filled: true,
+                                fillColor: AppColors.surfaceLight,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.divider),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.divider),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
-                  return Container(
-                    padding: EdgeInsets.all(5),
-                    width: width * 0.9,
-                    height: height * 0.06,
-                    decoration: BoxDecoration(border: Border.all(color: AppColors.primary)),
+                  SizedBox(height: 20),
+
+                  // Category
+                  Text(
+                    'Category',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Observer(
+                    builder: (context) {
+                      final categories = expenseCategoryStore.enabledCategories;
+                      return Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: selectedCategoryId,
+                            hint: Text(
+                              'Select Category',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                            items: categories.map((category) {
+                              return DropdownMenuItem<String>(
+                                value: category.id,
+                                child: Text(
+                                  category.name,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? value) {
+                              setState(() {
+                                selectedCategoryId = value;
+                              });
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // Reason
+                  Text(
+                    'Reason',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: _reasonController,
+                    style: GoogleFonts.poppins(fontSize: 15),
+                    decoration: InputDecoration(
+                      hintText: 'Enter reason (optional)',
+                      hintStyle: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.grey.shade400,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.surfaceLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.divider),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.primary, width: 2),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // Payment Type
+                  Text(
+                    'Payment Type',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
-                        value: selectedCategoryId,
-                        hint: Text(
-                          'Select Category',
-                          textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
-                        ),
-                        items: categories.map((category) {
+                        value: Dropvalue2,
+                        items: items2.map((String itemm) {
                           return DropdownMenuItem<String>(
-                            value: category.id,
+                            value: itemm,
                             child: Text(
-                              category.name,
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 14),
+                              itemm,
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           );
                         }).toList(),
                         onChanged: (String? value) {
                           setState(() {
-                            selectedCategoryId = value;
+                            Dropvalue2 = value!;
                           });
                         },
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
 
-              SizedBox(height: 20),
-              Text('Reason',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                  )),
-              SizedBox(height:10),
-              Container(
-                // width: width * 0.45,
-                height: height * 0.07,
-                child: CommonTextForm(
-                  controller: _reasonController,
-                  borderc: 0,
-                  obsecureText: false,
-                  hintText: "Enter Reason",
-                  BorderColor: AppColors.primary,
-                  HintColor: Colors.grey,
-                ),
-              ),
+                  SizedBox(height: 24),
 
-              SizedBox(height: 20),
-              Text('Payment Type',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                  )),
-              SizedBox(height:10),
-
-              Container(
-                padding: EdgeInsets.all(5),
-
-                width: width,
-                height: height * 0.06,
-                decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.primary)
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton(
-                      value: Dropvalue2,
-                      items: items2.map((String itemm){
-                        return DropdownMenuItem(
-                            value: itemm,
-                            child: Text(itemm,textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontSize: 14),));
-                      }). toList(),
-                      onChanged: (String? value){
-                        setState(() {
-                          Dropvalue2 = value!;
-                        });
-                      }),
-                ),
-              ),
-
-              SizedBox(height:20),
-              Container(
-                alignment: Alignment.center,
-                child: CommonButton(
-                  bordercircular: 0,
-                  width: width * 0.8,
-                  height: height * 0.06,
-                  onTap: _addExpense,
-                  child: Text(
-                    'Add',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
+                  // Add Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _addExpense,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Add Expense',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              )
+                ],
+              ),
+            ),
 
 
 
             ],
           ),
         ),
-      ),
     );
   }
 }

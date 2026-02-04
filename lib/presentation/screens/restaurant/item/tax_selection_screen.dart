@@ -6,6 +6,8 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
+
+import '../../../../util/common/app_responsive.dart';
 class TaxSelectionScreen extends StatefulWidget {
   final String? selectedTaxId;
   final double? currentTaxRate;
@@ -228,7 +230,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
               bgcolor: Colors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height:AppResponsive.height(context, 0.06),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
@@ -248,7 +250,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
                 });
               },
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height:AppResponsive.height(context, 0.06),
               child: Text(
                 'Apply Tax',
                 style: GoogleFonts.poppins(

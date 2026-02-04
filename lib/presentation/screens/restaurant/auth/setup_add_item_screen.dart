@@ -13,7 +13,7 @@ import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/category_management_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
@@ -1546,7 +1546,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               onTap: _saveItem,
               bgcolor: AppColors.primary,
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1570,7 +1570,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               onTap: widget.onNext!,
               bgcolor: _totalItemsInDatabase > 0 ? Colors.green : Colors.grey[600]!,
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               width: 130,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,

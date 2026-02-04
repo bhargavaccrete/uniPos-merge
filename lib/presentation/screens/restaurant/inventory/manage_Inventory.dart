@@ -108,24 +108,33 @@ class _ManageInventoryState extends State<ManageInventory> {
     try {
       if (variant != null) {
         // Update the variant's stock quantity
-        variant.stockQuantity = (variant.stockQuantity ?? 0) + stockToAdd;
-        // Ensure the item tracks inventory when stock is added
-        item.trackInventory = true;
-        // Save the parent item to persist the variant changes
-        await item.save();
-        print('✅ Added stock to variant ${variant.variantId}. New stock: ${variant.stockQuantity}');
+        final updatedVariants = item.variant?.map((v) {
+          if (v.variantId == variant.variantId) {
+            return ItemVariante(
+              variantId: v.variantId,
+              price: v.price,
+              stockQuantity: (v.stockQuantity ?? 0) + stockToAdd,
+            );
+          }
+          return v;
+        }).toList();
+
+        // Use store's updateItem to ensure MobX observers are notified
+        await itemStore.updateItem(item.copyWith(
+          trackInventory: true,
+          variant: updatedVariants,
+        ));
+        print('✅ Added stock to variant ${variant.variantId}. New stock: ${(variant.stockQuantity ?? 0) + stockToAdd}');
       } else {
-        // Ensure the item tracks inventory when stock is added
-        item.trackInventory = true;
-        item.stockQuantity = item.stockQuantity + stockToAdd;
-        await item.save();
-        print('✅ Added stock to item ${item.name}. New stock: ${item.stockQuantity}, trackInventory: ${item.trackInventory}');
+        // Use store's updateItem to ensure MobX observers are notified
+        await itemStore.updateItem(item.copyWith(
+          trackInventory: true,
+          stockQuantity: item.stockQuantity + stockToAdd,
+        ));
+        print('✅ Added stock to item ${item.name}. New stock: ${item.stockQuantity + stockToAdd}, trackInventory: true');
       }
 
       controller.clear();
-
-      // Reload items to update UI
-      await itemStore.loadItems();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -211,20 +220,32 @@ class _ManageInventoryState extends State<ManageInventory> {
     try {
       if (variant != null) {
         // ** SUBTRACT from variant stock **
-        variant.stockQuantity = (variant.stockQuantity ?? 0) - stockToRemove;
-        await item.save(); // Save the parent item
-        print('✅ Removed stock from variant ${variant.variantId}. New stock: ${variant.stockQuantity}');
+        final updatedVariants = item.variant?.map((v) {
+          if (v.variantId == variant.variantId) {
+            return ItemVariante(
+              variantId: v.variantId,
+              price: v.price,
+              stockQuantity: (v.stockQuantity ?? 0) - stockToRemove,
+            );
+          }
+          return v;
+        }).toList();
+
+        // Use store's updateItem to ensure MobX observers are notified
+        await itemStore.updateItem(item.copyWith(
+          variant: updatedVariants,
+        ));
+        print('✅ Removed stock from variant ${variant.variantId}. New stock: ${(variant.stockQuantity ?? 0) - stockToRemove}');
       } else {
         // ** SUBTRACT from item stock **
-        item.stockQuantity = item.stockQuantity - stockToRemove;
-        await item.save();
-        print('✅ Removed stock from item ${item.name}. New stock: ${item.stockQuantity}');
+        // Use store's updateItem to ensure MobX observers are notified
+        await itemStore.updateItem(item.copyWith(
+          stockQuantity: item.stockQuantity - stockToRemove,
+        ));
+        print('✅ Removed stock from item ${item.name}. New stock: ${item.stockQuantity - stockToRemove}');
       }
 
       controller.clear();
-
-      // Reload items to update UI
-      await itemStore.loadItems();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -251,144 +272,189 @@ class _ManageInventoryState extends State<ManageInventory> {
 
 
   Widget _buildItemTile(Items item) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      padding: EdgeInsets.symmetric(
+        horizontal: isTablet ? 20 : 16,
+        vertical: 6,
+      ),
+      child: Container(
+        padding: EdgeInsets.all(isTablet ? 14 : 12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: isTablet ? 15 : 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Row(
                         children: [
-                          Text(
-                            item.name,
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isTablet ? 10 : 8,
+                              vertical: isTablet ? 5 : 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: item.isSoldByWeight
+                                  ? Colors.blue.withOpacity(0.1)
+                                  : Colors.purple.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              item.isSoldByWeight ? 'Weight-based' : 'Unit-based',
+                              style: GoogleFonts.poppins(
+                                fontSize: isTablet ? 11 : 10,
+                                color: item.isSoldByWeight ? Colors.blue.shade700 : Colors.purple.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                          SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: item.isSoldByWeight ? Colors.blue[50] : Colors.purple[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  item.isSoldByWeight ? 'Weight-based' : 'Unit-based',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 9,
-                                    color: item.isSoldByWeight ? Colors.blue[600] : Colors.purple[600],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                '(${item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs')})',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
+                          SizedBox(width: 8),
+                          Text(
+                            '(${item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs')})',
+                            style: GoogleFonts.poppins(
+                              fontSize: isTablet ? 12 : 11,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: item.isInStock ? Colors.green[100] : Colors.red[100],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        item.isInStock ? 'In Stock' : 'Out of Stock',
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: item.isInStock ? Colors.green[800] : Colors.red[800],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 12 : 10,
+                    vertical: isTablet ? 6 : 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: item.isInStock
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: item.isInStock ? Colors.green.shade600 : Colors.red.shade600,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                    ),
-                  ],
+                      SizedBox(width: 6),
+                      Text(
+                        item.isInStock ? 'In Stock' : 'Out of Stock',
+                        style: GoogleFonts.poppins(
+                          fontSize: isTablet ? 12 : 11,
+                          fontWeight: FontWeight.w600,
+                          color: item.isInStock ? Colors.green.shade700 : Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 8),
+              ],
+            ),
+            SizedBox(height: 12),
 
                 // Show item stock management if no variants or item-level tracking
                 if (!item.hasVariants) ...[
                   _buildStockRow(item: item),
                 ],
 
-                // Show variants if available
-                if (item.hasVariants) ...[
-                  Text(
-                    'Variants:',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                      color: Colors.grey[700],
+            // Show variants if available
+            if (item.hasVariants) ...[
+              Text(
+                'Variants:',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: isTablet ? 13 : 12,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 10),
+              ...item.variant!.map((variant) => Container(
+                margin: EdgeInsets.only(bottom: 10),
+                padding: EdgeInsets.all(isTablet ? 12 : 10),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
                     ),
-                  ),
-                  SizedBox(height: 8),
-                  ...item.variant!.map((variant) => Container(
-                    margin: EdgeInsets.only(bottom: 8),
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _getVariantName(variant.variantId),
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 12,
-                                ),
-                              ),
+                        Expanded(
+                          child: Text(
+                            _getVariantName(variant.variantId),
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: isTablet ? 14 : 13,
+                              color: AppColors.textPrimary,
                             ),
-                            Text(
-                              '\$${variant.price.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                        SizedBox(height: 8),
-                        _buildStockRow(item: item, variant: variant),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 10 : 8,
+                            vertical: isTablet ? 5 : 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '\$${variant.price.toStringAsFixed(2)}',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w700,
+                              fontSize: isTablet ? 13 : 12,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  )),
-                ],
+                    SizedBox(height: 10),
+                    _buildStockRow(item: item, variant: variant),
+                  ],
+                ),
+              )),
+            ],
               ],
             ),
-          ),
-        ],
-      ),
-    );
+          ));
+
   }
 
 // Replace your existing _buildStockRow method with this one
@@ -412,17 +478,27 @@ class _ManageInventoryState extends State<ManageInventory> {
                 'Current Stock:',
                 style: GoogleFonts.poppins(
                   fontSize: 11,
-                  color: Colors.grey[600],
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
+              SizedBox(height: 2),
               Text(
                 isWeightBased
                     ? currentStock.toStringAsFixed(2)
                     : currentStock.toStringAsFixed(0),
                 style: GoogleFonts.poppins(
-                  fontSize: 16, // Slightly larger font
-                  fontWeight: FontWeight.w600,
-                  color: currentStock > 0 ? Colors.green[700] : Colors.red[700],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: currentStock > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                ),
+              ),
+              Text(
+                unit,
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -444,66 +520,71 @@ class _ManageInventoryState extends State<ManageInventory> {
               FilteringTextInputFormatter.digitsOnly,
             ],
             decoration: InputDecoration(
-              hintText: 'Enter Qty (${unit})', // Shorter hint text
-              hintStyle: GoogleFonts.poppins(fontSize: 12),
+              hintText: 'Enter qty',
+              hintStyle: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade400),
+              filled: true,
+              fillColor: AppColors.white,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: AppColors.divider),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: AppColors.primary),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: AppColors.divider),
               ),
-              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               isDense: true,
             ),
-            style: GoogleFonts.poppins(fontSize: 14),
+            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
           ),
         ),
         SizedBox(width: 8),
 
-        // ** NEW BUTTONS ROW **
+        // Action Buttons
         Expanded(
-          flex: 3, // Adjusted flex for two buttons
+          flex: 3,
           child: Row(
             children: [
               // REMOVE BUTTON
               Expanded(
                 child: SizedBox(
-                  height: 38,
+                  height: 40,
                   child: ElevatedButton(
                     onPressed: () => _removeStock(item, variant: variant),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
+                      backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: Icon(Icons.remove, size: 18),
+                    child: Icon(Icons.remove_rounded, size: 18),
                   ),
                 ),
               ),
-              SizedBox(width: 4),
+              SizedBox(width: 6),
               // ADD BUTTON
               Expanded(
                 child: SizedBox(
-                  height: 38,
+                  height: 40,
                   child: ElevatedButton(
                     onPressed: () => _addStock(item, variant: variant),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[600],
+                      backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
+                      elevation: 0,
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: Icon(Icons.add, size: 18),
+                    child: Icon(Icons.add_rounded, size: 18),
                   ),
                 ),
               ),
@@ -515,83 +596,157 @@ class _ManageInventoryState extends State<ManageInventory> {
   }
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width * 1;
-    final height = MediaQuery.of(context).size.height * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    final width = size.width;
+    final height = size.height;
+
     return Scaffold(
-      appBar: AppBar(
-        elevation: 1,
-        shadowColor: Colors.black,
-        actions: [
-          Padding(
-            padding: EdgeInsets.all(10),
-            child: Row(
-              children: [
-                Icon(Icons.person),
-                Text(
-                  "Admin",
-                  style: GoogleFonts.poppins(),
-                ),
-              ],
-            ),
-          )
-        ],
+      backgroundColor: AppColors.surfaceLight,
+      drawer: DrawerManage(
+        issync: false,
+        isDelete: true,
+        islogout: true,
       ),
       body: Column(
         children: [
-          Padding(
-            padding: EdgeInsets.all(20),
+          // Header
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  Builder(
+                    builder: (context) {
+                      return GestureDetector(
+                        onTap: () => Scaffold.of(context).openDrawer(),
+                        child: Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.menu, color: AppColors.white, size: 24),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Manage Inventory',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Track and update stock levels',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(isTablet ? 10 : 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.person,
+                      size: isTablet ? 22 : 20,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Actions Section
+          Container(
+            color: AppColors.white,
+            padding: EdgeInsets.all(isTablet ? 20 : 16),
             child: Column(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Manage Inventory",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                      textScaler: TextScaler.linear(1.2),
+                // Stock History Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pushNamed(context, RouteNames.restaurantStockHistory);
+                    },
+                    icon: Icon(Icons.history_rounded, size: isTablet ? 20 : 18),
+                    label: Text(
+                      'Stock History',
+                      style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 16 : 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    CommonButton(
-                        bordercircular: 10,
-                        width: width * 0.42,
-                        height: height * 0.05,
-                        onTap: () {
-                          /*   Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => StockHistory()));
-
-                       */
-                          Navigator.pushNamed(context,RouteNames.restaurantStockHistory);
-
-                        },
-                        child: Text(
-                          'Stock History',
-                          textScaler: TextScaler.linear(1.2),
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: Colors.white),
-                        )),
-                  ],
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(vertical: isTablet ? 14 : 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
                 SizedBox(height: 12),
+
+                // Info Card
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: EdgeInsets.all(isTablet ? 14 : 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.blue[600]),
-                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.info_outline,
+                          size: isTablet ? 20 : 18,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Weight-based items: decimals allowed (2.5 kg) • Unit-based items: whole numbers only (5 pcs)',
                           style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.grey[700],
+                            fontSize: isTablet ? 13 : 12,
+                            color: Colors.blue.shade700,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -601,126 +756,173 @@ class _ManageInventoryState extends State<ManageInventory> {
               ],
             ),
           ),
-          Divider(
-            thickness: 1,
-            color: Colors.grey,
-          ),
+
+          SizedBox(height: 8),
+          // Inventory List
           Expanded(
             child: Observer(
               builder: (context) {
-
-
-
                 final categories = categoryStore.categories.toList();
                 final items = itemStore.items.toList();
 
-                    // Check if there are any items with inventory tracking enabled
-                    final inventoryItems = items.where((item) => item.trackInventory == true).toList();
+                // Check if there are any items with inventory tracking enabled
+                final inventoryItems = items.where((item) => item.trackInventory == true).toList();
 
-                    if (categories.isEmpty) {
-                      return Center(
-                        child: Text(
-                          "No Categories Found",
+                if (categories.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isTablet ? 24 : 20),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceMedium,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.category_rounded,
+                            size: isTablet ? 64 : 56,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No Categories Found',
                           style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            color: Colors.grey[600],
+                            fontSize: isTablet ? 18 : 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                      );
-                    }
+                      ],
+                    ),
+                  );
+                }
 
-                    if (inventoryItems.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inventory_2_outlined,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              "No Items with Inventory Tracking",
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              "Items with 'Manage Inventory' set to 'Yes' will appear here",
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                if (inventoryItems.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isTablet ? 24 : 20),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceMedium,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            size: isTablet ? 64 : 56,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      );
+                        SizedBox(height: 16),
+                        Text(
+                          'No Items with Inventory Tracking',
+                          style: GoogleFonts.poppins(
+                            fontSize: isTablet ? 18 : 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          "Items with 'Manage Inventory' set to 'Yes' will appear here",
+                          style: GoogleFonts.poppins(
+                            fontSize: isTablet ? 15 : 14,
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: EdgeInsets.all(isTablet ? 16 : 12),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final categoryItems = items
+                        .where((item) => item.categoryOfItem == category.id && item.trackInventory == true)
+                        .toList();
+
+                    if (categoryItems.isEmpty) {
+                      return SizedBox.shrink();
                     }
 
-                    return ListView.builder(
-                      padding: EdgeInsets.all(16),
-                      itemCount: categories.length,
-                      itemBuilder: (context, index) {
-                        final category = categories[index];
-                        final categoryItems = items
-                            .where((item) => item.categoryOfItem == category.id && item.trackInventory == true)
-                            .toList();
+                    final isExpanded = _expandedCategories[category.id] ?? false;
 
-                        if (categoryItems.isEmpty) {
-                          return SizedBox.shrink();
-                        }
-
-                        final isExpanded = _expandedCategories[category.id] ?? false;
-
-                        return Card(
-                          margin: EdgeInsets.only(bottom: 8),
-                          elevation: 2,
-                          child: ExpansionTile(
-                            title: Text(
-                              category.name,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          dividerColor: Colors.transparent,
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 20 : 16,
+                            vertical: 4,
+                          ),
+                          childrenPadding: EdgeInsets.only(bottom: 12),
+                          title: Text(
+                            category.name,
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: isTablet ? 17 : 16,
+                              color: AppColors.textPrimary,
                             ),
-                            subtitle: Text(
-                              '${categoryItems.length} items',
-                              style: GoogleFonts.poppins(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
+                          ),
+                          subtitle: Text(
+                            '${categoryItems.length} item${categoryItems.length != 1 ? 's' : ''}',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.textSecondary,
+                              fontSize: isTablet ? 13 : 12,
+                              fontWeight: FontWeight.w500,
                             ),
-                            leading: Icon(
-                              Icons.category,
+                          ),
+                          leading: Container(
+                            padding: EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.category_rounded,
                               color: AppColors.primary,
+                              size: isTablet ? 24 : 22,
                             ),
-                            initiallyExpanded: isExpanded,
-                            onExpansionChanged: (expanded) {
-                              setState(() {
-                                _expandedCategories[category.id] = expanded;
-                              });
-                            },
-                            children: categoryItems.map((item) {
-                              return _buildItemTile(item);
-                            }).toList(),
                           ),
-                        );
-                      },
+                          initiallyExpanded: isExpanded,
+                          onExpansionChanged: (expanded) {
+                            setState(() {
+                              _expandedCategories[category.id] = expanded;
+                            });
+                          },
+                          children: categoryItems.map((item) {
+                            return _buildItemTile(item);
+                          }).toList(),
+                        ),
+                      ),
                     );
+                  },
+                );
               },
             ),
           ),
         ],
-      ),
-      drawer: DrawerManage(
-        issync: false,
-        isDelete: true,
-        islogout: true,
       ),
     );
   }

@@ -8,7 +8,6 @@ import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 
 class ChoiceTab extends StatefulWidget {
@@ -517,7 +516,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
             crossAxisCount: _getGridColumns(size.width),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.9,
+            childAspectRatio: 2,
           ),
           itemCount: filteredChoices.length,
           itemBuilder: (context, index) {

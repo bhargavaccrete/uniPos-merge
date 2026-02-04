@@ -6,7 +6,6 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
-import '../../../util/restaurant/images.dart';
 import 'AuthSelectionScreen.dart';
 import 'dashboard.dart';
 

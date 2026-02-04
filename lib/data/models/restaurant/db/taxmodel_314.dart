@@ -15,7 +15,7 @@ class Tax extends HiveObject{
   String taxname;
 
   @HiveField(2)
-  double? taxperecentage ;
+  double? taxperecentage;
 
 
   Tax({

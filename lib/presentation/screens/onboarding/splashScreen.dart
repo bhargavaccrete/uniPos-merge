@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/core/config/app_config.dart';
-import '../util/color.dart';
-import '../util/responsive.dart';
+import '../../../util/color.dart';
+import '../../../util/responsive.dart';
 
 // Import your color and responsive utilities
 // import '../util/color.dart';

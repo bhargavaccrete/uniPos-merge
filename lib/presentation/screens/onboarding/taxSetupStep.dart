@@ -6,9 +6,9 @@ import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
 import 'package:unipos/models/tax_details.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../util/color.dart';
-import '../core/config/app_config.dart';
-import '../core/di/service_locator.dart';
+import '../../../util/color.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/di/service_locator.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
 
 /// Tax Setup Step

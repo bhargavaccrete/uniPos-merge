@@ -1,3 +1,4 @@
+/*
 // In a new file, e.g., lib/screens/Reports/salesByCategory/CategoryReportData.dart
 
 class CategoryReportData {
@@ -10,4 +11,4 @@ class CategoryReportData {
     required this.totalItemsSold,
     required this.totalRevenue,
   });
-}
+}*/

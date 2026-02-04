@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
+import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/core/di/service_locator.dart';
 
@@ -354,7 +355,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               bgcolor: Colors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
@@ -372,7 +373,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 Navigator.pop(context, selectedVariants);
               },
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               child: Text(
                 'Save',
                 style: GoogleFonts.poppins(

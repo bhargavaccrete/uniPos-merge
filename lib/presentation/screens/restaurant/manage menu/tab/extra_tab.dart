@@ -10,7 +10,6 @@ import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/images.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
@@ -830,7 +829,7 @@ class _ExtraTabState extends State<ExtraTab> {
             crossAxisCount: _getGridColumns(size.width),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.85,
+            childAspectRatio: 2,
           ),
           itemCount: filteredExtras.length,
           itemBuilder: (context, index) {

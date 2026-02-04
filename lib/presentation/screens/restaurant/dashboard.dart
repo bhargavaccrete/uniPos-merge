@@ -5,8 +5,8 @@ import 'package:unipos/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
 import '../../../main.dart';
-import '../../../util/restaurant/images.dart';
-import '../../../util/restaurant/responsive_helper.dart';
+
+import '../../../util/common/app_responsive.dart';
 import '../../widget/componets/restaurant/componets/Button.dart';
 import 'AuthSelectionScreen.dart';
 import 'auth/admin_login.dart';
@@ -38,9 +38,9 @@ class Dashboard extends StatelessWidget {
         child: Container(
           width: width,
           height: height,
-          padding: ResponsiveHelper.responsiveSymmetricPadding(context,
-            horizontalPercent: 0.03,
-            verticalPercent: 0.01,
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.width(context, 0.03),
+            vertical: AppResponsive.height(context, 0.01),
           ),
           // color: Colors.red,
           child: Column(
@@ -48,27 +48,27 @@ class Dashboard extends StatelessWidget {
             children: [
               Container(
                 alignment: Alignment.bottomCenter,
-                height: ResponsiveHelper.responsiveHeight(context, 0.15),
+                height: AppResponsive.height(context, 0.15),
 
-                width: ResponsiveHelper.responsiveWidth(context, 0.5),
+                width: AppResponsive.width(context, 0.5),
 
                 child: Image.asset(
                   AppImages.logo,
                 ),
               ),
               SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                height: AppResponsive.height(context, 0.02),
 
               ),
               Text(
                   'DashBoard',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(
-                    fontSize: ResponsiveHelper.responsiveTextSize(context, 20),
+                    fontSize: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0),
                     fontWeight: FontWeight.w600,)
               ),
               SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                height: AppResponsive.height(context, 0.02),
 
               ),
               Row(
@@ -79,7 +79,7 @@ class Dashboard extends StatelessWidget {
                         Navigator.push(context, MaterialPageRoute(builder: (context) => AdminLogin()));
                       },
                       child: Container(
-                        height: ResponsiveHelper.responsiveHeight(context, 0.12),
+                        height: AppResponsive.height(context, 0.12),
 
                         decoration: BoxDecoration(
                             color: Colors.white,
@@ -92,13 +92,13 @@ class Dashboard extends StatelessWidget {
                             Icon(
                               Icons.person_2_outlined,
                               color: AppColors.primary,
-                              size:ResponsiveHelper.responsiveTextSize(context, 40),
+                              size: AppResponsive.getValue(context, mobile: 40.0, tablet: 44.0, desktop: 48.0),
                             ),
                             Text(
                               'Admin',
                               textScaler: TextScaler.linear(1),
                               style: GoogleFonts.poppins(
-                                  fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
+                                  fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.primary),
                             ),
@@ -108,7 +108,7 @@ class Dashboard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-                    width: ResponsiveHelper.responsiveWidth(context, 0.03),
+                    width: AppResponsive.width(context, 0.03),
 
                   ),
                   Expanded(
@@ -117,7 +117,7 @@ class Dashboard extends StatelessWidget {
                         Navigator.push(context, MaterialPageRoute(builder: (context) => CashierWaiter()));
                       },
                       child: Container(
-                        height: ResponsiveHelper.responsiveHeight(context, 0.12),
+                        height: AppResponsive.height(context, 0.12),
                         decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
@@ -127,7 +127,7 @@ class Dashboard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.receipt_long,
-                              size:ResponsiveHelper.responsiveTextSize(context, 40),
+                              size: AppResponsive.getValue(context, mobile: 40.0, tablet: 44.0, desktop: 48.0),
 
                               color: AppColors.primary,
                             ),
@@ -135,7 +135,7 @@ class Dashboard extends StatelessWidget {
                             Text('Cashier|Waiter',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(
-                                    fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
+                                    fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
                                     fontWeight: FontWeight.w600, color: AppColors.primary)),
                           ],
                         ),
@@ -145,7 +145,7 @@ class Dashboard extends StatelessWidget {
                 ],
               ),
               SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.02),
+                height: AppResponsive.height(context, 0.02),
               ),
               Row(
                 children: [
@@ -155,7 +155,7 @@ class Dashboard extends StatelessWidget {
                         Navigator.push(context, MaterialPageRoute(builder: (context) => NeedhelpDrawer()));
                       },
                       child: Container(
-                        height: ResponsiveHelper.responsiveHeight(context, 0.12),
+                        height: AppResponsive.height(context, 0.12),
 
                         decoration: BoxDecoration(
                             color: Colors.white,
@@ -166,7 +166,7 @@ class Dashboard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.support_agent_outlined,
-                              size:ResponsiveHelper.responsiveTextSize(context, 40),
+                              size: AppResponsive.getValue(context, mobile: 40.0, tablet: 44.0, desktop: 48.0),
 
                               color: AppColors.primary,
                             ),
@@ -176,7 +176,7 @@ class Dashboard extends StatelessWidget {
                             Text('Support',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(
-                                    fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
+                                    fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
                                     fontWeight: FontWeight.w600, color: AppColors.primary)),
                           ],
                         ),
@@ -184,7 +184,7 @@ class Dashboard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-                    width: ResponsiveHelper.responsiveWidth(context, 0.03),
+                    width: AppResponsive.width(context, 0.03),
 
                   ),
                   Expanded(
@@ -195,7 +195,7 @@ class Dashboard extends StatelessWidget {
                             builder: (BuildContext context) => AlertDialog(
                               title: Text('Are you sure you want to logout?',
                                   style: TextStyle(
-                                    fontSize: ResponsiveHelper.responsiveTextSize(context, 15),
+                                    fontSize: AppResponsive.getValue(context, mobile: 15.0, tablet: 16.5, desktop: 18.0),
                                   )),
                               actions: <Widget>[
                                 Row(
@@ -204,33 +204,33 @@ class Dashboard extends StatelessWidget {
                                     CommonButton(
                                       bordercolor: Colors.red,
                                       bordercircular: 2,
-                                      width: ResponsiveHelper.responsiveWidth(context, 0.3),
+                                      width: AppResponsive.width(context, 0.3),
 
-                                      height: ResponsiveHelper.responsiveHeight(context, 0.05),
+                                      height: AppResponsive.height(context, 0.05),
 
                                       bgcolor: Colors.red,
                                       onTap: () {
                                         Navigator.of(context).pop();
                                       },
                                       child: Text("Cancel",style: GoogleFonts.poppins(
-                                        fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                                        fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
                                       ),),
                                     ),
                                     SizedBox(
-                                      width: ResponsiveHelper.responsiveWidth(context, 0.01),
+                                      width: AppResponsive.width(context, 0.01),
 
                                     ),
                                     CommonButton(
                                       bordercircular: 2,
-                                      width: width * 0.3,
-                                      height: height * 0.05,
+                                      width: AppResponsive.width(context, 0.3),
+                                      height: AppResponsive.height(context, 0.05),
                                       bgcolor: AppColors.primary,
                                       onTap: () {
                                         Navigator.push(context,
                                             MaterialPageRoute(builder: (context) => AuthSelectionScreen()));
                                         ;
                                       },
-                                      child: Text("Yes",style: GoogleFonts.poppins(  fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                                      child: Text("Yes",style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
                                       ),),
                                     ),
                                   ],
@@ -239,7 +239,7 @@ class Dashboard extends StatelessWidget {
                             ));
                       },
                       child: Container(
-                        height: ResponsiveHelper.responsiveHeight(context, 0.12),
+                        height: AppResponsive.height(context, 0.12),
 
                         decoration: BoxDecoration(
                             color: Colors.white,
@@ -250,7 +250,7 @@ class Dashboard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.logout_outlined,
-                              size:ResponsiveHelper.responsiveTextSize(context, 40),
+                              size: AppResponsive.getValue(context, mobile: 40.0, tablet: 44.0, desktop: 48.0),
 
                               color: AppColors.primary,
                             ),
@@ -261,7 +261,7 @@ class Dashboard extends StatelessWidget {
                                 textScaler: TextScaler.linear(1),
 
                                 style: GoogleFonts.poppins(
-                                    fontSize: ResponsiveHelper.responsiveTextSize(context, 16),
+                                    fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
                                     fontWeight: FontWeight.w600, color: AppColors.primary)),
                           ],
                         ),

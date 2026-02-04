@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'variant_selection_screen.dart';
 import 'choice_selection_screen.dart';
@@ -195,7 +196,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                     bgcolor: Colors.white,
                     bordercolor: AppColors.primary,
                     bordercircular: 10,
-                    height: ResponsiveHelper.responsiveHeight(context, 0.06),
+                    height: AppResponsive.height(context, 0.06),
                     child: Text(
                       'Continue',
                       style: GoogleFonts.poppins(
@@ -218,7 +219,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                       'shouldSave': true,
                     }),
                     bordercircular: 10,
-                    height: ResponsiveHelper.responsiveHeight(context, 0.06),
+                    height: AppResponsive.height(context, 0.06),
                     child: Text(
                       'Save & Continue',
                       style: GoogleFonts.poppins(

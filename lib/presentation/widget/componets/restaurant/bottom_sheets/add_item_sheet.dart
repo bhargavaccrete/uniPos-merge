@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/di/service_locator.dart';
-import '../../../../../util/restaurant/responsive_helper.dart';
+import '../../../../../util/common/app_responsive.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import '../componets/Button.dart';
 import '../componets/Textform.dart';
@@ -225,7 +225,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
       child: Text(
         "Add Item",
         style: TextStyle(
-          fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
+          fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -234,7 +234,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   Widget _buildItemNameField() {
     return SizedBox(
-      height: ResponsiveHelper.responsiveHeight(context, 0.06),
+      height: AppResponsive.height(context, 0.06),
       child: CommonTextForm(
         borderc: 5,
         labelText: 'Item Name',
@@ -263,7 +263,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   Widget _buildPriceField() {
     return SizedBox(
-      height: ResponsiveHelper.responsiveHeight(context, 0.06),
+      height: AppResponsive.height(context, 0.06),
       child: CommonTextForm(
         borderc: 5,
         labelText: 'Price',
@@ -290,7 +290,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   Widget _buildDescriptionField() {
     return SizedBox(
-      height: ResponsiveHelper.responsiveHeight(context, 0.06),
+      height: AppResponsive.height(context, 0.06),
       child: CommonTextForm(
         borderc: 5,
         labelText: 'Description (Optional)',
@@ -333,7 +333,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
             onTap: _handleAddMoreInfo,
             bgcolor: Colors.white,
             bordercolor: Colors.deepOrange,
-            height: ResponsiveHelper.responsiveHeight(context, 0.06),
+            height: AppResponsive.height(context, 0.06),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -348,7 +348,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
                 Text(
                   'Add More Info',
                   style: GoogleFonts.poppins(
-                    fontSize: ResponsiveHelper.responsiveTextSize(context, 12),
+                    fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.2, desktop: 14.4),
                   ),
                 )
               ],
@@ -359,7 +359,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
         Expanded(
           child: CommonButton(
             onTap: _saveItem,
-            height: ResponsiveHelper.responsiveHeight(context, 0.06),
+            height: AppResponsive.height(context, 0.06),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

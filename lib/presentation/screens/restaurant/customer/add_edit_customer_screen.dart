@@ -142,20 +142,34 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black87),
         title: Text(
           _isEditMode ? 'Edit Customer' : 'Add Customer',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            fontSize: isTablet ? 22 : 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
         ),
         actions: [
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+            Padding(
+              padding: EdgeInsets.all(isTablet ? 18 : 16),
               child: SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
               ),
             ),
         ],
@@ -163,88 +177,119 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(isTablet ? 20 : 16),
           children: [
             // Header Card
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
+            Container(
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              child: Row(
+                children: [
+                  Container(
+                    width: isTablet ? 60 : 56,
+                    height: isTablet ? 60 : 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _isEditMode ? Icons.edit_rounded : Icons.person_add_rounded,
+                      size: isTablet ? 32 : 28,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  SizedBox(width: isTablet ? 16 : 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor:AppColors.primary.withOpacity(0.2),
-                          child: Icon(
-                            Icons.person,
-                            size: 35,
-                            color: AppColors.primary,
+                        Text(
+                          _isEditMode ? 'Update Information' : 'New Customer',
+                          style: GoogleFonts.poppins(
+                            fontSize: isTablet ? 18 : 17,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _isEditMode ? 'Update Information' : 'New Customer',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                _isEditMode
-                                    ? 'Edit customer details'
-                                    : 'Add a new customer to your database',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
+                        SizedBox(height: 4),
+                        Text(
+                          _isEditMode
+                              ? 'Edit customer details'
+                              : 'Add a new customer to your database',
+                          style: GoogleFonts.poppins(
+                            fontSize: isTablet ? 14 : 13,
+                            color: Colors.grey.shade600,
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: isTablet ? 28 : 24),
 
             // Basic Information Section
             Text(
               'Basic Information',
               style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: isTablet ? 17 : 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+                color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: isTablet ? 14 : 12),
 
             // Name Field
             TextFormField(
               controller: _nameController,
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 15 : 14,
+              ),
               decoration: InputDecoration(
                 labelText: 'Customer Name *',
-                labelStyle: GoogleFonts.poppins(),
+                labelStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                  color: Colors.grey.shade600,
+                ),
                 hintText: 'Enter customer name',
-                hintStyle: GoogleFonts.poppins(),
-                prefixIcon: const Icon(Icons.person_outline),
+                hintStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                ),
+                prefixIcon: Icon(
+                  Icons.person_outline_rounded,
+                  color: AppColors.primary,
+                  size: isTablet ? 22 : 20,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: isTablet ? 16 : 14,
+                ),
               ),
               textCapitalization: TextCapitalization.words,
               validator: (value) {
@@ -255,22 +300,47 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
               },
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: isTablet ? 18 : 16),
 
             // Phone Field
             TextFormField(
               controller: _phoneController,
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 15 : 14,
+              ),
               decoration: InputDecoration(
                 labelText: 'Phone Number *',
-                labelStyle: GoogleFonts.poppins(),
+                labelStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                  color: Colors.grey.shade600,
+                ),
                 hintText: 'Enter phone number',
-                hintStyle: GoogleFonts.poppins(),
-                prefixIcon: const Icon(Icons.phone_outlined),
+                hintStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                ),
+                prefixIcon: Icon(
+                  Icons.phone_rounded,
+                  color: AppColors.primary,
+                  size: isTablet ? 22 : 20,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: isTablet ? 16 : 14,
+                ),
               ),
               keyboardType: TextInputType.phone,
               validator: (value) {
@@ -284,119 +354,182 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
               },
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: isTablet ? 28 : 24),
 
             // Preferences Section
             Text(
               'Preferences',
               style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: isTablet ? 17 : 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+                color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: isTablet ? 14 : 12),
 
             // Food Preference Field
             TextFormField(
               controller: _foodPreferenceController,
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 15 : 14,
+              ),
               decoration: InputDecoration(
                 labelText: 'Food Preference',
-                labelStyle: GoogleFonts.poppins(),
+                labelStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                  color: Colors.grey.shade600,
+                ),
                 hintText: 'E.g., Vegetarian, Non-Veg, Vegan',
-                hintStyle: GoogleFonts.poppins(),
-                prefixIcon: const Icon(Icons.restaurant_menu),
+                hintStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                ),
+                prefixIcon: Icon(
+                  Icons.restaurant_menu_rounded,
+                  color: AppColors.primary,
+                  size: isTablet ? 22 : 20,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: isTablet ? 16 : 14,
+                ),
               ),
               textCapitalization: TextCapitalization.sentences,
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: isTablet ? 18 : 16),
 
             // Notes Field
             TextFormField(
               controller: _notesController,
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 15 : 14,
+              ),
               decoration: InputDecoration(
                 labelText: 'Notes',
-                labelStyle: GoogleFonts.poppins(),
+                labelStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                  color: Colors.grey.shade600,
+                ),
                 hintText: 'Any special notes about this customer',
-                hintStyle: GoogleFonts.poppins(),
-                prefixIcon: const Icon(Icons.notes),
+                hintStyle: GoogleFonts.poppins(
+                  fontSize: isTablet ? 14 : 13,
+                ),
+                prefixIcon: Icon(
+                  Icons.notes_rounded,
+                  color: AppColors.primary,
+                  size: isTablet ? 22 : 20,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: isTablet ? 16 : 14,
+                ),
                 alignLabelWithHint: true,
               ),
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: isTablet ? 28 : 24),
 
             // Info Card
             if (_isEditMode)
-              Card(
-                color: Colors.blue[50],
-                elevation: 0,
-                shape: RoundedRectangleBorder(
+              Container(
+                padding: EdgeInsets.all(isTablet ? 16 : 14),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.blue[200]!),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue[700]),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Customer Stats',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.blue[900],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Total Visits: ${widget.customer!.totalVisites} | Loyalty Points: ${widget.customer!.loyaltyPoints}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.blue[800],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  border: Border.all(
+                    color: Colors.blue.withValues(alpha: 0.3),
                   ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.info_outline_rounded,
+                        color: Colors.blue,
+                        size: isTablet ? 24 : 22,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Customer Stats',
+                            style: GoogleFonts.poppins(
+                              fontSize: isTablet ? 15 : 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue.shade900,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Total Visits: ${widget.customer!.totalVisites} | Loyalty Points: ${widget.customer!.loyaltyPoints}',
+                            style: GoogleFonts.poppins(
+                              fontSize: isTablet ? 13 : 12,
+                              color: Colors.blue.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-            const SizedBox(height: 32),
+            SizedBox(height: isTablet ? 36 : 32),
 
             // Save Button
             SizedBox(
-              height: 50,
+              height: isTablet ? 54 : 50,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _saveCustomer,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 2,
+                  elevation: 0,
+                  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
                 ),
                 child: _isLoading
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
@@ -407,15 +540,14 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
                     : Text(
                         _isEditMode ? 'Update Customer' : 'Add Customer',
                         style: GoogleFonts.poppins(
-                          fontSize: 16,
+                          fontSize: isTablet ? 17 : 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
                         ),
                       ),
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: isTablet ? 20 : 16),
           ],
         ),
       ),

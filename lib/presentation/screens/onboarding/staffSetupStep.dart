@@ -6,7 +6,7 @@ import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
 import 'package:unipos/data/models/restaurant/db/staffModel_310.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
-import '../util/color.dart';
+import '../../../util/color.dart';
 
 /// Staff Setup Step - Business Mode Aware
 /// Shows retail-specific fields for retail POS

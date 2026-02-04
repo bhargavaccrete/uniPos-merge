@@ -4,18 +4,18 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/screen/productManagementScreen.dart';
-import 'package:unipos/screen/storeDetailsScreen.dart';
-import 'package:unipos/screen/taxSetupStep.dart';
-import 'package:unipos/screen/paymentSetupStep.dart';
-import 'package:unipos/screen/staffSetupStep.dart';
+import 'package:unipos/presentation/screens/onboarding/storeDetailsScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/taxSetupStep.dart';
+import 'package:unipos/presentation/screens/onboarding/paymentSetupStep.dart';
+import 'package:unipos/presentation/screens/onboarding/staffSetupStep.dart';
 
-import '../util/color.dart';
-import '../util/responsive.dart';
-import '../core/config/app_config.dart';
-import '../presentation/screens/restaurant/welcome_Admin.dart';
+import '../../../util/color.dart';
+import '../../../util/responsive.dart';
+import '../../../core/config/app_config.dart';
+import '../restaurant/welcome_Admin.dart';
 import 'businessTypeScreen.dart';
 import 'add_product_screen.dart'; // Unified Add Product Screen
-import '../presentation/screens/restaurant/auth/setup_add_item_screen.dart'; // Restaurant-specific Add Item Screen
+import '../restaurant/auth/setup_add_item_screen.dart'; // Restaurant-specific Add Item Screen
 
 /// Setup Wizard Screen
 /// UI Only - uses Observer to listen to store changes

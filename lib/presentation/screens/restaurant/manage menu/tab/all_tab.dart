@@ -424,7 +424,28 @@ class _AllTabState extends State<AllTab> {
               ),
 
           // Bottom Sheet Menu
-          BottomsheetMenu(),
+          BottomsheetMenu(
+            onItemAdded: () {
+              // Show success feedback
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text(
+                        'Item added successfully!',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

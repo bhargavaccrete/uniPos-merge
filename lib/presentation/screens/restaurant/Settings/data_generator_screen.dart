@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../domain/services/restaurant/comprehensive_data_generator.dart';
 
@@ -139,14 +141,31 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Performance Test Data Generator'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black87),
+        title: Text(
+          'Performance Test Data Generator',
+          style: GoogleFonts.poppins(
+            fontSize: isTablet ? 22 : 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoadingStats ? null : _loadStats,
-            tooltip: 'Refresh Stats',
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: isTablet ? 12 : 8),
+            child: IconButton(
+              icon: Icon(Icons.refresh, color: AppColors.primary),
+              onPressed: _isLoadingStats ? null : _loadStats,
+              tooltip: 'Refresh Stats',
+            ),
           ),
         ],
       ),
@@ -155,20 +174,23 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(),
+            CircularProgressIndicator(color: AppColors.primary),
             const SizedBox(height: 20),
             Text(
               _isGenerating
                   ? 'Generating data...\nThis may take a while for large datasets'
                   : 'Clearing all data...',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 18 : 16,
+                color: Colors.black87,
+              ),
             ),
           ],
         ),
       )
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isTablet ? 20 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -438,53 +460,83 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   }
 
   Widget _buildInfoCard() {
-    return Card(
-      color: Colors.blue.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.blue.shade700),
-                const SizedBox(width: 8),
-                Text(
-                  'Performance Testing Tool',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
-                  ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '• Generate test data for all Hive boxes\n'
-                  '• Configure the amount of data for each box\n'
-                  '• Monitor insertion speed and file sizes\n'
-                  '• Test performance with large datasets (50,000+ records)\n'
-                  '• Verify data integrity and query performance',
-              style: TextStyle(fontSize: 14, height: 1.5),
-            ),
-          ],
-        ),
+                child: Icon(Icons.info_outline, color: Colors.blue.shade700),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Performance Testing Tool',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue.shade700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '• Generate test data for all Hive boxes\n'
+                '• Configure the amount of data for each box\n'
+                '• Monitor insertion speed and file sizes\n'
+                '• Test performance with large datasets (50,000+ records)\n'
+                '• Verify data integrity and query performance',
+            style: GoogleFonts.poppins(fontSize: 14, height: 1.5, color: Colors.black87),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildInputSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Configure Data Counts',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Configure Data Counts',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
             ),
+          ),
             const SizedBox(height: 16),
             _buildInputField('Categories', _categoriesController, Icons.category),
             _buildInputField('Items', _itemsController, Icons.restaurant_menu),
@@ -501,8 +553,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             _buildInputField('EOD Reports', _eodReportsController, Icons.assessment),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildInputField(
@@ -516,49 +567,81 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       child: TextField(
         controller: controller,
         keyboardType: TextInputType.number,
+        style: GoogleFonts.poppins(fontSize: 14),
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, color: highlight ? Colors.orange : null),
+          labelStyle: GoogleFonts.poppins(fontSize: 14),
+          prefixIcon: Icon(
+            icon,
+            color: highlight ? Colors.orange : AppColors.primary,
+          ),
           border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(
-              color: highlight ? Colors.orange : Colors.grey,
-              width: highlight ? 2 : 1,
+              color: highlight ? Colors.orange : Colors.grey.shade300,
+              width: 1,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(
+              color: highlight ? Colors.orange.shade200 : Colors.grey.shade300,
+              width: 1,
             ),
           ),
           focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(
-              // color: highlight ? Colors.orange : Theme.of(context).AppColors.primary,
-              color: Colors.orange ,
+              color: highlight ? Colors.orange : AppColors.primary,
               width: 2,
             ),
           ),
+          filled: true,
+          fillColor: Colors.white,
         ),
       ),
     );
   }
 
   Widget _buildImageOptionsCard() {
-    return Card(
-      color: Colors.orange.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.image, color: Colors.orange.shade700),
-                const SizedBox(width: 8),
-                Text(
-                  'Image Generation Options',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange.shade700,
-                  ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
+                child: Icon(Icons.image, color: Colors.orange.shade700),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Image Generation Options',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange.shade700,
+                ),
+              ),
+            ],
+          ),
             const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('Include Images for Items'),
@@ -620,8 +703,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             ],
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildActionButtons() {
@@ -632,11 +714,21 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           height: 50,
           child: ElevatedButton.icon(
             onPressed: _isGenerating || _isClearing ? null : _generateData,
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Generate Test Data', style: TextStyle(fontSize: 16)),
+            icon: const Icon(Icons.play_arrow, size: 20),
+            label: Text(
+              'Generate Test Data',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ),
@@ -646,11 +738,20 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           height: 50,
           child: OutlinedButton.icon(
             onPressed: _isGenerating || _isClearing ? null : _clearAllData,
-            icon: const Icon(Icons.delete_forever),
-            label: const Text('Clear All Data', style: TextStyle(fontSize: 16)),
+            icon: const Icon(Icons.delete_forever, size: 20),
+            label: Text(
+              'Clear All Data',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red,
-              side: const BorderSide(color: Colors.red),
+              side: const BorderSide(color: Colors.red, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ),

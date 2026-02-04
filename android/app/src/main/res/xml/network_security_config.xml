@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 
+         Allow cleartext traffic (HTTP/WS) for all domains.
+         This is necessary for local network communication (e.g. 192.168.x.x)
+         because the <domain> tag does not support IP ranges.
+    -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

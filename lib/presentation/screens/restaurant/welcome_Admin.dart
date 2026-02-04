@@ -2,14 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
-import '../../../constants/restaurant/color.dart';
 import '../../../core/routes/routes_name.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
-import '../../../util/restaurant/responsive_helper.dart';
-import '../../widget/componets/restaurant/componets/Button.dart';
-import '../../widget/componets/restaurant/componets/listmenu.dart';
-import '../../widget/restaurant/opening_balance_dialog.dart';
-import 'customer/manage_customers_screen.dart';
+import '../../widget/componets/restaurant/componets/drawermanage.dart';
 
 class AdminWelcome extends StatefulWidget {
   const AdminWelcome({super.key});
@@ -28,814 +23,495 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   Future<void> _checkDayStarted() async {
     final isDayStarted = await DayManagementService.isDayStarted();
     if (!isDayStarted && mounted) {
-      // Show opening balance dialog
       final balance = await showDialog<double>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const OpeningBalanceDialog(),
+        builder: (context) => _buildOpeningBalanceDialog(),
       );
 
-      // Show success message if balance was set
-      if (balance != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (balance != null) {
+        // Save the opening balance to mark the day as started
+        await DayManagementService.setOpeningBalance(balance);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}'),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text(
+                  'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
         );
+        }
       }
     }
   }
 
+  Widget _buildOpeningBalanceDialog() {
+    final controller = TextEditingController();
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      contentPadding: EdgeInsets.zero,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Container(
+            padding: EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.play_circle_rounded,
+                    size: 28,
+                    color: Colors.green,
+                  ),
+                ),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    'Start Day',
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.divider),
+
+          // Content
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enter opening balance to start the day',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  style: GoogleFonts.poppins(fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Opening Balance',
+                    labelStyle: GoogleFonts.poppins(fontSize: 14),
+                    prefixText: 'Rs. ',
+                    prefixStyle: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.surfaceLight,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, 0.0),
+          child: Text(
+            'Skip',
+            style: GoogleFonts.poppins(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final balance = double.tryParse(controller.text) ?? 0;
+            Navigator.pop(context, balance);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Text(
+            'Start Day',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // final height = MediaQuery.of(context).size.height * 1;
-    // final width = MediaQuery.of(context).size.width * 1;
-    return  Scaffold(
-      backgroundColor: AppColors.white,
-      appBar: AppBar(
-          backgroundColor: AppColors.white,
-          automaticallyImplyLeading: false,
-          // toolbarHeight: 50,
-          // backgroundColor: Colors.red,
-          title: Container(
-            // color: Colors.red,
-              alignment: Alignment.centerLeft,
-              height: ResponsiveHelper.responsiveHeight(context, 0.3),
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    final isDesktop = size.width > 1200;
 
-              // width: width ,
-              // color: Colors.purple,
-              child: Image.asset(
-                // 'assets/images/BillBerry3_processed.jpg',
-                'assets/images/bblogo.png',
-                width: 150,
-                fit: BoxFit.fill,
-              )),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.all(10),
+    return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
+      drawer: DrawerManage(islogout: true, isDelete: false, issync: false),
+      body: Column(
+        children: [
+          // Header
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
               child: Row(
                 children: [
-                  Icon(Icons.person),
-                  Text(
-                    'Admin',
-                    style: GoogleFonts.poppins(
-                      fontSize:
-                      ResponsiveHelper.responsiveTextSize(context, 14),
+                  Builder(
+                    builder: (context) {
+                      return GestureDetector(
+                        onTap: () => Scaffold.of(context).openDrawer(),
+                        child: Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.menu, color: AppColors.white, size: 24),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dashboard',
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Orange Restaurant',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  )
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(isTablet ? 10 : 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.person,
+                      size: isTablet ? 22 : 20,
+                      color: AppColors.primary,
+                    ),
+                  ),
                 ],
               ),
             ),
-          ]),
-      body: SingleChildScrollView(
+          ),
+
+          SizedBox(height: 8),
+
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome Section
+                  Container(
+                    padding: EdgeInsets.all(isTablet ? 20 : 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isTablet ? 16 : 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.waving_hand_rounded,
+                            size: isTablet ? 32 : 28,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome Back!',
+                                style: GoogleFonts.poppins(
+                                  fontSize: isTablet ? 20 : 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Ready to manage your restaurant',
+                                style: GoogleFonts.poppins(
+                                  fontSize: isTablet ? 14 : 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: isTablet ? 24 : 20),
+                  // Menu Grid
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      int columns = 2;
+                      if (isDesktop) {
+                        columns = 4;
+                      } else if (isTablet) {
+                        columns = 3;
+                      }
+
+                      return GridView.count(
+                        shrinkWrap: true,
+                        physics: NeverScrollableScrollPhysics(),
+                        crossAxisCount: columns,
+                        crossAxisSpacing: isTablet ? 16 : 12,
+                        mainAxisSpacing: isTablet ? 16 : 12,
+                        childAspectRatio: isTablet ? 1.3 : 1.2,
+                        children: [
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.shopping_cart_rounded,
+                            title: 'Start Order',
+                            color: Colors.blue,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantStartOrder),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.restaurant_menu_rounded,
+                            title: 'Manage Menu',
+                            color: Colors.purple,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantManageMenu),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.people_rounded,
+                            title: 'Manage Staff',
+                            color: Colors.teal,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantStaff),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.person_outline_rounded,
+                            title: 'Customers',
+                            color: Colors.indigo,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantCustomers),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.bar_chart_rounded,
+                            title: 'Reports',
+                            color: Colors.orange,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReports),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.receipt_long_rounded,
+                            title: 'Tax Settings',
+                            color: Colors.green,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.settings_rounded,
+                            title: 'Settings',
+                            color: Colors.blueGrey,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantSettings),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.account_balance_wallet_rounded,
+
+                            title: 'Expenses',
+                            color: Colors.red,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantExpenses),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.inventory_2_rounded,
+                            title: 'Inventory',
+                            color: Colors.amber,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantInventory),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.logout_rounded,
+                            title: 'Logout',
+                            color: Colors.red.shade700,
+                            onTap: () => _showLogoutDialog(context),
+                            isTablet: isTablet,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isTablet,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          // alignment: Alignment.center,
-          width: ResponsiveHelper.responsiveWidth(context, 1),
-// width: width,
-          // height: height * 0.1,
-          // color: Colors.red,
-          padding: ResponsiveHelper.responsiveSymmetricPadding(context,
-              horizontalPercent: 0.05, verticalPercent: 0.01),
-          // color: Colors.red,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.divider,
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.02),
-              ),
-              // welcom
-              FittedBox(
-                child: Text(
-                  'Welcome Admin',
-                  textScaler: TextScaler.linear(1.2),
-                  style: GoogleFonts.poppins(
-                      fontSize:
-                      ResponsiveHelper.responsiveTextSize(context, 20),
-                      fontWeight: FontWeight.w600),
+              Container(
+                padding: EdgeInsets.all(isTablet ? 16 : 14),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  icon,
+                  size: isTablet ? 32 : 28,
+                  color: color,
                 ),
               ),
-
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.02),
-              ),
-              Text(
-                'Orange',
-                style: GoogleFonts.poppins(fontSize: 18),
-              ),
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.02),
-              ),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-
-
-                            Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
-                            //
-                            // ResponsiveHelper.isDesktop(context)?
-                            // Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //         builder: (context) => StartorderD()))
-                            //     :
-                            // Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //         builder: (context) => Startorder()));
-                          },
-                          title: 'Start',
-                          icons: (Icons.shopping_cart_sharp))),
-                  SizedBox(
-                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
+              SizedBox(height: isTablet ? 12 : 10),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: isTablet ? 15 : 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantManageMenu);
-                          },
-                          title: 'Manage Menu',
-                          icons: (Icons.manage_accounts)
-                      ))
-                ],
+                ),
               ),
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.01),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantStaff);
-                          },
-                          title: 'Manage Staff',
-                          icons: (Icons.manage_accounts_sharp))),
-                  SizedBox(
-                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                  ),
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantCustomers);
-                          },
-                          title: 'Customer',
-                          icons: (Icons.people)
-                      )
-                  )
-                ],
-              ),
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.01),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantReports);
-                          },
-                          title: 'Reports',
-                          icons: (Icons.auto_graph_outlined)
-                      )),
-                  SizedBox(
-                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                  ),
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantTaxSettings);
-                          },
-                          title: 'Tax Setting',
-                          icons: (Icons.settings)
-                      ))
-                ],
-              ),
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.01),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantSettings);
-                          },
-                          title: 'Setting',
-                          icons: (Icons.settings))),
-                  SizedBox(
-                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                  ),
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantExpenses);
-                          },
-                          title: 'Expense',
-                          icons: (Icons.wallet)))
-                ],
-              ),
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.01),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                      child: Listmenu(
-                          onTap: () {
-                            Navigator.pushNamed(context, RouteNames.restaurantInventory);
-                          },
-                          title: 'Inventory',
-                          icons: (Icons.inventory))),
-                  SizedBox(
-                    width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                  ),
-                  Expanded(
-                      child: Listmenu(
-                        onTap: () {
-                          _showLogoutDialog(context);
-                        },
-                        title: 'Logout',
-                        icons: (Icons.logout),
-                        color: Colors.red,
-                      ))
-                ],
-              ),
-              SizedBox(
-                height: ResponsiveHelper.responsiveHeight(context, 0.01),
-              ),
-              // Listmenu(title: 'start', icon: Icon(Icons.shopping_cart_sharp), titleS: 'Manage Menu', iconS: Icon(Icons.manage_accounts),)
             ],
           ),
         ),
       ),
     );
-    /*  LayoutBuilder(builder: (context , constraints){
-      if(constraints.maxWidth <700 ){
-        return
-          Scaffold(
-          backgroundColor: screenBGColor,
-          appBar: AppBar(
-              backgroundColor: screenBGColor,
-              automaticallyImplyLeading: false,
-              // toolbarHeight: 50,
-              // backgroundColor: Colors.red,
-              title: Container(
-                // color: Colors.red,
-                  alignment: Alignment.centerLeft,
-                  height: ResponsiveHelper.responsiveHeight(context, 0.3),
-
-                  // width: width ,
-                  // color: Colors.purple,
-                  child: Image.asset(
-                    // 'assets/images/BillBerry3_processed.jpg',
-                    'assets/images/bblogo.png',
-                    width: 150,
-                    fit: BoxFit.fill,
-                  )),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Row(
-                    children: [
-                      Icon(Icons.person),
-                      Text(
-                        'Admin',
-                        style: GoogleFonts.poppins(
-                          fontSize:
-                          ResponsiveHelper.responsiveTextSize(context, 14),
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-              ]),
-          body: SingleChildScrollView(
-            child: Container(
-              // alignment: Alignment.center,
-              width: ResponsiveHelper.responsiveWidth(context, 1),
-// width: width,
-              // height: height * 0.1,
-              // color: Colors.red,
-              padding: ResponsiveHelper.responsiveSymmetricPadding(context,
-                  horizontalPercent: 0.05, verticalPercent: 0.01),
-              // color: Colors.red,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.02),
-                  ),
-                  // welcom
-                  FittedBox(
-                    child: Text(
-                      'Welcome Admin',
-                      textScaler: TextScaler.linear(1.2),
-                      style: GoogleFonts.poppins(
-                          fontSize:
-                          ResponsiveHelper.responsiveTextSize(context, 20),
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.02),
-                  ),
-                  Text(
-                    'Orange',
-                    style: GoogleFonts.poppins(fontSize: 18),
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.02),
-                  ),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-
-
-                                Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
-                                //
-                                // ResponsiveHelper.isDesktop(context)?
-                                // Navigator.push(
-                                //     context,
-                                //     MaterialPageRoute(
-                                //         builder: (context) => StartorderD()))
-                                //     :
-                                // Navigator.push(
-                                //     context,
-                                //     MaterialPageRoute(
-                                //         builder: (context) => Startorder()));
-                              },
-                              title: 'Start',
-                              icons: (Icons.shopping_cart_sharp))),
-                      SizedBox(
-                        width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                      ),
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => Managemenu()));
-                              },
-                              title: 'Manage Menu',
-                              icons: (Icons.manage_accounts)
-                          ))
-                    ],
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.01),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => manageStaff()));
-                              },
-                              title: 'Manage Staff',
-                              icons: (Icons.manage_accounts_sharp))),
-                      SizedBox(
-                        width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                      ),
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => ManageInventory()));
-                              },
-                              title: 'Invatory',
-                              icons: (Icons.inventory)
-                          )
-                      )
-                    ],
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.01),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => ReportsScreen()));
-                              },
-                              title: 'Reports',
-                              icons: (Icons.auto_graph_outlined)
-                          )),
-                      SizedBox(
-                        width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                      ),
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => taxSetting(),
-                                    ));
-                              },
-                              title: 'Tax Setting',
-                              icons: (Icons.settings)
-                          ))
-                    ],
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.01),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => Settingsscreen()));
-                              },
-                              title: 'Setting',
-                              icons: (Icons.settings))),
-                      SizedBox(
-                        width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                      ),
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) => ExpenseScreen()));
-                              },
-                              title: 'Expense',
-                              icons: (Icons.wallet)))
-                    ],
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.01),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: Listmenu(
-                              onTap: () {
-                                Navigator.pushNamed(context, RouteNames.restaurantManageCustomers);
-                              },
-                              title: 'Language',
-                              icons: (Icons.language))),
-                      SizedBox(
-                        width: ResponsiveHelper.responsiveWidth(context, 0.015),
-                      ),
-                      Expanded(
-                          child: Listmenu(
-                            onTap: () {
-                              showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) => AlertDialog(
-                                    title: Text(
-                                      'Are you sure you want to logout?',
-                                      style: TextStyle(
-                                        fontSize:
-                                        ResponsiveHelper.responsiveTextSize(
-                                            context, 15),
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    actions: <Widget>[
-                                      Row(
-                                        mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                        children: [
-                                          CommonButton(
-                                            bordercolor: Colors.red,
-                                            bordercircular: 2,
-                                            width: ResponsiveHelper.responsiveWidth(
-                                                context, 0.2),
-                                            height:
-                                            ResponsiveHelper.responsiveHeight(
-                                                context, 0.05),
-                                            bgcolor: Colors.red,
-                                            onTap: () {
-                                              Navigator.of(context).pop();
-                                            },
-                                            child: Text("Cancle"),
-                                          ),
-                                          SizedBox(
-                                            width: 10,
-                                          ),
-                                          CommonButton(
-                                            bordercircular: 2,
-                                            width: ResponsiveHelper.responsiveWidth(
-                                                context, 0.2),
-                                            height:
-                                            ResponsiveHelper.responsiveHeight(
-                                                context, 0.05),
-                                            bgcolor: AppColors.primary,
-                                            onTap: () {
-                                              Navigator.pushNamed(context, RouteNames.restaurantAdminLogin);
-                                            },
-                                            child: Text(
-                                              "Yes",
-                                              style: GoogleFonts.poppins(
-                                                fontSize: ResponsiveHelper
-                                                    .responsiveTextSize(
-                                                    context, 12),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ));
-                            },
-                            title: 'Logout',
-                            icons: (Icons.logout),
-                            color: Colors.red,
-                          ))
-                    ],
-                  ),
-                  SizedBox(
-                    height: ResponsiveHelper.responsiveHeight(context, 0.01),
-                  ),
-                  // Listmenu(title: 'start', icon: Icon(Icons.shopping_cart_sharp), titleS: 'Manage Menu', iconS: Icon(Icons.manage_accounts),)
-                ],
-              ),
-            ),
-          ),
-        );
-      }else{
-        return Scaffold(
-          appBar: AppBar(
-            backgroundColor: screenBGColor,
-            elevation: 10,
-            surfaceTintColor: Colors.transparent,
-            shadowColor: Colors.black.withValues(alpha: 1),
-            title: Container(
-              // color: Colors.red,
-                alignment: Alignment.centerLeft,
-                height: ResponsiveHelper.responsiveHeight(context, 0.3),
-
-                // width: width ,
-                // color: Colors.purple,
-                child: Image.asset(
-                  logo,
-                  width: 150,
-                  fit: BoxFit.fill,
-                )),
-            actions: [
-              InkWell(
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context)=> OnlineDesktop()));
-                },
-                child: Card(
-                  color: Colors.white,
-                  elevation: 25,
-                  shape: StadiumBorder(
-                      side: BorderSide(
-                        color: Colors.white,
-                        width: 2.0,
-                      )),
-                  // color: Colors.white,
-                  child: Container(
-                    padding: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      // color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Image.asset('assets/icons/dinner.png'),
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 5,
-              ),
-              VerticalDivider(
-                width: 5,
-              ),
-              SizedBox(
-                width: 5,
-              ),
-              Column(
-                children: [
-                  Image.asset(
-                    'assets/icons/system-administration.png',
-                    color: AppColors.primary,
-                    width: 30,
-                    height: 30,
-                  ),
-                  Text('Admin Panel')
-                ],
-              ),
-              SizedBox(
-                width: 5,
-              ),
-              VerticalDivider(
-                width: 5,
-              ),
-              SizedBox(
-                width: 5,
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 5,left: 5),
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'assets/icons/support.png',
-                      color: AppColors.primary,
-                      width: 30,
-                      height: 30,
-                    ),
-                    Text('Need Help?')
-                  ],
-                ),
-              ),
-              VerticalDivider(
-                width: 5,
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 5,right: 5),
-                child: Row(
-                  children: [
-                    Icon(Icons.person),
-                    Text(
-                      'Admin',
-                      style: GoogleFonts.poppins(fontSize: 12),
-                      textScaler: TextScaler.linear(1),
-                    ),
-                  ],
-                ),
-              )
-            ],
-          ),
-          body: SingleChildScrollView(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal:10 , vertical:10),
-              child:
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Listmenud(Title: "Start Order",
-                          onTap: () {
-
-
-                            Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
-                            //
-                            // ResponsiveHelper.isDesktop(context)?
-                            // Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //         builder: (context) => StartorderD()))
-                            //     :
-                            // Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //         builder: (context) => Startorder()));
-                          },
-                          // img:'assets/icons/ecommerce.png'),
-                          icons: (Icons.shopping_cart_sharp),
-                        ),
-                      ),
-                      SizedBox(width: 10,),
-
-
-                      Expanded(
-                        child: Listmenud(Title: 'Manage Menu',
-                            icons: (Icons.manage_accounts)
-
-                        ),
-                      ),
-                      SizedBox(width: 10,),
-
-                      Expanded(
-                        child: Listmenud(Title: 'Manage Staff',
-                            icons: (Icons.manage_accounts_sharp)
-                        ),
-                      )
-
-                    ],
-                  ),
-                  Row(
-                    children: [
-
-                      Expanded(
-                        child: Listmenud(
-                            Title: 'Tax Setting',
-                            icons: (Icons.settings)
-                        ),
-                      ),
-                      SizedBox(width: 10,),
-
-
-                      Expanded(
-                        child: Listmenud(Title:'Reports',
-                            icons: (Icons.auto_graph_outlined)),
-                      ),
-
-                      SizedBox(width: 10,),
-                      Expanded(
-                        child: Listmenud(
-
-                            Title: 'Expense',
-                            icons: (Icons.wallet)
-                        ),
-                      ),
-
-
-
-                    ],
-                  ),
-                  Row(
-                    children: [
-
-                      Expanded(
-                        child: Listmenud(
-                            Title: 'Setting',
-                            icons: (Icons.settings)
-                        ),
-                      ),
-                      SizedBox(width: 10,),
-
-
-                      Expanded(
-                        child: Listmenud(Title:'Marketing',
-                            icons: (Icons.auto_graph_outlined)),
-                      ),
-
-                      SizedBox(width: 10,),
-                      Expanded(
-                        child: Listmenud(
-
-                            Title: 'LogOUt',
-                            icons: (Icons.logout)
-                        ),
-                      ),
-
-
-
-                    ],
-                  ),
-                  // InkWell(
-                  //
-                  //   onHover: (value){
-                  //     setState(() {
-                  //       elevationcard = 20;
-                  //     });
-                  //
-                  //   },
-                  //   child: Card(
-                  //     elevation: elevationcard,
-                  //     child:Container(
-                  //       width: width * 0.3,
-                  //       height: height * 0.2,
-                  //       child: Column(
-                  //         mainAxisAlignment: MainAxisAlignment.center,
-                  //         children: [
-                  //         Container(
-                  //           padding: EdgeInsets.all(15),
-                  //           width: width * 0.1,
-                  //             height: height * 0.1,
-                  //             decoration: BoxDecoration(
-                  //               color: Color(0xffcbf1f0),
-                  //               shape: BoxShape.circle,
-                  //               // borderRadius: BorderRadius.circular(10)
-                  //             ),
-                  //             child: Image.asset('assets/icons/ecommerce.png')),
-                  //           Text('Start Order',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.w500),)
-                  //         ],
-                  //       ),
-                  //     ),
-                  //   ),
-                  // )
-                ],
-              ),
-            ),
-          ),
-        );
-      }
-    });*/
   }
 
-  /// Improved logout dialog with better UI and proper navigation
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -844,91 +520,107 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: Row(
+        contentPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.logout,
-              color: Colors.red,
-              size: 28,
+            // Header
+            Container(
+              padding: EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.logout_rounded,
+                      color: Colors.red,
+                      size: 28,
+                    ),
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      'Logout',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            SizedBox(width: 12),
-            Expanded(
+            Divider(height: 1, color: AppColors.divider),
+
+            // Content
+            Padding(
+              padding: EdgeInsets.all(20),
               child: Text(
-                'Logout',
+                'Are you sure you want to logout?',
                 style: GoogleFonts.poppins(
-                  fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
-                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
           ],
         ),
-        content: Text(
-          'Are you sure you want to logout?',
-          style: GoogleFonts.poppins(
-            fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-          ),
-        ),
         actions: <Widget>[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                },
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                ),
-                child: Text(
-                  "Cancel",
-                  style: GoogleFonts.poppins(
-                    fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: Text(
+              "Cancel",
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
-              SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  // Close dialog first
-                  Navigator.of(dialogContext).pop();
-
-                  // Clear login state from SharedPreferences
-                  await _clearLoginState();
-
-                  // Clear entire navigation stack and go to login screen
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    RouteNames.restaurantLogin,
-                    (route) => false, // Remove all previous routes
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  "Logout",
-                  style: GoogleFonts.poppins(
-                    fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+            ),
+          ),
+          SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await _clearLoginState();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  RouteNames.restaurantLogin,
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-            ],
+              elevation: 0,
+            ),
+            child: Text(
+              "Logout",
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// Clear login state from SharedPreferences
   Future<void> _clearLoginState() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('restaurant_is_logged_in', false);

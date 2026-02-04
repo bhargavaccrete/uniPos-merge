@@ -4,32 +4,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
 import 'package:unipos/domain/services/common/unified_backup_service.dart';
-
-import 'package:unipos/presentation/screens/restaurant/Expense/Expense.dart';
-import 'package:unipos/presentation/screens/restaurant/customiztion/customization_drawer.dart';
-import 'package:unipos/presentation/screens/restaurant/end%20day/endday.dart';
-import 'package:unipos/presentation/screens/restaurant/need%20help/needhelp.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/customization.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/printersetting.dart';
-import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
-import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-// Legacy import (kept for backward compatibility, not actively used)
-// import 'package:unipos/presentation/widget/componets/restaurant/componets/import/import.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/listmenu.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
 import 'package:unipos/main.dart' as main_app;
-
-import 'package:unipos/presentation/screens/restaurant/Reports/reports.dart';
-
 
 class Drawerr extends StatefulWidget {
   const Drawerr({super.key});
@@ -39,14 +20,23 @@ class Drawerr extends StatefulWidget {
 }
 
 class _DrawerrState extends State<Drawerr> {
+  bool _printerExpanded = false;
+
   Future<void> clearCart() async {
     try {
       await cartStore.clearCart();
-      // await loadCartItems();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Cart cleared'),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Cart cleared successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
             duration: Duration(seconds: 2),
           ),
         );
@@ -66,868 +56,335 @@ class _DrawerrState extends State<Drawerr> {
 
   @override
   Widget build(BuildContext context) {
-    bool _printerExpanded = false;
-    bool isChecked = true;
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
 
     return Drawer(
-      // backgroundColor: ,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 10),
-        child: SingleChildScrollView(
-          child: Container(
-            // color: Colors.green,
-            width: width,
-            child: Column(
-              children: [
-                Listmenu(
-                  onTap: () {
-                    // Navigator.push(context,
-                    //     MaterialPageRoute(builder: (context) => AdminWelcome()));
-                    //
-                    Navigator.pushNamed(context,RouteNames.restaurantAdminWelcome);
-                  },
-                  title: 'Home',
-                  icons: Icons.home,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                //clear caart
-                Listmenu(
-                  onTap: (){
-                    Navigator.pop(context);
-                    showDialog(context: context,
-                        builder: (BuildContext context){
-                      return AlertDialog(
-
-                        title: Text('Are you sure you want to \n clear cart?',
-                          textScaler: TextScaler.linear(1),
-
-                          style: GoogleFonts.poppins(fontSize: 14),textAlign: TextAlign.center,),
-                        // content: Text('AleartDialog Description'),
-                        actions: [
-                          CommonButton(
-                            borderwidth: 0,
-                            bordercolor: Colors.red,
-                            bgcolor: Colors.red,
-                            bordercircular: 0,
-                            width: width * 0.3,
-                              height: height * 0.04,
-                              onTap: (){
-                              Navigator.pop(context);
-                              }, child: Text('No',
-                            textScaler: TextScaler.linear(1),
-
-                            style: GoogleFonts.poppins(color: Colors.white),)),
-                          CommonButton(
-                            bordercircular: 0,
-                            width: width * 0.3,
-                              height: height * 0.04,
-                              onTap: ()async{
-                              await clearCart();
-                                // Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
-
-                                Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
-
-                                // Navigator.pop(context);
-                              }, child: Text('Yes',
-                            textScaler: TextScaler.linear(1),
-
-                            style: GoogleFonts.poppins(color: Colors.white),))
-                        ],
-                      );
-                        },);
-                  },
-                  title: 'Clear Cart',
-                  icons: Icons.cleaning_services_outlined,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-
-                // Printer Setting
-                Container(
-                  // height: height *0.05,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300
+      backgroundColor: Colors.white,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(isTablet ? 24 : 20),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      initiallyExpanded: _printerExpanded,
-                      onExpansionChanged: (expanded) {
-                        setState(() {
-                          _printerExpanded = expanded;
-                        });
-                      },
-                      leading: Icon(Icons.print, color: AppColors.primary),
-                      title: Text(
-                        "Printer Setting",
-                        style: GoogleFonts.poppins(fontSize: 16),
-                      ),
-                      backgroundColor: Colors.grey.shade300,
-                      childrenPadding: EdgeInsets.all(10),
-                      children: [
-                        Column(
-                          children: [
-                            Container(
-                              // padding: EdgeInsets.symmetric(horizontal: 5,vertical: 5),
-                              width: width ,
-                              height: height * 0.08,
-                              color: Colors.grey.shade300,
-                              child: Listmenu(
-                                title: 'Add Printer',
-                                icons: Icons.circle,
-                                color: AppColors.primary,
-                                listcolor: Colors.grey.shade300,
-                                // heightCon: 50,
-                                borderwidth: 1,
-                                colorb: AppColors.primary,
-                                borderradius: 5,
-                                onTap: () {
-                                  // Navigator.push(context, MaterialPageRoute(builder: (context)=> Printersetting()));
-                                  Navigator.pushNamed(context, RouteNames.restaurantPrinterSettings);
-                                  // Handle tap
-                                },
-                              ),
-                            ),
-                            SizedBox(height: 10,),
-                            // Cash drawer
-                            Container(
-                              // padding: EdgeInsets.symmetric(horizontal: 5,vertical: 5),
-                              width: width ,
-                              height: height * 0.08,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                             border: Border.all(color: AppColors.primary)
-                              ),
-                              // width: width * 0.7,
-                              child: Listmenu(
-                                iconsT: Checkbox(value: isChecked,
-                                    onChanged: (bool?newvalue){
-                                  setState(() {
-                                    isChecked =newvalue!;
-                                  });
-                                }),
-                                title: 'Cash Drawer Setting ',
-                                icons: Icons.settings,
-                                listcolor: Colors.grey.shade300,
-                                heightCon: 45,
-                                borderwidth: 0,
-                                colorb: Colors.transparent,
-                                borderradius: 0,
-                                onTap: () {
-                                  // Handle tap
-                                },
-                              ),
-                            ),
-                            SizedBox(height: 10,),
-
-                            // Customization
-                            Container(
-                              // padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
-                              // width: width * 0.8,
-                              height: height * 0.08,
-                              color: Colors.grey.shade300,
-                              child: Listmenu(
-
-                                title: 'Customize Your Printer',
-                                icons: Icons.tune,
-                                listcolor: Colors.grey.shade300,
-                                heightCon: 50,
-                                borderwidth: 1,
-                                colorb: AppColors.primary,
-                                borderradius: 5,
-                                onTap: () {
-                                  // Navigator.push(context, MaterialPageRoute(builder: (context)=> CustomizationPrinter()));
-
-                                  Navigator.pushNamed(context, RouteNames.restaurantPrinterCustomization);
-
-                                  // Handle tap
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.restaurant_menu,
+                      color: Colors.white,
+                      size: isTablet ? 32 : 28,
                     ),
                   ),
+                  SizedBox(height: 16),
+                  Text(
+                    'UniPOS',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 24 : 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'POS System',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 14 : 13,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Menu Items
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.symmetric(
+                  vertical: isTablet ? 16 : 12,
+                  horizontal: isTablet ? 12 : 8,
                 ),
-
-                SizedBox(
-                  height: 10,
-                ),
-                Listmenu(
-                  onTap: (){
-                    // Navigator.pop(context);
-                    // showDialog(
-                    //
-                    //   context: context,
-                    //   builder: (BuildContext context){
-                    //     return CustomizationDrawer();
-                    //   },);
-
-                    // Navigator.push(context,MaterialPageRoute(builder: (context)=>CustomizationDrawer() ));
-
-                    Navigator.pushNamed(context, RouteNames.restaurantCustomizationDrawer);
-
-                  },
-                  title: 'Customization',
-                  icons: Icons.dashboard_customize,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                Listmenu(
-                  onTap: (){
-                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> ReportsScreen()));
-
-
-                    Navigator.pushNamed(context, RouteNames.restaurantReports);
-
-                  },
-                  title: 'Reports',
-                  icons: Icons.auto_graph,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                Listmenu(
-                  onTap: (){
-                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> ExpenseScreen()));
-                    Navigator.pushNamed(context, RouteNames.restaurantExpenseCategory);
-
-                  },
-                  title: 'Expenses',
-                  icons: Icons.wallet,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-
-                    Listmenu(
-            onTap: () {
-              // Close the drawer/page first
-              Navigator.pop(context);
-
-              // Then show dialog after popping
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext dialogContext) {
-                  // Start 5-second timer to close the dialog
-                  Timer(
-                    Duration(seconds: 5),
-                        () {
-                      Navigator.of(dialogContext, rootNavigator: true).pop(); // closes the dialog
+                children: [
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.home_rounded,
+                    title: 'Home',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.restaurantAdminWelcome);
                     },
-                  );
+                    isTablet: isTablet,
+                  ),
 
-                  return AlertDialog(
-                    actions: [
-                      Container(
-                        padding: EdgeInsets.all(10),
-                        width: width,
-                        height: height * 0.4,
-                        child: Column(
-                          children: [
-                            Lottie.asset(
-                              AppImages.syncanimation,
-                              width: width * 0.5,
-                              height: height * 0.2 ,
-                            ),
-                            SizedBox(height: 25),
-                            Text(
-                              'Sync in Progress...',
-                              style: GoogleFonts.poppins(color: AppColors.primary),
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              'Please wait while we update your data...',
-                              textScaler: TextScaler.linear(1),
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(),
-                            )
-                          ],
-                        ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.cleaning_services_rounded,
+                    title: 'Clear Cart',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showClearCartDialog(context);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  // Printer Settings Expandable
+                  _buildExpandableSection(
+                    context: context,
+                    icon: Icons.print_rounded,
+                    title: 'Printer Settings',
+                    isExpanded: _printerExpanded,
+                    onExpansionChanged: (expanded) {
+                      setState(() {
+                        _printerExpanded = expanded;
+                      });
+                    },
+                    children: [
+                      _buildSubItem(
+                        context: context,
+                        icon: Icons.add_circle_outline,
+                        title: 'Add Printer',
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, RouteNames.restaurantPrinterSettings);
+                        },
+                        isTablet: isTablet,
+                      ),
+                      _buildSubItem(
+                        context: context,
+                        icon: Icons.settings_outlined,
+                        title: 'Cash Drawer Setting',
+                        onTap: () {},
+                        isTablet: isTablet,
+                      ),
+                      _buildSubItem(
+                        context: context,
+                        icon: Icons.tune_rounded,
+                        title: 'Customize Printer',
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, RouteNames.restaurantPrinterCustomization);
+                        },
+                        isTablet: isTablet,
                       ),
                     ],
-                  );
-                },
-              );
-            },
-            title: 'Sync Data',
-            icons: Icons.sync,
-            listcolor: Colors.grey.shade300,
-            heightCon: height * 0.07,
-            borderwidth: 0,
-            colorb: Colors.transparent,
-            borderradius: 2,
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.dashboard_customize_rounded,
+                    title: 'Customization',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.restaurantCustomizationDrawer);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.bar_chart_rounded,
+                    title: 'Reports',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.restaurantReports);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.account_balance_wallet_rounded,
+                    title: 'Expenses',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.restaurantExpenses);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.sync_rounded,
+                    title: 'Sync Data',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showSyncDialog(context);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.sync_alt_rounded,
+                    title: 'Sync Order',
+                    onTap: () {},
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.sunny_snowing,
+                    title: 'End Day',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.restaurantEndDay);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.import_export_rounded,
+                    title: 'Import/Export',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showImportExportDialog(context);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.data_object_rounded,
+                    title: 'Test Data Generator',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.restaurantTestData);
+                    },
+                    isTablet: isTablet,
+                    color: Colors.orange,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.help_outline_rounded,
+                    title: 'Need Help?',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, RouteNames.restaurantNeedHelp);
+                    },
+                    isTablet: isTablet,
+                  ),
+
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.language_rounded,
+                    title: 'Language',
+                    onTap: () {},
+                    isTablet: isTablet,
+                  ),
+                ],
+              ),
+            ),
+
+            // Footer
+            Container(
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.grey.shade200,
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Version 1.0.0',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
-                SizedBox(
-                  height: 10,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required bool isTablet,
+    Color? color,
+  }) {
+    final itemColor = color ?? AppColors.primary;
+    final bgColor = itemColor.withValues(alpha: 0.1);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 16 : 12,
+              vertical: isTablet ? 14 : 12,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: isTablet ? 22 : 20,
+                    color: itemColor,
+                  ),
                 ),
-                Listmenu(
-
-                  title: 'Sync Order',
-                  icons: Icons.sync,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
+                SizedBox(width: isTablet ? 16 : 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 15 : 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
                 ),
-                SizedBox(
-                  height: 10,
-                ),
-                Listmenu(
-                  onTap: (){
-            /*        Navigator.push(context, MaterialPageRoute(builder: (context)=>
-                        EndDayDrawer()
-                    ));*/
-
-                    Navigator.pushNamed(context, RouteNames.restaurantEndDay);
-
-                  },
-                  title: 'End Day',
-                  icons: Icons.sunny_snowing,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-
-                Listmenu(
-                  title: 'Import/Export',
-                  icons: Icons.cleaning_services_outlined,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                  onTap: ()async{
-                    Navigator.pop(context);
-
-                    // Load initial status once
-                    bool initialEnabled = await AutoBackupService.isAutoBackupEnabled();
-                    String? initialBackup = await AutoBackupService.getLastBackupDate();
-
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext dialogContext){
-                        return StatefulBuilder(
-                          builder: (context, setState) {
-                            return AlertDialog(
-                              title: Center(
-                                child: Text('Backup & Restore',
-                                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              content: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Auto Backup Toggle
-                                    Container(
-                                      padding: EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: initialEnabled ? Colors.green.shade50 : Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: initialEnabled ? Colors.green.shade300 : Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                initialEnabled ? Icons.check_circle : Icons.cancel,
-                                                color: initialEnabled ? Colors.green : Colors.grey,
-                                              ),
-                                              SizedBox(width: 10),
-                                              Expanded(
-                                                child: Text(
-                                                  'Daily Auto Backup',
-                                                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                                ),
-                                              ),
-                                              Switch(
-                                                value: initialEnabled,
-                                                onChanged: (value) async {
-                                                  // Update immediately
-                                                  setState(() {
-                                                    initialEnabled = value;
-                                                  });
-
-                                                  // Save in background
-                                                  await AutoBackupService.setAutoBackupEnabled(value);
-
-                                                  if (context.mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(
-                                                        content: Text(value
-                                                          ? '✅ Auto backup enabled!'
-                                                          : 'Auto backup disabled'),
-                                                        duration: Duration(seconds: 2),
-                                                      ),
-                                                    );
-                                                  }
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                          if (initialBackup != null)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 8.0),
-                                              child: Text(
-                                                'Last backup: $initialBackup',
-                                                style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade700),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    SizedBox(height: 16),
-                                    Divider(),
-                                    SizedBox(height: 8),
-
-                                    // Download to Downloads Button
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  minimumSize: Size(double.infinity, 50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                icon: Icon(Icons.download, color: Colors.white),
-                                label: Text('Download Backup',
-                                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-                                ),
-                                onPressed: ()async{
-                                  final outerContext = context;
-                                  Navigator.pop(outerContext);
-
-                                  // Show loading dialog and get the navigator
-                                  final navigatorState = Navigator.of(outerContext, rootNavigator: true);
-                                  showDialog(
-                                    context: outerContext,
-                                    barrierDismissible: false,
-                                    builder: (BuildContext context) {
-                                      return WillPopScope(
-                                        onWillPop: () async => false,
-                                        child: AlertDialog(
-                                          content: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              CircularProgressIndicator(),
-                                              SizedBox(height: 20),
-                                              Text(
-                                                'Creating backup...\nPlease wait',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(fontSize: 16),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  );
-
-                                  String? filePath;
-                                  try {
-                                    filePath = await UnifiedBackupService.exportToDownloads();
-                                  } catch (e) {
-                                    debugPrint('❌ Backup error: $e');
-                                  } finally {
-                                    // Always close the dialog no matter what
-                                    debugPrint('🔄 Attempting to close dialog...');
-                                    try {
-                                      navigatorState.pop();
-                                      debugPrint('✅ Dialog closed successfully');
-                                    } catch (e) {
-                                      debugPrint('❌ Error closing dialog: $e');
-                                    }
-                                  }
-
-                                  // Show result after dialog is closed
-                                  await Future.delayed(Duration(milliseconds: 300));
-
-                                  if (filePath == null) {
-                                    if (outerContext.mounted) {
-                                      ScaffoldMessenger.of(outerContext).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('❌ Backup failed'),
-                                          duration: Duration(seconds: 3),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                    return;
-                                  }
-
-                                  if (outerContext.mounted) {
-                                    ScaffoldMessenger.of(outerContext).showSnackBar(
-                                      SnackBar(
-                                        content: Row(
-                                          children: [
-                                            Icon(Icons.check_circle, color: Colors.white),
-                                            SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                '✅ Backup saved successfully!\n📁 Location: Downloads folder',
-                                                style: TextStyle(fontSize: 14),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        duration: Duration(seconds: 5),
-                                        backgroundColor: Colors.green,
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-
-                              SizedBox(height: 12),
-
-                              // Choose Folder Button
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                  minimumSize: Size(double.infinity, 50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                icon: Icon(Icons.folder_open, color: Colors.white),
-                                label: Text('Choose Folder',
-                                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-                                ),
-                                onPressed: ()async{
-                                  Navigator.pop(context);
-
-                                  // Show folder picker first
-                                  String? selectedDirectory;
-                                  try {
-                                    selectedDirectory = await FilePicker.platform.getDirectoryPath();
-                                  } catch (e) {
-                                    debugPrint('❌ Folder picker error: $e');
-                                    final globalContext = main_app.navigatorKey.currentContext;
-                                    if (globalContext != null && globalContext.mounted) {
-                                      ScaffoldMessenger.of(globalContext).showSnackBar(
-                                        SnackBar(
-                                          content: Text('❌ Error selecting folder: $e'),
-                                          duration: Duration(seconds: 3),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                    return;
-                                  }
-
-                                  if (selectedDirectory == null) {
-                                    final globalContext = main_app.navigatorKey.currentContext;
-                                    if (globalContext != null && globalContext.mounted) {
-                                      ScaffoldMessenger.of(globalContext).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Folder selection cancelled'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    }
-                                    return;
-                                  }
-
-                                  // Use global context for dialog after folder picker
-                                  final globalContext = main_app.navigatorKey.currentContext;
-                                  if (globalContext == null) {
-                                    debugPrint('❌ Global context is null after folder picker');
-                                    return;
-                                  }
-
-                                  // Show loading dialog using global navigator
-                                  final navigatorState = Navigator.of(globalContext, rootNavigator: true);
-                                  showDialog(
-                                    context: globalContext,
-                                    barrierDismissible: false,
-                                    builder: (BuildContext context) {
-                                      return WillPopScope(
-                                        onWillPop: () async => false,
-                                        child: AlertDialog(
-                                          content: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              CircularProgressIndicator(),
-                                              SizedBox(height: 20),
-                                              Text(
-                                                'Creating backup...\nPlease wait',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(fontSize: 16),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  );
-
-                                  String? filePath;
-                                  try {
-                                    // Create backup directly in selected folder
-                                    filePath = await UnifiedBackupService.exportToCustomFolder(selectedDirectory);
-                                  } catch (e) {
-                                    debugPrint('❌ Backup error: $e');
-                                  } finally {
-                                    // Always close dialog
-                                    debugPrint('🔄 Attempting to close dialog...');
-                                    try {
-                                      navigatorState.pop();
-                                      debugPrint('✅ Dialog closed successfully');
-                                    } catch (e) {
-                                      debugPrint('❌ Error closing dialog: $e');
-                                    }
-                                  }
-
-                                  // Show result after dialog closes
-                                  await Future.delayed(Duration(milliseconds: 300));
-
-                                  final finalContext = main_app.navigatorKey.currentContext;
-                                  if (finalContext == null) return;
-
-                                  if (filePath == null) {
-                                    ScaffoldMessenger.of(finalContext).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('❌ Backup creation failed'),
-                                        duration: Duration(seconds: 3),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                    return;
-                                  }
-
-                                  // Success - show confirmation
-                                  ScaffoldMessenger.of(finalContext).showSnackBar(
-                                    SnackBar(
-                                      content: Row(
-                                        children: [
-                                          Icon(Icons.check_circle, color: Colors.white),
-                                          SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              '✅ Backup saved successfully!\n📁 $selectedDirectory',
-                                              style: TextStyle(fontSize: 14),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      duration: Duration(seconds: 5),
-                                      backgroundColor: Colors.green,
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              SizedBox(height: 16),
-                              Divider(),
-                              SizedBox(height: 8),
-
-                              // Import Button
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  minimumSize: Size(double.infinity, 50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                icon: Icon(Icons.restore, color: Colors.white),
-                                label: Text('Import Backup',
-                                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-                                ),
-                                onPressed: ()async{
-                                  Navigator.pop(context);
-
-                                  // Show loading dialog
-                                  final navigatorState = Navigator.of(context, rootNavigator: true);
-
-                                          showDialog(
-                                            context: context,
-                                            barrierDismissible: false,
-                                            builder: (BuildContext dialogContext) {
-                                              return WillPopScope(
-                                                onWillPop: () async => false,
-                                                child: AlertDialog(
-                                                  content: Column(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      const CircularProgressIndicator(),
-                                                      const SizedBox(height: 20),
-                                                      Text('Importing backup...\nPlease wait',
-                                                        textAlign: TextAlign.center,
-                                                        style: GoogleFonts.poppins(),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          );
-
-                                          bool importSuccess = false;
-                                          try {
-                                            importSuccess = await UnifiedBackupService.importData(context);
-                                          } catch (e) {
-                                            debugPrint('Import error in drawer: $e');
-                                          } finally {
-                                            // Always dismiss dialog
-                                            if (navigatorState.mounted) {
-                                              navigatorState.pop();
-                                              debugPrint('✅ Dialog dismissed via navigator state');
-                                            }
-
-                                            // Only show restart dialog if import was successful
-                                            if (importSuccess) {
-                                              await Future.delayed(Duration(milliseconds: 300));
-
-                                              final globalContext = main_app.navigatorKey.currentContext;
-                                              if (globalContext != null) {
-                                                showDialog(
-                                                  context: globalContext,
-                                                  barrierDismissible: false,
-                                                  builder: (BuildContext dialogContext) {
-                                                    return AlertDialog(
-                                                      title: Text('Import Completed', style: GoogleFonts.poppins()),
-                                                      content: Text(
-                                                        'Data imported successfully!\n\nPlease close and restart the app.',
-                                                        style: GoogleFonts.poppins(),
-                                                      ),
-                                                      actions: [
-                                                        CommonButton(
-                                                          borderwidth: 0,
-                                                          bordercircular: 5,
-                                                          width: MediaQuery.of(dialogContext).size.width * 0.3,
-                                                          height: MediaQuery.of(dialogContext).size.height * 0.05,
-                                                          onTap: () {
-                                                            exit(0);
-                                                          },
-                                                          child: Text(
-                                                            'Close App',
-                                                            style: GoogleFonts.poppins(color: Colors.white),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    );
-                                                  },
-                                                );
-                                              } else {
-                                                debugPrint('⚠️ Global context is null');
-                                              }
-                                            }
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                )
-                                )
-
-                            );
-                          }
-                        );
-                      },
-                    );
-                  },
-                ),
-
-
-                SizedBox(
-                  height: 10,
-                ),
-
-                // Test Data Generator (for testing backup)
-                Listmenu(
-                  onTap: (){
-                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> TestDataScreen()));
-                    Navigator.pushNamed(context, RouteNames.restaurantTestData);
-
-                  },
-                  title: 'Test Data Generator',
-                  icons: Icons.data_object,
-                  listcolor: Colors.orange.shade100,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-
-                Listmenu(
-                  onTap:(){
-                    // Navigator.push(context, MaterialPageRoute(builder: (context)=> NeedhelpDrawer()));
-                    Navigator.pushNamed(context, RouteNames.restaurantNeedHelp);
-
-                  },
-                  title: 'Need Help?',
-                  icons: Icons.person,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                Listmenu(
-                  title: 'Language',
-                  icons: Icons.language,
-                  listcolor: Colors.grey.shade300,
-                  heightCon: height * 0.07,
-                  borderwidth: 0,
-                  colorb: Colors.transparent,
-                  borderradius: 2,
-                ),
-                SizedBox(
-                  height: 10,
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: Colors.grey.shade400,
                 ),
               ],
             ),
@@ -936,6 +393,684 @@ class _DrawerrState extends State<Drawerr> {
       ),
     );
   }
+
+  Widget _buildExpandableSection({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required bool isExpanded,
+    required Function(bool) onExpansionChanged,
+    required List<Widget> children,
+    required bool isTablet,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isExpanded ? Colors.grey.shade50 : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: isExpanded,
+            onExpansionChanged: onExpansionChanged,
+            tilePadding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 16 : 12,
+              vertical: isTablet ? 6 : 4,
+            ),
+            childrenPadding: EdgeInsets.only(left: isTablet ? 24 : 20),
+            leading: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                size: isTablet ? 22 : 20,
+                color: AppColors.primary,
+              ),
+            ),
+            title: Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 15 : 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubItem({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    required bool isTablet,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 12 : 10,
+              vertical: isTablet ? 10 : 8,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: isTablet ? 18 : 16,
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: isTablet ? 12 : 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 14 : 13,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showClearCartDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.warning_rounded, color: Colors.orange, size: 24),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Clear Cart?',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to clear the cart?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+                child: Text(
+                  "No",
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  await clearCart();
+                  Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  "Yes",
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSyncDialog(BuildContext context) {
+    Timer(
+      Duration(seconds: 5),
+      () {
+        Navigator.of(context, rootNavigator: true).pop();
+      },
+    );
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: Container(
+            padding: EdgeInsets.all(10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Lottie.asset(
+                  AppImages.syncanimation,
+                  width: 200,
+                  height: 150,
+                ),
+                SizedBox(height: 25),
+                Text(
+                  'Sync in Progress...',
+                  style: GoogleFonts.poppins(
+                    color: AppColors.primary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Please wait while we update your data...',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showImportExportDialog(BuildContext context) async {
+    bool initialEnabled = await AutoBackupService.isAutoBackupEnabled();
+    String? initialBackup = await AutoBackupService.getLastBackupDate();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Center(
+                child: Text(
+                  'Backup & Restore',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Auto Backup Toggle
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: initialEnabled
+                            ? Colors.green.shade50
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: initialEnabled
+                              ? Colors.green.shade300
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                initialEnabled
+                                    ? Icons.check_circle
+                                    : Icons.cancel,
+                                color: initialEnabled
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Daily Auto Backup',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Switch(
+                                value: initialEnabled,
+                                onChanged: (value) async {
+                                  setState(() {
+                                    initialEnabled = value;
+                                  });
+                                  await AutoBackupService.setAutoBackupEnabled(value);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(value
+                                            ? '✅ Auto backup enabled!'
+                                            : 'Auto backup disabled'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          if (initialBackup != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'Last backup: $initialBackup',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 16),
+                    Divider(),
+                    SizedBox(height: 8),
+
+                    // Download to Downloads Button
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        minimumSize: Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: Icon(Icons.download, color: Colors.white),
+                      label: Text(
+                        'Download Backup',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onPressed: () async {
+                        final outerContext = context;
+                        Navigator.pop(outerContext);
+
+                        final navigatorState =
+                            Navigator.of(outerContext, rootNavigator: true);
+                        showDialog(
+                          context: outerContext,
+                          barrierDismissible: false,
+                          builder: (BuildContext context) {
+                            return WillPopScope(
+                              onWillPop: () async => false,
+                              child: AlertDialog(
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 20),
+                                    Text(
+                                      'Creating backup...\nPlease wait',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+
+                        String? filePath;
+                        try {
+                          filePath =
+                              await UnifiedBackupService.exportToDownloads();
+                        } catch (e) {
+                          debugPrint('❌ Backup error: $e');
+                        } finally {
+                          try {
+                            navigatorState.pop();
+                          } catch (e) {
+                            debugPrint('❌ Error closing dialog: $e');
+                          }
+                        }
+
+                        await Future.delayed(Duration(milliseconds: 300));
+
+                        if (filePath == null) {
+                          if (outerContext.mounted) {
+                            ScaffoldMessenger.of(outerContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('❌ Backup failed'),
+                                duration: Duration(seconds: 3),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        if (outerContext.mounted) {
+                          ScaffoldMessenger.of(outerContext).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.white),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      '✅ Backup saved successfully!\n📁 Location: Downloads folder',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              duration: Duration(seconds: 5),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+
+                    SizedBox(height: 12),
+
+                    // Choose Folder Button
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        minimumSize: Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: Icon(Icons.folder_open, color: Colors.white),
+                      label: Text(
+                        'Choose Folder',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(context);
+
+                        String? selectedDirectory;
+                        try {
+                          selectedDirectory =
+                              await FilePicker.platform.getDirectoryPath();
+                        } catch (e) {
+                          debugPrint('❌ Folder picker error: $e');
+                          final globalContext =
+                              main_app.navigatorKey.currentContext;
+                          if (globalContext != null && globalContext.mounted) {
+                            ScaffoldMessenger.of(globalContext).showSnackBar(
+                              SnackBar(
+                                content: Text('❌ Error selecting folder: $e'),
+                                duration: Duration(seconds: 3),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        if (selectedDirectory == null) {
+                          final globalContext =
+                              main_app.navigatorKey.currentContext;
+                          if (globalContext != null && globalContext.mounted) {
+                            ScaffoldMessenger.of(globalContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Folder selection cancelled'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        final globalContext = main_app.navigatorKey.currentContext;
+                        if (globalContext == null) return;
+
+                        final navigatorState =
+                            Navigator.of(globalContext, rootNavigator: true);
+                        showDialog(
+                          context: globalContext,
+                          barrierDismissible: false,
+                          builder: (BuildContext context) {
+                            return WillPopScope(
+                              onWillPop: () async => false,
+                              child: AlertDialog(
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 20),
+                                    Text(
+                                      'Creating backup...\nPlease wait',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+
+                        String? filePath;
+                        try {
+                          filePath = await UnifiedBackupService
+                              .exportToCustomFolder(selectedDirectory);
+                        } catch (e) {
+                          debugPrint('❌ Backup error: $e');
+                        } finally {
+                          try {
+                            navigatorState.pop();
+                          } catch (e) {
+                            debugPrint('❌ Error closing dialog: $e');
+                          }
+                        }
+
+                        await Future.delayed(Duration(milliseconds: 300));
+
+                        final finalContext = main_app.navigatorKey.currentContext;
+                        if (finalContext == null) return;
+
+                        if (filePath == null) {
+                          ScaffoldMessenger.of(finalContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('❌ Backup creation failed'),
+                              duration: Duration(seconds: 3),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        ScaffoldMessenger.of(finalContext).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.white),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    '✅ Backup saved successfully!\n📁 $selectedDirectory',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            duration: Duration(seconds: 5),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
+
+                    SizedBox(height: 16),
+                    Divider(),
+                    SizedBox(height: 8),
+
+                    // Import Button
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        minimumSize: Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: Icon(Icons.restore, color: Colors.white),
+                      label: Text(
+                        'Import Backup',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(context);
+
+                        final navigatorState =
+                            Navigator.of(context, rootNavigator: true);
+
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (BuildContext dialogContext) {
+                            return WillPopScope(
+                              onWillPop: () async => false,
+                              child: AlertDialog(
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CircularProgressIndicator(),
+                                    const SizedBox(height: 20),
+                                    Text(
+                                      'Importing backup...\nPlease wait',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+
+                        bool importSuccess = false;
+                        try {
+                          importSuccess =
+                              await UnifiedBackupService.importData(context);
+                        } catch (e) {
+                          debugPrint('Import error in drawer: $e');
+                        } finally {
+                          if (navigatorState.mounted) {
+                            navigatorState.pop();
+                          }
+
+                          if (importSuccess) {
+                            await Future.delayed(Duration(milliseconds: 300));
+
+                            final globalContext =
+                                main_app.navigatorKey.currentContext;
+                            if (globalContext != null) {
+                              showDialog(
+                                context: globalContext,
+                                barrierDismissible: false,
+                                builder: (BuildContext dialogContext) {
+                                  return AlertDialog(
+                                    title: Text(
+                                      'Import Completed',
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                    content: Text(
+                                      'Data imported successfully!\n\nPlease close and restart the app.',
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                    actions: [
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          exit(0);
+                                        },
+                                        child: Text(
+                                          'Close App',
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
-
-

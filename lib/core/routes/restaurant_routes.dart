@@ -18,11 +18,11 @@ import 'package:unipos/presentation/screens/restaurant/tabbar/order.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
 
 // Core Screens
-import 'package:unipos/screen/splashScreen.dart';
-import 'package:unipos/screen/walkthroughScreen.dart';
-import 'package:unipos/screen/userSelectionScreen.dart';
-import 'package:unipos/screen/existingUserRestoreScreen.dart';
-import 'package:unipos/screen/setupWizardScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/splashScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/walkthroughScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/userSelectionScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/existingUserRestoreScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/setupWizardScreen.dart';
 
 // Restaurant - Auth
 import 'package:unipos/presentation/screens/restaurant/auth/restaurant_login.dart';
@@ -102,6 +102,7 @@ import 'package:unipos/presentation/screens/restaurant/language.dart';
 import 'package:unipos/presentation/screens/restaurant/need%20help/needhelp.dart';
 import 'package:unipos/presentation/screens/restaurant/customiztion/customization_drawer.dart';
 
+import '../../presentation/screens/restaurant/Reports/comparison/comparison.dart';
 import '../../presentation/screens/restaurant/Reports/customer list by revenue/customerlistbyrevenue.dart';
 import '../../presentation/screens/restaurant/Reports/customerList/customerlist.dart';
 import '../../presentation/screens/restaurant/Reports/expenseReport/expensereport.dart';
@@ -179,11 +180,11 @@ class RestaurantRoutes {
     RouteNames.restaurantPerformanceStats: (_) => const PerformanceStatisticsReport(),
     RouteNames.restaurantReportsTotalSales: (_) => const Totalsales(),
     RouteNames.restaurantReportsSalesBYItem: (_) =>  Salesbyitem(),
-    RouteNames.restaurantReportsSalesByCategory: (_) =>  SalesbyCategory(),
+    RouteNames.restaurantReportsSalesByCategory: (_) =>  SalesByCategory(),
     RouteNames.restaurantReportsDailyClosingReport: (_) =>  DailyClosingReport(),
-    RouteNames.restaurantReportsSalesByTop: (_) =>  SalesbyTop(),
+    RouteNames.restaurantReportsSalesByTop: (_) =>  SalesByTopSelling(),
     RouteNames.restaurantReportsCustomerList: (_) =>  CustomerListReport(),
-    RouteNames.restaurantReportsComparisionByWeek: (_) =>  ComparisonByWeek(),
+    RouteNames.restaurantReportsComparisionByWeek: (_) =>  SalesComparison(),
     RouteNames.restaurantReportsComparisionByMonth: (_) =>  ComparisonByMonth(),
     RouteNames.restaurantReportsComparisionByYear: (_) =>  ComparisonByYear(),
     RouteNames.restaurantReportsComparisionByProduct: (_) =>  ComparisonByProduct(),

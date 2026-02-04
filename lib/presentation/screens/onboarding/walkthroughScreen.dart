@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // Import your utilities
-import '../util/color.dart';
-import '../util/responsive.dart';
+import '../../../util/color.dart';
+import '../../../util/responsive.dart';
 
 class WalkthroughScreen extends StatefulWidget {
   const WalkthroughScreen({Key? key}) : super(key: key);

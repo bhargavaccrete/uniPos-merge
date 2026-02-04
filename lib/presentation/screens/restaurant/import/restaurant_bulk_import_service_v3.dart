@@ -14,6 +14,7 @@ import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
+import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:uuid/uuid.dart';
 
 /// 🚀 Enhanced Restaurant Bulk Import Service V3
@@ -34,6 +35,7 @@ class RestaurantBulkImportServiceV3 {
   Map<String, ChoicesModel> _choiceCache = {};
   Map<String, Extramodel> _extraCache = {};
   Map<String, VariantModel> _variantCache = {};
+  Map<double, Tax> _taxByRateCache = {}; // Cache taxes by percentage rate
 
   RestaurantBulkImportServiceV3({this.onProgress});
 
@@ -47,23 +49,28 @@ class RestaurantBulkImportServiceV3 {
   static const String SHEET_ITEMS = 'Items';
   static const String SHEET_ITEM_VARIANTS = 'ItemVariants';
 
-  /// Enhanced template with CategoryName support
+  /// Enhanced template with CategoryName support and user-friendly instructions
   Future<String> downloadTemplate() async {
     try {
       var excel = Excel.createExcel();
 
-      if (excel.sheets.containsKey('Sheet1')) {
-        excel.delete('Sheet1');
-      }
-
+      // Add sheets in logical order (Instructions first!)
+      _createInstructionsSheet(excel);
       _createCategoriesSheet(excel);
+      _createEnhancedItemsSheet(excel);
+      _createItemVariantsSheet(excel);
       _createVariantsSheet(excel);
       _createExtrasSheet(excel);
       _createToppingsSheet(excel);
       _createChoicesSheet(excel);
       _createChoiceOptionsSheet(excel);
-      _createEnhancedItemsSheet(excel);
-      _createItemVariantsSheet(excel);
+
+      // ✅ FIX: Delete default Sheet1 AFTER creating all custom sheets
+      // This ensures Sheet1 doesn't appear in the final file
+      if (excel.sheets.containsKey('Sheet1')) {
+        excel.delete('Sheet1');
+        print('🗑️ Removed default Sheet1');
+      }
 
       return await _saveExcelFile(excel, 'unipos_restaurant_import_template_v3.xlsx');
     } catch (e) {
@@ -71,20 +78,117 @@ class RestaurantBulkImportServiceV3 {
     }
   }
 
+  /// Create comprehensive Instructions sheet
+  void _createInstructionsSheet(Excel excel) {
+    var sheet = excel['📖 Instructions'];
+
+    // Title
+    var titleCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0));
+    titleCell.value =  TextCellValue('UniPOS Restaurant Bulk Import Guide');
+    titleCell.cellStyle = CellStyle(
+      bold: true,
+      fontSize: 16,
+      backgroundColorHex: ExcelColor.green,
+    );
+
+    int row = 2;
+
+    // Quick Start
+    _addBoldRow(sheet, row++, ['QUICK START GUIDE']);
+    _addTextRow(sheet, row++, ['1. Start with "Categories" sheet - Add your food categories (Burgers, Pizza, etc.)']);
+    _addTextRow(sheet, row++, ['2. Fill "Items" sheet - Add your menu items (Name, Price, Category are REQUIRED)']);
+    _addTextRow(sheet, row++, ['3. Optional: Fill other sheets for variants, extras, toppings, choices']);
+    _addTextRow(sheet, row++, ['4. Save the file and import it back into UniPOS']);
+    row++;
+
+    // Important Notes
+    _addBoldRow(sheet, row++, ['⚠️ IMPORTANT NOTES']);
+    _addTextRow(sheet, row++, ['• Fields marked with * are REQUIRED']);
+    _addTextRow(sheet, row++, ['• Row 2 in each sheet contains helpful instructions (yellow background)']);
+    _addTextRow(sheet, row++, ['• Sample data is provided in rows 3-5 - You can delete these and add your own']);
+    _addTextRow(sheet, row++, ['• For Yes/No fields: Type exactly "Yes" or "No" (case sensitive)']);
+    _addTextRow(sheet, row++, ['• CategoryName in Items sheet must match a name from Categories sheet']);
+    row++;
+
+    // Sheet Descriptions
+    _addBoldRow(sheet, row++, ['SHEET DESCRIPTIONS']);
+    _addTextRow(sheet, row++, ['📁 Categories: Your food categories (Burgers, Pizza, Drinks, etc.)']);
+    _addTextRow(sheet, row++, ['🍕 Items: Your menu items - START HERE! (Required: Name, Price, Category, VegType)']);
+    _addTextRow(sheet, row++, ['📏 ItemVariants: Size-based pricing (Small: ₹200, Medium: ₹300, Large: ₹400)']);
+    _addTextRow(sheet, row++, ['🔧 Variants: Available sizes (Small, Medium, Large)']);
+    _addTextRow(sheet, row++, ['➕ Extras: Customization groups (Toppings, Sauces)']);
+    _addTextRow(sheet, row++, ['🧀 Toppings: Individual toppings with prices']);
+    _addTextRow(sheet, row++, ['🎯 Choices: Selection options (Crust Type, Spice Level)']);
+    _addTextRow(sheet, row++, ['✅ ChoiceOptions: Available choices (Thin Crust, Thick Crust)']);
+    row++;
+
+    // Tips
+    _addBoldRow(sheet, row++, ['💡 TIPS FOR SUCCESS']);
+    _addTextRow(sheet, row++, ['• Start simple: Just fill Categories and Items sheets']);
+    _addTextRow(sheet, row++, ['• Test with 2-3 items first before doing all your menu']);
+    _addTextRow(sheet, row++, ['• Keep category names simple and consistent']);
+    _addTextRow(sheet, row++, ['• For images: Use direct image URLs or leave blank to add later']);
+    _addTextRow(sheet, row++, ['• Price should be numbers only (no currency symbols)']);
+  }
+
+  void _addBoldRow(Sheet sheet, int rowIndex, List<String> values) {
+    for (int i = 0; i < values.length; i++) {
+      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
+      cell.value = TextCellValue(values[i]);
+      cell.cellStyle = CellStyle(
+        bold: true,
+        fontSize: 12,
+        backgroundColorHex: ExcelColor.grey,
+      );
+    }
+  }
+
+  void _addTextRow(Sheet sheet, int rowIndex, List<String> values) {
+    for (int i = 0; i < values.length; i++) {
+      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
+      cell.value = TextCellValue(values[i]);
+    }
+  }
+
   void _createCategoriesSheet(Excel excel) {
     var sheet = excel[SHEET_CATEGORIES];
-    _addHeader(sheet, 0, ['id', 'name', 'imagePath']);
-    _addRow(sheet, 1, ['cat_burgers', 'Burgers', '']);
-    _addRow(sheet, 2, ['cat_pizza', 'Pizza', '']);
-    _addRow(sheet, 3, ['cat_drinks', 'Drinks', '']);
+
+    // Headers
+    _addHeader(sheet, 0, ['id*', 'name*', 'imagePath']);
+
+    // Instructions row
+    _addInstructionRow(sheet, 1, [
+      'Unique ID (e.g., cat_burgers)',
+      'Category Name (e.g., Burgers)',
+      'Optional: Image path/URL'
+    ]);
+
+    // Sample data
+    _addRow(sheet, 2, ['cat_burgers', 'Burgers', '']);
+    _addRow(sheet, 3, ['cat_pizza', 'Pizza', '']);
+    _addRow(sheet, 4, ['cat_drinks', 'Drinks', '']);
+    _addRow(sheet, 5, ['cat_appetizers', 'Appetizers', '']);
+    _addRow(sheet, 6, ['cat_desserts', 'Desserts', '']);
   }
 
   void _createVariantsSheet(Excel excel) {
     var sheet = excel[SHEET_VARIANTS];
-    _addHeader(sheet, 0, ['id', 'name']);
-    _addRow(sheet, 1, ['var_small', 'Small']);
-    _addRow(sheet, 2, ['var_medium', 'Medium']);
-    _addRow(sheet, 3, ['var_large', 'Large']);
+
+    // Headers
+    _addHeader(sheet, 0, ['id*', 'name*']);
+
+    // Instructions row
+    _addInstructionRow(sheet, 1, [
+      'Unique ID (e.g., var_small)',
+      'Variant name (e.g., Small, Medium, Large)'
+    ]);
+
+    // Sample data
+    _addRow(sheet, 2, ['var_small', 'Small']);
+    _addRow(sheet, 3, ['var_medium', 'Medium']);
+    _addRow(sheet, 4, ['var_large', 'Large']);
+    _addRow(sheet, 5, ['var_regular', 'Regular']);
+    _addRow(sheet, 6, ['var_family', 'Family Size']);
   }
 
   void _createExtrasSheet(Excel excel) {
@@ -115,37 +219,97 @@ class RestaurantBulkImportServiceV3 {
     _addRow(sheet, 2, ['choice_crust', 'opt_thick', 'Thick Crust']);
   }
 
-  /// Enhanced Items sheet with CategoryName and ImageURL
+  /// Enhanced Items sheet with CategoryName and ImageURL - USER FRIENDLY VERSION
   void _createEnhancedItemsSheet(Excel excel) {
+    print('📝 Creating Enhanced Items sheet...');
     var sheet = excel[SHEET_ITEMS];
 
-    // Enhanced headers with CategoryName and ImageURL
+    // Row 0: Enhanced headers
     _addHeader(sheet, 0, [
-      'ItemName', 'Price', 'CategoryName', 'VegType', 'Description',
+      'ItemName*', 'Price*', 'CategoryName*', 'VegType*', 'Description',
       'ImageURL', 'IsSoldByWeight', 'Unit', 'TrackInventory',
       'StockQuantity', 'AllowOutOfStock', 'TaxRate', 'IsEnabled',
       'HasVariants', 'ChoiceIds', 'ExtraIds'
     ]);
+    print('   ✅ Added headers (16 columns)');
 
-    // Sample data with CategoryName (not ID)
-    _addRow(sheet, 1, [
-      'Chicken Burger', 150, 'Burgers', 'Non-Veg', 'Delicious chicken burger',
-      '', 'No', 'pcs', 'Yes', 50, 'Yes', 5, 'Yes', 'No', '', 'extra_sauces'
+    // Row 1: Instructions row (colored differently)
+    _addInstructionRow(sheet, 1, [
+      'Required: Item name',
+      'Required: Number only',
+      'Required: Must match Categories sheet',
+      'Required: Veg or Non-Veg',
+      'Optional: Short description',
+      'Optional: Image URL',
+      'Yes or No',
+      'kg, gm, pcs',
+      'Yes or No',
+      'Number (0 if not tracking)',
+      'Yes or No',
+      'Number (0-100)',
+      'Yes or No',
+      'Yes or No',
+      'Comma separated IDs',
+      'Comma separated IDs'
     ]);
 
+    // Row 2-4: Sample data with better examples
+    print('   📝 Adding sample row 2: Chicken Burger');
     _addRow(sheet, 2, [
-      'Veg Pizza', 0, 'Pizza', 'Veg', 'Fresh vegetable pizza',
-      'https://example.com/veg-pizza.jpg', 'No', 'pcs', 'No', 0, 'Yes',
-      5, 'Yes', 'Yes', 'choice_crust,choice_spice', 'extra_toppings'
+      'Chicken Burger', 150, 'Burgers', 'Non-Veg', 'Delicious chicken burger with lettuce',
+      '', 'No', 'pcs', 'Yes', 50, 'No', 5, 'Yes', 'No', '', 'extra_sauces'
     ]);
+
+    print('   📝 Adding sample row 3: Veg Pizza');
+    _addRow(sheet, 3, [
+      'Veg Pizza', 200, 'Pizza', 'Veg', 'Fresh vegetable pizza',
+      '', 'No', 'pcs', 'Yes', 30, 'Yes', 5, 'Yes', 'Yes', 'choice_crust', 'extra_toppings'
+    ]);
+
+    print('   📝 Adding sample row 4: Cold Drink');
+    _addRow(sheet, 4, [
+      'Cold Drink', 50, 'Drinks', 'Veg', 'Chilled soft drink',
+      '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', ''
+    ]);
+    print('✅ Enhanced Items sheet created successfully');
+  }
+
+  /// Add instruction row with different styling
+  void _addInstructionRow(Sheet sheet, int rowIndex, List<String> values) {
+    for (int i = 0; i < values.length; i++) {
+      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
+      cell.value = TextCellValue(values[i]);
+      cell.cellStyle = CellStyle(
+        italic: true,
+        backgroundColorHex: ExcelColor.yellow100,
+        fontSize: 9,
+      );
+    }
   }
 
   void _createItemVariantsSheet(Excel excel) {
     var sheet = excel[SHEET_ITEM_VARIANTS];
-    _addHeader(sheet, 0, ['itemName', 'variantName', 'price', 'trackInventory', 'stockQuantity']);
-    _addRow(sheet, 1, ['Veg Pizza', 'Small', 200, 'Yes', 10]);
-    _addRow(sheet, 2, ['Veg Pizza', 'Medium', 300, 'Yes', 15]);
-    _addRow(sheet, 3, ['Veg Pizza', 'Large', 400, 'Yes', 20]);
+
+    // Headers
+    _addHeader(sheet, 0, ['itemName*', 'variantName*', 'price*', 'trackInventory', 'stockQuantity']);
+
+    // Instructions row
+    _addInstructionRow(sheet, 1, [
+      'Must match item name from Items sheet',
+      'Must match variant from Variants sheet',
+      'Price for this variant (number only)',
+      'Yes or No',
+      'Number (0 if not tracking)'
+    ]);
+
+    // Sample data - Pizza with 3 sizes
+    _addRow(sheet, 2, ['Veg Pizza', 'Small', 200, 'Yes', 10]);
+    _addRow(sheet, 3, ['Veg Pizza', 'Medium', 300, 'Yes', 15]);
+    _addRow(sheet, 4, ['Veg Pizza', 'Large', 400, 'Yes', 20]);
+
+    // Sample data - Another item
+    _addRow(sheet, 5, ['Chicken Burger', 'Regular', 150, 'No', 0]);
+    _addRow(sheet, 6, ['Chicken Burger', 'Large', 200, 'No', 0]);
   }
 
   void _addHeader(Sheet sheet, int rowIndex, List<String> headers) {
@@ -371,12 +535,13 @@ class RestaurantBulkImportServiceV3 {
     print('📂 Loading caches...');
 
     try {
-      // Load categories
+      // Load categories with case-insensitive name matching
       await categoryStore.loadCategories();
       final categories = categoryStore.categories;
       _categoryCache = {for (var cat in categories) cat.id: cat};
-      _categoryByNameCache = {for (var cat in categories) cat.name.toLowerCase(): cat};
-      print('✅ Cached ${categories.length} categories');
+      // ✅ IMPROVED: Trim and lowercase for consistent matching (Pizza, pizza, " Pizza " all match)
+      _categoryByNameCache = {for (var cat in categories) cat.name.toLowerCase().trim(): cat};
+      print('✅ Cached ${categories.length} categories (case-insensitive matching enabled)');
     } catch (e) {
       print('⚠️ Error loading categories: $e');
       // Continue with empty cache
@@ -410,6 +575,20 @@ class RestaurantBulkImportServiceV3 {
       print('✅ Cached ${variants.length} variants');
     } catch (e) {
       print('⚠️ Error loading variants: $e');
+    }
+
+    try {
+      // Load taxes
+      await taxStore.loadTaxes();
+      final taxes = taxStore.taxes;
+      // Cache by tax percentage rate for easy lookup
+      _taxByRateCache = {
+        for (var tax in taxes)
+          if (tax.taxperecentage != null) tax.taxperecentage!: tax
+      };
+      print('✅ Cached ${taxes.length} taxes');
+    } catch (e) {
+      print('⚠️ Error loading taxes: $e');
     }
   }
 
@@ -468,21 +647,24 @@ class RestaurantBulkImportServiceV3 {
     );
   }
 
-  /// ✅ CRITICAL: Auto-create category from name
+  /// ✅ CRITICAL: Auto-create category from name (case-insensitive, duplicate-safe)
+  /// Prevents duplicates: "Pizza", "pizza", " Pizza " all map to the same category
   Future<String> _getOrCreateCategory(String categoryName, ImportResultV3 result) async {
     final nameLower = categoryName.toLowerCase().trim();
 
-    // Check cache first (O(1) lookup)
+    // Check cache first (O(1) lookup) - prevents duplicates
     if (_categoryByNameCache.containsKey(nameLower)) {
-      return _categoryByNameCache[nameLower]!.id;
+      final existingCategory = _categoryByNameCache[nameLower]!;
+      print('✅ Reusing existing category: "${existingCategory.name}" for input "$categoryName"');
+      return existingCategory.id;
     }
 
     // Category doesn't exist - create it
-    print('📝 Auto-creating category: $categoryName');
+    print('📝 Auto-creating new category: $categoryName');
 
     final newCategory = Category(
       id: const Uuid().v4(),
-      name: categoryName,
+      name: categoryName.trim(), // Use trimmed name for consistency
       imagePath: null,
       createdTime: DateTime.now(),
       editCount: 0,
@@ -490,14 +672,44 @@ class RestaurantBulkImportServiceV3 {
 
     await categoryStore.addCategory(newCategory);
 
-    // Update caches
+    // Update caches with lowercase key for future lookups
     _categoryCache[newCategory.id] = newCategory;
     _categoryByNameCache[nameLower] = newCategory;
 
     result.categoriesAutoCreated++;
-    result.warnings.add('Auto-created category: $categoryName');
+    result.warnings.add('✨ Auto-created category: ${newCategory.name}');
 
     return newCategory.id;
+  }
+
+  /// ✅ CRITICAL: Auto-create tax from rate (duplicate-safe)
+  /// Prevents duplicates: same tax rate will reuse existing tax
+  Future<String> _getOrCreateTax(double taxRate, ImportResultV3 result) async {
+    // Check cache first (O(1) lookup) - prevents duplicates
+    if (_taxByRateCache.containsKey(taxRate)) {
+      final existingTax = _taxByRateCache[taxRate]!;
+      print('✅ Reusing existing tax: "${existingTax.taxname}" (${existingTax.taxperecentage}%) for rate $taxRate%');
+      return existingTax.id;
+    }
+
+    // Tax doesn't exist - create it
+    print('📝 Auto-creating new tax: $taxRate%');
+
+    final newTax = Tax(
+      id: const Uuid().v4(),
+      taxname: 'Tax ${taxRate.toStringAsFixed(2)}%',
+      taxperecentage: taxRate,
+    );
+
+    await taxStore.addTax(newTax);
+
+    // Update cache for future lookups
+    _taxByRateCache[taxRate] = newTax;
+
+    result.taxesAutoCreated++;
+    result.warnings.add('✨ Auto-created tax: ${newTax.taxname} (${newTax.taxperecentage}%)');
+
+    return newTax.id;
   }
 
   /// ✅ CRITICAL: Download image from URL
@@ -543,9 +755,10 @@ class RestaurantBulkImportServiceV3 {
   }
 
   Future<void> _importCategories(List<List<dynamic>>? rows, ImportResultV3 result) async {
-    if (rows == null || rows.length < 2) return;
+    if (rows == null || rows.length < 3) return; // Need at least: header + instruction + 1 data row
 
-    for (int i = 1; i < rows.length; i++) {
+    // Start from row 2 to skip the instruction row (row 1)
+    for (int i = 2; i < rows.length; i++) {
       try {
         var row = rows[i];
         if (row.isEmpty || _getValue(row, 0).isEmpty) continue;
@@ -580,9 +793,10 @@ class RestaurantBulkImportServiceV3 {
   }
 
   Future<void> _importVariants(List<List<dynamic>>? rows, ImportResultV3 result) async {
-    if (rows == null || rows.length < 2) return;
+    if (rows == null || rows.length < 3) return; // Need at least: header + instruction + 1 data row
 
-    for (int i = 1; i < rows.length; i++) {
+    // Start from row 2 to skip the instruction row (row 1)
+    for (int i = 2; i < rows.length; i++) {
       try {
         var row = rows[i];
         if (row.isEmpty || _getValue(row, 0).isEmpty) continue;
@@ -811,20 +1025,37 @@ class RestaurantBulkImportServiceV3 {
 
   /// ✅ ENHANCED: Items import with validation, auto-category, and image download
   Future<void> _importEnhancedItems(List<List<dynamic>>? rows, ImportResultV3 result) async {
-    if (rows == null || rows.length < 2) return;
+    if (rows == null || rows.length < 3) return; // Need at least: header + instruction + 1 data row
 
-    // Get header row to map columns
-    final headers = rows[0].map((e) => e.toString().trim()).toList();
+    // Get header row to map columns - STRIP ASTERISKS from required field markers
+    final headers = rows[0].map((e) => e.toString().trim().replaceAll('*', '')).toList();
+    print('📋 Headers from Excel (cleaned): ${headers.take(5).join(", ")}');
+    print('   Will map to: ItemName, Price, CategoryName, VegType, Description');
 
-    for (int i = 1; i < rows.length; i++) {
+    // Start from row 2 to skip the instruction row (row 1)
+    for (int i = 2; i < rows.length; i++) {
       try {
         var row = rows[i];
+
+        // Debug: Print raw row data
+        if (i <= 4) {
+          print('🔍 Row $i RAW: length=${row.length}, isEmpty=${row.isEmpty}');
+          if (row.isNotEmpty) {
+            print('   First 3 cells: [${row.length > 0 ? row[0] : "N/A"}, ${row.length > 1 ? row[1] : "N/A"}, ${row.length > 2 ? row[2] : "N/A"}]');
+          }
+        }
+
         if (row.isEmpty) continue;
 
         // Map row to dictionary
         Map<String, dynamic> rowData = {};
         for (int j = 0; j < headers.length && j < row.length; j++) {
           rowData[headers[j]] = row[j];
+        }
+
+        // Debug: Print mapped data
+        if (i <= 4) {
+          print('📋 Row $i MAPPED: ItemName="${rowData['ItemName']}", Price="${rowData['Price']}", Category="${rowData['CategoryName']}"');
         }
 
         // Step 1: Validate row
@@ -885,7 +1116,16 @@ class RestaurantBulkImportServiceV3 {
                 return true;
               }).toList();
 
-        // Step 5: Create item
+        // Step 5: Auto-create tax if tax rate is specified
+        final rawTaxRate = _getDoubleFromValue(rowData['TaxRate']);
+        final taxRateValue = _normalizeTaxRate(rawTaxRate);
+        String? taxId;
+        if (rawTaxRate != null && rawTaxRate > 0) {
+          // Use raw value (5) for Tax creation, normalized value (0.05) for Item
+          taxId = await _getOrCreateTax(rawTaxRate, result);
+        }
+
+        // Step 6: Create item
         final hasVariants = _parseBool(rowData['HasVariants']?.toString() ?? '', false);
 
         Items item = Items(
@@ -900,7 +1140,8 @@ class RestaurantBulkImportServiceV3 {
           trackInventory: _parseBool(rowData['TrackInventory']?.toString() ?? '', false),
           stockQuantity: hasVariants ? 0 : _getDoubleFromValue(rowData['StockQuantity']),
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
-          taxRate: _normalizeTaxRate(_getDoubleFromValue(rowData['TaxRate'])),
+          taxRate: taxRateValue,
+          taxIds: taxId != null ? [taxId] : null,
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
           variant: [],
           choiceIds: choiceIds,
@@ -928,11 +1169,12 @@ class RestaurantBulkImportServiceV3 {
   }
 
   Future<void> _importItemVariants(List<List<dynamic>>? rows, ImportResultV3 result) async {
-    if (rows == null || rows.length < 2) return;
+    if (rows == null || rows.length < 3) return; // Need at least: header + instruction + 1 data row
 
     Map<String, List<List<dynamic>>> variantGroups = {};
 
-    for (int i = 1; i < rows.length; i++) {
+    // Start from row 2 to skip the instruction row (row 1)
+    for (int i = 2; i < rows.length; i++) {
       var row = rows[i];
       if (row.isEmpty) continue;
 
@@ -1059,6 +1301,7 @@ class ImportResultV3 {
 
   int categoriesImported = 0;
   int categoriesAutoCreated = 0;
+  int taxesAutoCreated = 0;
   int variantsImported = 0;
   int extrasImported = 0;
   int toppingsImported = 0;
@@ -1075,6 +1318,7 @@ class ImportResultV3 {
     sb.writeln('\n📊 Import Statistics:');
     sb.writeln('  Total Items: $itemsImported');
     sb.writeln('  Categories: $categoriesImported (+ $categoriesAutoCreated auto-created)');
+    sb.writeln('  Taxes: $taxesAutoCreated auto-created');
     sb.writeln('  Variants: $variantsImported');
     sb.writeln('  Item Variants: $itemVariantsImported');
     sb.writeln('  Extras: $extrasImported');

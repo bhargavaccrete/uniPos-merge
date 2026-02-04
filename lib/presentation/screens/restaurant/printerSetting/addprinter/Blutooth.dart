@@ -2,14 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/Blutooth.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/usb.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/wifi.dart';
 
-import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
+
 class Bluthooth extends StatelessWidget {
   const Bluthooth({super.key});
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../../util/common/currency_helper.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
@@ -50,49 +52,79 @@ class _settingsScreenState extends State<Settingsscreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width * 1;
-    final screenheight = MediaQuery.of(context).size.height * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    final screenheight = size.height;
+
     return Scaffold(
         resizeToAvoidBottomInset: false,
+        backgroundColor: Colors.grey.shade50,
         appBar: AppBar(
-          elevation: 1,
+          elevation: 0,
+          backgroundColor: Colors.white,
+          iconTheme: IconThemeData(color: Colors.black87),
+          title: Text(
+            'Settings',
+            style: GoogleFonts.poppins(
+              fontSize: isTablet ? 22 : 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
           actions: [
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.symmetric(
+                horizontal: isTablet ? 16 : 12,
+                vertical: 8,
+              ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.person,
+                  Container(
+                    padding: EdgeInsets.all(isTablet ? 10 : 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.person,
+                      size: isTablet ? 22 : 20,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  Text("Admin",style: TextStyle(fontSize: 15.0,fontWeight: FontWeight.bold),)
+                  if (isTablet) ...[
+                    SizedBox(width: 10),
+                    Text(
+                      'Admin',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-            )
+            ),
           ],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 32),
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
+                  // Navigation Options Section
                   Text(
-                    "Settings",
-                    textScaler: TextScaler.linear(1.2),
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    'General Settings',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 18 : 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
-                  const SizedBox(height: 10),
-              /*------ADDRESS CUSTOMIZATION--------------*/
+                  SizedBox(height: isTablet ? 16 : 12),
 
-              /*    MultipleListViewWithNavigation(
-                    displayTitle: "Address Customization",
-                    displayicon: Icons.keyboard_arrow_right,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => AddressCustomizationScreen()));
-                    },
-                  ),*/
                   MultipleListViewWithNavigation(
                     displayTitle: "Password Change",
                     displayicon: Icons.keyboard_arrow_right,
@@ -140,6 +172,20 @@ class _settingsScreenState extends State<Settingsscreen> {
 
                     },
                   ),
+
+                  SizedBox(height: isTablet ? 24 : 20),
+
+                  // Display Settings Section
+                  Text(
+                    'Display Settings',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 18 : 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: isTablet ? 16 : 12),
+
                   // 💰 Decimal Precision Section
                   ValueListenableBuilder<int>(
                     valueListenable: DecimalSettings.precisionNotifier,

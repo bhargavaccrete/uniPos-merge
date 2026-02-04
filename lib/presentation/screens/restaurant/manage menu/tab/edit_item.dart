@@ -13,8 +13,8 @@ import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/filterButton.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as p;
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
@@ -268,9 +268,22 @@ class _EdititemScreenState extends State<EdititemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: Text('Edit Item',style: GoogleFonts.poppins(color: Colors.white),),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Edit Item',
+          style: GoogleFonts.poppins(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
       body: FutureBuilder<EditScreenData>(
         future: _loadDataFuture,
@@ -290,31 +303,50 @@ class _EdititemScreenState extends State<EdititemScreen> {
     );
   }
 
-  // This method now contains your full UI, including the missing parts
+  // Helper method for section headers (matching setup screen style)
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 22),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // This method now contains your full UI with improved structure
   Widget _buildForm(EditScreenData data) {
-    final width = MediaQuery.of(context).size.width * 1;
-    final height = MediaQuery.of(context).size.height * 1;
     final currentCategoryName = data.allCategories.firstWhere(
             (cat) => cat.id == selectedCategoryId,
         orElse: () => Category(id: '', name: 'Select Category')
     ).name;
 
-
-
-
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(10.0),
+      padding: const EdgeInsets.all(20.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Basic Information Section
+          _buildSectionHeader('Basic Information', Icons.info_outline),
+          const SizedBox(height: 15),
           CommonTextForm(
               borderc: 5,
               LabelColor: Colors.grey,
               controller: _nameController,
               labelText: 'Item Name',
               obsecureText: false),
-          const SizedBox(height: 10),
+          const SizedBox(height: 25),
 
-          // ✅ UPDATED: New Selling Method UI matching bottomsheet
+          // Selling Method Section
+          _buildSectionHeader('Selling Method', Icons.scale),
+          const SizedBox(height: 15),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -415,13 +447,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          // Your Category Selector UI
-          Container( /* ... same as your code ... */ ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
 
-
-          // ✅ YOUR CATEGORY SELECTOR UI IS HERE
+          // Category Section
+          _buildSectionHeader('Category', Icons.category_outlined),
+          const SizedBox(height: 15),
           Container(
             height: 60,
             decoration: BoxDecoration(border: Border.all(width: 0.5, color: Colors.black38)),
@@ -469,8 +499,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          // ✅ UPDATED: Inventory Management Container matching bottomsheet
+          const SizedBox(height: 25),
+
+          // Inventory Management Section
+          _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
+          const SizedBox(height: 15),
           Container(
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -570,10 +603,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
 
-
-          // ✅ ADDED: Your Image Picker UI
+          // Item Image Section
+          _buildSectionHeader('Item Image', Icons.image_outlined),
+          const SizedBox(height: 15),
           InkWell(
             onTap: () async {
               final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -588,7 +622,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
             child: Column(
               children: [
                 Container(
-                  height: ResponsiveHelper.responsiveHeight(context, 0.16),
+                  height: AppResponsive.height(context, 0.16),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey),
@@ -604,12 +638,48 @@ class _EdititemScreenState extends State<EdititemScreen> {
           const SizedBox(height: 10),
 
           CommonTextForm(maxline: 3, controller: _descController, hintText: 'Description (Optional)', obsecureText: false),
-          const SizedBox(height: 16),
+          const SizedBox(height: 25),
+
+          // Variants, Choices & Extras Section
+          if (data.allVariants.isNotEmpty || data.allChoices.isNotEmpty || data.allExtra.isNotEmpty) ...[
+            _buildSectionHeader('Additional Options', Icons.extension),
+            const SizedBox(height: 15),
+          ],
           if (data.allVariants.isNotEmpty) _buildVariantSection(data.allVariants),
           if (data.allChoices.isNotEmpty) _buildChoiceSection(data.allChoices),
           if(data.allExtra.isNotEmpty) _buildExtrtaSection(data.allExtra),
-          const SizedBox(height: 24),
-          CommonButton(onTap: () => _saveChanges(data), child: const Text('Save')),
+          const SizedBox(height: 30),
+          // Save Button
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: () => _saveChanges(data),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.save, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Save Changes',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -643,12 +713,30 @@ class _EdititemScreenState extends State<EdititemScreen> {
   // Helper widget for building the variants section
   Widget _buildVariantSection(List<VariantModel> variants) {
     return Card(
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Variants', style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Icon(Icons.tune, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Variants',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
             const Divider(),
             ListView.builder(
               shrinkWrap: true,
@@ -683,13 +771,31 @@ class _EdititemScreenState extends State<EdititemScreen> {
   // Helper widget for building the choices section
   Widget _buildChoiceSection(List<ChoicesModel> choices) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Choices', style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Icon(Icons.checklist, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Choices',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
             const Divider(),
             ListView.builder(
               shrinkWrap: true,
@@ -711,13 +817,31 @@ class _EdititemScreenState extends State<EdititemScreen> {
   }
   Widget _buildExtrtaSection(List<Extramodel> extra) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: Colors.white,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Extra', style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Extras',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
             const Divider(),
             ListView.builder(
               shrinkWrap: true,

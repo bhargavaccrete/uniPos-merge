@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/restaurant/responsive_helper.dart';
+import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/core/di/service_locator.dart';
 
@@ -286,7 +287,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
               bgcolor: Colors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
@@ -303,7 +304,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                 Navigator.pop(context, selectedExtraIds.toList());
               },
               bordercircular: 10,
-              height: ResponsiveHelper.responsiveHeight(context, 0.06),
+              height: AppResponsive.height(context, 0.06),
               child: Text(
                 'Save',
                 style: GoogleFonts.poppins(
@@ -480,7 +481,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                         if (value) {
                                           // Initialize variant controllers if needed
                                           if (selectedVariants.isEmpty) {
-                                             // Auto-select all or none? Let's leave empty and let user select
+                                            // Auto-select all or none? Let's leave empty and let user select
                                           }
                                         } else {
                                           // Clear logic if unchecked? Keep data for now or clear?
@@ -495,11 +496,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                   ),
                                 ],
                               ),
-                            
+
                             // Price Input (Show if NO size or used as base price)
                             if (!hasSize) ...[
-                               SizedBox(height: 10),
-                               CommonTextForm(
+                              SizedBox(height: 10),
+                              CommonTextForm(
                                 controller: data['priceController'],
                                 labelText: 'Price',
                                 obsecureText: false,
@@ -522,7 +523,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                       final isSelected = selectedVariants.contains(variant.id);
                                       // Ensure controller exists if selected
                                       if (isSelected && !variantControllers.containsKey(variant.id)) {
-                                          variantControllers[variant.id] = TextEditingController();
+                                        variantControllers[variant.id] = TextEditingController();
                                       }
 
                                       return Row(
@@ -646,18 +647,18 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
 
                       if (hasSize) {
                         variantPrices = {};
-                         if (selectedVariants.isEmpty) {
-                           // Skip if contains size but no variants selected?
-                           // Or allow with 0 prices? Let's skip invalid ones or warn
-                           // For now, continuing
-                         }
-                         for (var variantId in selectedVariants) {
-                            final priceText = variantControllers[variantId]?.text.trim() ?? '0';
-                            final price = double.tryParse(priceText) ?? 0.0;
-                            variantPrices[variantId] = price;
-                            // Set base price to first variant's price as fallback
-                            if (basePrice == 0.0) basePrice = price;
-                         }
+                        if (selectedVariants.isEmpty) {
+                          // Skip if contains size but no variants selected?
+                          // Or allow with 0 prices? Let's skip invalid ones or warn
+                          // For now, continuing
+                        }
+                        for (var variantId in selectedVariants) {
+                          final priceText = variantControllers[variantId]?.text.trim() ?? '0';
+                          final price = double.tryParse(priceText) ?? 0.0;
+                          variantPrices[variantId] = price;
+                          // Set base price to first variant's price as fallback
+                          if (basePrice == 0.0) basePrice = price;
+                        }
                       } else {
                         final priceText = data['priceController'].text.trim();
                         basePrice = double.tryParse(priceText) ?? 0.0;

@@ -2,22 +2,18 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:unipos/util/color.dart';
+import '../../../../../util/common/app_responsive.dart';
 
-import '../../../../../constants/restaurant/color.dart';
-import '../../../../../util/restaurant/responsive_helper.dart';
-
-/// Bottom sheet for selecting image source (Gallery/Search)
+/// Bottom sheet for selecting image source (Gallery)
 class ImagePickerSheet extends StatelessWidget {
   final Function(Uint8List) onImageSelected;
-  final bool isForCategory;
 
   const ImagePickerSheet({
     super.key,
     required this.onImageSelected,
-    this.isForCategory = false,
   });
 
-  static Future<Uint8List?> show(BuildContext context, {bool isForCategory = false}) async {
+  static Future<Uint8List?> show(BuildContext context) async {
     Uint8List? selectedBytes;
 
     await showModalBottomSheet(
@@ -27,7 +23,6 @@ class ImagePickerSheet extends StatelessWidget {
       ),
       builder: (BuildContext context) {
         return ImagePickerSheet(
-          isForCategory: isForCategory,
           onImageSelected: (bytes) {
             selectedBytes = bytes;
           },
@@ -53,6 +48,31 @@ class ImagePickerSheet extends StatelessWidget {
 
       final Uint8List bytes = await pickedFile.readAsBytes();
 
+      // Validate image size (3MB = 3 * 1024 * 1024 bytes)
+      const maxSizeInBytes = 3 * 1024 * 1024;
+      if (bytes.length > maxSizeInBytes) {
+        if (context.mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Image size must be less than 3MB. Please choose a smaller image.'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
       onImageSelected(bytes);
       if (context.mounted) Navigator.pop(context);
     } catch (e) {
@@ -60,7 +80,17 @@ class ImagePickerSheet extends StatelessWidget {
       if (context.mounted) {
          Navigator.pop(context);
          ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text('Failed to add image: $e')),
+           SnackBar(
+             content: Row(
+               children: [
+                 Icon(Icons.error_outline, color: Colors.white),
+                 SizedBox(width: 12),
+                 Text('Failed to pick image. Please try again.'),
+               ],
+             ),
+             backgroundColor: Colors.red,
+             behavior: SnackBarBehavior.floating,
+           ),
          );
       }
     }
@@ -70,28 +100,36 @@ class ImagePickerSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: SizedBox(
-        width: double.infinity,
-        height: ResponsiveHelper.responsiveHeight(context, 0.25),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildOption(
-              context,
-              icon: Icons.photo_library,
-              label: 'From Gallery',
-              onTap: () => _pickImage(context, ImageSource.gallery),
-            ),
-            _buildOption(
-              context,
-              icon: Icons.search,
-              label: 'From Search',
-              onTap: () {
-                // TODO: Implement search functionality
-              },
-            ),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Select Image Source',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          SizedBox(height: 20),
+          // Image source option
+          _buildOption(
+            context,
+            icon: Icons.photo_library,
+            label: 'From Gallery',
+            onTap: () => _pickImage(context, ImageSource.gallery),
+          ),
+          SizedBox(height: 20),
+        ],
       ),
     );
   }
@@ -104,19 +142,31 @@ class ImagePickerSheet extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        alignment: Alignment.center,
-        width: ResponsiveHelper.responsiveWidth(context, 0.35),
-        height: ResponsiveHelper.responsiveHeight(context, 0.2),
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(4),
+          color: AppColors.primary.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 50, color: AppColors.primary),
-            Text(label),
+            SizedBox(height: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
           ],
         ),
       ),
@@ -147,7 +197,7 @@ class ImageUploader extends StatelessWidget {
         children: [
           Container(
             width: double.infinity,
-            height: ResponsiveHelper.responsiveHeight(context, 0.12),
+            height: AppResponsive.height(context, 0.12),
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey),
               borderRadius: BorderRadius.circular(10),
@@ -169,14 +219,14 @@ class ImageUploader extends StatelessWidget {
                       Text(
                         uploadLabel,
                         style: TextStyle(
-                          fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
+                          fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       Text(
                         sizeHint,
                         style: TextStyle(
-                          fontSize: ResponsiveHelper.responsiveTextSize(context, 12),
+                          fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.2, desktop: 14.4),
                           color: Colors.grey.shade600,
                         ),
                       )
@@ -189,7 +239,7 @@ class ImageUploader extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey,
-              fontSize: ResponsiveHelper.responsiveTextSize(context, 11),
+              fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.1, desktop: 13.2),
             ),
           )
         ],

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
-import '../util/color.dart';
-import '../util/responsive.dart';
+import '../../../util/color.dart';
+import '../../../util/responsive.dart';
 
 /// Business Type Selection Step
 /// UI Only - uses Observer to listen to store changes

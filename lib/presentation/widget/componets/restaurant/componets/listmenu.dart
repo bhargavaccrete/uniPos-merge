@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
-import '../../../../../util/restaurant/responsive_helper.dart';
+import '../../../../../util/common/app_responsive.dart';
 
 
 class Listmenu extends StatefulWidget {
@@ -48,11 +48,11 @@ class _ListmenuState extends State<Listmenu> {
         style: ListTileStyle.drawer,
 
         onTap:widget.onTap,
-        leading:Icon(widget.icons,color:widget.color?? AppColors.primary,size: widget.iconssize??ResponsiveHelper.responsiveTextSize(context, 20),
+        leading:Icon(widget.icons,color:widget.color?? AppColors.primary,size: widget.iconssize??AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0),
           ),
         titleAlignment: ListTileTitleAlignment.center,
         title: Text(widget.title,style: GoogleFonts.poppins(
-            fontSize: ResponsiveHelper.responsiveTextSize(context, 10),
+            fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0),
             color: widget.colortext?? Colors.black),),
       ),
     );

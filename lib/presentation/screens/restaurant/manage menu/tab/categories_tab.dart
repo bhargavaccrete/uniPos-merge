@@ -10,8 +10,7 @@ import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_ca
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/restaurant/images.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
@@ -57,7 +56,7 @@ class _CategoryTabState extends State<CategoryTab> {
       builder: (context) {
         return Container(
           padding: EdgeInsets.all(20),
-          height: ResponsiveHelper.responsiveHeight(context, 0.25),
+          height: AppResponsive.height(context, 0.25),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -86,8 +85,8 @@ class _CategoryTabState extends State<CategoryTab> {
     return InkWell(
       onTap: onTap,
       child: Container(
-        width: ResponsiveHelper.responsiveWidth(context, 0.35),
-        height: ResponsiveHelper.responsiveHeight(context, 0.18),
+        width: AppResponsive.width(context, 0.35),
+        height: AppResponsive.height(context, 0.18),
         decoration: BoxDecoration(
           color: AppColors.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
@@ -401,7 +400,7 @@ class _CategoryTabState extends State<CategoryTab> {
             crossAxisCount: _getGridColumns(size.width),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.85,
+            childAspectRatio: 2,
           ),
           itemCount: filteredCategories.length,
           itemBuilder: (context, index) {

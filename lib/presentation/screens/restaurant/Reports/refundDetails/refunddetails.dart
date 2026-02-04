@@ -1,19 +1,19 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'dart:io';
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/color.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/refundDetails/monthbyrefund.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/refundDetails/thisweekbyrefund.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/refundDetails/todaybyrefund.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/refundDetails/yearbyrefund.dart';
-import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
+import '../../tabbar/orderDetails.dart';
 
-import 'customebyrefund.dart';
+enum RefundPeriod { Today, ThisWeek, Month, Year, Custom }
 
 class RefundDetails extends StatefulWidget {
   const RefundDetails({super.key});
@@ -23,110 +23,828 @@ class RefundDetails extends StatefulWidget {
 }
 
 class _RefundDetailsState extends State<RefundDetails> {
-  String selectedFilter = "Today";
-
-  Widget _getBody() {
-    switch (selectedFilter) {
-      case "Today":
-        return TodayByRefund();
-      case "Custom":
-        return CustomByRefund();
-      case "Week Wise":
-        return WeekByRefund();
-      case "Month Wise":
-        return Monthbyrefund();
-      case "Year Wise":
-        return YearWisebyRefund();
-      default:
-        return Center(
-          child: Text('NO DATA AVAILABE'),
-        );
-    }
-  }
+  RefundPeriod _selectedPeriod = RefundPeriod.Today;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: Text("Refund Details",
-            textScaler: TextScaler.linear(1),
-            style: GoogleFonts.poppins(
-                fontSize: 20,
-                color: Colors.white,
-                fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        leading: IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: Icon(
-              Icons.arrow_back_ios,
-              color: Colors.white,
-            )),
-      ),
-      body: Container(
-        padding: EdgeInsets.symmetric(horizontal: 5, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Text(
-            //   'Refund Details',
-            //   textScaler: TextScaler.linear(1),
-            //   style: GoogleFonts.poppins(
-            //       fontWeight: FontWeight.w500, fontSize: 18),
-            // ),
-            // SizedBox(
-            //   height: 10,
-            // ),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+      backgroundColor: AppColors.surfaceLight,
+      body: Column(
+        children: [
+          // Modern Header
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
               child: Row(
                 children: [
-                  _filterButton('Today'),
-                  SizedBox(
-                    width: 10,
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.arrow_back, color: AppColors.white, size: 24),
+                    ),
                   ),
-                  _filterButton('Custom'),
-                  SizedBox(
-                    width: 10,
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Refund Details',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.headingFontSize(context),
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'View refunds across different periods',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  _filterButton('Week Wise'),
-                  SizedBox(
-                    width: 10,
+                  Container(
+                    padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.receipt_long,
+                      size: AppResponsive.iconSize(context),
+                      color: AppColors.primary,
+                    ),
                   ),
-                  _filterButton('Month Wise'),
-                  SizedBox(
-                    width: 10,
-                  ),
-                  _filterButton('Year Wise'),
                 ],
               ),
             ),
-            Expanded(child: _getBody())
-          ],
+          ),
+
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+
+          // Filter Buttons
+          Container(
+            color: AppColors.white,
+            padding: AppResponsive.horizontalPadding(context).copyWith(top: 12, bottom: 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _filterButton(RefundPeriod.Today, 'Today', Icons.today),
+                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                  _filterButton(RefundPeriod.ThisWeek, 'This Week', Icons.view_week),
+                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                  _filterButton(RefundPeriod.Month, 'This Month', Icons.calendar_month),
+                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                  _filterButton(RefundPeriod.Year, 'This Year', Icons.calendar_today),
+                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                  _filterButton(RefundPeriod.Custom, 'Custom', Icons.date_range),
+                ],
+              ),
+            ),
+          ),
+
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+
+          Expanded(
+            child: RefundDataView(
+              key: ValueKey(_selectedPeriod),
+              period: _selectedPeriod,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterButton(RefundPeriod period, String title, IconData icon) {
+    bool isSelected = _selectedPeriod == period;
+    return ElevatedButton.icon(
+      onPressed: () {
+        setState(() {
+          _selectedPeriod = period;
+        });
+      },
+      icon: Icon(icon, size: AppResponsive.smallIconSize(context)),
+      label: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.smallFontSize(context),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
+          vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0),
+        ),
+        backgroundColor: isSelected ? AppColors.primary : AppColors.white,
+        foregroundColor: isSelected ? AppColors.white : AppColors.textPrimary,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: 1,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class RefundDataView extends StatefulWidget {
+  final RefundPeriod period;
+  const RefundDataView({super.key, required this.period});
+
+  @override
+  State<RefundDataView> createState() => _RefundDataViewState();
+}
+
+class _RefundDataViewState extends State<RefundDataView> {
+  List<pastOrderModel> _allOrders = [];
+  List<pastOrderModel> _refundedOrders = [];
+  double _totalRefundAmount = 0.0;
+  int _totalRefundCount = 0;
+  bool _isLoading = true;
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDataAndFilter();
+  }
+
+  @override
+  void didUpdateWidget(covariant RefundDataView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _loadDataAndFilter();
+
+    if (widget.period != oldWidget.period) {
+      _startDate = null;
+      _endDate = null;
+    }
+  }
+
+  Future<void> _loadDataAndFilter() async {
+    await pastOrderStore.loadPastOrders();
+    _allOrders = pastOrderStore.pastOrders.toList();
+    _fetchAndFilterData();
+  }
+
+  void _fetchAndFilterData() {
+    setState(() {
+      _isLoading = true;
+    });
+
+    List<pastOrderModel> resultingList = [];
+    final now = DateTime.now();
+
+    if (widget.period == RefundPeriod.Custom) {
+      if (_startDate != null && _endDate != null) {
+        resultingList = _allOrders.where((order) {
+          if (order.refundedAt == null) return false;
+          return order.refundedAt!.isAfter(_startDate!.subtract(const Duration(seconds: 1))) &&
+              order.refundedAt!.isBefore(_endDate!.add(const Duration(days: 1)));
+        }).toList();
+      }
+    } else {
+      switch (widget.period) {
+        case RefundPeriod.Today:
+          resultingList = _allOrders.where((order) {
+            if (order.refundedAt == null) return false;
+            final refundDate = order.refundedAt!;
+            return refundDate.year == now.year &&
+                refundDate.month == now.month &&
+                refundDate.day == now.day;
+          }).toList();
+          break;
+        case RefundPeriod.ThisWeek:
+          final dayOfWeek = now.subtract(Duration(days: now.weekday - 1));
+          final startOfWeek = DateTime(dayOfWeek.year, dayOfWeek.month, dayOfWeek.day);
+          final endOfWeek = startOfWeek.add(const Duration(days: 7));
+
+          resultingList = _allOrders.where((order) {
+            if (order.refundedAt == null) return false;
+            final refundDate = order.refundedAt!;
+            return !refundDate.isBefore(startOfWeek) && refundDate.isBefore(endOfWeek);
+          }).toList();
+          break;
+        case RefundPeriod.Month:
+          resultingList = _allOrders.where((order) {
+            if (order.refundedAt == null) return false;
+            final refundDate = order.refundedAt!;
+            return refundDate.year == now.year && refundDate.month == now.month;
+          }).toList();
+          break;
+        case RefundPeriod.Year:
+          resultingList = _allOrders.where((order) {
+            if (order.refundedAt == null) return false;
+            return order.refundedAt!.year == now.year;
+          }).toList();
+          break;
+        case RefundPeriod.Custom:
+          break;
+      }
+    }
+
+    setState(() {
+      _refundedOrders = resultingList;
+      _totalRefundCount = _refundedOrders.length;
+      _totalRefundAmount = _refundedOrders.fold(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+      _isLoading = false;
+    });
+  }
+
+  String _getMostCommonReason() {
+    if (_refundedOrders.isEmpty) return '-';
+
+    final reasonCounts = <String, int>{};
+    for (final order in _refundedOrders) {
+      if (order.refundReason != null && order.refundReason!.isNotEmpty) {
+        final lines = order.refundReason!.split('\n');
+        final reason = lines.isNotEmpty ? lines.last.trim() : '';
+        if (reason.isNotEmpty) {
+          reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
+        }
+      }
+    }
+
+    if (reasonCounts.isEmpty) return '-';
+
+    var mostCommon = reasonCounts.entries.first;
+    for (final entry in reasonCounts.entries) {
+      if (entry.value > mostCommon.value) {
+        mostCommon = entry;
+      }
+    }
+    return mostCommon.key;
+  }
+
+  Future<void> _exportToExcel() async {
+    if (_refundedOrders.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No data to export'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    List<String> headers = [
+      'Date',
+      'Order ID',
+      'Customer Name',
+      'Payment Method',
+      'Order Type',
+      'Refund Amount',
+      'Reason'
+    ];
+
+    List<List<dynamic>> rows = [headers];
+
+    for (var order in _refundedOrders) {
+      String reason = '';
+      if (order.refundReason != null && order.refundReason!.isNotEmpty) {
+        final lines = order.refundReason!.split('\n');
+        reason = lines.isNotEmpty ? lines.last.trim() : '';
+      }
+
+      rows.add([
+        order.refundedAt != null ? DateFormat('dd-MM-yyyy HH:mm').format(order.refundedAt!) : 'N/A',
+        order.id,
+        order.customerName,
+        order.paymentmode ?? 'N/A',
+        order.orderType ?? 'N/A',
+        DecimalSettings.formatAmount(order.refundAmount ?? 0.0),
+        reason,
+      ]);
+    }
+
+    String csv = const ListToCsvConverter().convert(rows);
+
+    try {
+      final directory = await getTemporaryDirectory();
+      final periodName = widget.period.name;
+      final path = '${directory.path}/refunds_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+      final file = File(path);
+      await file.writeAsString(csv);
+
+      await Share.shareXFiles([XFile(path)], text: "Refund Report - $periodName");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Report exported successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error exporting: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context, bool isStartDate) {
+    return showDatePicker(
+      context: context,
+      initialDate: (isStartDate ? _startDate : _endDate) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: AppColors.white,
+              surface: AppColors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    ).then((picked) {
+      if (picked != null) {
+        setState(() {
+          if (isStartDate) {
+            _startDate = picked;
+          } else {
+            _endDate = picked;
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
+    if (widget.period == RefundPeriod.Custom) {
+      return _buildCustomDateSelector(isTablet);
+    }
+
+    return _buildReportUI(isTablet);
+  }
+
+  Widget _buildCustomDateSelector(bool isTablet) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 1200;
+
+    String formatDate(DateTime? date) {
+      if (date == null) return 'Select Date';
+      return DateFormat('dd MMM, yyyy').format(date);
+    }
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isTablet ? 20 : 16),
+      child: Center(
+        child: Container(
+          constraints: BoxConstraints(maxWidth: isDesktop ? 1400 : 1000),
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(isTablet ? 20 : 16),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Select Date Range',
+                      style: GoogleFonts.poppins(
+                        fontSize: isDesktop ? 20 : (isTablet ? 18 : 16),
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(child: _buildDatePickerButton('Start Date', formatDate(_startDate), () => _selectDate(context, true), isTablet)),
+                        SizedBox(width: 16),
+                        Expanded(child: _buildDatePickerButton('End Date', formatDate(_endDate), () => _selectDate(context, false), isTablet)),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: (_startDate != null && _endDate != null) ? _fetchAndFilterData : null,
+                        icon: Icon(Icons.filter_list, size: isTablet ? 20 : 18),
+                        label: Text(
+                          'Apply Filter',
+                          style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 15, fontWeight: FontWeight.w600),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.white,
+                          padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          disabledBackgroundColor: AppColors.divider,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_refundedOrders.isNotEmpty) ...[
+                SizedBox(height: 16),
+                _buildReportContent(isTablet),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _filterButton(String title) {
-    return ElevatedButton(
-        onPressed: () {
-          setState(() {
-            selectedFilter = title;
-          });
-        },
-        style: ElevatedButton.styleFrom(
-            backgroundColor:
-            selectedFilter == title ? AppColors.primary: Colors.white,
-            foregroundColor:
-            selectedFilter == title ? Colors.white : AppColors.primary,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: AppColors.primary))),
-        child: Text(title));
+  Widget _buildDatePickerButton(String label, String value, VoidCallback onPressed, bool isTablet) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(fontSize: isTablet ? 14 : 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        ),
+        SizedBox(height: 8),
+        InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: EdgeInsets.all(isTablet ? 14 : 12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: isTablet ? 14 : 13,
+                    color: value == 'Select Date' ? AppColors.textSecondary : AppColors.textPrimary,
+                  ),
+                ),
+                Icon(Icons.calendar_today, size: isTablet ? 20 : 18, color: AppColors.primary),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
-// CommonButton;
+  Widget _buildReportUI(bool isTablet) {
+    if (_refundedOrders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0)),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMedium,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                size: AppResponsive.getValue(context, mobile: 56.0, tablet: 64.0),
+                color: AppColors.textSecondary,
+              ),
+            ),
+            AppResponsive.verticalSpace(context, size: SpacingSize.large),
+            Text(
+              'No Refunds Data',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.headingFontSize(context),
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            AppResponsive.verticalSpace(context, size: SpacingSize.small),
+            Text(
+              'No refunds found for this period',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: AppResponsive.padding(context),
+      child: AppResponsive.constrainedContent(
+        context: context,
+        child: _buildReportContent(isTablet),
+      ),
+    );
+  }
+
+  Widget _buildReportContent(bool isTablet) {
+    return Column(
+      children: [
+        _buildSummaryCards(isTablet),
+        SizedBox(height: 16),
+        _buildExportButton(isTablet),
+        SizedBox(height: 16),
+        _buildDataTable(isTablet),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCards(bool isTablet) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 1200;
+    final mostCommonReason = _getMostCommonReason();
+
+    return Wrap(
+      spacing: isDesktop ? 24 : 16,
+      runSpacing: 16,
+      children: [
+        Container(
+          width: isDesktop ? (screenWidth - 88) / 3 : (screenWidth - 48),
+          padding: EdgeInsets.all(isTablet ? 24 : 16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider, width: 0.5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Refunds',
+                    style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.receipt_long, color: AppColors.primary, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                  ),
+                ],
+              ),
+              SizedBox(height: isDesktop ? 16 : 12),
+              Text(
+                _totalRefundCount.toString(),
+                style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: isDesktop ? (screenWidth - 88) / 3 : (screenWidth - 48),
+          padding: EdgeInsets.all(isTablet ? 24 : 16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider, width: 0.5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Amount',
+                    style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1 * Colors.red.a),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.monetization_on, color: Colors.red, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                  ),
+                ],
+              ),
+              SizedBox(height: isDesktop ? 16 : 12),
+              Text(
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRefundAmount)}',
+                style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: isDesktop ? (screenWidth - 88) / 3 : (screenWidth - 48),
+          padding: EdgeInsets.all(isTablet ? 24 : 16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider, width: 0.5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Common Reason',
+                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1 * Colors.orange.a),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.info_outline, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                  ),
+                ],
+              ),
+              SizedBox(height: isDesktop ? 16 : 12),
+              Text(
+                mostCommonReason,
+                style: GoogleFonts.poppins(fontSize: isDesktop ? 18 : (isTablet ? 16 : 15), fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExportButton(bool isTablet) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 1200;
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _exportToExcel,
+        icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
+        label: Text(
+          'Export to Excel',
+          style: GoogleFonts.poppins(fontSize: isDesktop ? 17 : (isTablet ? 16 : 15), fontWeight: FontWeight.w600),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: AppColors.white,
+          padding: EdgeInsets.symmetric(vertical: isDesktop ? 18 : (isTablet ? 16 : 14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataTable(bool isTablet) {
+    final screenWidth = AppResponsive.screenWidth(context);
+    final cellFontSize = AppResponsive.smallFontSize(context);
+    final headerFontSize = AppResponsive.bodyFontSize(context);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: screenWidth - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
+            ),
+            child: DataTable(
+              columnSpacing: AppResponsive.tableColumnSpacing(context),
+              headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
+              headingRowHeight: AppResponsive.tableHeadingHeight(context),
+              dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
+              dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
+              columns: [
+                DataColumn(label: Text('Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                DataColumn(label: Text('Order ID', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                DataColumn(label: Text('Customer', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                DataColumn(label: Text('Payment', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                DataColumn(label: Text('Type', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                DataColumn(label: Text('Amount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
+                DataColumn(label: Text('Reason', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+              ],
+              rows: _refundedOrders.map((order) {
+                String reason = '-';
+                if (order.refundReason != null && order.refundReason!.isNotEmpty) {
+                  final lines = order.refundReason!.split('\n');
+                  reason = lines.isNotEmpty ? lines.last.trim() : '-';
+                }
+
+                return DataRow(
+                  onSelectChanged: (selected) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => Orderdetails(Order: order),
+                      ),
+                    );
+                  },
+                  cells: [
+                    DataCell(Text(order.refundedAt != null ? DateFormat('dd-MM-yy\nHH:mm').format(order.refundedAt!) : 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
+                    DataCell(Text('#${order.id?.substring(0, 8) ?? 'N/A'}...', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
+                    DataCell(Text(order.customerName ?? '-', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
+                    DataCell(
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
+                          vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(order.paymentmode ?? 'N/A', style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context), color: AppColors.primary, fontWeight: FontWeight.w500)),
+                      ),
+                    ),
+                    DataCell(Text(order.orderType ?? 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textSecondary))),
+                    DataCell(Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(order.refundAmount ?? 0.0)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: Colors.red.shade600, fontWeight: FontWeight.w600))),
+                    DataCell(
+                      Container(
+                        constraints: BoxConstraints(maxWidth: 200),
+                        child: Text(reason, style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis, maxLines: 2),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

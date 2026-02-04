@@ -83,8 +83,16 @@ void main() async{
 
 
 
-     startServer();
-    print('🚀 UniPOS Local Server Started');
+    // Start the local server with proper error handling
+    try {
+      await startServer();
+      print('🚀 UniPOS Local Server Started Successfully');
+    } catch (e, stackTrace) {
+      print('❌ Failed to start UniPOS Local Server: $e');
+      print('Stack trace: $stackTrace');
+      // Continue app initialization even if server fails
+      print('⚠️  App will continue without local server');
+    }
 
   } else if (AppConfig.isRetail) {
     // Load retail printer settings from SharedPreferences

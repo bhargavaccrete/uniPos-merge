@@ -1,59 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/color.dart';
 
-import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/manyListViewWithBottomSheet.dart';
-
-
 
 class Taxragistration extends StatelessWidget{
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width * 1;
-    final height = MediaQuery.of(context).size.height * 1;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        leading: IconButton(onPressed: (){Navigator.of(context).pop();}, icon: Icon(Icons.arrow_back_ios_new_outlined)),
-        elevation: 1,
+        automaticallyImplyLeading: true,
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black87),
+        title: Text(
+          'Tax Registration',
+          style: GoogleFonts.poppins(
+            fontSize: isTablet ? 22 : 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
         actions: [
-          Padding(padding:
-          EdgeInsets.all(8.0),
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 16 : 12,
+              vertical: 8,
+            ),
             child: Row(
               children: [
-                Icon(Icons.person),
-                Text('Admin')
+                Container(
+                  padding: EdgeInsets.all(isTablet ? 10 : 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.person,
+                    size: isTablet ? 22 : 20,
+                    color: AppColors.primary,
+                  ),
+                ),
+                if (isTablet) ...[
+                  SizedBox(width: 10),
+                  Text(
+                    'Admin',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
               ],
-            ),)
+            ),
+          ),
         ],
       ),
 
-      body:
-      SingleChildScrollView(
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),
-          // height: height * 0.6,
-          child: Column(
-            children: [
-              Container(
-                height: height *0.7,
-
-                // color: Colors.green,
-                child: MultipleListView(
-                  ShowText: "Text Ragistration",
-
-                  lists: [['TAX NAME : ','DRR','TAX NUMBER : ','25412']], ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              child: Column(
+                children: [
+                  Container(
+                    child: MultipleListView(
+                      ShowText: "Tax Registration",
+                      lists: [['TAX NAME : ','DRR','TAX NUMBER : ','25412']],
+                    ),
+                  ),
+                ],
               ),
-
-              CommonButton(
-                  bgcolor: Colors.grey,
-                  bordercolor: Colors.grey,
-                  height: height * 0.08,
-                  width: width * 0.9,
-                  bordercircular: 10,
-                  onTap: (){}, child:Text("Add Tax Name & Number",style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold),) ),
-            ],
+            ),
           ),
-        ),
+
+          Container(
+            color: Colors.white,
+            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            child: SizedBox(
+              width: double.infinity,
+              height: isTablet ? 54 : 50,
+              child: ElevatedButton.icon(
+                onPressed: (){},
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: Icon(Icons.add_circle_rounded, size: isTablet ? 24 : 22),
+                label: Text(
+                  'Add Tax Name & Number',
+                  style: GoogleFonts.poppins(
+                    fontSize: isTablet ? 17 : 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
 
 

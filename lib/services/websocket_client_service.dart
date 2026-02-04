@@ -43,11 +43,14 @@ class WebSocketClientService {
     _isConnecting = true;
 
     try {
-      // Connect to local server WebSocket
-      const wsUrl = 'ws://localhost:9090/ws';
+      // Use 127.0.0.1 instead of localhost for better Android compatibility
+      const wsUrl = 'ws://127.0.0.1:9090/ws';
       print('🔌 UniPOS connecting to WebSocket: $wsUrl');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+      // Wait a moment to see if connection succeeds before setting up listeners
+      await Future.delayed(const Duration(milliseconds: 100));
 
       _channel!.stream.listen(
         (message) {
@@ -67,6 +70,7 @@ class WebSocketClientService {
           print('🔌 UniPOS WebSocket connection closed');
           _handleDisconnect();
         },
+        cancelOnError: false,
       );
 
       _isConnecting = false;
@@ -81,12 +85,15 @@ class WebSocketClientService {
   void _handleDisconnect() {
     _channel = null;
 
-    // Attempt to reconnect after 5 seconds if still enabled
+    // Attempt to reconnect after 10 seconds if still enabled
+    // Using longer delay to avoid spamming connection attempts
     if (_isEnabled) {
       _reconnectTimer?.cancel();
-      _reconnectTimer = Timer(const Duration(seconds: 5), () {
-        print('🔄 UniPOS attempting to reconnect WebSocket...');
-        _connect();
+      _reconnectTimer = Timer(const Duration(seconds: 10), () {
+        if (_isEnabled && !_isConnecting) {
+          print('🔄 UniPOS attempting to reconnect WebSocket...');
+          _connect();
+        }
       });
     }
   }

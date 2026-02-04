@@ -157,45 +157,64 @@ class _ChangepasswordState extends State<Changepassword> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    final width = size.width;
+    final height = size.height;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black87),
         title: Text(
-          "Change Password",
+          'Change Password',
           style: GoogleFonts.poppins(
-            fontSize: 18,
+            fontSize: isTablet ? 22 : 20,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: Colors.black87,
           ),
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 16 : 12,
+              vertical: 8,
+            ),
             child: Row(
               children: [
-                const Icon(Icons.person, color: Colors.white),
-                const SizedBox(width: 4),
-                Text(
-                  "Admin",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.white,
+                Container(
+                  padding: EdgeInsets.all(isTablet ? 10 : 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.person,
+                    size: isTablet ? 22 : 20,
+                    color: AppColors.primary,
                   ),
                 ),
+                if (isTablet) ...[
+                  SizedBox(width: 10),
+                  Text(
+                    'Admin',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
               ],
             ),
-          )
+          ),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isTablet ? 24 : 20),
           child: Form(
             key: _formKey,
             child: Column(
@@ -204,21 +223,39 @@ class _ChangepasswordState extends State<Changepassword> {
                 // Info Card
                 Container(
                   width: width,
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(isTablet ? 18 : 16),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.blue.shade200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 24),
+                      Container(
+                        padding: EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade700,
+                          size: isTablet ? 26 : 24,
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Change your admin password to keep your account secure.',
                           style: GoogleFonts.poppins(
-                            fontSize: 13,
+                            fontSize: isTablet ? 14 : 13,
                             color: Colors.blue.shade700,
                           ),
                         ),
@@ -233,22 +270,40 @@ class _ChangepasswordState extends State<Changepassword> {
                 if (_errorMessage != null) ...[
                   Container(
                     width: width,
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(isTablet ? 14 : 12),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.red.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                        const SizedBox(width: 8),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            Icons.error_outline,
+                            color: Colors.red.shade700,
+                            size: isTablet ? 22 : 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             _errorMessage!,
                             style: GoogleFonts.poppins(
                               color: Colors.red.shade700,
-                              fontSize: 14,
+                              fontSize: isTablet ? 15 : 14,
                             ),
                           ),
                         ),
@@ -262,22 +317,40 @@ class _ChangepasswordState extends State<Changepassword> {
                 if (_successMessage != null) ...[
                   Container(
                     width: width,
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(isTablet ? 14 : 12),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.green.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline, color: Colors.green.shade700, size: 20),
-                        const SizedBox(width: 8),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            Icons.check_circle_outline,
+                            color: Colors.green.shade700,
+                            size: isTablet ? 22 : 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             _successMessage!,
                             style: GoogleFonts.poppins(
                               color: Colors.green.shade700,
-                              fontSize: 14,
+                              fontSize: isTablet ? 15 : 14,
                             ),
                           ),
                         ),
@@ -291,8 +364,9 @@ class _ChangepasswordState extends State<Changepassword> {
                 Text(
                   "Current Password",
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: isTablet ? 16 : 15,
                     fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
                 ),
                 SizedBox(height: height * 0.01),
@@ -328,8 +402,9 @@ class _ChangepasswordState extends State<Changepassword> {
                 Text(
                   "New Password",
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: isTablet ? 16 : 15,
                     fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
                 ),
                 SizedBox(height: height * 0.01),
@@ -365,8 +440,9 @@ class _ChangepasswordState extends State<Changepassword> {
                 Text(
                   "Confirm New Password",
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: isTablet ? 16 : 15,
                     fontWeight: FontWeight.w600,
+                    color: Colors.black87,
                   ),
                 ),
                 SizedBox(height: height * 0.01),
@@ -431,24 +507,48 @@ class _ChangepasswordState extends State<Changepassword> {
 
                 // Password Requirements
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(isTablet ? 16 : 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Password Requirements:',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              Icons.security_rounded,
+                              color: AppColors.primary,
+                              size: isTablet ? 20 : 18,
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Password Requirements:',
+                            style: GoogleFonts.poppins(
+                              fontSize: isTablet ? 15 : 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       _buildRequirement('Minimum 6 characters'),
                       _buildRequirement('Different from current password'),
                       _buildRequirement('New password and confirm password must match'),

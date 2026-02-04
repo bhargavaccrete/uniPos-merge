@@ -53,7 +53,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   }
 
   Future<void> _pickImage() async {
-    final bytes = await ImagePickerSheet.show(context, isForCategory: true);
+    final bytes = await ImagePickerSheet.show(context);
     if (bytes != null) {
       setState(() {
         _selectedImageBytes = bytes;

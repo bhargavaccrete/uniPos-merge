@@ -10,3 +10,11 @@ nul
 
 # Ignore markdown files
 *.md
+*.txt
+*.xlsx
+/lib/presentation/screens/restaurant/Reports/customer list by revenue/customerlistbyrevenue.dart.backup
+/lib/presentation/screens/restaurant/Reports/expenseReport/expensereport.dart.backup
+/lib/presentation/screens/restaurant/Reports/pos End Day Report/posenddayreport.dart.backup
+/lib/presentation/screens/restaurant/Reports/void Order Report/voidOrderReport.dart.backup
+/lib/presentation/screens/restaurant/Reports/refundDetails/refunddetails.dart.backup
+/lib/presentation/screens/restaurant/Reports/Discount Order Report/dicountOrderReport.dart.backup

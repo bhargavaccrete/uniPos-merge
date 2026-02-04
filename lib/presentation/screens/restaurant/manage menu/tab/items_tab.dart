@@ -11,7 +11,6 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/bottom
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
-import '../../../../../util/restaurant/images.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 
 class ItemsTab extends StatefulWidget {
@@ -107,7 +106,8 @@ class _AllTabState extends State<ItemsTab> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       body: Column(
-        children: [ // Modern Search Bar
+        children: [
+          // Modern Search Bar
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -160,6 +160,26 @@ class _AllTabState extends State<ItemsTab> {
           BottomsheetMenu(
             onCategorySelected: (category) {
               setState(() {});
+            },
+            onItemAdded: () {
+              // Show success feedback
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text(
+                        'Item added successfully!',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 2),
+                ),
+              );
             },
           ),
         ],
@@ -524,6 +544,7 @@ class _AllTabState extends State<ItemsTab> {
         }
 
         final columns = _getGridColumns(size.width);
+        final isTablet = size.width > 600;
 
         return GridView.builder(
           padding: EdgeInsets.all(24),
@@ -531,7 +552,8 @@ class _AllTabState extends State<ItemsTab> {
             crossAxisCount: columns,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.75,
+            // childAspectRatio: isTablet ? 1.0 : 0.75,
+            childAspectRatio:1.5,
           ),
           itemCount: filteredItems.length,
           itemBuilder: (context, index) {
@@ -558,7 +580,7 @@ class _AllTabState extends State<ItemsTab> {
                 children: [
                   // Header
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: EdgeInsets.all(isTablet ? 8 : 10),
                     decoration: BoxDecoration(
                       color: item.isEnabled
                           ? Colors.green.withOpacity(0.05)
@@ -571,7 +593,7 @@ class _AllTabState extends State<ItemsTab> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Container(
-                              padding: EdgeInsets.all(8),
+                              padding: EdgeInsets.all(isTablet ? 6 : 8),
                               decoration: BoxDecoration(
                                 color: item.isEnabled
                                     ? Colors.green.withOpacity(0.1)
@@ -581,7 +603,7 @@ class _AllTabState extends State<ItemsTab> {
                               child: Icon(
                                 Icons.restaurant_menu,
                                 color: item.isEnabled ? Colors.green : Colors.red,
-                                size: 20,
+                                size: isTablet ? 18 : 20,
                               ),
                             ),
                             Transform.scale(
@@ -599,11 +621,11 @@ class _AllTabState extends State<ItemsTab> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 8),
+                        SizedBox(height: isTablet ? 6 : 8),
                         Text(
                           item.name,
                           style: GoogleFonts.poppins(
-                            fontSize: 14,
+                            fontSize: isTablet ? 13 : 14,
                             fontWeight: FontWeight.w600,
                             color: Colors.black87,
                           ),
@@ -616,84 +638,79 @@ class _AllTabState extends State<ItemsTab> {
                   ),
 
                   // Body
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: item.isVeg == 'Veg'
-                                      ? Colors.green.withOpacity(0.1)
-                                      : Colors.red.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
-                                  ),
-                                ),
-                                child: Text(
-                                  item.isVeg == 'Veg' ? 'Veg' : 'Non-Veg',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
-                                  ),
+                  Padding(
+                    padding: EdgeInsets.all(isTablet ? 8 : 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: item.isVeg == 'Veg'
+                                    ? Colors.green.withOpacity(0.1)
+                                    : Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
                                 ),
                               ),
-                              SizedBox(height: 6),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.category, size: 12, color: Colors.grey.shade600),
-                                  SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      categoryName,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                item.isVeg == 'Veg' ? 'Veg' : 'Non-Veg',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Icon(Icons.category, size: 11, color: Colors.grey.shade600),
+                            SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                categoryName,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: isTablet ? 8 : 10),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.currency_rupee, size: 13, color: AppColors.primary),
+                              Text(
+                                "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}",
+                                style: GoogleFonts.poppins(
+                                  fontSize: isTablet ? 13 : 14,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.currency_rupee, size: 14, color: AppColors.primary),
-                                Text(
-                                  "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
 
                   // Footer Actions
                   Container(
-                    padding: EdgeInsets.all(8),
+                    padding: EdgeInsets.all(isTablet ? 6 : 8),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
                       borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
@@ -704,23 +721,23 @@ class _AllTabState extends State<ItemsTab> {
                         InkWell(
                           onTap: () => editItems(item),
                           child: Container(
-                            padding: EdgeInsets.all(6),
+                            padding: EdgeInsets.all(isTablet ? 5 : 6),
                             decoration: BoxDecoration(
                               color: Colors.blue.shade50,
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue),
+                            child: Icon(Icons.edit_outlined, size: isTablet ? 15 : 16, color: Colors.blue),
                           ),
                         ),
                         InkWell(
                           onTap: () => _deleteItem(item.id),
                           child: Container(
-                            padding: EdgeInsets.all(6),
+                            padding: EdgeInsets.all(isTablet ? 5 : 6),
                             decoration: BoxDecoration(
                               color: Colors.red.shade50,
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                            child: Icon(Icons.delete_outline, size: isTablet ? 15 : 16, color: Colors.red),
                           ),
                         ),
                       ],
