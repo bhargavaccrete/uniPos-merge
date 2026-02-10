@@ -6,17 +6,17 @@ part of 'pastordermodel_313.dart';
 // TypeAdapterGenerator
 // **************************************************************************
 
-class pastOrderModelAdapter extends TypeAdapter<pastOrderModel> {
+class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
   @override
   final int typeId = 113;
 
   @override
-  pastOrderModel read(BinaryReader reader) {
+  PastOrderModel read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return pastOrderModel(
+    return PastOrderModel(
       id: fields[0] as String,
       customerName: fields[1] as String,
       totalPrice: fields[2] as double,
@@ -38,13 +38,17 @@ class pastOrderModelAdapter extends TypeAdapter<pastOrderModel> {
       kotNumbers: (fields[18] as List).cast<int>(),
       kotBoundaries: (fields[19] as List).cast<int>(),
       billNumber: fields[20] as int?,
+      paymentListJson: fields[21] as String?,
+      isSplitPayment: fields[22] as bool?,
+      totalPaid: fields[23] as double?,
+      changeReturn: fields[24] as double?,
     );
   }
 
   @override
-  void write(BinaryWriter writer, pastOrderModel obj) {
+  void write(BinaryWriter writer, PastOrderModel obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -86,7 +90,15 @@ class pastOrderModelAdapter extends TypeAdapter<pastOrderModel> {
       ..writeByte(19)
       ..write(obj.kotBoundaries)
       ..writeByte(20)
-      ..write(obj.billNumber);
+      ..write(obj.billNumber)
+      ..writeByte(21)
+      ..write(obj.paymentListJson)
+      ..writeByte(22)
+      ..write(obj.isSplitPayment)
+      ..writeByte(23)
+      ..write(obj.totalPaid)
+      ..writeByte(24)
+      ..write(obj.changeReturn);
   }
 
   @override
@@ -95,7 +107,7 @@ class pastOrderModelAdapter extends TypeAdapter<pastOrderModel> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is pastOrderModelAdapter &&
+      other is PastOrderModelAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

@@ -13,6 +13,7 @@ import 'package:unipos/presentation/screens/retail/parked_sales_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -59,13 +60,7 @@ class _PosScreenState extends State<PosScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error initializing POS: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        NotificationService.instance.showError('Error initializing POS: $e');
         Navigator.of(context).pop();
       }
     }
@@ -263,12 +258,7 @@ class _PosScreenState extends State<PosScreen> {
 
     if (variants.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No variants available for this product'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        NotificationService.instance.showError('No variants available for this product');
       }
       return;
     }
@@ -279,23 +269,9 @@ class _PosScreenState extends State<PosScreen> {
       _clearSearch();
       if (mounted) {
         if (result.success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${product.productName} added to cart'),
-              backgroundColor: const Color(0xFF4CAF50),
-              duration: const Duration(seconds: 1),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showSuccess('${product.productName} added to cart');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result.errorMessage ?? 'Cannot add item'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showError(result.errorMessage ?? 'Cannot add item');
         }
       }
     } else {
@@ -323,23 +299,9 @@ class _PosScreenState extends State<PosScreen> {
           // Clear search field and hide search results
           _clearSearch();
           if (result.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${product.productName} ${_getVariantDisplayName(variant)} added to cart'),
-                backgroundColor: const Color(0xFF4CAF50),
-                duration: const Duration(seconds: 1),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            NotificationService.instance.showSuccess('${product.productName} ${_getVariantDisplayName(variant)} added to cart');
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result.errorMessage ?? 'Cannot add item'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            NotificationService.instance.showError(result.errorMessage ?? 'Cannot add item');
           }
         }
       }
@@ -348,14 +310,7 @@ class _PosScreenState extends State<PosScreen> {
       // Only show error for numeric-only input (likely a barcode)
       final isLikelyBarcode = RegExp(r'^\d+$').hasMatch(barcode);
       if (mounted && isLikelyBarcode) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Product not found for barcode: $barcode'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        NotificationService.instance.showError('Product not found for barcode: $barcode');
         _clearSearch();
       }
     }
@@ -373,23 +328,9 @@ class _PosScreenState extends State<PosScreen> {
       final result = await cartStore.addItem(product, selectedVariant);
       _barcodeController.clear();
       if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${product.productName} ${selectedVariant.shortDescription} added to cart'),
-            backgroundColor: const Color(0xFF4CAF50),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        NotificationService.instance.showSuccess('${product.productName} ${selectedVariant.shortDescription} added to cart');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.errorMessage ?? 'Cannot add item'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        NotificationService.instance.showError(result.errorMessage ?? 'Cannot add item');
       }
     }
   }
@@ -404,12 +345,7 @@ class _PosScreenState extends State<PosScreen> {
 
   Future<void> _holdCurrentSale() async {
     if (cartStore.itemCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cart is empty. Nothing to hold.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('Cart is empty. Nothing to hold.');
       return;
     }
 
@@ -486,22 +422,11 @@ class _PosScreenState extends State<PosScreen> {
       await cartStore.clearCart();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sale parked successfully!'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        NotificationService.instance.showSuccess('Sale parked successfully!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error parking sale: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error parking sale: $e');
       }
     }
   }
@@ -1268,14 +1193,7 @@ class _PosScreenState extends State<PosScreen> {
                             onTap: () async {
                               final result = await cartStore.incrementQuantity(item.variantId);
                               if (!result.success && mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(result.errorMessage ?? 'Cannot add more items'),
-                                    backgroundColor: Colors.orange,
-                                    duration: const Duration(seconds: 2),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                NotificationService.instance.showError(result.errorMessage ?? 'Cannot add more items');
                               }
                             },
                             child: Container(
@@ -1497,13 +1415,7 @@ class _PosScreenState extends State<PosScreen> {
 
                       // If checkout was successful, show success message
                       if (result == true && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Checkout completed successfully!'),
-                            backgroundColor: Color(0xFF4CAF50),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                        NotificationService.instance.showSuccess('Checkout completed successfully!');
                       }
                     },
                     style: ElevatedButton.styleFrom(

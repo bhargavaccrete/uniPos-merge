@@ -4,6 +4,7 @@ import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
 import 'package:unipos/data/models/restaurant/db/staffModel_310.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../util/color.dart';
@@ -60,12 +61,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
 
   void _addStaff() {
     if (_firstNameController.text.isEmpty || _pinController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('First name and PIN are required'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('First name and PIN are required');
       return;
     }
 
@@ -160,12 +156,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     } catch (e) {
       print('❌ Error saving staff: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save staff: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to save staff: $e');
       }
     }
   }

@@ -3,6 +3,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import 'package:unipos/util/common/currency_helper.dart';
@@ -28,7 +29,7 @@ class _TodayByDiscountState extends State<TodayByDiscount> {
     await pastOrderStore.loadPastOrders();
   }
 
-  List<pastOrderModel> _calculateDiscountedOrders() {
+  List<PastOrderModel> _calculateDiscountedOrders() {
     // Get all past orders from store
     final allOrders = pastOrderStore.pastOrders.toList();
     final now = DateTime.now();
@@ -55,7 +56,7 @@ class _TodayByDiscountState extends State<TodayByDiscount> {
     return discountedOrders;
   }
 
-  double _calculateTotalDiscount(List<pastOrderModel> orders) {
+  double _calculateTotalDiscount(List<PastOrderModel> orders) {
     double totalDiscount = 0.0;
     for (var order in orders) {
       totalDiscount += (order.Discount ?? 0.0);
@@ -89,8 +90,7 @@ class _TodayByDiscountState extends State<TodayByDiscount> {
                         height: height * 0.07,
                         bordercircular: 5,
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("Export coming soon")));
+                          NotificationService.instance.showSuccess("Export coming soon");
                         },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,

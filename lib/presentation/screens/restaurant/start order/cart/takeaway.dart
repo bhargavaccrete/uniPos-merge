@@ -726,7 +726,7 @@ class _TakeawayState extends State<Takeaway> {
         MaterialPageRoute(builder: (context) => Startorder()),
         (Route<dynamic> route) => false,
       );
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order Placed SuccessFuly')));
+      NotificationService.instance.showSuccess('Order Placed Successfully');
     }
   }
 
@@ -1250,12 +1250,14 @@ class _TakeawayState extends State<Takeaway> {
               height: height * 0.06,
               onTap: () {
                 // _completeOrder();
+                final plainItems = widget.cartItems.map((w) => w.item).toList();
                 Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (context) => Customerdetails(
                           tableid: widget.tableid,
                           existingModel: widget.existingModel,
+                          cartitems: plainItems, // Include all items (old + new)
                           totalPrice: calculations.grandTotal,
                         )));
               },
@@ -1916,7 +1918,7 @@ class _TakeawayState extends State<Takeaway> {
 
     // Directly convert the active order to a past order.
     // All calculations (GST, subtotal) were already done and saved on the activeModel.
-    final pastOrder = pastOrderModel(
+    final pastOrder = PastOrderModel(
       id: activeModel.id,
       customerName: activeModel.customerName,
       totalPrice: activeModel.totalPrice,
@@ -1978,7 +1980,7 @@ class _TakeawayState extends State<Takeaway> {
         MaterialPageRoute(builder: (context) => const Startorder()),
         (Route<dynamic> route) => false,
       );
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quick Settle Successful')));
+      NotificationService.instance.showSuccess('Quick Settle Successful');
     }
   }
 
@@ -2016,7 +2018,7 @@ class _TakeawayState extends State<Takeaway> {
     final int billNumber = await orderStore.getNextBillNumber();
     print('✅ Bill number generated for quick settle: $billNumber');
 
-    final pastOrder = pastOrderModel(
+    final pastOrder = PastOrderModel(
       id: Uuid().v4(), // Generate a unique ID for this transaction
       customerName: 'Quick Settle',
       totalPrice: calculations.grandTotal, // ✅ Use the final grand total from the service

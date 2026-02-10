@@ -14,7 +14,7 @@ import 'partial_refund_dialog.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 class Orderdetails extends StatefulWidget {
-  final pastOrderModel? Order;
+  final PastOrderModel? Order;
   const Orderdetails({super.key, this.Order});
 
   @override
@@ -22,7 +22,7 @@ class Orderdetails extends StatefulWidget {
 }
 
 class _OrderdetailsState extends State<Orderdetails> {
-  late pastOrderModel currentOrder;
+  late PastOrderModel currentOrder;
 
   @override
   void initState() {

@@ -9,6 +9,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
 import 'package:unipos/domain/services/common/unified_backup_service.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/main.dart' as main_app;
 
@@ -26,30 +27,12 @@ class _DrawerrState extends State<Drawerr> {
     try {
       await cartStore.clearCart();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Cart cleared successfully'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        NotificationService.instance.showSuccess('Cart cleared successfully');
       }
     } catch (e) {
       print('Error clearing cart: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error clearing cart'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error clearing cart');
       }
     }
   }
@@ -686,14 +669,11 @@ class _DrawerrState extends State<Drawerr> {
                                   });
                                   await AutoBackupService.setAutoBackupEnabled(value);
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(value
-                                            ? '✅ Auto backup enabled!'
-                                            : 'Auto backup disabled'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
+                                    if (value) {
+                                      NotificationService.instance.showSuccess('Auto backup enabled!');
+                                    } else {
+                                      NotificationService.instance.showSuccess('Auto backup disabled');
+                                    }
                                   }
                                 },
                               ),
@@ -783,37 +763,13 @@ class _DrawerrState extends State<Drawerr> {
 
                         if (filePath == null) {
                           if (outerContext.mounted) {
-                            ScaffoldMessenger.of(outerContext).showSnackBar(
-                              const SnackBar(
-                                content: Text('❌ Backup failed'),
-                                duration: Duration(seconds: 3),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            NotificationService.instance.showError('Backup failed');
                           }
                           return;
                         }
 
                         if (outerContext.mounted) {
-                          ScaffoldMessenger.of(outerContext).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  Icon(Icons.check_circle, color: Colors.white),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      '✅ Backup saved successfully!\n📁 Location: Downloads folder',
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              duration: Duration(seconds: 5),
-                              backgroundColor: Colors.green,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          NotificationService.instance.showSuccess('Backup saved successfully! Location: Downloads folder');
                         }
                       },
                     ),
@@ -849,13 +805,7 @@ class _DrawerrState extends State<Drawerr> {
                           final globalContext =
                               main_app.navigatorKey.currentContext;
                           if (globalContext != null && globalContext.mounted) {
-                            ScaffoldMessenger.of(globalContext).showSnackBar(
-                              SnackBar(
-                                content: Text('❌ Error selecting folder: $e'),
-                                duration: Duration(seconds: 3),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            NotificationService.instance.showError('Error selecting folder: $e');
                           }
                           return;
                         }
@@ -864,12 +814,7 @@ class _DrawerrState extends State<Drawerr> {
                           final globalContext =
                               main_app.navigatorKey.currentContext;
                           if (globalContext != null && globalContext.mounted) {
-                            ScaffoldMessenger.of(globalContext).showSnackBar(
-                              const SnackBar(
-                                content: Text('Folder selection cancelled'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
+                            NotificationService.instance.showSuccess('Folder selection cancelled');
                           }
                           return;
                         }
@@ -923,35 +868,11 @@ class _DrawerrState extends State<Drawerr> {
                         if (finalContext == null) return;
 
                         if (filePath == null) {
-                          ScaffoldMessenger.of(finalContext).showSnackBar(
-                            const SnackBar(
-                              content: Text('❌ Backup creation failed'),
-                              duration: Duration(seconds: 3),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
+                          NotificationService.instance.showError('Backup creation failed');
                           return;
                         }
 
-                        ScaffoldMessenger.of(finalContext).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.white),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    '✅ Backup saved successfully!\n📁 $selectedDirectory',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            duration: Duration(seconds: 5),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        NotificationService.instance.showSuccess('Backup saved successfully! Location: $selectedDirectory');
                       },
                     ),
 

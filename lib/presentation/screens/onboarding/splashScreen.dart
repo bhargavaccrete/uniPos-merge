@@ -102,33 +102,56 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   _navigateToHome() async {
-    await Future.delayed(const Duration(seconds: 4), () async {
-      // Check if setup is complete
-      if (AppConfig.isSetupComplete) {
-        // Setup is complete - navigate to appropriate screen based on business mode
-        if (AppConfig.isRetail) {
-          Navigator.pushReplacementNamed(context, '/retail-billing');
-        } else if (AppConfig.isRestaurant) {
-          // Check restaurant login state
-          final prefs = await SharedPreferences.getInstance();
-          final isLoggedIn = prefs.getBool('restaurant_is_logged_in') ?? false;
+    // Use minimum display time for better UX
+    // Show splash for at least 2 seconds while performing any initialization
+    await Future.wait([
+      Future.delayed(const Duration(seconds: 2)), // Minimum display time
+      _performInitialization(), // Any additional initialization tasks
+    ]);
 
-          if (isLoggedIn) {
-            // User is logged in - go to admin welcome screen
-            Navigator.pushReplacementNamed(context, '/restaurant-home');
-          } else {
-            // User is not logged in - go to login screen
-            Navigator.pushReplacementNamed(context, '/restaurant-login');
-          }
+    if (!mounted) return;
+
+    // Check if setup is complete
+    if (AppConfig.isSetupComplete) {
+      // Setup is complete - navigate to appropriate screen based on business mode
+      if (AppConfig.isRetail) {
+        Navigator.pushReplacementNamed(context, '/retail-billing');
+      } else if (AppConfig.isRestaurant) {
+        // Check restaurant login state
+        final prefs = await SharedPreferences.getInstance();
+        final isLoggedIn = prefs.getBool('restaurant_is_logged_in') ?? false;
+
+        if (isLoggedIn) {
+          // User is logged in - go to admin welcome screen
+          Navigator.pushReplacementNamed(context, '/restaurant-home');
         } else {
-          // Setup complete but no business mode - navigate to walkthrough
-          Navigator.pushReplacementNamed(context, '/walkthrough');
+          // User is not logged in - go to login screen
+          Navigator.pushReplacementNamed(context, '/restaurant-login');
         }
       } else {
-        // Setup not complete - navigate to walkthrough
+        // Setup complete but no business mode - navigate to walkthrough
         Navigator.pushReplacementNamed(context, '/walkthrough');
       }
-    });
+    } else {
+      // Setup not complete - check if user wants to skip walkthrough
+      final prefs = await SharedPreferences.getInstance();
+      final skipWalkthrough = prefs.getBool('skip_walkthrough') ?? false;
+
+      if (skipWalkthrough) {
+        // User chose to skip walkthrough - go directly to user selection
+        Navigator.pushReplacementNamed(context, '/userSelectionScreen');
+      } else {
+        // Show walkthrough to new users
+        Navigator.pushReplacementNamed(context, '/walkthrough');
+      }
+    }
+  }
+
+  // Placeholder for any initialization tasks
+  Future<void> _performInitialization() async {
+    // Add any async initialization tasks here (e.g., preloading data, checking updates)
+    // For now, this completes immediately
+    return Future.value();
   }
 
   @override

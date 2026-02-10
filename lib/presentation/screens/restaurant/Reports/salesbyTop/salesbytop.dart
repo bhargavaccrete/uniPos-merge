@@ -11,6 +11,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 enum TopSellingPeriod { Today, ThisWeek, DayWise, MonthWise, YearWise }
 
@@ -397,12 +398,7 @@ class _TopSellingReportViewState extends State<TopSellingReportView> {
 
     if (topSellingItems.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No data to export'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('No data to export');
       return;
     }
 
@@ -447,20 +443,10 @@ class _TopSellingReportViewState extends State<TopSellingReportView> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report exported successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('Report exported successfully');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Export failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('Export failed: $e');
     }
   }
 

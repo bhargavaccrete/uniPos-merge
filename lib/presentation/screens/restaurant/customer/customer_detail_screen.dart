@@ -5,6 +5,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final RestaurantCustomer customer;
@@ -45,15 +46,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     if (result == 'updated') {
       await _refreshCustomerData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Customer updated successfully',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Customer updated successfully');
       }
     }
   }
@@ -164,15 +157,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         if (success) {
           await _refreshCustomerData();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '$points loyalty points added',
-                  style: GoogleFonts.poppins(),
-                ),
-                backgroundColor: Colors.green,
-              ),
-            );
+            NotificationService.instance.showSuccess('$points loyalty points added');
           }
         }
       }

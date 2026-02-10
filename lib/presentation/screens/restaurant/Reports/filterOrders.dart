@@ -2,7 +2,7 @@ import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 
 /// Filters a list of orders based on a given time period string.
 /// This function is safe to use with nullable dates.
-List<pastOrderModel> filterOrders(List<pastOrderModel> allOrders, String period) {
+List<PastOrderModel> filterOrders(List<PastOrderModel> allOrders, String period) {
   final now = DateTime.now();
 
   switch (period) {

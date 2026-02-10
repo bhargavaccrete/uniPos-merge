@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/screen/productManagementScreen.dart';
 import 'package:unipos/presentation/screens/onboarding/storeDetailsScreen.dart';
@@ -166,13 +167,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         Navigator.pop(context);
 
         // Show error
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error completing setup: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        NotificationService.instance.showError('Error completing setup: $e');
       }
     }
   }
@@ -194,23 +189,76 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   void _showExitDialog() {
+    final progress = ((_store.currentStep + 1) / _totalSteps * 100).round();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Exit Setup?'),
-        content: const Text('Your progress will be saved.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Row(
+          children: [
+            Icon(Icons.exit_to_app, color: AppColors.warning),
+            const SizedBox(width: 12),
+            const Text('Exit Setup?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your progress will be automatically saved.',
+              style: TextStyle(fontSize: 15, color: AppColors.darkNeutral),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.info.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: AppColors.info, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Setup Progress: $progress% complete',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.info,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You can resume setup anytime from where you left off.',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Continue Setup'),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pop(context);
+              // Show confirmation snackbar
+              NotificationService.instance.showSuccess('Progress saved ($progress% complete)');
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('Exit'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save & Exit'),
           ),
         ],
       ),
@@ -489,7 +537,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: Observer(
+          child:  Observer(
             builder: (_) => AppConfig.isRestaurant
                 ? SetupAddItemScreen(
                     onNext: _nextStep,

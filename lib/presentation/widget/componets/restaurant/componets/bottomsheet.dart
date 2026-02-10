@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_item_sheet.dart';
 import 'package:unipos/util/color.dart';
 
@@ -49,22 +50,7 @@ class _BottomsheetMenuState extends State<BottomsheetMenu> {
     } catch (e) {
       // Show error feedback if sheet fails to open
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.white),
-                SizedBox(width: 12),
-                Text(
-                  'Failed to open form. Please try again.',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        NotificationService.instance.showError('Failed to open form. Please try again.');
       }
     } finally {
       if (mounted) {

@@ -3,6 +3,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/models/tax_details.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -138,12 +139,8 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
       print('❌ Error saving taxes to database: $e');
       // Show error to user
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save taxes: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to save taxes: $e');
+
       }
     }
   }

@@ -19,6 +19,7 @@ import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
@@ -488,16 +489,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
       if (success) {
         // Show success
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Item "${item.name}" added successfully!',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        NotificationService.instance.showSuccess('Item "${item.name}" added successfully!');
 
         // Reset form
         _resetForm();
@@ -509,32 +501,14 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         });
       } else {
         // Show error from store
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error saving item: ${itemStore.errorMessage ?? "Unknown error"}',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        NotificationService.instance.showError('Error saving item: ${itemStore.errorMessage ?? "Unknown error"}');
       }
     } catch (e) {
       // Close loading
       if (mounted) Navigator.pop(context);
 
       // Show error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Error saving item: $e',
-            style: GoogleFonts.poppins(color: Colors.white),
-          ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      NotificationService.instance.showError('Error saving item: $e');
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 
 import '../../../../domain/services/restaurant/comprehensive_data_generator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class DataGeneratorScreen extends StatefulWidget {
   const DataGeneratorScreen({super.key});
@@ -130,13 +131,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   }
 
   void _showSnackBar(String message, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        duration: Duration(seconds: isError ? 5 : 3),
-      ),
-    );
+    if (isError) {
+      NotificationService.instance.showError(message);
+    } else {
+      NotificationService.instance.showSuccess(message);
+    }
   }
 
   @override

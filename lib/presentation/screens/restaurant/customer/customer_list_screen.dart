@@ -6,6 +6,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
 import 'customer_detail_screen.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -59,15 +60,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     if (result == 'added') {
       await restaurantCustomerStore.loadCustomers();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Customer added successfully',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Customer added successfully');
       }
     }
   }
@@ -83,15 +76,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     if (result == 'updated') {
       await restaurantCustomerStore.loadCustomers();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Customer updated successfully',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Customer updated successfully');
       }
     }
   }
@@ -107,15 +92,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     if (result == 'deleted') {
       await restaurantCustomerStore.loadCustomers();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Customer deleted successfully',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showSuccess('Customer deleted successfully');
       }
     } else if (result != null) {
       await restaurantCustomerStore.loadCustomers();
@@ -193,21 +170,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     if (confirm == true) {
       final success = await restaurantCustomerStore.deleteCustomer(customer.customerId);
       if (mounted && success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text(
-                  'Customer deleted successfully',
-                  style: GoogleFonts.poppins(),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showSuccess('Customer deleted successfully');
       }
     }
   }

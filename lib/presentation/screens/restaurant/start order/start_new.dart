@@ -852,25 +852,7 @@ class _OrdersTabContentState extends State<_OrdersTabContent> {
 
         // Show notification to user
         if (mounted && status != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.update, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'KOT #$kotNumber: Status updated to $status',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.blue,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showSuccess('KOT #$kotNumber: Status updated to $status');
         }
       } else if (type == 'ORDER_UPDATED' || type == 'NEW_ITEMS_ADDED') {
         final kotNumber = message['kotNumber'];
@@ -880,25 +862,7 @@ class _OrdersTabContentState extends State<_OrdersTabContent> {
         print('🔔 UniPOS: Order updated - KOT #$kotNumber with $newItemCount new items');
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.add_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'New KOT #$kotNumber: $newItemCount items added to Table $tableNo',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showSuccess('New KOT #$kotNumber: $newItemCount items added to Table $tableNo');
         }
       } else if (type == 'NEW_ORDER') {
         final kotNumber = message['kotNumber'];
@@ -907,23 +871,7 @@ class _OrdersTabContentState extends State<_OrdersTabContent> {
         print('🔔 UniPOS: New order received - KOT #$kotNumber (Table $tableNo)');
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.restaurant_menu, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Text(
-                    'New Order: KOT #$kotNumber - Table $tableNo',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showSuccess('New Order: KOT #$kotNumber - Table $tableNo');
         }
       }
     });
@@ -1248,23 +1196,12 @@ class _ActiveOrdersContentState extends State<_ActiveOrdersContent> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('KOT #$kotNumber updated to $newStatus'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        NotificationService.instance.showSuccess('KOT #$kotNumber updated to $newStatus');
       }
     } catch (e) {
       print('❌ Error updating KOT status: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update status: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to update status: $e');
       }
     }
   }

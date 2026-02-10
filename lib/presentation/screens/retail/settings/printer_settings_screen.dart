@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../../../../data/models/retail/printer_settings_model.dart';
+import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/retail/retail_printer_settings_service.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
@@ -803,16 +804,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         _loadSettings();
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Logo updated successfully')),
-          );
+          NotificationService.instance.showSuccess('Logo updated successfully');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error selecting image: $e')),
-        );
+        NotificationService.instance.showError('Error selecting image: $e');
       }
     }
   }
@@ -852,9 +849,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       await _printerService.setLogoPath(null);
       _loadSettings();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logo removed')),
-        );
+        NotificationService.instance.showSuccess('Logo removed');
       }
     }
   }
@@ -884,17 +879,13 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       await _printerService.resetToDefaults();
       _loadSettings();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings reset to defaults')),
-        );
+        NotificationService.instance.showSuccess('Settings reset to defaults');
       }
     }
   }
 
   Future<void> _testPrint() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Test print feature coming soon')),
-    );
+    NotificationService.instance.showSuccess('Test print feature coming soon');
     // TODO: Implement test print with sample invoice
   }
 }

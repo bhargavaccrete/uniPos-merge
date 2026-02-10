@@ -7,24 +7,24 @@ class HivePastOrder{
 
 
 
-  static Box<pastOrderModel>? _box;
+  static Box<PastOrderModel>? _box;
 
-  static Box<pastOrderModel> _getPastOrderBox(){
+  static Box<PastOrderModel> _getPastOrderBox(){
     // Box is already opened during app startup in HiveInit
     if(_box == null || !_box!.isOpen){
-      _box = Hive.box<pastOrderModel>(_boxName);
+      _box = Hive.box<PastOrderModel>(_boxName);
     }
     return _box!;
   }
 
 
 
-  static Future<void> addOrder (pastOrderModel pastOrder)async{
+  static Future<void> addOrder (PastOrderModel pastOrder)async{
     final box = _getPastOrderBox();
     await box.put(pastOrder.id, pastOrder);
   }
 
-  static Future<List<pastOrderModel>> getAllPastOrderModel ()async{
+  static Future<List<PastOrderModel>> getAllPastOrderModel ()async{
     final box = _getPastOrderBox();
     return  box.values.toList();
   }
@@ -35,7 +35,7 @@ class HivePastOrder{
     await box.delete(id);
   }
 
-  static Future<void> updateOrder(pastOrderModel updatedOrder) async {
+  static Future<void> updateOrder(PastOrderModel updatedOrder) async {
     final box = _getPastOrderBox();
     await box.put(updatedOrder.id, updatedOrder);
   }

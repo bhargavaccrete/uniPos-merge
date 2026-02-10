@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/domain/services/restaurant/eod_service.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class RetailEODScreen extends StatefulWidget {
   const RetailEODScreen({super.key});
@@ -174,12 +175,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
 
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('End of Day completed successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('End of Day completed successfully!');
       }
 
       // Navigate back
@@ -235,9 +231,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    NotificationService.instance.showError(message);
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
 import '../../../../../util/common/app_responsive.dart';
 
@@ -53,22 +54,7 @@ class ImagePickerSheet extends StatelessWidget {
       if (bytes.length > maxSizeInBytes) {
         if (context.mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text('Image size must be less than 3MB. Please choose a smaller image.'),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 3),
-            ),
-          );
+          NotificationService.instance.showError('Image size must be less than 3MB. Please choose a smaller image.');
         }
         return;
       }
@@ -79,19 +65,7 @@ class ImagePickerSheet extends StatelessWidget {
       debugPrint('Error picking image: $e');
       if (context.mounted) {
          Navigator.pop(context);
-         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
-             content: Row(
-               children: [
-                 Icon(Icons.error_outline, color: Colors.white),
-                 SizedBox(width: 12),
-                 Text('Failed to pick image. Please try again.'),
-               ],
-             ),
-             backgroundColor: Colors.red,
-             behavior: SnackBarBehavior.floating,
-           ),
-         );
+         NotificationService.instance.showError('Failed to pick image. Please try again.');
       }
     }
   }

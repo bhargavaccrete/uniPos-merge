@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -690,15 +691,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
     await customerStoreRestail.addCustomer(customer);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Customer added successfully'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    NotificationService.instance.showSuccess('Customer added successfully');
   }
 
   Future<void> _updateCustomer(CustomerModel customer, String name, String phone, String email, String address, String notes) async {
@@ -713,28 +706,12 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
     await customerStoreRestail.updateCustomer(updatedCustomer);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Customer updated successfully'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    NotificationService.instance.showSuccess('Customer updated successfully');
   }
 
   Future<void> _deleteCustomer(CustomerModel customer) async {
     await customerStoreRestail.deleteCustomer(customer.customerId);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Customer deleted successfully'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    NotificationService.instance.showSuccess('Customer deleted successfully');
   }
 }

@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 
 import '../../../../util/common/app_responsive.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 class TaxSelectionScreen extends StatefulWidget {
   final String? selectedTaxId;
   final double? currentTaxRate;
@@ -322,9 +323,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
               final percentage = double.tryParse(percentageController.text.trim());
 
               if (name.isEmpty || percentage == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter valid tax details')),
-                );
+                NotificationService.instance.showError('Please enter valid tax details');
                 return;
               }
 
@@ -361,12 +360,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
 
               // Show success message
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$name added and selected successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                NotificationService.instance.showSuccess('$name added and selected successfully');
               }
             },
             style: ElevatedButton.styleFrom(

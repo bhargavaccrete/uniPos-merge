@@ -13,6 +13,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 enum CategoryPeriod { Today, ThisWeek, ThisMonth, ThisYear, Custom }
 
@@ -229,7 +230,7 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     });
 
     final allOrders = pastOrderStore.pastOrders.toList();
-    List<pastOrderModel> filteredOrders = [];
+    List<PastOrderModel> filteredOrders = [];
 
     if (widget.period == CategoryPeriod.Custom) {
       if (_startDate != null && _endDate != null) {
@@ -276,7 +277,7 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     });
   }
 
-  List<pastOrderModel> _filterOrdersByPeriod(List<pastOrderModel> allOrders, String period) {
+  List<PastOrderModel> _filterOrdersByPeriod(List<PastOrderModel> allOrders, String period) {
     final now = DateTime.now();
     switch (period) {
       case 'Today':
@@ -309,8 +310,8 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     }
   }
 
-  List<pastOrderModel> _filterOrdersByDateRange(
-    List<pastOrderModel> allOrders,
+  List<PastOrderModel> _filterOrdersByDateRange(
+    List<PastOrderModel> allOrders,
     DateTime startDate,
     DateTime endDate,
   ) {
@@ -321,7 +322,7 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     }).toList();
   }
 
-  List<CategoryReportData> _generateCategoryWiseReport(List<pastOrderModel> filteredOrders) {
+  List<CategoryReportData> _generateCategoryWiseReport(List<PastOrderModel> filteredOrders) {
     final Map<String, CategoryReportData> categorySummary = {};
 
     // Build fast lookups from stores
@@ -389,12 +390,7 @@ class _CategoryDataViewState extends State<CategoryDataView> {
 
   Future<void> _exportToExcel() async {
     if (_filteredData.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No data to export'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('No data to export');
       return;
     }
 
@@ -421,21 +417,11 @@ class _CategoryDataViewState extends State<CategoryDataView> {
       await Share.shareXFiles([XFile(path)], text: "Categories Report - $periodName");
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Report exported successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Report exported successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error exporting: $e');
       }
     }
   }

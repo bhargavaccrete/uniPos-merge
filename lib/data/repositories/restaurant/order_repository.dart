@@ -68,24 +68,40 @@ class OrderRepository {
 
   // ==================== KOT MANAGEMENT ====================
 
-  /// Get next KOT number
+  /// Get next KOT number (Resets Daily)
   Future<int> getNextKotNumber() async {
+    final lastKotDate = await _counterBox.get('lastKotDate');
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    // If it's a new day, reset the counter
+    if (lastKotDate != todayStr) {
+      await _counterBox.put('lastKotNumber', 0);
+      await _counterBox.put('lastKotDate', todayStr);
+      print('🔄 New day detected - KOT number reset to 0');
+    }
+
     int lastNumber = await _counterBox.get('lastKotNumber', defaultValue: 0);
     int newNumber = lastNumber + 1;
     await _counterBox.put('lastKotNumber', newNumber);
     return newNumber;
   }
 
-  /// Get next daily bill number (resets every day)
+  /// Get next bill number (Resets yearly on April 1st)
   Future<int> getNextBillNumber() async {
-    final lastBillDate = await _counterBox.get('lastBillDate');
+    final lastResetYear = await _counterBox.get('lastBillResetYear');
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-    // If it's a new day, reset the counter
-    if (lastBillDate != todayStr) {
+    // Determine current fiscal year start year
+    // If today is April 1st or later, current FY starts in current year (e.g., April 1, 2026 -> FY 2026-27)
+    // If today is before April 1st, current FY started in previous year (e.g., Feb 5, 2026 -> FY 2025-26)
+    final currentFiscalYearStartYear = today.month >= 4 ? today.year : today.year - 1;
+
+    // If we haven't reset for this fiscal year yet, reset now
+    if (lastResetYear != currentFiscalYearStartYear) {
       await _counterBox.put('lastBillNumber', 0);
-      await _counterBox.put('lastBillDate', todayStr);
+      await _counterBox.put('lastBillResetYear', currentFiscalYearStartYear);
+      print('🔄 New Fiscal Year Detected ($currentFiscalYearStartYear) - Bill number reset to 0');
     }
 
     // Get and increment the bill number
@@ -97,12 +113,10 @@ class OrderRepository {
   }
 
   /// Reset daily bill number (called at end of day)
+  /// DEPRECATED: Now handled automatically by getNextBillNumber on fiscal year change
   Future<void> resetDailyBillNumber() async {
-    await _counterBox.put('lastBillNumber', 0);
-    final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    await _counterBox.put('lastBillDate', todayStr);
-    print('✅ Daily bill number reset to 0');
+    // No-op to prevent daily reset
+    print('⚠️ Daily bill reset skipped (Using Fiscal Year Reset)');
   }
 
   /// Get next daily order number (resets every day)

@@ -9,6 +9,7 @@ import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 
 class ChoiceSelectionScreen extends StatefulWidget {
@@ -416,12 +417,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (choiceNameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(parentContext).showSnackBar(
-                        SnackBar(
-                          content: Text('Please enter a choice name'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      NotificationService.instance.showError('Please enter a choice name');
                       return;
                     }
 
@@ -435,12 +431,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                         .toList();
 
                     if (options.isEmpty) {
-                      ScaffoldMessenger.of(parentContext).showSnackBar(
-                        SnackBar(
-                          content: Text('Please add at least one option'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      NotificationService.instance.showError('Please add at least one option');
                       return;
                     }
 
@@ -473,14 +464,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     }
 
                     // Show success message
-                    ScaffoldMessenger.of(parentContext).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Choice "${newChoice.name}" added with ${options.length} options',
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    NotificationService.instance.showSuccess('Choice "${newChoice.name}" added with ${options.length} options');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,

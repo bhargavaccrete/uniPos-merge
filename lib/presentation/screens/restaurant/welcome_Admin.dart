@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import '../../../core/routes/routes_name.dart';
+import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
 
@@ -34,22 +35,28 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         await DayManagementService.setOpeningBalance(balance);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text(
-                  'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+          NotificationService.instance.showSuccess(
+            'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
+            // style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+          );
+
+
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //     content: Row(
+        //       children: [
+        //         Icon(Icons.check_circle, color: Colors.white),
+        //         SizedBox(width: 12),
+        //         Text(
+        //           'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
+        //           style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+        //         ),
+        //       ],
+        //     ),
+        //     backgroundColor: Colors.green,
+        //     behavior: SnackBarBehavior.floating,
+        //   ),
+        // );
         }
       }
     }
@@ -277,7 +284,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Welcome Section
-                  Container(
+      /*            Container(
                     padding: EdgeInsets.all(isTablet ? 20 : 16),
                     decoration: BoxDecoration(
                       color: AppColors.white,
@@ -331,7 +338,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                         ),
                       ],
                     ),
-                  ),
+                  ),*/
 
                   SizedBox(height: isTablet ? 24 : 20),
                   // Menu Grid

@@ -9,6 +9,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 /// Category Management Screen
 /// Allows users to view, add, edit, and delete categories with images
@@ -62,15 +63,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
 
     if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Category "${result.name}" added successfully!',
-            style: GoogleFonts.poppins(color: Colors.white),
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('Category "${result.name}" added successfully!');
       _loadCategories();
     }
   }
@@ -82,15 +75,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
 
     if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Category "${result.name}" updated successfully!',
-            style: GoogleFonts.poppins(color: Colors.white),
-          ),
-          backgroundColor: Colors.blue,
-        ),
-      );
+      NotificationService.instance.showSuccess('Category "${result.name}" updated successfully!');
       _loadCategories();
     }
   }
@@ -163,37 +148,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         final success = await categoryStore.deleteCategory(category.id);
 
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Category "${category.name}" deleted',
-                style: GoogleFonts.poppins(color: Colors.white),
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationService.instance.showSuccess('Category "${category.name}" deleted');
           _loadCategories();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Error deleting category: ${categoryStore.errorMessage ?? "Unknown error"}',
-                style: GoogleFonts.poppins(color: Colors.white),
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationService.instance.showError('Error deleting category: ${categoryStore.errorMessage ?? "Unknown error"}');
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error deleting category: $e',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error deleting category: $e');
       }
     }
   }
@@ -209,10 +170,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+        // leading: IconButton(
+        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
+        //   onPressed: () => Navigator.pop(context),
+        // ),
         title: Text(
           'Category Management',
           style: GoogleFonts.poppins(
@@ -272,28 +233,28 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 color: Colors.grey[500],
               ),
             ),
-            const SizedBox(height: 30),
-            CommonButton(
-              onTap: _addCategory,
-              bgcolor: AppColors.primary,
-              bordercircular: 10,
-              height: 50,
-              width: 200,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.add, color: Colors.white),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Add Category',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // const SizedBox(height: 30),
+            // CommonButton(
+            //   onTap: _addCategory,
+            //   bgcolor: AppColors.primary,
+            //   bordercircular: 10,
+            //   height: 50,
+            //   width: 200,
+            //   child: Row(
+            //     mainAxisAlignment: MainAxisAlignment.center,
+            //     children: [
+            //       const Icon(Icons.add, color: Colors.white),
+            //       const SizedBox(width: 10),
+            //       Text(
+            //         'Add Category',
+            //         style: GoogleFonts.poppins(
+            //           color: Colors.white,
+            //           fontWeight: FontWeight.w600,
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -513,15 +474,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         } else {
           // Show error
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Error saving category: ${categoryStore.errorMessage ?? "Unknown error"}',
-                  style: GoogleFonts.poppins(color: Colors.white),
-                ),
-                backgroundColor: Colors.red,
-              ),
-            );
+            NotificationService.instance.showError('Error saving category: ${categoryStore.errorMessage ?? "Unknown error"}');
           }
         }
       } catch (e) {
@@ -529,15 +482,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         if (mounted) Navigator.pop(context);
 
         // Show error
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error saving category: $e',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error saving category: $e');
       }
     }
   }

@@ -33,7 +33,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
     final todayStart = DateTime(now.year, now.month, now.day);
     final todayEnd = todayStart.add(Duration(days: 1));
 
-    final List<pastOrderModel> voidOrdersList = [];
+    final List<PastOrderModel> voidOrdersList = [];
     double totalAmount = 0.0;
 
     for (final order in allOrders) {
@@ -72,7 +72,7 @@ class _TodayByVoidState extends State<TodayByVoid> {
           }
 
           final voidData = _calculateVoidOrders();
-          final voidOrders = voidData['orders'] as List<pastOrderModel>;
+          final voidOrders = voidData['orders'] as List<PastOrderModel>;
           final totalVoidAmount = voidData['totalAmount'] as double;
           final totalVoidCount = voidData['totalCount'] as int;
 

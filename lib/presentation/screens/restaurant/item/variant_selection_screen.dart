@@ -8,6 +8,7 @@ import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class VariantSelectionScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedVariants;
@@ -435,13 +436,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 final String name = variantNameController.text.trim();
 
                 if (name.isEmpty) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a variant name'),
-                      backgroundColor: Colors.red,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  NotificationService.instance.showError('Please enter a variant name');
                   return;
                 }
 
@@ -489,13 +484,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
           _loadVariants();
 
           // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Variant "$variantName" added successfully'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          NotificationService.instance.showSuccess('Variant "$variantName" added successfully');
         });
       }
     });
@@ -549,12 +538,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 final String name = variantNameController.text.trim();
 
                 if (name.isEmpty) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a variant name'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  NotificationService.instance.showError('Please enter a variant name');
                   return;
                 }
 
@@ -612,12 +596,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             *//*ElevatedButton(
               onPressed: () async {
                 if (variantNameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Please enter a variant name'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  NotificationService.instance.showError('Please enter a variant name');
                   return;
                 }
 
@@ -634,12 +613,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 _loadVariants();
 
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Variant "${newVariant.name}" added successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  NotificationService.instance.showSuccess('Variant "${newVariant.name}" added successfully');
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -658,23 +632,16 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
       variantNameController.dispose();
 
       // Use postFrameCallback to ensure widget tree is stable
-      if (wasAdded == true && mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-
-          _loadVariants();
-
-          // Show success message on SCREEN context
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Variant added successfully'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        });
-      }
-    });
+                if (wasAdded == true && mounted) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+      
+                _loadVariants();
+      
+                // Show success message on SCREEN context
+                NotificationService.instance.showSuccess('Variant added successfully');
+              });
+            }    });
 
     // variantNameController.dispose();
 

@@ -2,11 +2,11 @@
 import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../constants/restaurant/color.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
@@ -15,6 +15,9 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../../data/models/restaurant/db/toppingmodel_304.dart';
 import '../../../../data/models/restaurant/db/variantmodel_305.dart';
+import '../../../../domain/store/restaurant/variant_store.dart';
+import '../../../../domain/store/restaurant/choice_store.dart';
+import '../../../../domain/store/restaurant/extra_store.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 class DisplayVariant {
@@ -38,6 +41,11 @@ class ItemOptionsDialog extends StatefulWidget {
 }
 
 class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
+  // Inject stores via GetIt using convenience getters
+  final _variantStore = variantStore;
+  final _choiceStore = choiceStore;
+  final _extraStore = extraStore;
+
   // State for Variants
   List<DisplayVariant> _displayVariants = [];
   DisplayVariant? _selectedVariant;
@@ -57,19 +65,22 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   @override
   void initState() {
     super.initState();
-    _prepareVariants();
-    _prepareChoices();
-    _prepareExtra();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _prepareVariants();
+    await _prepareChoices();
+    await _prepareExtra();
     _recalculateTotal();
   }
 
-  void _prepareVariants() {
+  Future<void> _prepareVariants() async {
     if (widget.item.variant == null || widget.item.variant!.isEmpty) return;
-    final variantBox = Hive.box<VariantModel>('variante');
 
     for (ItemVariante itemVariant in widget.item.variant!) {
-      // Use direct key lookup which is O(1) and safer
-      final variantDetails = variantBox.get(itemVariant.variantId);
+      // Use store instead of direct Hive access
+      final variantDetails = await _variantStore.getVariantById(itemVariant.variantId);
 
       if (variantDetails != null) {
         _displayVariants.add(DisplayVariant(
@@ -79,7 +90,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           stockQuantity: itemVariant.stockQuantity ?? 0,
         ));
       } else {
-        print("Warning: Variant ID ${itemVariant.variantId} found in item but not in 'variante' box.");
+        print("Warning: Variant ID ${itemVariant.variantId} found in item but not in store.");
       }
     }
     if (_displayVariants.isNotEmpty) {
@@ -91,27 +102,27 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     }
   }
 
-  void _prepareChoices() {
+  Future<void> _prepareChoices() async {
     if (widget.item.choiceIds == null || widget.item.choiceIds!.isEmpty) return;
-    final choiceBox = Hive.box<ChoicesModel>('choice'); // Use your choice group box name
+
     for (String choiceId in widget.item.choiceIds!) {
-      // Use direct key lookup
-      final choiceGroup = choiceBox.get(choiceId);
+      // Use store instead of direct Hive access
+      final choiceGroup = await _choiceStore.getChoiceById(choiceId);
 
       if (choiceGroup != null) {
         _displayChoiceGroups.add(choiceGroup);
       } else {
-         print("Warning: Choice ID $choiceId found in item but not in 'choice' box.");
+         print("Warning: Choice ID $choiceId found in item but not in store.");
       }
     }
   }
 
-  void _prepareExtra(){
+  Future<void> _prepareExtra() async {
     if(widget.item.extraId == null || widget.item.extraId!.isEmpty) return ;
-    final ExtraBox = Hive.box<Extramodel>('extra');
+
     for(String extraId in widget.item.extraId!){
-      // Use direct key lookup
-      final extraGroup = ExtraBox.get(extraId);
+      // Use store instead of direct Hive access
+      final extraGroup = await _extraStore.getExtraById(extraId);
 
       if(extraGroup != null){
         _displayExtra.add(extraGroup);
@@ -122,7 +133,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           }
         }
       } else {
-         print("Warning: Extra ID $extraId found in item but not in 'extra' box.");
+         print("Warning: Extra ID $extraId found in item but not in store.");
       }
     }
 

@@ -239,54 +239,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   } ),
             ),
 
-
-   /*         Card(
-              elevation: 5,
-              child: InkWell(
-                onTap: (){
-                 widget.store.pickLogo();
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 200,
-                  // color: Colors.teal.shade100,
-                    child: Observer(
-                      builder: (_){
-                        if(widget.store.logoByte != null){
-                          return Container(
-
-                              child: Stack(
-                               children: [
-
-                                 Icon(Icons.delete,color: Colors.red,size: 100,),
-
-                                 Image.memory(widget.store.logoByte!)
-
-                               ],
-
-                              ));
-                        }else{
-                          return  Icon(Icons.image,color: Colors.white,size: 100,);
-                        }
-                      },
-                    ),
-
-
-
-
-
-                    *//*child:Column(
-                      mainAxisAlignment:MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.image,color: Colors.white,size: 100,),
-                      Text('UPLOAD LOGO',style: TextStyle(fontSize:20,color: Colors.white,fontWeight: FontWeight.w600),),
-                    ],
-                  )*//*
-                ),
-              ),
-            ),*/
-
-            const SizedBox(height: 20,),
+            const SizedBox(height: 20),
 
 
             // Phone & Email Row

@@ -64,9 +64,23 @@ class _AddexpenceState extends State<Addexpence> {
 
     try {
       final amount = double.parse(_amountController.text.trim());
+
+      // Combine selected date with current time (not just midnight)
+      // This ensures expenses show up in EOD reports filtered by day start time
+      final now = DateTime.now();
+      final expenseDateTime = DateTime(
+        _dateselect!.year,
+        _dateselect!.month,
+        _dateselect!.day,
+        now.hour,
+        now.minute,
+        now.second,
+        now.millisecond,
+      );
+
       final expense = Expense(
         id: Uuid().v4(),
-        dateandTime: _dateselect!,
+        dateandTime: expenseDateTime,
         amount: amount,
         categoryOfExpense: selectedCategoryId,
         reason: _reasonController.text.trim().isEmpty ? null : _reasonController.text.trim(),

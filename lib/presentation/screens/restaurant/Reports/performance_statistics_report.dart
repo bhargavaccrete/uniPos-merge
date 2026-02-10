@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:unipos/domain/services/restaurant/comprehensive_data_generator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class PerformanceStatisticsReport extends StatefulWidget {
   const PerformanceStatisticsReport({super.key});
@@ -36,13 +37,11 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
   }
 
   void _showSnackBar(String message, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        duration: Duration(seconds: isError ? 5 : 3),
-      ),
-    );
+    if (isError) {
+      NotificationService.instance.showError(message);
+    } else {
+      NotificationService.instance.showSuccess(message);
+    }
   }
 
   @override

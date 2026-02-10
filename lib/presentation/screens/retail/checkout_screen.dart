@@ -6,9 +6,10 @@ import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:unipos/domain/services/retail/gst_service.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/presentation/screens/retail/customer_selection_screen.dart';
-import 'package:unipos/presentation/widget/retail/split_payment_widget.dart';
+import 'package:unipos/presentation/widget/componets/common/split_payment_widget.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -82,13 +83,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _processCreditSale() async {
     // Require customer for credit sales
     if (customerStoreRestail.selectedCustomer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Customer is required for Pay Later sales'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      NotificationService.instance.showError('Customer is required for Pay Later sales');
       return;
     }
 
@@ -101,13 +96,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         final symbol = CurrencyHelper.currentSymbol;
         final precision = DecimalSettings.precision;
         final formattedCredit = availableCredit.toStringAsFixed(precision);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Credit limit exceeded. Available credit: $symbol$formattedCredit'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        NotificationService.instance.showError('Credit limit exceeded. Available credit: $symbol$formattedCredit');
       }
       return;
     }
@@ -197,13 +186,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing credit sale: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        NotificationService.instance.showError('Error processing credit sale: $e');
       }
     } finally {
       if (mounted) {
@@ -369,13 +352,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing checkout: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        NotificationService.instance.showError('Error processing checkout: $e');
       }
     } finally {
       if (mounted) {

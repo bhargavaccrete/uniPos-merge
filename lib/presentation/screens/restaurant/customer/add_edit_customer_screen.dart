@@ -4,6 +4,7 @@ import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class AddEditCustomerScreen extends StatefulWidget {
   final RestaurantCustomer? customer;
@@ -81,15 +82,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
 
         if (existingCustomer != null) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'A customer with this phone number already exists',
-                  style: GoogleFonts.poppins(),
-                ),
-                backgroundColor: Colors.orange,
-              ),
-            );
+            NotificationService.instance.showError('A customer with this phone number already exists');
           }
           setState(() {
             _isLoading = false;
@@ -121,15 +114,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error: ${e.toString()}',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error: ${e.toString()}');
       }
     } finally {
       if (mounted) {

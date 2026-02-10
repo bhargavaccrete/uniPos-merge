@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
 import 'customer_detail_screen.dart';
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -214,12 +215,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.isEmpty || phoneController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Name and Phone are required'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                NotificationService.instance.showError('Name and Phone are required');
                 return;
               }
 
@@ -243,15 +239,10 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
               if (mounted) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      openingBalance > 0
-                          ? 'Customer added with \u20B9${openingBalance.toStringAsFixed(2)} opening balance'
-                          : 'Customer added successfully',
-                    ),
-                    backgroundColor: const Color(0xFF4CAF50),
-                  ),
+                NotificationService.instance.showSuccess(
+                  openingBalance > 0
+                      ? 'Customer added with \u20B9${openingBalance.toStringAsFixed(2)} opening balance'
+                      : 'Customer added successfully',
                 );
               }
             },

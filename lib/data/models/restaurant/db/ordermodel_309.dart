@@ -1,4 +1,5 @@
 
+import 'dart:convert';
 import 'package:hive/hive.dart';
 import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
@@ -89,6 +90,19 @@ class OrderModel extends HiveObject {
   @HiveField(26)
   final String? customerId; // Customer ID linking to RestaurantCustomer
 
+  // --- SPLIT PAYMENT SUPPORT ---
+  @HiveField(27)
+  final String? paymentListJson; // JSON serialized list of payment entries
+
+  @HiveField(28)
+  final bool? isSplitPayment; // Flag indicating if split payment was used
+
+  @HiveField(29)
+  final double? totalPaid; // Total amount paid across all payment methods
+
+  @HiveField(30)
+  final double? changeReturn; // Total change to return to customer
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -119,6 +133,11 @@ class OrderModel extends HiveObject {
     this.kotStatuses,
     this.orderNumber, // Optional - assigned when order is placed
     this.customerId, // Optional - customer ID
+    // Split payment fields
+    this.paymentListJson,
+    this.isSplitPayment,
+    this.totalPaid,
+    this.changeReturn,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -152,6 +171,10 @@ class OrderModel extends HiveObject {
     Map<int, String>? kotStatuses,
     int? orderNumber,
     String? customerId,
+    String? paymentListJson,
+    bool? isSplitPayment,
+    double? totalPaid,
+    double? changeReturn,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -181,6 +204,10 @@ class OrderModel extends HiveObject {
       kotStatuses: kotStatuses ?? this.kotStatuses,
       orderNumber: orderNumber ?? this.orderNumber,
       customerId: customerId ?? this.customerId,
+      paymentListJson: paymentListJson ?? this.paymentListJson,
+      isSplitPayment: isSplitPayment ?? this.isSplitPayment,
+      totalPaid: totalPaid ?? this.totalPaid,
+      changeReturn: changeReturn ?? this.changeReturn,
     );
   }
 
@@ -256,6 +283,10 @@ class OrderModel extends HiveObject {
       'kotStatuses': kotStatuses,
       if (orderNumber != null) 'orderNumber': orderNumber,
       'customerId': customerId,
+      'paymentListJson': paymentListJson,
+      'isSplitPayment': isSplitPayment,
+      'totalPaid': totalPaid,
+      'changeReturn': changeReturn,
     };
   }
 
@@ -306,6 +337,28 @@ class OrderModel extends HiveObject {
           : null,
       orderNumber: map['orderNumber'] != null ? _toInt(map['orderNumber']) : null,
       customerId: map['customerId'] as String?,
+      paymentListJson: map['paymentListJson'] as String?,
+      isSplitPayment: map['isSplitPayment'] as bool?,
+      totalPaid: map['totalPaid'] != null ? (map['totalPaid'] as num).toDouble() : null,
+      changeReturn: map['changeReturn'] != null ? (map['changeReturn'] as num).toDouble() : null,
     );
+  }
+
+  // Helper method to get payment list from JSON
+  List<Map<String, dynamic>> get paymentList {
+    if (paymentListJson == null || paymentListJson!.isEmpty) {
+      // Fallback to single payment method for backward compatibility
+      return [
+        {'method': paymentMethod ?? 'cash', 'amount': totalPrice}
+      ];
+    }
+    try {
+      final List<dynamic> decoded = jsonDecode(paymentListJson!);
+      return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
+      return [
+        {'method': paymentMethod ?? 'cash', 'amount': totalPrice}
+      ];
+    }
   }
 }

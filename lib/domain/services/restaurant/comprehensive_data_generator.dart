@@ -174,7 +174,7 @@ class ComprehensiveDataGenerator {
 
   // 4. Generate Past Orders (Completed Orders)
   static Future<int> generatePastOrders(int count, {int batchSize = 100}) async {
-    final box = Hive.box<pastOrderModel>('pastorderBox');
+    final box = Hive.box<PastOrderModel>('pastorderBox');
     final itemBox = Hive.box<Items>('itemBoxs');
 
     print('📦 Generating $count past orders...');
@@ -187,7 +187,7 @@ class ComprehensiveDataGenerator {
     final items = itemBox.values.toList();
     final startTime = DateTime.now();
     int generated = 0;
-    List<pastOrderModel> batch = [];
+    List<PastOrderModel> batch = [];
 
     for (int i = 0; i < count; i++) {
       final cartItemCount = 2 + _random.nextInt(7);
@@ -221,7 +221,7 @@ class ComprehensiveDataGenerator {
       final first = _firstNames[_random.nextInt(_firstNames.length)];
       final last = _lastNames[_random.nextInt(_lastNames.length)];
 
-      final order = pastOrderModel(
+      final order = PastOrderModel(
         id: 'ORD${(i + 1).toString().padLeft(6, '0')}',
         customerName: '$first $last',
         orderType: _orderTypes[_random.nextInt(_orderTypes.length)],
@@ -825,7 +825,7 @@ class ComprehensiveDataGenerator {
       'variants': Hive.box<VariantModel>('variante').length,
       'extras': Hive.box<Extramodel>('extra').length,
       'activeOrders': Hive.box<OrderModel>('orderBox').length,
-      'pastOrders': Hive.box<pastOrderModel>('pastorderBox').length,
+      'pastOrders': Hive.box<PastOrderModel>('pastorderBox').length,
       'tables': Hive.box<TableModel>('tablesBox').length,
       'staff': Hive.box<StaffModel>('staffBox').length,
       'taxRates': Hive.box<Tax>('restaurant_taxes').length,

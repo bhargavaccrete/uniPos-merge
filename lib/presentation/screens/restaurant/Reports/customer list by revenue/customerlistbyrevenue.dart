@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -91,12 +92,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
 
   Future<void> _exportToExcel(List<CustomerRevenueData> customers) async {
     if (customers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No data to export'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('No data to export');
       return;
     }
 
@@ -136,21 +132,11 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       await Share.shareXFiles([XFile(path)], text: "Customer Revenue Report");
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Report exported successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Report exported successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error exporting: $e');
       }
     }
   }

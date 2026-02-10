@@ -11,6 +11,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 enum TimePeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -182,8 +183,8 @@ class SalesDataView extends StatefulWidget {
 }
 
 class _SalesDataViewState extends State<SalesDataView> {
-  List<pastOrderModel> _allOrders = [];
-  List<pastOrderModel> _filteredOrders = [];
+  List<PastOrderModel> _allOrders = [];
+  List<PastOrderModel> _filteredOrders = [];
   double _totalSales = 0.0;
   int _totalOrdersCount = 0;
   bool _isLoading = true;
@@ -218,7 +219,7 @@ class _SalesDataViewState extends State<SalesDataView> {
       _isLoading = true;
     });
 
-    List<pastOrderModel> resultingList = [];
+    List<PastOrderModel> resultingList = [];
     final now = DateTime.now();
 
     if (widget.period == TimePeriod.Custom) {
@@ -281,12 +282,7 @@ class _SalesDataViewState extends State<SalesDataView> {
 
   Future<void> _exportToExcel() async {
     if (_filteredOrders.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No data to export'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('No data to export');
       return;
     }
 
@@ -324,21 +320,11 @@ class _SalesDataViewState extends State<SalesDataView> {
       await Share.shareXFiles([XFile(path)], text: "Sales Report - $periodName");
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Report exported successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Report exported successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error exporting: $e');
       }
     }
   }

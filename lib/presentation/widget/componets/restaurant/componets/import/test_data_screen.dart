@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'test_data_generator.dart';
 import '../../../../../../core/di/service_locator.dart';
+import '../../../../../../domain/services/restaurant/notification_service.dart';
 
 class TestDataScreen extends StatefulWidget {
   const TestDataScreen({super.key});
@@ -42,24 +43,14 @@ class _TestDataScreenState extends State<TestDataScreen> {
         _statusMessage = '✅ Successfully generated $_categoryCount categories and $_itemCount items${_includeImages ? " with images" : ""}!';
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Test data generated successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('✅ Test data generated successfully!');
     } catch (e) {
       setState(() {
         _isLoading = false;
         _statusMessage = '❌ Error: $e';
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('❌ Error: $e');
     }
   }
 
@@ -106,12 +97,7 @@ class _TestDataScreenState extends State<TestDataScreen> {
         _statusMessage = '✅ All data cleared!';
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ All data cleared!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('✅ All data cleared!');
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -122,9 +108,7 @@ class _TestDataScreenState extends State<TestDataScreen> {
 
   void _showStats() {
     TestDataGenerator.printDataStats();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Check console for data statistics')),
-    );
+    NotificationService.instance.showSuccess('Check console for data statistics');
   }
 
   @override

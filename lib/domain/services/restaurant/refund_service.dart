@@ -23,8 +23,8 @@ class PartialRefundResult {
 class RefundService {
   /// Process a partial or full refund for an order
   /// Returns the updated order after refund processing
-  static Future<pastOrderModel> processRefund({
-    required pastOrderModel order,
+  static Future<PastOrderModel> processRefund({
+    required PastOrderModel order,
     required PartialRefundResult refundResult,
   }) async {
     try {
@@ -95,7 +95,7 @@ class RefundService {
 
   /// Validate if an order is eligible for refund
   /// Returns error message if not eligible, null if eligible
-  static String? validateRefundEligibility(pastOrderModel order) {
+  static String? validateRefundEligibility(PastOrderModel order) {
     // Check if order time exists
     if (order.orderAt == null) {
       return 'Order time is missing. Cannot process refund.';
@@ -122,7 +122,7 @@ class RefundService {
   }
 
   /// Get list of items that can be refunded from an order
-  static List<CartItem> getRefundableItems(pastOrderModel order) {
+  static List<CartItem> getRefundableItems(PastOrderModel order) {
     return order.items?.where((item) {
       final originalQty = item.quantity ?? 0;
       final alreadyRefunded = item.refundedQuantity ?? 0;
@@ -131,15 +131,15 @@ class RefundService {
   }
 
   /// Calculate remaining refundable amount
-  static double getRemainingRefundableAmount(pastOrderModel order) {
+  static double getRemainingRefundableAmount(PastOrderModel order) {
     final originalTotal = order.totalPrice ?? 0.0;
     final alreadyRefunded = order.refundAmount ?? 0.0;
     return originalTotal - alreadyRefunded;
   }
 
   /// Process void order (mark as voided)
-  static Future<pastOrderModel> voidOrder({
-    required pastOrderModel order,
+  static Future<PastOrderModel> voidOrder({
+    required PastOrderModel order,
     required String reason,
   }) async {
     try {

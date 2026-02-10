@@ -13,6 +13,8 @@ import '../../../widget/componets/restaurant/componets/OrderCard.dart';
 import '../start order/cart/cart.dart';
 import '../../../../services/websocket_client_service.dart';
 import '../../../../server/websocket.dart' as ws;
+import '../util/restaurant_print_helper.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 
 class Activeorder extends StatefulWidget {
@@ -59,25 +61,7 @@ class _ActiveorderState extends State<Activeorder> {
 
         // Show notification to user
         if (mounted && status != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.update, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'KOT #$kotNumber: Status updated to $status',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.blue,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showSuccess('KOT #$kotNumber: Status updated to $status');
         }
 
         // UI will automatically refresh via ValueListenableBuilder
@@ -91,25 +75,7 @@ class _ActiveorderState extends State<Activeorder> {
 
         // Show notification
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.add_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'New KOT #$kotNumber: $newItemCount items added to Table $tableNo',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showSuccess('New KOT #$kotNumber: $newItemCount items added to Table $tableNo');
         }
       } else if (type == 'NEW_ORDER') {
         final kotNumber = message['kotNumber'];
@@ -119,23 +85,7 @@ class _ActiveorderState extends State<Activeorder> {
 
         // Show notification
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.restaurant_menu, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Text(
-                    'New Order: KOT #$kotNumber - Table $tableNo',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationService.instance.showSuccess('New Order: KOT #$kotNumber - Table $tableNo');
         }
       }
     });
@@ -424,23 +374,12 @@ class _ActiveorderState extends State<Activeorder> {
 
       // Show success message
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('KOT #$kotNumber updated to $newStatus'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        NotificationService.instance.showSuccess('KOT #$kotNumber updated to $newStatus');
       }
     } catch (e) {
       print('❌ Error updating KOT status: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update status: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to update status: $e');
       }
     }
   }
@@ -477,7 +416,7 @@ class _ActiveorderState extends State<Activeorder> {
 // ACTION 2: Moves the order to the past orders box
   Future<void> _moveOrderToPast(OrderModel order) async {
     // Create a past order record from the active order
-    final pastOrder = pastOrderModel(
+    final pastOrder = PastOrderModel(
       id: order.id,
       customerName: order.customerName,
       totalPrice: order.totalPrice,
@@ -505,6 +444,71 @@ class _ActiveorderState extends State<Activeorder> {
   }
 
 
+
+  // Show dialog to select KOT for reprinting
+  void _showKotPrintSelectionDialog(OrderModel order) {
+    if (order.kotNumbers.isEmpty) {
+      NotificationService.instance.showError('No KOTs found for this order');
+      return;
+    }
+
+    // If only one KOT, print it directly
+    if (order.kotNumbers.length == 1) {
+      RestaurantPrintHelper.printKOT(
+        context: context,
+        order: order,
+        kotNumber: order.kotNumbers.first,
+        autoPrint: true,
+      );
+      return;
+    }
+
+    // If multiple KOTs, show selection dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Select KOT to Reprint', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: order.kotNumbers.length,
+              itemBuilder: (context, index) {
+                final kotNum = order.kotNumbers[index];
+                // Calculate item count for this KOT
+                final startIndex = index == 0 ? 0 : order.kotBoundaries[index - 1];
+                final endIndex = order.kotBoundaries[index];
+                final itemCount = endIndex - startIndex;
+
+                return ListTile(
+                  leading: Icon(Icons.receipt_long, color: Colors.blue),
+                  title: Text('KOT #$kotNum', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  subtitle: Text('$itemCount items', style: GoogleFonts.poppins(fontSize: 12)),
+                  trailing: Icon(Icons.print, color: Colors.grey),
+                  onTap: () {
+                    Navigator.pop(context);
+                    RestaurantPrintHelper.printKOT(
+                      context: context,
+                      order: order,
+                      kotNumber: kotNum,
+                      autoPrint: true,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: GoogleFonts.poppins()),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -640,6 +644,7 @@ class _ActiveorderState extends State<Activeorder> {
                       color: _getColorForStatus(order.status),
                       order: order,
                       onDelete: _deleteOrder,
+                      onPrintKot: () => _showKotPrintSelectionDialog(order), // Pass print callback
                       ontapcooking: () async {
                         if (order.status == 'Processing' ||
                             order.status == 'Cooking' ||

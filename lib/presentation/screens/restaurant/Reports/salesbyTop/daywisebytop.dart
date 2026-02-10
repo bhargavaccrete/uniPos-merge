@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -34,9 +35,7 @@ class _DayWisebyTopState extends State<DayWisebyTop> {
 
   Future<void> _loadTopSellingItems() async {
     if (_fromDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a date first'), backgroundColor: Colors.orange),
-      );
+      NotificationService.instance.showError('Please select a date first');
       return;
     }
 

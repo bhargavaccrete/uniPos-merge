@@ -5,6 +5,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/stores/payment_method_store.dart';
 import 'package:unipos/util/color.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class Paymentsmethods extends StatefulWidget {
   @override
@@ -135,12 +136,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                   iconName: 'payment',
                 );
                 if (mounted) Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${_nameController.text} added successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                NotificationService.instance.showSuccess('${_nameController.text} added successfully');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -249,12 +245,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                 );
                 await _paymentStore.updatePaymentMethod(updatedMethod);
                 if (mounted) Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Payment method updated successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                NotificationService.instance.showSuccess('Payment method updated successfully');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -346,12 +337,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                       await _paymentStore.init();
                       if (mounted) {
                         final count = _paymentStore.paymentMethods.length;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Refreshed: Found $count payment methods'),
-                            backgroundColor: count > 0 ? Colors.green : Colors.orange,
-                          ),
-                        );
+                        NotificationService.instance.showSuccess('Refreshed: Found $count payment methods');
                       }
                     },
                     icon: Icon(Icons.sync_rounded, size: isTablet ? 20 : 18),
@@ -581,14 +567,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                                       onChanged: (value) async {
                                         await _paymentStore.togglePaymentMethod(method.id);
                                         if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                '${method.name} ${value ? 'enabled' : 'disabled'}',
-                                              ),
-                                              backgroundColor: Colors.green,
-                                            ),
-                                          );
+                                          NotificationService.instance.showSuccess('${method.name} ${value ? 'enabled' : 'disabled'}');
                                         }
                                       },
                                       activeColor: Colors.green,
@@ -712,12 +691,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                                               if (confirm == true) {
                                                 await _paymentStore.deletePaymentMethod(method.id);
                                                 if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text('${method.name} deleted'),
-                                                      backgroundColor: Colors.red,
-                                                    ),
-                                                  );
+                                                  NotificationService.instance.showSuccess('${method.name} deleted');
                                                 }
                                               }
                                             },

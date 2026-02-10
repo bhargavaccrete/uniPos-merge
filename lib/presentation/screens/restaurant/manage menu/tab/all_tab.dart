@@ -11,6 +11,7 @@ import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class AllTab extends StatefulWidget {
   const AllTab({super.key});
@@ -427,23 +428,7 @@ class _AllTabState extends State<AllTab> {
           BottomsheetMenu(
             onItemAdded: () {
               // Show success feedback
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white),
-                      SizedBox(width: 12),
-                      Text(
-                        'Item added successfully!',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              NotificationService.instance.showSuccess('Item added successfully!');
             },
           ),
         ],

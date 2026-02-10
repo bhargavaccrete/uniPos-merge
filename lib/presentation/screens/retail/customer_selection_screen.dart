@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
 
 class CustomerSelectionScreen extends StatefulWidget {
   const CustomerSelectionScreen({super.key});
@@ -102,12 +103,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.isEmpty || phoneController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Name and Phone are required'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                NotificationService.instance.showError('Name and Phone are required');
                 return;
               }
 

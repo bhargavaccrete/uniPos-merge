@@ -54,8 +54,10 @@ class InventoryService {
 
           if (item.isSoldByWeight && cartItem.weightDisplay != null) {
             // Parse the weight from weightDisplay (e.g., "500GM" -> 500, "1.5KG" -> 1500)
-            quantityToDeduct = _parseWeightFromDisplay(cartItem.weightDisplay!);
-            print('🔍 Weight-based item detected. Parsed weight: $quantityToDeduct');
+            final singleWeight = _parseWeightFromDisplay(cartItem.weightDisplay!);
+            // ✅ FIX: Multiply by quantity (e.g., 3 qty × 5kg = 15kg)
+            quantityToDeduct = cartItem.quantity * singleWeight;
+            print('🔍 Weight-based item detected. Single weight: $singleWeight, Quantity: ${cartItem.quantity}, Total: $quantityToDeduct');
           }
 
           print('🔍 Deducting $quantityToDeduct from item ${item.name}');

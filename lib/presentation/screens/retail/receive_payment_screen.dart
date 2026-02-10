@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
 
@@ -62,22 +63,12 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
 
     final amount = double.tryParse(_amountController.text) ?? 0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid amount'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('Please enter a valid amount');
       return;
     }
 
     if (amount > _totalDue) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Amount cannot exceed total due (₹${_totalDue.toStringAsFixed(2)})'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('Amount cannot exceed total due (₹${_totalDue.toStringAsFixed(2)})');
       return;
     }
 
@@ -143,22 +134,12 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result.errorMessage ?? 'Payment failed'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationService.instance.showError(result.errorMessage ?? 'Payment failed');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error: $e');
       }
     } finally {
       if (mounted) {

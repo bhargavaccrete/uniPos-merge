@@ -588,6 +588,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                 key: _categoryKeys[category.id],
                                 margin: EdgeInsets.only(bottom: 12),
                                 elevation: 2,
+                                color: AppColors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),

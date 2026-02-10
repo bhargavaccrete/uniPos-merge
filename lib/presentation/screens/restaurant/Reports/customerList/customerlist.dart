@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -127,12 +128,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
 
     if (customerData.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No customers to export'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('No customers to export');
       return;
     }
 
@@ -197,20 +193,10 @@ class _CustomerListReportState extends State<CustomerListReport> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report exported successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('Report exported successfully');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Export failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('Export failed: $e');
     }
   }
 

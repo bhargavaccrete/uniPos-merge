@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service_v3.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 /// Test screen for V3 Bulk Import with Phase 1 improvements
 class BulkImportTestScreenV3 extends StatefulWidget {
@@ -241,15 +242,11 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
           _statusMessage = '';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result),
-            backgroundColor: result.contains('Error')
-                ? Colors.red
-                : Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        if (result.contains('Error')) {
+          NotificationService.instance.showError(result);
+        } else {
+          NotificationService.instance.showSuccess(result);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -258,13 +255,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
           _statusMessage = '';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        NotificationService.instance.showError('Error: $e');
       }
     }
   }
@@ -323,13 +314,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
           _statusMessage = '';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Import failed: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        NotificationService.instance.showError('Import failed: $e');
       }
     }
   }

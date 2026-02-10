@@ -9,11 +9,11 @@ part of 'past_order_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$PastOrderStore on _PastOrderStore, Store {
-  Computed<List<pastOrderModel>>? _$filteredPastOrdersComputed;
+  Computed<List<PastOrderModel>>? _$filteredPastOrdersComputed;
 
   @override
-  List<pastOrderModel> get filteredPastOrders =>
-      (_$filteredPastOrdersComputed ??= Computed<List<pastOrderModel>>(
+  List<PastOrderModel> get filteredPastOrders =>
+      (_$filteredPastOrdersComputed ??= Computed<List<PastOrderModel>>(
               () => super.filteredPastOrders,
               name: '_PastOrderStore.filteredPastOrders'))
           .value;
@@ -43,13 +43,13 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       Atom(name: '_PastOrderStore.pastOrders', context: context);
 
   @override
-  ObservableList<pastOrderModel> get pastOrders {
+  ObservableList<PastOrderModel> get pastOrders {
     _$pastOrdersAtom.reportRead();
     return super.pastOrders;
   }
 
   @override
-  set pastOrders(ObservableList<pastOrderModel> value) {
+  set pastOrders(ObservableList<PastOrderModel> value) {
     _$pastOrdersAtom.reportWrite(value, super.pastOrders, () {
       super.pastOrders = value;
     });
@@ -171,7 +171,7 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.addOrder', context: context);
 
   @override
-  Future<bool> addOrder(pastOrderModel pastOrder) {
+  Future<bool> addOrder(PastOrderModel pastOrder) {
     return _$addOrderAsyncAction.run(() => super.addOrder(pastOrder));
   }
 
@@ -179,7 +179,7 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.getOrderById', context: context);
 
   @override
-  Future<pastOrderModel?> getOrderById(String orderId) {
+  Future<PastOrderModel?> getOrderById(String orderId) {
     return _$getOrderByIdAsyncAction.run(() => super.getOrderById(orderId));
   }
 
@@ -187,7 +187,7 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.updateOrder', context: context);
 
   @override
-  Future<bool> updateOrder(pastOrderModel updatedOrder) {
+  Future<bool> updateOrder(PastOrderModel updatedOrder) {
     return _$updateOrderAsyncAction.run(() => super.updateOrder(updatedOrder));
   }
 
@@ -203,7 +203,7 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.getOrdersByDateRange', context: context);
 
   @override
-  Future<List<pastOrderModel>> getOrdersByDateRange(
+  Future<List<PastOrderModel>> getOrdersByDateRange(
       DateTime startDate, DateTime endDate) {
     return _$getOrdersByDateRangeAsyncAction
         .run(() => super.getOrdersByDateRange(startDate, endDate));
@@ -213,7 +213,7 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.getTodaysPastOrders', context: context);
 
   @override
-  Future<List<pastOrderModel>> getTodaysPastOrders() {
+  Future<List<PastOrderModel>> getTodaysPastOrders() {
     return _$getTodaysPastOrdersAsyncAction
         .run(() => super.getTodaysPastOrders());
   }
@@ -222,7 +222,7 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.getOrdersByType', context: context);
 
   @override
-  Future<List<pastOrderModel>> getOrdersByType(String orderType) {
+  Future<List<PastOrderModel>> getOrdersByType(String orderType) {
     return _$getOrdersByTypeAsyncAction
         .run(() => super.getOrdersByType(orderType));
   }
@@ -247,7 +247,7 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.searchOrders', context: context);
 
   @override
-  Future<List<pastOrderModel>> searchOrders(String query) {
+  Future<List<PastOrderModel>> searchOrders(String query) {
     return _$searchOrdersAsyncAction.run(() => super.searchOrders(query));
   }
 
@@ -271,8 +271,8 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.processRefund', context: context);
 
   @override
-  Future<pastOrderModel?> processRefund(
-      {required pastOrderModel order,
+  Future<PastOrderModel?> processRefund(
+      {required PastOrderModel order,
       required PartialRefundResult refundResult}) {
     return _$processRefundAsyncAction.run(
         () => super.processRefund(order: order, refundResult: refundResult));
@@ -282,8 +282,8 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
       AsyncAction('_PastOrderStore.voidOrder', context: context);
 
   @override
-  Future<pastOrderModel?> voidOrder(
-      {required pastOrderModel order, required String reason}) {
+  Future<PastOrderModel?> voidOrder(
+      {required PastOrderModel order, required String reason}) {
     return _$voidOrderAsyncAction
         .run(() => super.voidOrder(order: order, reason: reason));
   }

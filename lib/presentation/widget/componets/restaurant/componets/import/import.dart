@@ -35,6 +35,7 @@ import '../../../../../../data/models/restaurant/db/staffModel_310.dart';
 import '../../../../../../data/models/restaurant/db/table_Model_311.dart';
 import '../../../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../../../data/models/restaurant/db/variantmodel_305.dart';
+import '../../../../../../domain/services/restaurant/notification_service.dart';
 
 
 
@@ -195,7 +196,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting past orders...");
       try {
-        final pastOrderBox = Hive.box<pastOrderModel>("pastorderBox");
+        final pastOrderBox = Hive.box<PastOrderModel>("pastorderBox");
         final pastOrderCount = pastOrderBox.length;
         debugPrint("📦 Past orders count: $pastOrderCount");
 
@@ -427,7 +428,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting past orders...");
       try {
-        final pastOrderBox = Hive.box<pastOrderModel>("pastorderBox");
+        final pastOrderBox = Hive.box<PastOrderModel>("pastorderBox");
         final pastOrderCount = pastOrderBox.length;
         debugPrint("📦 Past orders count: $pastOrderCount");
 
@@ -581,7 +582,7 @@ class CategoryImportExport {
 
       debugPrint("📦 Exporting past orders...");
       try {
-        final pastOrderBox = Hive.box<pastOrderModel>("pastorderBox");
+        final pastOrderBox = Hive.box<PastOrderModel>("pastorderBox");
         final pastOrderCount = pastOrderBox.length;
         debugPrint("📦 Past orders count: $pastOrderCount");
 
@@ -835,7 +836,7 @@ class CategoryImportExport {
       }
 
       if (!Hive.isBoxOpen('pastorderBox')) {
-        await Hive.openBox<pastOrderModel>('pastorderBox', encryptionCipher: cipher);
+        await Hive.openBox<PastOrderModel>('pastorderBox', encryptionCipher: cipher);
         debugPrint("✅ Opened pastorderBox box");
       }
 
@@ -914,7 +915,7 @@ class CategoryImportExport {
     await _restoreBox("expenses", Hive.box<Expense>("restaurant_expenseBox"), (m) => Expense.fromMap(m), data);
     await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
     await _restoreBox("eodReports", Hive.box<EndOfDayReport>("restaurant_eodBox"), (m) => EndOfDayReport.fromMap(m), data);
-    await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
+    await _restoreBox("pastOrders", Hive.box<PastOrderModel>("pastorderBox"), (m) => PastOrderModel.fromMap(m), data);
     await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
 
     // Restore app state (configuration settings)
@@ -994,7 +995,7 @@ class CategoryImportExport {
     await _restoreBox("expenses", Hive.box<Expense>("restaurant_expenseBox"), (m) => Expense.fromMap(m), data);
     await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
     await _restoreBox("eodReports", Hive.box<EndOfDayReport>("restaurant_eodBox"), (m) => EndOfDayReport.fromMap(m), data);
-    await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
+    await _restoreBox("pastOrders", Hive.box<PastOrderModel>("pastorderBox"), (m) => PastOrderModel.fromMap(m), data);
     await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
 
     // Restore app state (configuration settings)
@@ -1140,15 +1141,11 @@ class CategoryImportExport {
             ElevatedButton(
               onPressed: () {
                 if (passwordController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a password')),
-                  );
+                  NotificationService.instance.showError('Please enter a password');
                   return;
                 }
                 if (passwordController.text != confirmPasswordController.text) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Passwords do not match')),
-                  );
+                  NotificationService.instance.showError('Passwords do not match');
                   return;
                 }
                 Navigator.pop(context, true);
@@ -1181,9 +1178,7 @@ class CategoryImportExport {
 
       if (!jsonMap.containsKey('data') || !jsonMap.containsKey('iv')) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid backup format')),
-        );
+        NotificationService.instance.showError('Invalid backup format');
         return;
       }
 
@@ -1248,9 +1243,7 @@ class CategoryImportExport {
       }
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error reading backup file: $e')),
-      );
+      NotificationService.instance.showError('Error reading backup file: $e');
     }
   }
 
@@ -1349,7 +1342,7 @@ class CategoryImportExport {
       await _restoreBox("expenses", Hive.box<Expense>("restaurant_expenseBox"), (m) => Expense.fromMap(m), data);
       await _restoreBox("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), data);
       await _restoreBox("eodReports", Hive.box<EndOfDayReport>("restaurant_eodBox"), (m) => EndOfDayReport.fromMap(m), data);
-      await _restoreBox("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), data);
+      await _restoreBox("pastOrders", Hive.box<PastOrderModel>("pastorderBox"), (m) => PastOrderModel.fromMap(m), data);
       await _restoreBox("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), data);
 
       // Restore app state (configuration settings)
@@ -1414,9 +1407,7 @@ class CategoryImportExport {
     } catch (e) {
       debugPrint("❌ Import failed: $e");
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Import failed: $e")),
-      );
+      NotificationService.instance.showError("❌ Import failed: $e");
     }
   }
 }

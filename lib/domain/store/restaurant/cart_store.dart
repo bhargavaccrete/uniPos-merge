@@ -1,6 +1,8 @@
 import 'package:mobx/mobx.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/repositories/restaurant/cart_repository.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
 
 part 'cart_store.g.dart';
 
@@ -61,6 +63,42 @@ abstract class _CartStore with Store {
   @action
   Future<Map<String, dynamic>> addToCart(CartItem item) async {
     try {
+      // ✅ VALIDATION: Check stock availability before adding
+      if (item.isStockManaged == true) {
+        // Get the actual item to check stock
+        final actualItem = await itemStore.getItemById(item.productId);
+
+        if (actualItem != null && actualItem.trackInventory == true) {
+          final availableStock = actualItem.stockQuantity;
+
+          // Check if item is weight-based (already validated in dialog, but double-check)
+          if (!actualItem.isSoldByWeight) {
+            // For unit-based items, check if we have enough quantity
+            if (availableStock < item.quantity) {
+              print('❌ STOCK CHECK FAILED: ${item.title} - Available: $availableStock, Requested: ${item.quantity}');
+              return {
+                'success': false,
+                'message': 'Insufficient stock! Available: ${availableStock.toInt()} units, You requested: ${item.quantity} units'
+              };
+            }
+
+            // Also check if adding this would exceed stock (if already in cart)
+            final existingItem = cartItems.where((ci) => ci.productId == item.productId).firstOrNull;
+            if (existingItem != null) {
+              final totalNeeded = existingItem.quantity + item.quantity;
+              if (totalNeeded > availableStock) {
+                print('❌ STOCK CHECK FAILED: ${item.title} - Already in cart: ${existingItem.quantity}, Total needed: $totalNeeded, Available: $availableStock');
+                return {
+                  'success': false,
+                  'message': 'Insufficient stock! Available: ${availableStock.toInt()} units, In cart: ${existingItem.quantity}, Total needed: $totalNeeded units'
+                };
+              }
+            }
+          }
+        }
+      }
+
+      // If validation passed, add to cart
       final result = await _repository.addToCart(item);
       if (result['success'] == true) {
         await loadCartItems(); // Reload to reflect changes
@@ -91,9 +129,54 @@ abstract class _CartStore with Store {
         return await removeFromCart(itemId);
       }
 
-      await _repository.updateQuantity(itemId, newQuantity);
+      // ✅ VALIDATION: Check stock for both weight-based and unit-based items
       final index = cartItems.indexWhere((item) => item.id == itemId);
       if (index != -1) {
+        final cartItem = cartItems[index];
+
+        // Get the actual item to check stock
+        final item = await itemStore.getItemById(cartItem.productId);
+
+        if (item != null && item.trackInventory == true) {
+          final availableStock = item.stockQuantity;
+
+          if (item.isSoldByWeight == true) {
+            // WEIGHT-BASED ITEMS
+            // Extract weight from weightDisplay (e.g., "5.0KG" -> 5.0)
+            double weight = 0.0;
+            if (cartItem.weightDisplay != null) {
+              final weightStr = cartItem.weightDisplay!.replaceAll(RegExp(r'[^0-9.]'), '');
+              weight = double.tryParse(weightStr) ?? 0.0;
+            }
+
+            // Calculate total weight needed
+            final totalWeightNeeded = newQuantity * weight;
+
+            // Check if there's enough stock
+            if (totalWeightNeeded > availableStock) {
+              NotificationService.instance.showError(
+                'Insufficient stock!\n'
+                'You need: $totalWeightNeeded ${item.unit ?? "kg"}\n'
+                'Available: $availableStock ${item.unit ?? "kg"}'
+              );
+              return false;
+            }
+          } else {
+            // UNIT-BASED ITEMS
+            // Check if new quantity exceeds available stock
+            if (newQuantity > availableStock) {
+              NotificationService.instance.showError(
+                'Insufficient stock for ${item.name}!\n'
+                'Available: ${availableStock.toInt()} units\n'
+                'You requested: $newQuantity units'
+              );
+              return false;
+            }
+          }
+        }
+
+        // If validation passed, update quantity
+        await _repository.updateQuantity(itemId, newQuantity);
         cartItems[index].quantity = newQuantity;
         cartItems = ObservableList.of(cartItems); // Trigger update
       }

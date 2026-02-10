@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 
 enum ComparisonPeriod { Today, ThisWeek, MonthWise, YearWise }
@@ -326,12 +327,8 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
 
     if (comparisonData.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No data to export'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('No data to export');
+
       return;
     }
 
@@ -391,20 +388,10 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report exported successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('Report exported successfully');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Export failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('Export failed: $e');
     }
   }
 

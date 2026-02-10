@@ -12,6 +12,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class ItemsTab extends StatefulWidget {
   final String? selectedCategory;
@@ -84,10 +85,24 @@ class _AllTabState extends State<ItemsTab> {
   }
 
   void editItems(Items itemToEdit) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => EdititemScreen(items: itemToEdit)),
-    );
+    // CRITICAL: Fetch fresh item from store instead of using cached object
+    // This ensures we always have the latest data from Hive
+    final freshItem = itemStore.getItemById(itemToEdit.id);
+
+    if (freshItem == null) {
+      // Item was deleted
+      if (mounted) {
+        NotificationService.instance.showError('Item not found');
+      }
+      return;
+    }
+
+    if (mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => EdititemScreen(items: freshItem)),
+      );
+    }
   }
 
   int _getGridColumns(double width) {
@@ -163,23 +178,7 @@ class _AllTabState extends State<ItemsTab> {
             },
             onItemAdded: () {
               // Show success feedback
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white),
-                      SizedBox(width: 12),
-                      Text(
-                        'Item added successfully!',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              NotificationService.instance.showSuccess('Item added successfully!');
             },
           ),
         ],

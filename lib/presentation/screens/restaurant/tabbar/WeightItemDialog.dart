@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/color.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -190,6 +191,33 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
                             color: AppColors.textSecondary,
                           ),
                         ),
+                        // ✅ Show available stock
+                        if (widget.item.trackInventory == true)
+                          Container(
+                            margin: EdgeInsets.only(top: 4),
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: widget.item.stockQuantity > 0
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: widget.item.stockQuantity > 0
+                                    ? Colors.green.withOpacity(0.3)
+                                    : Colors.red.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              'Available: ${_formatWeightDisplay(widget.item.stockQuantity, widget.item.unit)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: widget.item.stockQuantity > 0
+                                    ? Colors.green.shade700
+                                    : Colors.red.shade700,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -251,6 +279,20 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
               child: GestureDetector(
                 onTap: () {
                   if (_displayWeight > 0 && _displayAmount > 0) {
+                    // ✅ VALIDATION: Check stock availability for weight-based items
+                    if (widget.item.trackInventory == true) {
+                      final availableStock = widget.item.stockQuantity;
+
+                      if (_displayWeight > availableStock) {
+                        NotificationService.instance.showError(
+                          'Insufficient stock!\n'
+                          'You requested: ${_formatWeightDisplay(_displayWeight, widget.item.unit)}\n'
+                          'Available: ${_formatWeightDisplay(availableStock, widget.item.unit)}'
+                        );
+                        return;
+                      }
+                    }
+
                     final cartItem = CartItem(
                       productId: widget.item.id,
                       id: widget.item.id,

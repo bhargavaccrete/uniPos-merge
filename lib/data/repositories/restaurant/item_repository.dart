@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:unipos/core/constants/hive_box_names.dart';
 import '../../models/restaurant/db/itemmodel_302.dart';
 import '../../models/restaurant/db/categorymodel_300.dart';
@@ -23,11 +24,31 @@ class ItemRepository {
   /// Add a new item to Hive
   Future<void> addItem(Items item) async {
     await _itemBox.put(item.id, item);
+
+    // CRITICAL: Flush to disk on web platform
+    if (kIsWeb) {
+      await _itemBox.flush();
+    }
   }
 
   /// Update an existing item in Hive
   Future<void> updateItem(Items item) async {
+    print('📝 REPOSITORY - Saving item: ${item.name}');
+    print('   trackInventory BEFORE save: ${item.trackInventory}');
+    print('   allowOrderWhenOutOfStock BEFORE save: ${item.allowOrderWhenOutOfStock}');
+
     await _itemBox.put(item.id, item);
+
+    // CRITICAL: Flush to disk on web platform to ensure data is persisted
+    // Hive web uses IndexedDB which has caching issues
+    if (kIsWeb) {
+      await _itemBox.flush();
+    }
+
+    // Verify what was actually saved
+    final savedItem = _itemBox.get(item.id);
+    print('   trackInventory AFTER save: ${savedItem?.trackInventory}');
+    print('   allowOrderWhenOutOfStock AFTER save: ${savedItem?.allowOrderWhenOutOfStock}');
   }
 
   /// Delete an item from Hive

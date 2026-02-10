@@ -9,9 +9,12 @@ import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/domain/services/restaurant/data_clear_service.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/domain/services/restaurant/eod_service.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/core/routes/routes_name.dart';
+import '../../../widget/restaurant/opening_balance_dialog.dart';
 
 class EndDayDrawer extends StatefulWidget {
   const EndDayDrawer({super.key});
@@ -61,8 +64,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
       if (missingBoxes.isNotEmpty) {
         throw Exception(
-          'EOD system not fully initialized. Missing boxes:\n${missingBoxes.join('\n')}\n\n'
-          'Please restart the app completely (stop and relaunch).'
+            'EOD system not fully initialized. Missing boxes:\n${missingBoxes.join('\n')}\n\n'
+                'Please restart the app completely (stop and relaunch).'
         );
       }
 
@@ -182,11 +185,32 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
     // Check if there are any active orders remaining
     await orderStore.loadOrders();
-    final activeOrders = orderStore.orders.toList();
+    
+    print('🔍 DEBUG: Checking for active orders before End Day...');
+    print('   Total Orders in Active Store: ${orderStore.orders.length}');
+    
+    // Robust filter: ANY order that is NOT paid and NOT cancelled/voided is active.
+    final activeOrders = orderStore.orders.where((o) {
+        final status = o.status.toLowerCase();
+        final isVoided = status == 'voided' || status == 'cancelled';
+        final isPaid = o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid';
+        
+        // If it's voided, it's not active.
+        if (isVoided) return false;
+        
+        // If it's paid, it's not active (assuming paid means complete).
+        if (isPaid) return false;
+        
+        // Otherwise, it's active.
+        return true;
+    }).toList();
+
+    print('   Detected Active Orders: ${activeOrders.length}');
+
     if (activeOrders.isNotEmpty) {
-      // Show warning dialog asking user to clear active orders
-      final shouldProceed = await _showActiveOrdersWarning(activeOrders.length);
-      if (!shouldProceed) return;
+      // Show error dialog preventing End of Day
+      await _showActiveOrdersError(activeOrders.length);
+      return;
     }
 
     // Show confirmation dialog
@@ -231,11 +255,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       await DayManagementService.resetDay();
 
       // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('End of Day completed successfully!'), backgroundColor: Colors.green),
-        );
-      }
+      NotificationService.instance.showSuccess('End of Day completed successfully!');
 
       // Navigate immediately to Welcome Admin screen without delay
       if (mounted) {
@@ -262,37 +282,33 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
   }
 
-  Future<bool> _showActiveOrdersWarning(int count) async {
-    return await showDialog<bool>(
+  Future<void> _showActiveOrdersError(int count) async {
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.warning, color: Colors.orange, size: 28),
+              Icon(Icons.error, color: Colors.red, size: 28),
               SizedBox(width: 10),
-              Text('Active Orders Found', style: GoogleFonts.poppins(fontSize: 18)),
+              Text('Cannot End Day', style: GoogleFonts.poppins(fontSize: 18)),
             ],
           ),
           content: Text(
-            'There are $count active order(s) remaining.\n\nThese orders should be completed, voided, or moved to past orders before ending the day.\n\nDo you want to clear them and proceed with End of Day?',
+            'There are $count active order(s) currently running.\n\nYou must complete or void all active orders before you can perform End of Day.',
             style: GoogleFonts.poppins(fontSize: 14),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
-            ),
             ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: Text('Clear & Proceed', style: GoogleFonts.poppins(color: Colors.white)),
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: Text('OK', style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         );
       },
-    ) ?? false;
+    );
   }
 
   Future<bool> _showConfirmationDialog() async {
@@ -359,15 +375,26 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    NotificationService.instance.showError(message);
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    NotificationService.instance.showSuccess(message);
+  }
+
+  Future<void> _startDay() async {
+    final result = await showDialog<double>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => OpeningBalanceDialog(),
     );
+    if (result != null && mounted) {
+      // After starting the day, navigate to Welcome Admin screen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => AdminWelcome()),
+        (route) => false, // Remove all previous routes
+      );
+    }
   }
 
   @override
@@ -419,6 +446,17 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                 Text(
                   'Start a new day to see EOD data',
                   style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
+                ),
+                SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _startDay,
+                  icon: Icon(Icons.play_circle_fill),
+                  label: Text('Start Day'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
                 ),
               ],
             ],

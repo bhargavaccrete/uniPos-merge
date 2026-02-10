@@ -471,8 +471,27 @@ class _ViewExpenseState extends State<ViewExpense> {
                             onPressed: () async {
                               try {
                                 final amount = double.parse(amountController.text.trim());
+
+                                // Combine selected date with current time if editing today's expense
+                                final now = DateTime.now();
+                                final isSameDay = selectedDate.year == now.year &&
+                                                  selectedDate.month == now.month &&
+                                                  selectedDate.day == now.day;
+
+                                final expenseDateTime = isSameDay
+                                    ? DateTime(
+                                        selectedDate.year,
+                                        selectedDate.month,
+                                        selectedDate.day,
+                                        now.hour,
+                                        now.minute,
+                                        now.second,
+                                        now.millisecond,
+                                      )
+                                    : selectedDate;
+
                                 final updatedExpense = expense.copyWith(
-                                  dateandTime: selectedDate,
+                                  dateandTime: expenseDateTime,
                                   amount: amount,
                                   categoryOfExpense: selectedCategoryId,
                                   reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),

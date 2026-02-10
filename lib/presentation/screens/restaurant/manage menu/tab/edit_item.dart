@@ -97,10 +97,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _selectedUnit = widget.items.unit ?? 'kg';
 
     // Auto-select "YES" for manage inventory if track inventory is true
+    print('🔍 LOADING ITEM - Name: ${widget.items.name}');
+    print('   trackInventory value: ${widget.items.trackInventory}');
+    print('   allowOrderWhenOutOfStock value: ${widget.items.allowOrderWhenOutOfStock}');
+
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
+    print('   selectedFilter set to: $selectedFilter');
 
     // Auto-select "YES" for allow out of stock if allowOrderWhenOutOfStock is true
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true ? 'YES' : 'NO';
+    print('   allowOutOfStockFilter set to: $allowOutOfStockFilter');
 
     _loadDataFuture = _loadInitialData();
   }
@@ -238,8 +244,6 @@ class _EdititemScreenState extends State<EdititemScreen> {
       }
     }
 
-    final bool isTrackingInventory = selectedFilter.toLowerCase() == 'yes';
-
     final updateItem = widget.items.copyWith(
       name: _nameController.text,
       price: double.tryParse(_itemPriceController.text),
@@ -251,7 +255,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
       choiceIds: selectedChoiceIds,
       extraId: selectedExtraId,
       extraConstraints: extraConstraints.isNotEmpty ? extraConstraints : null,
-      trackInventory: isTrackingInventory,
+      trackInventory: selectedFilter.toLowerCase() == 'yes',
       allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
       // ✅ ADDED: Weight selling support
       isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
@@ -262,6 +266,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     AuditTrailHelper.trackEdit(updateItem, editedBy: 'Admin'); // TODO: Replace 'Admin' with actual logged-in user
 
     await itemStore.updateItem(updateItem);
+
     Navigator.pop(context, true);
   }
 
@@ -531,6 +536,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
                           onpressed: () {
                             setState(() {
                               selectedFilter = "YES";
+                              // Auto-set "Allow out of stock" to NO when enabling inventory management
+                              // This enforces stock limits by default (better UX)
+                              allowOutOfStockFilter = "NO";
                             });
                           },
                         ),

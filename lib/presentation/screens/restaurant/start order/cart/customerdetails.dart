@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -14,6 +15,7 @@ import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../stores/payment_method_store.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
+import '../../../../widget/componets/common/split_payment_widget.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -74,6 +76,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
   double DiscountPercentage = 0;
   String SelectedFilter = 'Cash';
   bool servicechargeapply = false;
+
+  // Split payment state
+  List<PaymentEntry> _paymentEntries = [];
+  double _totalPaid = 0;
+  double _changeReturn = 0;
+  bool _isPaymentValid = false;
   bool discountApply = false;
   String? SelectedRemark = 'Old Customer';
   final List<String> remarkList = [
@@ -158,14 +166,28 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // ✅ Step 3: Build the UI using the final, calculated values.
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
+    final isTablet = width > 600;
+
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: Text('Customer Details'),
+        automaticallyImplyLeading: true,
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black87),
+        title: Text(
+          'Customer Details',
+          style: GoogleFonts.poppins(
+            fontSize: isTablet ? 22 : 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          padding: EdgeInsets.all(isTablet ? 20 : 16),
           child: Column(
             children: [
               // Show selected customer info
@@ -516,53 +538,111 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     )
                   : SizedBox(),
 
-              Row(
-                children: [
-                  Expanded(
-                      flex: 2,
-                      child: CommonTextForm(
-                          controller: _serviceChargeController,
-                          borderc: 5,
-                          BorderColor: Colors.grey,
-                          labelText: widget.orderType == 'Delivery'
-                              ? 'Delivery Charge'
-                              : 'Service Charges(%)',
-                          LabelColor: Colors.grey,
-                          obsecureText: false)),
-                  SizedBox(width: 5),
-                  Expanded(
-                    child: CommonButton(
-                        bordercircular: 5,
-                        height: height * 0.05,
-                        bgcolor: servicechargeapply
-                            ? Colors.red.shade300
-                            : AppColors.primary,
-                        bordercolor: servicechargeapply
-                            ? Colors.red.shade300
-                            : AppColors.primary,
-                        onTap: () {
-                          servicechargeapply == false
-                              ? setState(() {
-                                  servicechargeapply = true;
-                                })
-                              : setState(() {
-                                  servicechargeapply = false;
-                                  _serviceChargeController.clear();
-                                });
-                        },
-                        child: Text(servicechargeapply ? 'Cancel' : 'Apply',
-                            style: TextStyle(
-                                color: servicechargeapply
-                                    ? Colors.black
-                                    : Colors.white)))
-                  )
-                ],
+              // Service/Delivery Charge Card
+              Container(
+                margin: EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                        flex: 2,
+                        child: CommonTextForm(
+                            controller: _serviceChargeController,
+                            borderc: 8,
+                            BorderColor: AppColors.primary.withOpacity(0.3),
+                            labelText: widget.orderType == 'Delivery'
+                                ? 'Delivery Charge'
+                                : 'Service Charges(%)',
+                            LabelColor: AppColors.primary,
+                            obsecureText: false)),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: servicechargeapply
+                                ? Colors.red.shade400
+                                : AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () {
+                            servicechargeapply == false
+                                ? setState(() {
+                                    servicechargeapply = true;
+                                  })
+                                : setState(() {
+                                    servicechargeapply = false;
+                                    _serviceChargeController.clear();
+                                  });
+                          },
+                          child: Text(
+                            servicechargeapply ? 'Cancel' : 'Apply',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          )),
+                    )
+                  ],
+                ),
               ),
-              SizedBox(height: 10),
 
-              ExpansionTile(
-                title: Text('Discount'),
-                children: [
+              // Discount Card
+              Container(
+                margin: EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ExpansionTile(
+                  backgroundColor: Colors.white,
+                  collapsedBackgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  collapsedShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  title: Row(
+                    children: [
+                      Icon(Icons.discount_outlined, color: AppColors.primary, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Discount',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        children: [
                   Row(
                     children: [
                       Expanded(
@@ -629,18 +709,21 @@ class _CustomerdetailsState extends State<Customerdetails> {
                                           : "Enter Percentage",
                                   LabelColor: Colors.grey,
                                   obsecureText: false)),
-                          SizedBox(width: 5),
+                          SizedBox(width: 12),
                           Expanded(
-                            child: CommonButton(
-                              bordercircular: 5,
-                              height: height * 0.05,
-                              bgcolor: discountApply
-                                  ? Colors.red.shade300
-                                  : AppColors.primary,
-                              bordercolor: discountApply
-                                  ? Colors.red.shade300
-                                  : AppColors.primary,
-                              onTap: () {
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: discountApply
+                                    ? Colors.red.shade400
+                                    : AppColors.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              onPressed: () {
                                 setState(() {
                                   if (discountApply) {
                                     // Cancel
@@ -656,10 +739,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
                               },
                               child: Text(
                                 discountApply ? 'Cancel' : 'Apply',
-                                style: TextStyle(
-                                  color: discountApply
-                                      ? Colors.black
-                                      : Colors.white,
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -706,66 +788,90 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
                       // Bill Summary
                       _buildBillSummary(calculations)
-                    ],
-                  )
-                ],
+                        ],
+                      ),
+                    ]),
+                    )],
+                ),
               ),
-              ExpansionTile(
-                title: Text('Payment Method'),
-                children: [
-                  // ✅ Dynamic payment methods - only shows enabled methods from setup wizard
-                  Observer(
-                    builder: (_) {
-                      final paymentStore = locator<PaymentMethodStore>();
 
-                      // Get only enabled payment methods
-                      final enabledMethods = paymentStore.paymentMethods
-                          .where((method) => method.isEnabled)
-                          .toList();
-
-                      // If no payment methods enabled, show fallback
-                      if (enabledMethods.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            'No payment methods enabled. Please enable payment methods in Settings.',
-                            style: TextStyle(
-                                color: Colors.grey[600], fontSize: 14),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.spaceAround,
-                        children: enabledMethods.map((method) {
-                          return Filterbutton(
-                            title: method.name,
-                            selectedFilter: SelectedFilter,
-                            onpressed: () {
-                              setState(() {
-                                SelectedFilter = method.name!;
-                              });
-                            },
-                          );
-                        }).toList(),
-                      );
-                    },
+              // Payment Method Card
+              Container(
+                margin: EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ExpansionTile(
+                  backgroundColor: Colors.white,
+                  collapsedBackgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ],
+                  collapsedShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  initiallyExpanded: true,
+                  title: Row(
+                    children: [
+                      Icon(Icons.payment, color: AppColors.primary, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Payment Method',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: SplitPaymentWidget(
+                        billTotal: calculations.grandTotal,
+                        onPaymentChanged: _onPaymentChanged,
+                        onValidationChanged: _onValidationChanged,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              SizedBox(height: 15),
-              CommonButton(
-                child: Text('Procced ',
+
+              SizedBox(height: 20),
+
+              // Proceed Button
+              SizedBox(
+                width: double.infinity,
+                height: isTablet ? 54 : 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isPaymentValid ? AppColors.primary : Colors.grey.shade400,
+                    foregroundColor: Colors.white,
+                    elevation: _isPaymentValid ? 2 : 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _isPaymentValid ? () => _submitOrder(calculations) : () {},
+                  child: Text(
+                    'Proceed to Checkout',
                     style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-                height: height * 0.06,
-                onTap: () => _submitOrder(calculations),
-              )
+                      fontSize: isTablet ? 17 : 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 20),
             ],
           ),
         ),
@@ -774,20 +880,33 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   Widget _buildPercentageButton(String text, double percentage) {
+    final isSelected = _amountpercentageContorller.text == percentage.toString();
+
     return InkWell(
       onTap: () {
         setState(() {
           _amountpercentageContorller.text = percentage.toString();
           discountApply = false;
-          // DiscountPercentage = percentage;
         });
       },
       child: Container(
-        child: Text(text, style: GoogleFonts.poppins(fontSize: 16)),
-        padding: EdgeInsets.all(5),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-            border: Border.all(width: 1, color: Colors.grey),
-            shape: BoxShape.rectangle),
+          color: isSelected ? AppColors.primary : Colors.white,
+          border: Border.all(
+            width: 1.5,
+            color: isSelected ? AppColors.primary : Colors.grey.shade300,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? Colors.white : Colors.black87,
+          ),
+        ),
       ),
     );
   }
@@ -881,6 +1000,21 @@ class _CustomerdetailsState extends State<Customerdetails> {
     return v ?? fallback;
   }
 
+  // Split payment callbacks
+  void _onPaymentChanged(List<PaymentEntry> payments, double totalPaid, double change) {
+    setState(() {
+      _paymentEntries = payments;
+      _totalPaid = totalPaid;
+      _changeReturn = change;
+    });
+  }
+
+  void _onValidationChanged(bool isValid) {
+    setState(() {
+      _isPaymentValid = isValid;
+    });
+  }
+
   void _clear() {
     setState(() {
       if (discountApply) {
@@ -905,7 +1039,36 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
       return;
     }
+    // Prepare split payment data
+    final paymentList = _paymentEntries.map((e) => e.toMap()).toList();
+    final isSplit = _paymentEntries.length > 1;
+
+    // Check if new items were added (settle without update)
+    final List<CartItem> itemsToSettle = widget.cartitems ?? widget.existingModel!.items;
+    final int previousItemCount = widget.existingModel!.itemCountAtLastKot ?? widget.existingModel!.items.length;
+    final int currentItemCount = itemsToSettle.length;
+    final bool hasNewItems = currentItemCount > previousItemCount;
+
+    // Generate new KOT if items were added without updating order first
+    List<int> finalKotNumbers = List<int>.from(widget.existingModel!.kotNumbers);
+    List<int> finalKotBoundaries = List<int>.from(widget.existingModel!.kotBoundaries);
+
+    if (hasNewItems) {
+      // Generate a new KOT for the newly added items before settling
+      final int newKotNumber = await orderStore.getNextKotNumber();
+      finalKotNumbers.add(newKotNumber);
+      finalKotBoundaries.add(currentItemCount);
+
+      print('🎫 Generated new KOT #$newKotNumber during settlement');
+      print('   Previous items: $previousItemCount, Current items: $currentItemCount');
+      print('   All KOTs: $finalKotNumbers, Boundaries: $finalKotBoundaries');
+    }
+
     final OrderModel completedOrder = widget.existingModel!.copyWith(
+      items: itemsToSettle, // Use updated items if provided
+      kotNumbers: finalKotNumbers, // Include new KOT if generated
+      kotBoundaries: finalKotBoundaries, // Update boundaries
+      itemCountAtLastKot: currentItemCount, // Update item count
       customerName: _nameController.text.trim(),
       customerNumber: _mobileController.text.trim(),
       customerEmail: _emailController.text.trim(),
@@ -913,13 +1076,18 @@ class _CustomerdetailsState extends State<Customerdetails> {
       // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
       serviceCharge: calculations.serviceChargeAmount,
       totalPrice: calculations.grandTotal,
-      paymentMethod: SelectedFilter,
+      paymentMethod: isSplit ? 'Split Payment' : _paymentEntries.first.method,
       completedAt: DateTime.now(),
       status: 'Cooking',
       tableNo: widget.tableid,
       isPaid: true,
       paymentStatus: 'Paid',
       customerId: selectedCustomer?.customerId, // Link to customer
+      // Split payment fields
+      paymentListJson: jsonEncode(paymentList),
+      isSplitPayment: isSplit,
+      totalPaid: _totalPaid,
+      changeReturn: _changeReturn,
     );
     try {
       final int billNumber = await completeOrder(completedOrder, calculations);
@@ -957,7 +1125,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final int billNumber = await orderStore.getNextBillNumber();
     print('✅ Bill number generated: $billNumber');
 
-    final pastOrder = pastOrderModel(
+    final pastOrder = PastOrderModel(
       id: activeModel.id,
       customerName: activeModel.customerName,
       totalPrice: calculations.grandTotal,
@@ -993,6 +1161,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final String newId = Uuid().v4();
     final List<CartItem> orderItems = widget.cartitems ?? [];
 
+    // Prepare split payment data
+    final paymentList = _paymentEntries.map((e) => e.toMap()).toList();
+    final isSplit = _paymentEntries.length > 1;
+    final paymentMethodDisplay = isSplit ? 'Split Payment' : _paymentEntries.first.method;
+
     // Check if this is a "Settle & Print" operation (immediate completion)
     if (widget.isSettle == true) {
       // Generate bill number for immediate settlement
@@ -1000,15 +1173,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
       print('✅ Bill number generated for settle & print: $billNumber');
 
       // Create completed order directly (skip active orders)
-      print('🔍 DEBUG: Creating pastOrder with payment method: $SelectedFilter');
-      final pastOrder = pastOrderModel(
+      print('🔍 DEBUG: Creating pastOrder with payment method: $paymentMethodDisplay');
+      final pastOrder = PastOrderModel(
         id: newId,
         customerName: _nameController.text.trim(),
         totalPrice: calculations.grandTotal,
         items: orderItems,
         orderAt: DateTime.now(),
         orderType: widget.orderType ?? 'Take Away',
-        paymentmode: SelectedFilter,
+        paymentmode: paymentMethodDisplay,
         remark: calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
         Discount: calculations.discountAmount,
         subTotal: calculations.subtotal,
@@ -1017,6 +1190,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
         kotNumbers: [newKotNumber],
         kotBoundaries: [orderItems.length],
         billNumber: billNumber, // Daily bill number
+        // Split payment fields
+        paymentListJson: jsonEncode(paymentList),
+        isSplitPayment: isSplit,
+        totalPaid: _totalPaid,
+        changeReturn: _changeReturn,
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
@@ -1063,7 +1241,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       gstAmount: calculations.totalGST
       ,
       totalPrice: calculations.grandTotal,
-      paymentMethod: SelectedFilter,
+      paymentMethod: paymentMethodDisplay,
       completedAt: null,
       paymentStatus: "Unpaid",
       isPaid: false,
@@ -1074,6 +1252,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
       itemCountAtLastKot: orderItems.length,
       kotBoundaries: [orderItems.length], // First KOT boundary at item count
       customerId: selectedCustomer?.customerId, // Link to customer
+      // Split payment fields
+      paymentListJson: jsonEncode(paymentList),
+      isSplitPayment: isSplit,
+      totalPaid: _totalPaid,
+      changeReturn: _changeReturn,
     );
     try {
       await orderStore.addOrder(newOrder);
@@ -1165,7 +1348,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   // Success dialog for settled orders (with bill number)
   Future<void> _showOrderSuccessDialogWithBillNumber(
-      pastOrderModel pastOrder, CartCalculationService calculations, int billNumber) async {
+      PastOrderModel pastOrder, CartCalculationService calculations, int billNumber) async {
     if (!mounted) return;
 
     // Convert pastOrderModel to OrderModel for printing
@@ -1212,7 +1395,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
           ],
         ),
         content: Text(
-          'Bill #${billNumber.toString().padLeft(3, '0')} generated successfully.\nDo you want to print the bill?',
+          'Bill #INV${billNumber} generated successfully.\nDo you want to print the bill?',
           textAlign: TextAlign.center,
           style: GoogleFonts.poppins(),
         ),
@@ -1339,3 +1522,4 @@ class _CustomerdetailsState extends State<Customerdetails> {
     );
   }
 }
+

@@ -232,6 +232,18 @@ class ReceiptPdfService {
             ),
           ),
           pw.SizedBox(height: 2),
+          // INVOICE heading (only for bills, not KOTs)
+          if (data.kotNumber == null) ...[
+            pw.Text(
+              'INVOICE',
+              style: pw.TextStyle(
+                fontSize: 12,
+                fontWeight: pw.FontWeight.bold,
+              ),
+              textAlign: pw.TextAlign.center,
+            ),
+            pw.SizedBox(height: 2),
+          ],
         ],
         if (showStoreAddress) ...[
           pw.Text(
@@ -293,12 +305,25 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
+                pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   data.billNumber != null
-                      ? data.billNumber.toString().padLeft(3, '0')
+                      ? 'INV${data.billNumber}'
                       : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+          // Display all KOT numbers for this order
+          if (data.kotNumbers != null && data.kotNumbers!.isNotEmpty) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('KOT #:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  data.kotNumbers!.map((num) => '#$num').join(', '),
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -307,10 +332,36 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Date:', style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
+                pw.Text('Date:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   _formatDateTime(data.sale.date),
-                  style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold),
+                  style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+          // Order Type field (Dine-in/Takeaway/Delivery)
+          if (data.orderType != null) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Order Type:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  data.orderType!.toUpperCase(),
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+          // Token/Order Number
+          if (data.orderNo != null && data.orderNo!.isNotEmpty) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Token #:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  data.orderNo!,
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -319,10 +370,10 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Payment:', style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
+                pw.Text('Payment:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   data.sale.paymentType.toUpperCase(),
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -331,24 +382,10 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Customer:', style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
+                pw.Text('Customer:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                     data.customer!.name,
-                    style:  pw.TextStyle(fontSize: 12,fontWeight: pw.FontWeight.bold)),
-              ],
-            ),
-          ],
-          // Display all KOT numbers for this order
-          if (data.kotNumbers != null && data.kotNumbers!.isNotEmpty) ...[
-            pw.SizedBox(height: 2),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('KOT #:', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                pw.Text(
-                  data.kotNumbers!.map((num) => '#$num').join(', '),
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-                ),
+                    style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
               ],
             ),
           ],
@@ -371,16 +408,20 @@ class ReceiptPdfService {
           pw.Row(
             children: [
               pw.Expanded(
-                flex: 4,
-                child: pw.Text('Item', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                flex: 3,
+                child: pw.Text('Item', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
               ),
               pw.Expanded(
                 flex: 1,
-                child: pw.Text('Qty', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+                child: pw.Text('Qty', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
               ),
               pw.Expanded(
                 flex: 2,
-                child: pw.Text('Amount', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                child: pw.Text('Price', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Text('Amount', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
               ),
             ],
           ),
@@ -409,45 +450,27 @@ class ReceiptPdfService {
               // TAX INCLUSIVE MODE - Labels only
               return pw.Column(
                 children: [
-                  // Item Total (Incl. GST) - Pre-calculated
-                  // if (showSubtotal && data.itemTotal != null)
-                  //   _buildThermalTotalRow('Item Total (Incl. GST)', data.itemTotal!),
-                  // Discount - Pre-calculated
+                  // Sub Total - Pre-calculated
+                  if (showSubtotal)
+                    _buildThermalTotalRow('Sub Total', data.sale.subtotal),
+                  // Discount - Pre-calculated (only show if > 0)
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-
-                  // Separator
-                  if (showSubtotal) pw.SizedBox(height: 4),
-                  if (showSubtotal) _buildDashedLine(),
-                  if (showSubtotal) pw.SizedBox(height: 4),
-
-                  // Taxable Amount - Pre-calculated
-                  if (showSubtotal)
-                    _buildThermalTotalRow('Taxable Amount', data.sale.subtotal),
                   // GST (Included) - Pre-calculated
                   if (showTax && data.sale.taxAmount > 0)
-                    _buildThermalTotalRow('GST (Included)', data.sale.taxAmount),
+                    _buildThermalTotalRow('GST', data.sale.taxAmount),
                 ],
               );
             } else {
               // TAX EXCLUSIVE MODE - Labels only
               return pw.Column(
                 children: [
-                  // Item Total - Pre-calculated
-                  // if (showSubtotal && data.itemTotal != null)
-                  //   _buildThermalTotalRow('Item Total', data.itemTotal!),
-                  // Discount - Pre-calculated
-                  if (data.sale.discountAmount > 0 && showSubtotal)
-                    _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-
-                  // Separator
-                  if (showSubtotal) pw.SizedBox(height: 4),
-                  if (showSubtotal) _buildDashedLine(),
-                  if (showSubtotal) pw.SizedBox(height: 4),
-
                   // Sub Total (Before Tax) - Pre-calculated
                   if (showSubtotal)
-                    _buildThermalTotalRow('Sub Total (Before Tax)', data.sale.subtotal),
+                    _buildThermalTotalRow('Sub Total', data.sale.subtotal),
+                  // Discount - Pre-calculated (only show if > 0)
+                  if (data.sale.discountAmount > 0 && showSubtotal)
+                    _buildThermalTotalRow('Discount', -data.sale.discountAmount),
                   // GST - Pre-calculated
                   if (showTax && data.sale.taxAmount > 0)
                     _buildThermalTotalRow('GST', data.sale.taxAmount),
@@ -464,12 +487,9 @@ class ReceiptPdfService {
           // Grand Total
           _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 14),
 
-          // Payment status - Show payment method or NOT PAID
-          if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit') ...[
-            if (data.sale.paymentType == 'NOT PAID')
-              _buildThermalTotalRow('NOT PAID', data.sale.totalAmount, fontSize: 12)
-            else
-              _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 12),
+          // Payment status - Show only for PAID orders (NOT PAID already shown at top)
+          if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit' && data.sale.paymentType != 'NOT PAID') ...[
+            _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 12),
           ],
 
           // Credit sale info
@@ -671,7 +691,9 @@ class ReceiptPdfService {
                 if (showInvoiceNumber || showInvoiceDate) pw.SizedBox(height: 8),
                 if (showInvoiceNumber)
                   pw.Text(
-                    '# ${data.sale.saleId.substring(0, min(13, data.sale.saleId.length)).toUpperCase()}',
+                    data.billNumber != null
+                        ? '# INV${data.billNumber}'
+                        : '# ${data.sale.saleId.substring(0, min(13, data.sale.saleId.length)).toUpperCase()}',
                     style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                   ),
                 if (showInvoiceNumber && showInvoiceDate) pw.SizedBox(height: 4),
@@ -1009,7 +1031,10 @@ class ReceiptPdfService {
     final displayNameText = item.size != null && item.size!.isNotEmpty
         ? '$name (${item.size})'
         : name;
-    final displayName = displayNameText.length > 25 ? '${displayNameText.substring(0, 23)}...' : displayNameText;
+    final displayName = displayNameText.length > 28 ? '${displayNameText.substring(0, 26)}...' : displayNameText;
+
+    // Calculate unit price (total / quantity)
+    final unitPrice = item.qty > 0 ? item.total / item.qty : item.total;
 
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 2),
@@ -1019,39 +1044,38 @@ class ReceiptPdfService {
           pw.Row(
             children: [
               pw.Expanded(
-                flex: 4,
-                child: pw.Text(displayName, style: const pw.TextStyle(fontSize: 14)),
+                flex: 3,
+                child: pw.Text(displayName, style: const pw.TextStyle(fontSize: 9)),
               ),
               pw.Expanded(
                 flex: 1,
-                child: pw.Text('${item.qty}', style: const pw.TextStyle(fontSize: 14), textAlign: pw.TextAlign.center),
+                child: pw.Text('${item.qty}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.center),
+              ),
+              pw.Expanded(
+                flex: 2,
+                child: pw.Text(
+                  _formatCurrency(unitPrice),
+                  style: const pw.TextStyle(fontSize: 9),
+                  textAlign: pw.TextAlign.right,
+                ),
               ),
               pw.Expanded(
                 flex: 2,
                 child: pw.Text(
                   _formatCurrency(item.total),
-                  style: const pw.TextStyle(fontSize: 12),
+                  style: const pw.TextStyle(fontSize: 9),
                   textAlign: pw.TextAlign.right,
                 ),
               ),
             ],
           ),
-          // Display size/variant (Only if not already shown in title, e.g. color or distinct size field usage)
-          if (item.color != null)
-            pw.Padding(
-              padding: const pw.EdgeInsets.only(left: 8),
-              child: pw.Text(
-                'Color: ${item.color}',
-                style: pw.TextStyle(fontSize: 18, color: PdfColors.grey600),
-              ),
-            ),
           // Display extras and add-ons (stored in weight field)
           if (item.weight != null && item.weight!.isNotEmpty)
             pw.Padding(
               padding: const pw.EdgeInsets.only(left: 8, top: 2),
               child: pw.Text(
                 item.weight!,
-                style: pw.TextStyle(fontSize: 14, color: PdfColors.grey600),
+                style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
               ),
             ),
         ],

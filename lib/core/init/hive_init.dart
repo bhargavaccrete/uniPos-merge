@@ -488,7 +488,7 @@ class HiveInit {
     }
     // PastOrder - 113
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPastOrder)) {
-      Hive.registerAdapter(pastOrderModelAdapter());
+      Hive.registerAdapter(PastOrderModelAdapter());
     }
     // Tax - 114
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantTax)) {
@@ -562,7 +562,7 @@ class HiveInit {
     await Hive.openBox<TableModel>(HiveBoxNames.restaurantTables);
 
     // Past Orders
-    await Hive.openBox<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
+    await Hive.openBox<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
 
     // Tax - use unique name to avoid conflict with retail 'taxBox'
     await Hive.openBox<Tax>(HiveBoxNames.restaurantTaxes);

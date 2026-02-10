@@ -10,6 +10,7 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 
 class ManageInventory extends StatefulWidget {
@@ -71,9 +72,7 @@ class _ManageInventoryState extends State<ManageInventory> {
 
     if (controller.text.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter stock quantity')),
-        );
+        NotificationService.instance.showError('Please enter stock quantity');
       }
       return;
     }
@@ -84,9 +83,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     final stockToAdd = double.tryParse(controller.text);
     if (stockToAdd == null || stockToAdd <= 0) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter a valid positive number')),
-        );
+        NotificationService.instance.showError('Please enter a valid positive number');
       }
       return;
     }
@@ -94,13 +91,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     // Validate whole numbers for unit-based items
     if (!isWeightBased && stockToAdd % 1 != 0) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unit-based items must be whole numbers only (e.g., 5 $unit, not 2.5 $unit)'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        NotificationService.instance.showError('Unit-based items must be whole numbers only (e.g., 5 $unit, not 2.5 $unit)');
       }
       return;
     }
@@ -137,24 +128,16 @@ class _ManageInventoryState extends State<ManageInventory> {
       controller.clear();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                isWeightBased
-                    ? 'Added ${stockToAdd.toStringAsFixed(2)} $unit to stock'
-                    : 'Added ${stockToAdd.toStringAsFixed(0)} $unit to stock'
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
+        NotificationService.instance.showSuccess(
+          isWeightBased
+              ? 'Added ${stockToAdd.toStringAsFixed(2)} $unit to stock'
+              : 'Added ${stockToAdd.toStringAsFixed(0)} $unit to stock'
         );
       }
     } catch (e) {
       print('Error adding stock: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error adding stock: $e')),
-        );
+        NotificationService.instance.showError('Error adding stock: $e');
       }
     }
   }
@@ -168,9 +151,7 @@ class _ManageInventoryState extends State<ManageInventory> {
 
     if (controller.text.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter quantity to remove')),
-        );
+        NotificationService.instance.showError('Please enter quantity to remove');
       }
       return;
     }
@@ -178,9 +159,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     final stockToRemove = double.tryParse(controller.text);
     if (stockToRemove == null || stockToRemove <= 0) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter a valid positive number')),
-        );
+        NotificationService.instance.showError('Please enter a valid positive number');
       }
       return;
     }
@@ -194,12 +173,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     // Check if there is enough stock to remove.
     if (currentStock < stockToRemove) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Not enough stock. Only ${currentStock.toStringAsFixed(isWeightBased ? 2 : 0)} $unit available.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        NotificationService.instance.showError('Not enough stock. Only ${currentStock.toStringAsFixed(isWeightBased ? 2 : 0)} $unit available.');
       }
       return;
     }
@@ -207,12 +181,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     // Validate whole numbers for unit-based items
     if (!isWeightBased && stockToRemove % 1 != 0) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unit-based items must be whole numbers only (e.g., 5 $unit, not 2.5 $unit)'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        NotificationService.instance.showError('Unit-based items must be whole numbers only (e.g., 5 $unit, not 2.5 $unit)');
       }
       return;
     }
@@ -248,24 +217,16 @@ class _ManageInventoryState extends State<ManageInventory> {
       controller.clear();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                isWeightBased
-                    ? 'Removed ${stockToRemove.toStringAsFixed(2)} $unit from stock'
-                    : 'Removed ${stockToRemove.toStringAsFixed(0)} $unit from stock'
-            ),
-            backgroundColor: Colors.orange[800], // Use a different color for removal
-            duration: Duration(seconds: 2),
-          ),
+        NotificationService.instance.showSuccess(
+          isWeightBased
+              ? 'Removed ${stockToRemove.toStringAsFixed(2)} $unit from stock'
+              : 'Removed ${stockToRemove.toStringAsFixed(0)} $unit from stock'
         );
       }
     } catch (e) {
       print('Error removing stock: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error removing stock: $e')),
-        );
+        NotificationService.instance.showError('Error removing stock: $e');
       }
     }
   }

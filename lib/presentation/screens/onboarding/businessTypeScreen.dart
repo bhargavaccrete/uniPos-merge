@@ -101,13 +101,9 @@ class BusinessTypeStep extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: store.canProceedFromBusinessType
                         ? () async {
-                            // Ensure business type is saved and dependencies are initialized
+                            // Business type already selected and saved on card tap
+                            // Just ensure it's persisted and proceed
                             await store.saveBusinessType();
-                            // Re-trigger initialization in case it wasn't done on selection
-                            await store.selectBusinessType(
-                              store.selectedBusinessTypeId!,
-                              store.selectedBusinessTypeName!,
-                            );
                             onNext();
                           }
                         : null,

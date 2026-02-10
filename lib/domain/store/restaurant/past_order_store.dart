@@ -14,7 +14,7 @@ abstract class _PastOrderStore with Store {
   _PastOrderStore(this._repository);
 
   @observable
-  ObservableList<pastOrderModel> pastOrders = ObservableList<pastOrderModel>();
+  ObservableList<PastOrderModel> pastOrders = ObservableList<PastOrderModel>();
 
   @observable
   bool isLoading = false;
@@ -36,7 +36,7 @@ abstract class _PastOrderStore with Store {
 
   // Computed properties
   @computed
-  List<pastOrderModel> get filteredPastOrders {
+  List<PastOrderModel> get filteredPastOrders {
     var result = pastOrders.toList();
 
     if (searchQuery.isNotEmpty) {
@@ -92,7 +92,7 @@ abstract class _PastOrderStore with Store {
   }
 
   @action
-  Future<bool> addOrder(pastOrderModel pastOrder) async {
+  Future<bool> addOrder(PastOrderModel pastOrder) async {
     try {
       await _repository.addOrder(pastOrder);
       pastOrders.add(pastOrder);
@@ -104,7 +104,7 @@ abstract class _PastOrderStore with Store {
   }
 
   @action
-  Future<pastOrderModel?> getOrderById(String orderId) async {
+  Future<PastOrderModel?> getOrderById(String orderId) async {
     try {
       return await _repository.getOrderById(orderId);
     } catch (e) {
@@ -114,7 +114,7 @@ abstract class _PastOrderStore with Store {
   }
 
   @action
-  Future<bool> updateOrder(pastOrderModel updatedOrder) async {
+  Future<bool> updateOrder(PastOrderModel updatedOrder) async {
     try {
       await _repository.updateOrder(updatedOrder);
       final index = pastOrders.indexWhere((o) => o.id == updatedOrder.id);
@@ -141,7 +141,7 @@ abstract class _PastOrderStore with Store {
   }
 
   @action
-  Future<List<pastOrderModel>> getOrdersByDateRange(
+  Future<List<PastOrderModel>> getOrdersByDateRange(
     DateTime startDate,
     DateTime endDate,
   ) async {
@@ -154,7 +154,7 @@ abstract class _PastOrderStore with Store {
   }
 
   @action
-  Future<List<pastOrderModel>> getTodaysPastOrders() async {
+  Future<List<PastOrderModel>> getTodaysPastOrders() async {
     try {
       return await _repository.getTodaysPastOrders();
     } catch (e) {
@@ -164,7 +164,7 @@ abstract class _PastOrderStore with Store {
   }
 
   @action
-  Future<List<pastOrderModel>> getOrdersByType(String orderType) async {
+  Future<List<PastOrderModel>> getOrdersByType(String orderType) async {
     try {
       return await _repository.getOrdersByType(orderType);
     } catch (e) {
@@ -194,7 +194,7 @@ abstract class _PastOrderStore with Store {
   }
 
   @action
-  Future<List<pastOrderModel>> searchOrders(String query) async {
+  Future<List<PastOrderModel>> searchOrders(String query) async {
     try {
       return await _repository.searchOrders(query);
     } catch (e) {
@@ -260,8 +260,8 @@ abstract class _PastOrderStore with Store {
   /// Process a refund for an order
   /// Handles both partial and full refunds with stock restoration
   @action
-  Future<pastOrderModel?> processRefund({
-    required pastOrderModel order,
+  Future<PastOrderModel?> processRefund({
+    required PastOrderModel order,
     required PartialRefundResult refundResult,
   }) async {
     try {
@@ -292,24 +292,24 @@ abstract class _PastOrderStore with Store {
 
   /// Validate if an order can be refunded
   /// Returns error message if not eligible, null if eligible
-  String? validateRefundEligibility(pastOrderModel order) {
+  String? validateRefundEligibility(PastOrderModel order) {
     return RefundService.validateRefundEligibility(order);
   }
 
   /// Get list of items that can be refunded from an order
-  List<CartItem> getRefundableItems(pastOrderModel order) {
+  List<CartItem> getRefundableItems(PastOrderModel order) {
     return RefundService.getRefundableItems(order);
   }
 
   /// Calculate remaining amount that can be refunded
-  double getRemainingRefundableAmount(pastOrderModel order) {
+  double getRemainingRefundableAmount(PastOrderModel order) {
     return RefundService.getRemainingRefundableAmount(order);
   }
 
   /// Void an order (mark as cancelled/voided)
   @action
-  Future<pastOrderModel?> voidOrder({
-    required pastOrderModel order,
+  Future<PastOrderModel?> voidOrder({
+    required PastOrderModel order,
     required String reason,
   }) async {
     try {

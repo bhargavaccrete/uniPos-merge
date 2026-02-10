@@ -419,7 +419,7 @@ class UnifiedBackupService {
 
       // Past Orders (batched processing with safe serialization)
       try {
-        final pastOrderBox = Hive.box<pastOrderModel>("pastorderBox");
+        final pastOrderBox = Hive.box<PastOrderModel>("pastorderBox");
         final List<Map<String, dynamic>> pastOrdersList = [];
         final allOrders = pastOrderBox.values.toList();
 
@@ -1280,7 +1280,7 @@ class UnifiedBackupService {
     // ✅ EOD Reports - hardcoded for restaurant mode (AppConfig not restored yet)
     await restoreBox("eodReports", Hive.box<EndOfDayReport>('restaurant_eodBox'), (m) => EndOfDayReport.fromMap(m));
 
-    await restoreBoxWithId("pastOrders", Hive.box<pastOrderModel>("pastorderBox"), (m) => pastOrderModel.fromMap(m), (po) => po.id);
+    await restoreBoxWithId("pastOrders", Hive.box<PastOrderModel>("pastorderBox"), (m) => PastOrderModel.fromMap(m), (po) => po.id);
     await restoreBoxWithId("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), (o) => o.id);
 
     // ✅ Restore Restaurant Cart

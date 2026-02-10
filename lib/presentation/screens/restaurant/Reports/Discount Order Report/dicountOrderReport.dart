@@ -11,6 +11,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 enum DiscountPeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -181,8 +182,8 @@ class DiscountDataView extends StatefulWidget {
 }
 
 class _DiscountDataViewState extends State<DiscountDataView> {
-  List<pastOrderModel> _allOrders = [];
-  List<pastOrderModel> _filteredOrders = [];
+  List<PastOrderModel> _allOrders = [];
+  List<PastOrderModel> _filteredOrders = [];
   double _totalDiscountAmount = 0.0;
   int _totalOrdersCount = 0;
   double _averageDiscount = 0.0;
@@ -229,7 +230,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       _isLoading = true;
     });
 
-    List<pastOrderModel> resultingList = [];
+    List<PastOrderModel> resultingList = [];
     final now = DateTime.now();
 
     if (widget.period == DiscountPeriod.Custom) {
@@ -293,12 +294,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
 
   Future<void> _exportToExcel() async {
     if (_filteredOrders.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No data to export'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('No data to export');
       return;
     }
 
@@ -340,21 +336,11 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       await Share.shareXFiles([XFile(path)], text: "Discount Orders Report - $periodName");
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Report exported successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Report exported successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error exporting: $e');
       }
     }
   }

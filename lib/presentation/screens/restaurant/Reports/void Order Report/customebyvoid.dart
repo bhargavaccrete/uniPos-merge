@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../util/common/currency_helper.dart';
@@ -31,7 +32,7 @@ class _CustomByVoidState extends State<CustomByVoid> {
     await pastOrderStore.loadPastOrders();
   }
 
-  List<pastOrderModel> _calculateVoidOrders() {
+  List<PastOrderModel> _calculateVoidOrders() {
     if (_fromDate == null || _toDate == null) {
       return [];
     }
@@ -60,7 +61,7 @@ class _CustomByVoidState extends State<CustomByVoid> {
     return voidOrdersList;
   }
 
-  Map<String, dynamic> _calculateTotals(List<pastOrderModel> voidOrders) {
+  Map<String, dynamic> _calculateTotals(List<PastOrderModel> voidOrders) {
     double totalAmount = 0.0;
     for (final order in voidOrders) {
       totalAmount += order.totalPrice;
@@ -168,9 +169,7 @@ class _CustomByVoidState extends State<CustomByVoid> {
                       InkWell(
                         onTap: () {
                           if (_fromDate == null || _toDate == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Please select both From and To dates')),
-                            );
+                            NotificationService.instance.showError('Please select both From and To dates');
                             return;
                           }
                           setState(() {}); // Trigger rebuild to refresh data

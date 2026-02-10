@@ -13,6 +13,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 class Companyregister extends StatefulWidget {
   const Companyregister({super.key});
 
@@ -100,9 +101,7 @@ class _CompanyregisterState extends State<Companyregister> {
       await box.add(company);
       dispose();
       Navigator.push(context, MaterialPageRoute(builder: (context)=> loginScreen()));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Company data saved')),
-      );
+      NotificationService.instance.showSuccess('Company data saved');
     }
   }
 

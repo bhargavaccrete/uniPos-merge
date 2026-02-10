@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../componets/Button.dart';
 import 'image_picker_sheet.dart';
 
@@ -63,9 +64,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
 
   Future<void> _addCategory() async {
     if (_categoryNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Category name cannot be Empty')),
-      );
+      NotificationService.instance.showError('Category name cannot be Empty');
       return;
     }
 

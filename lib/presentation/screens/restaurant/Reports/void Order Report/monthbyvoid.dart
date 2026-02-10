@@ -43,7 +43,7 @@ class _MonthbyVoidState extends State<MonthbyVoid> {
     await pastOrderStore.loadPastOrders();
   }
 
-  List<pastOrderModel> _calculateVoidOrders() {
+  List<PastOrderModel> _calculateVoidOrders() {
     // Get all past orders from store
     final allOrders = pastOrderStore.pastOrders.toList();
     final selectedMonthIndex = monthitem.indexOf(dropDownValue1) + 1;
@@ -66,7 +66,7 @@ class _MonthbyVoidState extends State<MonthbyVoid> {
     return voidOrdersList;
   }
 
-  Map<String, dynamic> _calculateTotals(List<pastOrderModel> voidOrders) {
+  Map<String, dynamic> _calculateTotals(List<PastOrderModel> voidOrders) {
     double totalAmount = 0.0;
     for (final order in voidOrders) {
       totalAmount += order.totalPrice;

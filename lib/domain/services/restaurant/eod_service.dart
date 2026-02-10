@@ -83,20 +83,48 @@ class EODService {
     // Use the same start time as orders filtering for consistency
     await expenseStore.loadExpenses();
     final allExpenses = expenseStore.expenses;
+
+    print('💰 ========== EXPENSE DEBUG ==========');
+    print('💰 Total expenses in system: ${allExpenses.length}');
+    print('💰 Filtering from: $startTime');
+    print('💰 Filtering to: $endTime');
+
+    if (allExpenses.isNotEmpty) {
+      print('💰 All expenses in system:');
+      for (var i = 0; i < allExpenses.length && i < 10; i++) {
+        final e = allExpenses[i];
+        print('   ${i + 1}. Amount: Rs.${e.amount} | PaymentType: "${e.paymentType}" | Time: ${e.dateandTime} | Category: ${e.categoryOfExpense}');
+      }
+    }
+
     final dayExpenses = allExpenses.where((expense) {
       return (expense.dateandTime.isAfter(startTime) || expense.dateandTime.isAtSameMomentAs(startTime)) &&
           (expense.dateandTime.isBefore(endTime) || expense.dateandTime.isAtSameMomentAs(endTime));
     }).toList();
 
-    print('✅ Found ${dayExpenses.length} expenses after day start');
+    print('✅ Found ${dayExpenses.length} expenses for current day');
+
+    if (dayExpenses.isNotEmpty) {
+      print('💰 Day expenses details:');
+      for (var i = 0; i < dayExpenses.length; i++) {
+        final e = dayExpenses[i];
+        print('   ${i + 1}. Amount: Rs.${e.amount} | PaymentType: "${e.paymentType}" | Time: ${e.dateandTime}');
+      }
+    }
 
     // Calculate total expenses (all payment types) for P&L reporting
     final totalExpenses = dayExpenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
 
     // Calculate ONLY cash expenses for cash drawer reconciliation
     final cashExpenses = dayExpenses.where((expense) {
-      return expense.paymentType?.toLowerCase().trim() == 'cash';
+      final paymentType = expense.paymentType?.toLowerCase().trim() ?? '';
+      print('   Checking expense Rs.${expense.amount}: paymentType="${expense.paymentType}" -> lowercase+trim="${paymentType}" -> isCash=${paymentType == 'cash'}');
+      return paymentType == 'cash';
     }).fold<double>(0.0, (sum, expense) => sum + expense.amount);
+
+    print('💰 Total expenses (all types): Rs.$totalExpenses');
+    print('💰 Cash expenses only: Rs.$cashExpenses');
+    print('💰 ====================================');
 
     final expectedCash = paymentSummaries
         .where((payment) => payment.paymentType.toLowerCase() == 'cash')
@@ -146,8 +174,8 @@ class EODService {
     );
   }
 
-  static List<OrderTypeSummary> _calculateOrderTypeSummaries(List<pastOrderModel> orders) {
-    final Map<String, List<pastOrderModel>> groupedOrders = {};
+  static List<OrderTypeSummary> _calculateOrderTypeSummaries(List<PastOrderModel> orders) {
+    final Map<String, List<PastOrderModel>> groupedOrders = {};
 
     for (final order in orders) {
       final orderType = order.orderType ?? 'Unknown';
@@ -170,7 +198,7 @@ class EODService {
     }).toList();
   }
 
-  static List<CategorySales> _calculateCategorySales(List<pastOrderModel> orders) {
+  static List<CategorySales> _calculateCategorySales(List<PastOrderModel> orders) {
     final Map<String, double> categoryTotals = {};
     final Map<String, int> categoryItemCounts = {};
 
@@ -214,7 +242,7 @@ class EODService {
     }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
   }
 
-  static List<PaymentSummary> _calculatePaymentSummaries(List<pastOrderModel> orders) {
+  static List<PaymentSummary> _calculatePaymentSummaries(List<PastOrderModel> orders) {
     final Map<String, double> paymentTotals = {};
     final Map<String, int> paymentCounts = {};
 
@@ -248,7 +276,7 @@ class EODService {
     }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
   }
 
-  static List<TaxSummary> _calculateTaxSummaries(List<pastOrderModel> orders) {
+  static List<TaxSummary> _calculateTaxSummaries(List<PastOrderModel> orders) {
     final Map<String, TaxInfo> taxData = {};
 
     for (final order in orders) {

@@ -23,6 +23,7 @@ import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_s
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:unipos/domain/services/common/notification_service.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback? onNext;
@@ -213,24 +214,13 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     if (success && mounted) {
       final isEditMode = _editingProductId != null || _editingRestaurantItemId != null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isEditMode
-                ? (AppConfig.isRetail ? 'Product updated successfully!' : 'Item updated successfully!')
-                : (AppConfig.isRetail ? 'Product added successfully!' : 'Item added successfully!'),
-          ),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      final message = isEditMode
+          ? (AppConfig.isRetail ? 'Product updated successfully!' : 'Item updated successfully!')
+          : (AppConfig.isRetail ? 'Product added successfully!' : 'Item added successfully!');
+      NotificationService.instance.showSuccess(message);
       _clearForm();
     } else if (_formStore.errorMessage != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_formStore.errorMessage!),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      NotificationService.instance.showError(_formStore.errorMessage!);
     }
   }
 
@@ -1610,22 +1600,12 @@ class _AddProductScreenState extends State<AddProductScreen>
     final stock = int.tryParse(_bulkStockController.text);
 
     if (costPrice == null && sellingPrice == null && stock == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter at least one value to apply'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('Please enter at least one value to apply');
       return;
     }
 
     if (_selectedVariantsForBulk.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one variant'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showError('Please select at least one variant');
       return;
     }
 
@@ -1658,20 +1638,9 @@ class _AddProductScreenState extends State<AddProductScreen>
         _selectedVariantsForBulk.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✓ Applied to $selectedCount variant(s). Ready for next group.'),
-          backgroundColor: const Color(0xFF4CAF50),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      NotificationService.instance.showSuccess('✓ Applied to $selectedCount variant(s). Ready for next group.');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error applying bulk pricing: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('Error applying bulk pricing: $e');
     }
   }
 
@@ -2292,9 +2261,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                       icon: const Icon(Icons.qr_code_scanner),
                       onPressed: () {
                         // Scan barcode
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Barcode scanner coming soon')),
-                        );
+                        NotificationService.instance.showSuccess('Barcode scanner coming soon');
                       },
                       tooltip: 'Scan',
                     ),
@@ -2330,9 +2297,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.qr_code_scanner),
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Barcode scanner coming soon')),
-                          );
+                          NotificationService.instance.showSuccess('Barcode scanner coming soon');
                         },
                         tooltip: 'Scan',
                       ),
@@ -2527,22 +2492,14 @@ class _AddProductScreenState extends State<AddProductScreen>
     } else if (AppConfig.isRestaurant) {
       final message = await restaurantImportService.downloadTemplate();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: message.startsWith('Error') || message == 'Permission denied'
-                ? AppColors.danger
-                : AppColors.success,
-          ),
-        );
+        if (message.startsWith('Error') || message == 'Permission denied') {
+          NotificationService.instance.showError(message);
+        } else {
+          NotificationService.instance.showSuccess(message);
+        }
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bulk import is not available for this mode'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      NotificationService.instance.showError('Bulk import is not available for this mode');
     }
   }
 
@@ -2638,18 +2595,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                         if (result.success && result.itemsImported > 0) {
                           Future.delayed(const Duration(milliseconds: 500), () {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('✅ Import successful! Go to "Manage Menu" to view all imported items.'),
-                                  duration: const Duration(seconds: 5),
-                                  backgroundColor: Colors.green,
-                                  action: SnackBarAction(
-                                    label: 'Got it',
-                                    textColor: Colors.white,
-                                    onPressed: () {},
-                                  ),
-                                ),
-                              );
+                              NotificationService.instance.showSuccess('✅ Import successful! Go to "Manage Menu" to view all imported items.');
                             }
                           });
                         }
@@ -2684,21 +2630,11 @@ class _AddProductScreenState extends State<AddProductScreen>
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Import failed: $e'),
-              backgroundColor: AppColors.danger,
-            ),
-          );
+          NotificationService.instance.showError('Import failed: $e');
         }
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bulk import is not available for this mode'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      NotificationService.instance.showError('Bulk import is not available for this mode');
     }
   }
 
@@ -2788,13 +2724,7 @@ class _AddProductScreenState extends State<AddProductScreen>
       curve: Curves.easeOut,
     );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Editing: ${product.productName}${product.hasVariants ? " (${variants.length} variants)" : ""}'),
-        backgroundColor: AppColors.info,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    NotificationService.instance.showSuccess('Editing: ${product.productName}${product.hasVariants ? " (${variants.length} variants)" : ""}');
   }
 
   void _editRestaurantItem(dynamic item) {
@@ -2808,7 +2738,7 @@ class _AddProductScreenState extends State<AddProductScreen>
     _descriptionController.text = item.description ?? '';
     _priceController.text = item.price?.toString() ?? '';
     _unitController.text = item.unit ?? '';
-    _restaurantStockController.text = item.stock?.toString() ?? '';
+    _restaurantStockController.text = item.stockQuantity?.toString() ?? '';
 
     // Update form store with correct method names
     _formStore.setSelectedCategoryId(item.category ?? '');
@@ -3353,22 +3283,16 @@ class _AddProductScreenState extends State<AddProductScreen>
         setState(() {});
 
         final message = attributeStore.errorMessage ?? 'Default attributes created successfully!';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: attributeStore.errorMessage != null ? Colors.orange : Colors.green,
-          ),
-        );
+        if (attributeStore.errorMessage != null) {
+          NotificationService.instance.showError(message);
+        } else {
+          NotificationService.instance.showSuccess(message);
+        }
       }
     } catch (e) {
       print('❌ Error in _createDefaultAttributes: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error creating attributes: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error creating attributes: $e');
       }
     }
   }
@@ -3408,9 +3332,7 @@ class _AddProductScreenState extends State<AddProductScreen>
             onPressed: () async {
               final name = nameController.text.trim();
               if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter an attribute name')),
-                );
+                NotificationService.instance.showError('Please enter an attribute name');
                 return;
               }
 
@@ -3418,17 +3340,10 @@ class _AddProductScreenState extends State<AddProductScreen>
               if (mounted) {
                 Navigator.pop(context);
                 if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Attribute "$name" created successfully!')),
-                  );
+                  NotificationService.instance.showSuccess('Attribute "$name" created successfully!');
                   _showAddValuesDialog(attributeStore, attributeStore.attributes.last);
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(attributeStore.errorMessage ?? 'Failed to create attribute'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  NotificationService.instance.showError(attributeStore.errorMessage ?? 'Failed to create attribute');
                 }
               }
             },
@@ -3619,12 +3534,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 final selectedCount = selectedCombinations.where((s) => s).length;
 
                 if (selectedCount == 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please select at least one variant'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
+                  NotificationService.instance.showError('Please select at least one variant');
                   return;
                 }
 
@@ -3655,13 +3565,7 @@ class _AddProductScreenState extends State<AddProductScreen>
 
                 Navigator.pop(context);
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('✓ Generated $selectedCount variant(s). Now set prices using bulk edit below.'),
-                    backgroundColor: Colors.green,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
+                NotificationService.instance.showSuccess('✓ Generated $selectedCount variant(s). Now set prices using bulk edit below.');
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
               child: const Text('Generate Selected Variants'),

@@ -113,6 +113,7 @@ class PrintService {
     bool? isAddonKot,
     int? billNumber,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
+    String? paymentBreakdown, // Split payment breakdown
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -204,6 +205,7 @@ class PrintService {
     DateTime? orderTimestamp,
     int? billNumber,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
+    String? paymentBreakdown, // Split payment breakdown
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -267,6 +269,7 @@ class PrintService {
     String? gstNumber,
     int? billNumber,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
+    String? paymentBreakdown, // Split payment breakdown
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -368,6 +371,7 @@ class PrintService {
     int? billNumber, // Bill number for completed orders
     List<int>? kotNumbers, // KOT numbers for restaurant orders
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
+    String? paymentBreakdown, // Split payment breakdown (e.g., "cash: ₹100, card: ₹200")
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -426,6 +430,7 @@ class PrintService {
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
                   itemTotal: itemTotal, // Pass item total
+                  paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                 );
               },
             ),
@@ -451,6 +456,7 @@ class PrintService {
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
                   itemTotal: itemTotal, // Pass item total
+                  paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                 );
               },
             ),
@@ -474,6 +480,7 @@ class PrintService {
                   gstNumber: gstNumber,
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
+                  paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                 );
               },
             ),
@@ -497,6 +504,7 @@ class PrintService {
                   gstNumber: gstNumber,
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
+                  paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                 );
                 if (context.mounted && path != null) {
                   ScaffoldMessenger.of(context).showSnackBar(

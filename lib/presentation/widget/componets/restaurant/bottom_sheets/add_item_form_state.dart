@@ -96,6 +96,7 @@ class AddItemFormState extends ChangeNotifier {
       id: const Uuid().v4(),
       name: itemNameController.text.trim(),
       price: double.tryParse(priceController.text.trim()),
+      description: descriptionController.text.trim(),
       categoryOfItem: selectedCategoryId ?? "",
       imageBytes: selectedImage,
       isVeg: vegCategory,

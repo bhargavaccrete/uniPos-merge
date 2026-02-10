@@ -42,7 +42,7 @@ import 'package:unipos/presentation/screens/restaurant/tabbar/table.dart';
 
 // Restaurant - Menu
 import 'package:unipos/presentation/screens/restaurant/tabbar/menu.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/managemenu.dart';
+import 'package:unipos/presentation/screens/restaurant/manage%20menu/manage_menu_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/setup_add_item_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/category_management_screen.dart';
 
@@ -60,7 +60,7 @@ import 'package:unipos/presentation/screens/restaurant/online%20Order/missed.dar
 
 // Restaurant - Inventory
 import 'package:unipos/presentation/screens/restaurant/inventory/manage_Inventory.dart';
-import 'package:unipos/presentation/screens/restaurant/inventory/stockHistoy.dart';
+import 'package:unipos/presentation/screens/restaurant/inventory/stock_history.dart';
 
 // Restaurant - Staff
 import 'package:unipos/presentation/screens/restaurant/ManageStaff/manageStaff.dart';

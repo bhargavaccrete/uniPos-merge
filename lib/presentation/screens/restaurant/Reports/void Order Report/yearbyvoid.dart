@@ -37,7 +37,7 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
     await pastOrderStore.loadPastOrders();
   }
 
-  List<pastOrderModel> _calculateVoidOrders() {
+  List<PastOrderModel> _calculateVoidOrders() {
     // Get all past orders from store
     final allOrders = pastOrderStore.pastOrders.toList();
     final selectedYear = dropdownvalue2;
@@ -58,7 +58,7 @@ class _YearWisebyVoidState extends State<YearWisebyVoid> {
     return voidOrdersList;
   }
 
-  Map<String, dynamic> _calculateTotals(List<pastOrderModel> voidOrders) {
+  Map<String, dynamic> _calculateTotals(List<PastOrderModel> voidOrders) {
     double totalAmount = 0.0;
     for (final order in voidOrders) {
       totalAmount += order.totalPrice;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // Import your utilities
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
@@ -15,6 +16,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _dontShowAgain = false;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -116,9 +118,17 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
     _navigateToNext();
   }
 
-  void _navigateToNext() {
-    // Navigate to the next screen
-    Navigator.pushReplacementNamed(context, '/userSelectionScreen');
+  void _navigateToNext() async {
+    // Save preference if "Don't show again" is checked
+    if (_dontShowAgain) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('skip_walkthrough', true);
+    }
+
+    if (!mounted) return;
+
+    // Navigate to the next screen - use pushNamed to allow back navigation
+    Navigator.pushNamed(context, '/userSelectionScreen');
   }
 
   @override
@@ -542,6 +552,44 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
               ),
             ],
           ),
+
+          // "Don't show again" checkbox (only show on last page)
+          if (_currentPage == _walkthroughItems.length - 1) ...[
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _dontShowAgain = !_dontShowAgain;
+                });
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _dontShowAgain,
+                      onChanged: (value) {
+                        setState(() {
+                          _dontShowAgain = value ?? false;
+                        });
+                      },
+                      activeColor: _walkthroughItems[_currentPage].color,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Don't show this walkthrough again",
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

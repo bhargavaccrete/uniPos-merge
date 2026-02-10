@@ -11,8 +11,9 @@ class OrderCard extends StatelessWidget {
   final Function(String) onDelete;
   final VoidCallback? ontap;
   final VoidCallback? ontapcooking;
+  final VoidCallback? onPrintKot; // Add callback
   final Color? color;
-  const OrderCard({super.key, required this.order, required this.onDelete, this.ontap  , this.ontapcooking,this.color});
+  const OrderCard({super.key, required this.order, required this.onDelete, this.ontap  , this.ontapcooking, this.onPrintKot, this.color});
 
 
 
@@ -166,15 +167,19 @@ class OrderCard extends StatelessWidget {
                       Text('#Admin', style: GoogleFonts.poppins()),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xff12b294), borderRadius: BorderRadius.circular(4)),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.print, color: Colors.white, size: 16),
-                        const SizedBox(width: 4),
-                        Text('Kot', style: GoogleFonts.poppins(color: Colors.white)),
-                      ],
+                  InkWell(
+                    onTap: onPrintKot, // Trigger print callback
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: const Color(0xff12b294), borderRadius: BorderRadius.circular(4)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.print, color: Colors.white, size: 16),
+                          const SizedBox(width: 4),
+                          Text('Kot', style: GoogleFonts.poppins(color: Colors.white)),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -189,7 +194,7 @@ class OrderCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('QTY   Items', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                  Text('#POS${(order.kotNumbers.isNotEmpty ? order.kotNumbers.first : 0).toString().padLeft(2, '0')}-${order.id.substring(0, 4)}', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+                  // Removed redundant POS ID string
                 ],
               ),
             ),

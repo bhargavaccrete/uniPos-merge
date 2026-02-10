@@ -3,6 +3,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -149,10 +150,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
         height: height * 0.06,
         bordercircular: 5,
         onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-        content: Text('Export feature coming soon')),
-        );
+        NotificationService.instance.showSuccess('Export feature coming soon');
         },
         child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

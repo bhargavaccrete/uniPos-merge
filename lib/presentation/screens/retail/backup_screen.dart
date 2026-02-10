@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
 
 import '../../../domain/services/common/unified_backup_service.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -124,32 +125,16 @@ class _BackupScreenState extends State<BackupScreen> {
         setState(() => _isLoading = false);
 
         if (backupFilePath != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Backup created successfully: ${backupFilePath.split('/').last}'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          NotificationService.instance.showSuccess('Backup created successfully: ${backupFilePath.split('/').last}');
           _loadData();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to create backup'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationService.instance.showError('Failed to create backup');
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create backup: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to create backup: $e');
       }
     }
   }
@@ -159,12 +144,7 @@ class _BackupScreenState extends State<BackupScreen> {
       await Share.shareXFiles([XFile(file.path)], text: 'rPOS Backup');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to share backup: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to share backup: $e');
       }
     }
   }
@@ -233,22 +213,12 @@ class _BackupScreenState extends State<BackupScreen> {
           await file.delete();
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backup deleted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          NotificationService.instance.showSuccess('Backup deleted successfully');
           _loadData();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete backup: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationService.instance.showError('Failed to delete backup: $e');
         }
       }
     }
@@ -344,12 +314,7 @@ class _BackupScreenState extends State<BackupScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to import backup: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to import backup: $e');
       }
     }
   }
@@ -442,24 +407,13 @@ class _BackupScreenState extends State<BackupScreen> {
 
             _loadData();
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Restore failed. Please check the backup file.'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 5),
-              ),
-            );
+            NotificationService.instance.showError('Restore failed. Please check the backup file.');
           }
         }
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to restore backup: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationService.instance.showError('Failed to restore backup: $e');
         }
       }
     }

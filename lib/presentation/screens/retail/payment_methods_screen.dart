@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/stores/payment_method_store.dart';
 
 class PaymentMethodsScreen extends StatefulWidget {
@@ -92,12 +93,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 );
                 if (mounted) Navigator.pop(context);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${_nameController.text} added successfully'),
-                      backgroundColor: const Color(0xFF4CAF50),
-                    ),
-                  );
+                  NotificationService.instance.showSuccess('${_nameController.text} added successfully');
                 }
               }
             },
@@ -159,12 +155,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 await _paymentStore.updatePaymentMethod(updatedMethod);
                 if (mounted) Navigator.pop(context);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Payment method updated successfully'),
-                      backgroundColor: Color(0xFF4CAF50),
-                    ),
-                  );
+                  NotificationService.instance.showSuccess('Payment method updated successfully');
                 }
               }
             },
@@ -199,12 +190,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               await _paymentStore.init();
               if (mounted) {
                 final count = _paymentStore.paymentMethods.length;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Refreshed: Found $count payment methods'),
-                    backgroundColor: count > 0 ? const Color(0xFF4CAF50) : Colors.orange,
-                  ),
-                );
+                NotificationService.instance.showSuccess('Refreshed: Found $count payment methods');
               }
             },
             icon: const Icon(Icons.sync),
@@ -315,15 +301,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                         onChanged: (value) async {
                           await _paymentStore.togglePaymentMethod(method.id);
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${method.name} ${value ? 'enabled' : 'disabled'}',
-                                ),
-                                backgroundColor: const Color(0xFF4CAF50),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
+                            NotificationService.instance.showSuccess('${method.name} ${value ? 'enabled' : 'disabled'}');
                           }
                         },
                         activeColor: const Color(0xFF4CAF50),
@@ -368,12 +346,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                           if (confirm == true) {
                             await _paymentStore.deletePaymentMethod(method.id);
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${method.name} deleted'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
+                              NotificationService.instance.showSuccess('${method.name} deleted');
                             }
                           }
                         },

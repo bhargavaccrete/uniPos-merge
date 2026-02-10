@@ -9,6 +9,7 @@ import 'package:unipos/server/server.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 
 import 'domain/store/restaurant/appStore.dart';
+import 'domain/services/common/notification_service.dart';
 import 'util/common/decimal_settings.dart';
 import 'util/restaurant/staticswitch.dart';
 import 'util/restaurant/print_settings.dart';
@@ -135,6 +136,15 @@ class UniPOSApp extends StatelessWidget {
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       title: 'UniPOS',
       debugShowCheckedModeBanner: false,
+
+      // Wrap all routes with NotificationOverlay using builder
+      builder: (context, child) {
+        return NotificationOverlay(
+          service: NotificationService.instance,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+
       // Handle unknown routes
       onUnknownRoute: (settings) {
         return MaterialPageRoute(

@@ -10,6 +10,7 @@ import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class ExtraSelectionScreen extends StatefulWidget {
   final List<String> selectedExtraIds;
@@ -623,12 +624,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (extraNameController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Please enter an extra category name'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      NotificationService.instance.showError('Please enter an extra category name');
                       return;
                     }
 
@@ -674,12 +670,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                     }
 
                     if (toppings.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Please add at least one valid topping'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      NotificationService.instance.showError('Please add at least one valid topping');
                       return;
                     }
 
@@ -713,12 +704,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                     }
 
                     // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Extra "${newExtra.Ename}" added with ${toppings.length} toppings'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    NotificationService.instance.showSuccess('Extra "${newExtra.Ename}" added with ${toppings.length} toppings');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,

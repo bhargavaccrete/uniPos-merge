@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:unipos/presentation/screens/retail/sale_detail_screen.dart';
@@ -171,12 +172,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.isEmpty || phoneController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Name and Phone are required'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                NotificationService.instance.showError('Name and Phone are required');
                 return;
               }
 
@@ -205,12 +201,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
 
               if (mounted) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Customer updated successfully'),
-                    backgroundColor: Color(0xFF4CAF50),
-                  ),
-                );
+                NotificationService.instance.showSuccess('Customer updated successfully');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -263,21 +254,11 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
             onPressed: () async {
               final points = int.tryParse(pointsController.text) ?? 0;
               if (points <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter valid points'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                NotificationService.instance.showError('Please enter valid points');
                 return;
               }
               if (points > _customer.pointsBalance) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Insufficient points'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                NotificationService.instance.showError('Insufficient points');
                 return;
               }
 
@@ -287,12 +268,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
 
               if (mounted) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$points points redeemed successfully'),
-                    backgroundColor: const Color(0xFF4CAF50),
-                  ),
-                );
+                NotificationService.instance.showSuccess('$points points redeemed successfully');
               }
             },
             style: ElevatedButton.styleFrom(

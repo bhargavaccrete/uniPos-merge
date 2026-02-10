@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
@@ -71,12 +72,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading sale: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error loading sale: $e');
       }
     }
   }
@@ -117,12 +113,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error printing: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error printing: $e');
       }
     }
   }
@@ -170,9 +161,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             icon: const Icon(Icons.share_outlined),
             onPressed: () {
               // TODO: Implement share functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share feature coming soon')),
-              );
+              NotificationService.instance.showSuccess('Share feature coming soon');
             },
           ),
           IconButton(

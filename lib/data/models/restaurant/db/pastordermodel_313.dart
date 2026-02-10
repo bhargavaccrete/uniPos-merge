@@ -1,4 +1,5 @@
 // import 'package:BillBerry/model/db/cartmodel_308.dart';
+import 'dart:convert';
 import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:hive/hive.dart';
@@ -7,7 +8,7 @@ part 'pastordermodel_313.g.dart';
 
 @HiveType(typeId: HiveTypeIds.restaurantPastOrder)
 
-class pastOrderModel extends HiveObject{
+class PastOrderModel extends HiveObject{
 
 
   @HiveField(0)
@@ -76,7 +77,20 @@ class pastOrderModel extends HiveObject{
   @HiveField(20)
   final int? billNumber; // Daily bill number (resets every day) - e.g., 1, 2, 3...
 
-  pastOrderModel({
+  // --- SPLIT PAYMENT SUPPORT ---
+  @HiveField(21)
+  final String? paymentListJson; // JSON serialized list of payment entries
+
+  @HiveField(22)
+  final bool? isSplitPayment; // Flag indicating if split payment was used
+
+  @HiveField(23)
+  final double? totalPaid; // Total amount paid across all payment methods
+
+  @HiveField(24)
+  final double? changeReturn; // Total change to return to customer
+
+  PastOrderModel({
     required this.id,
     required this.customerName,
     required this.totalPrice,
@@ -98,12 +112,17 @@ class pastOrderModel extends HiveObject{
     required this.kotNumbers, // REQUIRED
     required this.kotBoundaries, // REQUIRED
     this.billNumber, // Optional - Daily bill number
+    // Split payment fields
+    this.paymentListJson,
+    this.isSplitPayment,
+    this.totalPaid,
+    this.changeReturn,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
 
 
-  pastOrderModel copyWith({
+  PastOrderModel copyWith({
     String? id,
     String? customername,
     double? totalPrice,
@@ -125,8 +144,12 @@ class pastOrderModel extends HiveObject{
     List<int>? kotNumbers,
     List<int>? kotBoundaries,
     int? billNumber,
+    String? paymentListJson,
+    bool? isSplitPayment,
+    double? totalPaid,
+    double? changeReturn,
   }) {
-    return pastOrderModel(
+    return PastOrderModel(
       id: id ?? this.id,
       customerName: customerName ?? this.customerName,
       totalPrice: totalPrice ?? this.totalPrice,
@@ -148,6 +171,10 @@ class pastOrderModel extends HiveObject{
       kotNumbers: kotNumbers ?? this.kotNumbers,
       kotBoundaries: kotBoundaries ?? this.kotBoundaries,
       billNumber: billNumber ?? this.billNumber,
+      paymentListJson: paymentListJson ?? this.paymentListJson,
+      isSplitPayment: isSplitPayment ?? this.isSplitPayment,
+      totalPaid: totalPaid ?? this.totalPaid,
+      changeReturn: changeReturn ?? this.changeReturn,
     );
   }
 
@@ -199,12 +226,16 @@ class pastOrderModel extends HiveObject{
       'kotNumbers': kotNumbers,
       'kotBoundaries': kotBoundaries,
       'billNumber': billNumber,
+      'paymentListJson': paymentListJson,
+      'isSplitPayment': isSplitPayment,
+      'totalPaid': totalPaid,
+      'changeReturn': changeReturn,
     };
   }
 
   // Create from Map for import
-  factory pastOrderModel.fromMap(Map<String, dynamic> map) {
-    return pastOrderModel(
+  factory PastOrderModel.fromMap(Map<String, dynamic> map) {
+    return PastOrderModel(
       id: map['id'] ?? '',
       customerName: map['customerName'] ?? '',
       totalPrice: (map['totalPrice'] ?? 0).toDouble(),
@@ -226,6 +257,28 @@ class pastOrderModel extends HiveObject{
       kotNumbers: (map['kotNumbers'] as List?)?.map((e) => e as int).toList() ?? [1],
       kotBoundaries: (map['kotBoundaries'] as List?)?.map((e) => e as int).toList() ?? [0],
       billNumber: map['billNumber'],
+      paymentListJson: map['paymentListJson'],
+      isSplitPayment: map['isSplitPayment'],
+      totalPaid: map['totalPaid']?.toDouble(),
+      changeReturn: map['changeReturn']?.toDouble(),
     );
+  }
+
+  // Helper method to get payment list from JSON
+  List<Map<String, dynamic>> get paymentList {
+    if (paymentListJson == null || paymentListJson!.isEmpty) {
+      // Fallback to single payment method for backward compatibility
+      return [
+        {'method': paymentmode ?? 'cash', 'amount': totalPrice}
+      ];
+    }
+    try {
+      final List<dynamic> decoded = jsonDecode(paymentListJson!);
+      return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
+      return [
+        {'method': paymentmode ?? 'cash', 'amount': totalPrice}
+      ];
+    }
   }
 }

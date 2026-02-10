@@ -5,29 +5,29 @@ import '../../models/restaurant/db/pastordermodel_313.dart';
 /// Repository layer for Past Order data access (Restaurant)
 /// Handles all Hive database operations for past/completed orders
 class PastOrderRepository {
-  late Box<pastOrderModel> _pastOrderBox;
+  late Box<PastOrderModel> _pastOrderBox;
 
   PastOrderRepository() {
-    _pastOrderBox = Hive.box<pastOrderModel>(HiveBoxNames.restaurantPastOrders);
+    _pastOrderBox = Hive.box<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
   }
 
   /// Get all past orders
-  Future<List<pastOrderModel>> getAllPastOrders() async {
+  Future<List<PastOrderModel>> getAllPastOrders() async {
     return _pastOrderBox.values.toList();
   }
 
   /// Add a new past order
-  Future<void> addOrder(pastOrderModel pastOrder) async {
+  Future<void> addOrder(PastOrderModel pastOrder) async {
     await _pastOrderBox.put(pastOrder.id, pastOrder);
   }
 
   /// Get past order by ID
-  Future<pastOrderModel?> getOrderById(String orderId) async {
+  Future<PastOrderModel?> getOrderById(String orderId) async {
     return _pastOrderBox.get(orderId);
   }
 
   /// Update past order
-  Future<void> updateOrder(pastOrderModel updatedOrder) async {
+  Future<void> updateOrder(PastOrderModel updatedOrder) async {
     await _pastOrderBox.put(updatedOrder.id, updatedOrder);
   }
 
@@ -37,7 +37,7 @@ class PastOrderRepository {
   }
 
   /// Get past orders by date range
-  Future<List<pastOrderModel>> getOrdersByDateRange(
+  Future<List<PastOrderModel>> getOrdersByDateRange(
     DateTime startDate,
     DateTime endDate,
   ) async {
@@ -49,7 +49,7 @@ class PastOrderRepository {
   }
 
   /// Get today's past orders
-  Future<List<pastOrderModel>> getTodaysPastOrders() async {
+  Future<List<PastOrderModel>> getTodaysPastOrders() async {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
     final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
@@ -57,7 +57,7 @@ class PastOrderRepository {
   }
 
   /// Get past orders by order type
-  Future<List<pastOrderModel>> getOrdersByType(String orderType) async {
+  Future<List<PastOrderModel>> getOrdersByType(String orderType) async {
     return _pastOrderBox.values
         .where((order) => order.orderType == orderType)
         .toList();
@@ -76,7 +76,7 @@ class PastOrderRepository {
   }
 
   /// Search past orders by customer name
-  Future<List<pastOrderModel>> searchOrders(String query) async {
+  Future<List<PastOrderModel>> searchOrders(String query) async {
     if (query.isEmpty) {
       return getAllPastOrders();
     }

@@ -12,6 +12,7 @@ import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 enum VoidOrderPeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -240,7 +241,7 @@ class VoidOrderDataView extends StatefulWidget {
 }
 
 class _VoidOrderDataViewState extends State<VoidOrderDataView> {
-  List<pastOrderModel> _voidOrders = [];
+  List<PastOrderModel> _voidOrders = [];
   double _totalVoidAmount = 0.0;
   int _totalVoidCount = 0;
   double _averageVoidAmount = 0.0;
@@ -311,9 +312,9 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     }
   }
 
-  void _filterOrdersByPeriod(List<pastOrderModel> orders) {
+  void _filterOrdersByPeriod(List<PastOrderModel> orders) {
     final now = DateTime.now();
-    List<pastOrderModel> filtered = [];
+    List<PastOrderModel> filtered = [];
 
     switch (widget.period) {
       case VoidOrderPeriod.Today:
@@ -1216,28 +1217,12 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Report exported successfully',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+        NotificationService.instance.showSuccess('Report exported successfully');
       }
     } catch (e) {
       debugPrint('Error exporting CSV: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to export report',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Failed to export report');
       }
     }
   }

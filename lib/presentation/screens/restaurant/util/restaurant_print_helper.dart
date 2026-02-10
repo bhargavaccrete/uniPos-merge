@@ -14,6 +14,7 @@ import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
 import 'package:unipos/util/restaurant/staticswitch.dart'; // Import for AppSettings
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 class RestaurantPrintHelper {
 
@@ -39,12 +40,7 @@ class RestaurantPrintHelper {
 
       if (kotItems == null || kotItems.isEmpty) {
         if (context.mounted && !autoPrint) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No items found for this KOT'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationService.instance.showError('No items found for this KOT');
         }
         return;
       }
@@ -135,7 +131,9 @@ class RestaurantPrintHelper {
       );
 
       // 5. Determine order number and if this is an add-on KOT
-      final orderNo = order.id.substring(0, 8).toUpperCase(); // Use first 8 chars of order ID
+      final orderNo = order.orderNumber != null 
+          ? '${order.orderNumber}' 
+          : order.id.substring(0, 8).toUpperCase();
       final isAddonKot = order.kotNumbers.length > 1 && order.kotNumbers.first != kotNumber;
 
       // 6. Create ReceiptData for KOT
@@ -205,12 +203,7 @@ class RestaurantPrintHelper {
     } catch (e) {
       debugPrint('Error printing KOT: $e');
       if (context.mounted && !autoPrint) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error printing KOT: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationService.instance.showError('Error printing KOT: $e');
       }
     }
   }
@@ -368,10 +361,26 @@ class RestaurantPrintHelper {
       // ✅ FIX: Determine payment type based on payment status
       print('🔍 DEBUG PRINT: order.isPaid = ${order.isPaid}');
       print('🔍 DEBUG PRINT: order.paymentMethod = ${order.paymentMethod}');
+      print('🔍 DEBUG PRINT: order.isSplitPayment = ${order.isSplitPayment}');
+
       String paymentType;
+      String? paymentBreakdown; // For split payment display
+
       if (order.isPaid == true) {
         // Order is paid - show actual payment method
         paymentType = order.paymentMethod ?? 'Cash';
+
+        // If split payment, prepare breakdown for display
+        if (order.isSplitPayment == true && order.paymentListJson != null) {
+          final paymentList = order.paymentList;
+          final breakdown = paymentList.map((p) {
+            final method = p['method'] ?? 'Unknown';
+            final amount = p['amount'] ?? 0.0;
+            return '$method: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(amount)}';
+          }).join(', ');
+          paymentBreakdown = breakdown;
+          print('🔍 DEBUG PRINT: Payment breakdown = $paymentBreakdown');
+        }
       } else {
         // Order is unpaid (running order) - show NOT PAID status
         paymentType = 'NOT PAID';
@@ -444,13 +453,12 @@ class RestaurantPrintHelper {
         billNumber: billNumber, // Pass bill number for bill receipts
         kotNumbers: order.kotNumbers, // Pass all KOT numbers to display on bill
         itemTotal: receiptData.itemTotal, // ✅ Pass pre-calculated item total
+        paymentBreakdown: paymentBreakdown, // Pass split payment breakdown if available
       );
       
     } catch (e) {
       debugPrint('Error preparing receipt: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error preparing receipt: $e'), backgroundColor: Colors.red),
-      );
+      NotificationService.instance.showError('Error preparing receipt: $e');
     }
   }
 
@@ -473,9 +481,36 @@ class RestaurantPrintHelper {
       isDeliveryOrder: isDelivery,
     );
 
+    // Check if new items were added (for KOT boundary tracking)
+    final int previousItemCount = order.itemCountAtLastKot ?? order.items.length;
+    final int currentItemCount = currentItems.length;
+    final bool hasNewItems = currentItemCount > previousItemCount;
+
+    // Generate temporary KOT info for printing (not saved to database)
+    List<int> printKotNumbers = List<int>.from(order.kotNumbers);
+    List<int> printKotBoundaries = List<int>.from(order.kotBoundaries);
+
+    if (hasNewItems) {
+      // Generate a temporary KOT number for display only
+      final int tempKotNumber = await orderStore.getNextKotNumber();
+      printKotNumbers.add(tempKotNumber);
+      printKotBoundaries.add(currentItemCount);
+
+      print('🖨️ Temporary KOT #$tempKotNumber for bill preview');
+      print('   Previous items: $previousItemCount, Current items: $currentItemCount');
+    }
+
+    // Create updated order with current items and KOT info for printing
+    final updatedOrder = order.copyWith(
+      items: currentItems, // Use current items (includes newly added items)
+      kotNumbers: printKotNumbers, // Include temporary KOT for display
+      kotBoundaries: printKotBoundaries, // Update boundaries for display
+      itemCountAtLastKot: currentItemCount,
+    );
+
     await printOrderReceipt(
       context: context,
-      order: order, // Uses ID and customer details from order
+      order: updatedOrder, // Pass updated order with all items and KOT info
       calculations: calculations,
     );
   }
