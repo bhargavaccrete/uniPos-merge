@@ -384,13 +384,13 @@ class _NotificationOverlayState extends State<NotificationOverlay> {
         // Your main screen content
         widget.child,
 
-        // The notification list on top - wrapped with IgnorePointer
-        IgnorePointer(
-          ignoring: _isIgnoring,
-          child: Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 0,
-            right: 0,
+        // The notification list on top - Positioned with IgnorePointer inside
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 16,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(
+            ignoring: _isIgnoring,
             child: AnimatedList(
               key: widget.service.listKey,
               initialItemCount: widget.service.notifications.length,

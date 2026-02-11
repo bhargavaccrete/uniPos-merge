@@ -1,14 +1,11 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -76,7 +73,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
     });
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     final filteredReports = _getFilteredReports();
 
     if (filteredReports.isEmpty) {
@@ -84,22 +81,18 @@ class _PosenddayreportState extends State<Posenddayreport> {
       return;
     }
 
-    List<String> headers = [
+    final headers = [
       'Opening Date',
       'Closing Date',
       'Opening Balance',
       'Closing Balance',
       'Actual Cash',
-      'Cash',
-      'Card',
-      'Online',
+      'Cash Payment',
+      'Card Payment',
+      'Online Payment',
     ];
 
-    List<List<dynamic>> rows = [headers];
-
-    final dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
-
-    for (var report in filteredReports) {
+    final data = filteredReports.map((report) {
       double cashAmount = 0.0;
       double cardAmount = 0.0;
       double onlineAmount = 0.0;
@@ -115,36 +108,41 @@ class _PosenddayreportState extends State<Posenddayreport> {
         }
       }
 
-      rows.add([
-        dateFormatter.format(report.date),
-        dateFormatter.format(report.date.add(Duration(hours: 8))),
-        '${CurrencyHelper.currentSymbol}${report.openingBalance.toStringAsFixed(2)}',
-        '${CurrencyHelper.currentSymbol}${report.closingBalance.toStringAsFixed(2)}',
-        '${CurrencyHelper.currentSymbol}${report.cashReconciliation.actualCash.toStringAsFixed(2)}',
-        '${CurrencyHelper.currentSymbol}${cashAmount.toStringAsFixed(2)}',
-        '${CurrencyHelper.currentSymbol}${cardAmount.toStringAsFixed(2)}',
-        '${CurrencyHelper.currentSymbol}${onlineAmount.toStringAsFixed(2)}',
-      ]);
-    }
+      return [
+        ReportExportService.formatDateTime(report.date),
+        ReportExportService.formatDateTime(report.date.add(Duration(hours: 8))),
+        ReportExportService.formatCurrency(report.openingBalance),
+        ReportExportService.formatCurrency(report.closingBalance),
+        ReportExportService.formatCurrency(report.cashReconciliation.actualCash),
+        ReportExportService.formatCurrency(cashAmount),
+        ReportExportService.formatCurrency(cardAmount),
+        ReportExportService.formatCurrency(onlineAmount),
+      ];
+    }).toList();
 
-    String csv = const ListToCsvConverter().convert(rows);
+    final totalOpening = filteredReports.fold<double>(0, (sum, r) => sum + r.openingBalance);
+    final totalClosing = filteredReports.fold<double>(0, (sum, r) => sum + r.closingBalance);
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/eod_reports_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
+    String periodDisplay = _selectedDate != null
+        ? DateFormat('dd MMM yyyy').format(_selectedDate!)
+        : 'All Dates';
 
-      await Share.shareXFiles([XFile(path)], text: "End of Day Reports");
+    final summary = {
+      'Report Period': periodDisplay,
+      'Total Reports': filteredReports.length.toString(),
+      'Total Opening Balance': ReportExportService.formatCurrency(totalOpening),
+      'Total Closing Balance': ReportExportService.formatCurrency(totalClosing),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
-    }
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'eod_reports_${_selectedDate != null ? DateFormat('yyyyMMdd').format(_selectedDate!) : 'all'}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'End of Day Reports - $periodDisplay',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
   }
 
   @override
@@ -563,7 +561,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
           'Export to Excel',

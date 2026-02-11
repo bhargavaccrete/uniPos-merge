@@ -1,10 +1,6 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
@@ -12,6 +8,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 enum DiscountPeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -292,16 +289,16 @@ class _DiscountDataViewState extends State<DiscountDataView> {
     });
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     if (_filteredOrders.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    List<String> headers = [
-      'Date',
+    final headers = [
+      'Date & Time',
       'Invoice ID',
-      'Customer Name',
+      'Customer',
       'Payment Method',
       'Order Type',
       'Subtotal',
@@ -309,39 +306,57 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       'Total Amount'
     ];
 
-    List<List<dynamic>> rows = [headers];
+    final data = _filteredOrders.map((order) => [
+      ReportExportService.formatDateTime(order.orderAt),
+      order.id.substring(0, 8),
+      order.customerName.isNotEmpty ? order.customerName : 'Guest',
+      order.paymentmode ?? 'N/A',
+      order.orderType ?? 'N/A',
+      ReportExportService.formatCurrency(order.subTotal ?? 0.0),
+      ReportExportService.formatCurrency(order.Discount ?? 0.0),
+      ReportExportService.formatCurrency(order.totalPrice),
+    ]).toList();
 
-    for (var order in _filteredOrders) {
-      rows.add([
-        order.orderAt != null ? DateFormat('dd-MM-yyyy HH:mm').format(order.orderAt!) : 'N/A',
-        order.id,
-        order.customerName,
-        order.paymentmode ?? 'N/A',
-        order.orderType ?? 'N/A',
-        (order.subTotal ?? 0.0).toStringAsFixed(2),
-        (order.Discount ?? 0.0).toStringAsFixed(2),
-        order.totalPrice.toStringAsFixed(2),
-      ]);
-    }
+    final totalSubtotal = _filteredOrders.fold<double>(0, (sum, o) => sum + (o.subTotal ?? 0.0));
+    final totalAmount = _filteredOrders.fold<double>(0, (sum, o) => sum + o.totalPrice);
 
-    String csv = const ListToCsvConverter().convert(rows);
+    final periodDisplay = _getPeriodDisplayName();
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final periodName = widget.period.name;
-      final path = '${directory.path}/discount_orders_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
+    final summary = {
+      'Report Period': periodDisplay,
+      'Total Orders': _totalOrdersCount.toString(),
+      'Total Subtotal': ReportExportService.formatCurrency(totalSubtotal),
+      'Total Discount': ReportExportService.formatCurrency(_totalDiscountAmount),
+      'Total Amount': ReportExportService.formatCurrency(totalAmount),
+      'Average Discount': ReportExportService.formatCurrency(_averageDiscount),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      await Share.shareXFiles([XFile(path)], text: "Discount Orders Report - $periodName");
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'discount_orders_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Discount Orders Report - $periodDisplay',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
+  }
 
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case DiscountPeriod.Today:
+        return 'Today';
+      case DiscountPeriod.ThisWeek:
+        return 'This Week';
+      case DiscountPeriod.Month:
+        return 'This Month';
+      case DiscountPeriod.Year:
+        return 'This Year';
+      case DiscountPeriod.Custom:
+        if (_startDate != null && _endDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 
@@ -715,7 +730,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
           'Export to Excel',

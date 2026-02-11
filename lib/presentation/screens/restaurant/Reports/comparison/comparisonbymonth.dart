@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class ComparisonByMonth extends StatefulWidget {
   const ComparisonByMonth({super.key});
@@ -98,272 +100,365 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Comparison By Month',
-          textScaler: TextScaler.linear(1),
-          style: GoogleFonts.poppins(
-              fontSize: 20, color: Colors.white, fontWeight: FontWeight.w500),
-        ),
-        centerTitle: true,
-        backgroundColor: AppColors.primary,
-        leading: IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: Icon(
-              Icons.arrow_back_ios,
-              color: Colors.white,
-            )),
-      ),
-      body: Observer(builder: (_){
-        if(pastOrderStore.isLoading){
-          return Center(child: CircularProgressIndicator(color: AppColors.primary));
-        }
-
-        final data = _calculateComparisonData();
-
-        return SingleChildScrollView(
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sales Comparison',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600, fontSize: 18),
+      backgroundColor: AppColors.surfaceLight,
+      body: Column(
+        children: [
+          // Modern Header
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Comparison of Current Month with Previous Month',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w400, fontSize: 14),
-                  textAlign: TextAlign.start,
-                ),
-                SizedBox(height: 10),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${data.currentPeriod} vs ${data.previousPeriod}',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.arrow_back, color: AppColors.white, size: 24),
+                    ),
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Comparison By Month',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.headingFontSize(context),
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Compare sales month over month',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
                             fontWeight: FontWeight.w500,
-                            fontSize: 12,
-                            color: Colors.grey.shade700),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.trending_up,
+                      size: AppResponsive.iconSize(context),
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+
+          Expanded(
+            child: Observer(builder: (_){
+              if(pastOrderStore.isLoading){
+                return Center(child: CircularProgressIndicator(color: AppColors.primary));
+              }
+
+              final data = _calculateComparisonData();
+
+              return SingleChildScrollView(
+                padding: AppResponsive.padding(context),
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Info Card
+                      Container(
+                        padding: AppResponsive.cardPadding(context),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${data.currentPeriod} vs ${data.previousPeriod}',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.subheadingFontSize(context),
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: _loadComparisonData,
+                                  icon: Icon(Icons.refresh, color: AppColors.primary),
+                                  tooltip: 'Refresh',
+                                ),
+                              ],
+                            ),
+                            AppResponsive.verticalSpace(context, size: SpacingSize.small),
+                            Text(
+                              'Month-over-month sales performance analysis',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      AppResponsive.verticalSpace(context),
+
+                      // Export Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _exportReport(data),
+                          icon: Icon(Icons.file_download_outlined, size: AppResponsive.iconSize(context)),
+                          label: Text(
+                            'Export Report',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.buttonFontSize(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: AppColors.white,
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      AppResponsive.verticalSpace(context),
+
+                      // Comparison Table
+                      _buildComparisonTable(data),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComparisonTable(ComparisonData data) {
+    final screenWidth = AppResponsive.screenWidth(context);
+    final cellFontSize = AppResponsive.smallFontSize(context);
+    final headerFontSize = AppResponsive.bodyFontSize(context);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: screenWidth - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
+            ),
+            child: DataTable(
+              columnSpacing: AppResponsive.tableColumnSpacing(context),
+              headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
+              headingRowHeight: AppResponsive.tableHeadingHeight(context),
+              dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
+              dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
+              columns: [
+                DataColumn(
+                  label: Text(
+                    'Details',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: headerFontSize,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    data.previousPeriod,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: headerFontSize,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    data.currentPeriod,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: headerFontSize,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+              rows: [
+                DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        'Total Orders',
+                        style: GoogleFonts.poppins(
+                          fontSize: cellFontSize,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: _loadComparisonData,
-                      icon: Icon(Icons.refresh, color: AppColors.primary),
-                      tooltip: 'Refresh',
+                    DataCell(
+                      Center(
+                        child: Text(
+                          data.previousOrders.toString(),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          data.currentOrders.toString(),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 10),
-
-                CommonButton(
-                    width: width * 0.6,
-                    height: height * 0.06,
-                    bordercircular: 5,
-                    onTap: () {
-                      NotificationService.instance.showSuccess('Export feature coming soon');
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.note_add_outlined,
-                          color: Colors.white,
+                DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        'Total Amount (${CurrencyHelper.currentSymbol})',
+                        style: GoogleFonts.poppins(
+                          fontSize: cellFontSize,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Export TO Excel',
-                          textScaler: TextScaler.linear(1),
-                          style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500),
-                        )
-                      ],
-                    )),
-
-                SizedBox(height: 25),
-
-
-                  Container(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                          headingRowHeight: 50,
-                          columnSpacing: 20,
-                          headingRowColor:
-                          WidgetStateProperty.all(Colors.grey[300]),
-                          border: TableBorder.all(color: Colors.white),
-                          decoration: BoxDecoration(),
-                          columns: [
-                            DataColumn(
-                                columnWidth: FixedColumnWidth(width * 0.35),
-                                label: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: Radius.circular(50),
-                                        bottomLeft: Radius.circular(50),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Details',
-                                      textScaler: TextScaler.linear(1),
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600),
-                                    ))),
-                            DataColumn(
-                                headingRowAlignment:
-                                MainAxisAlignment.center,
-                                columnWidth: FixedColumnWidth(width * 0.3),
-                                label: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: Radius.circular(10),
-                                        bottomLeft: Radius.circular(10),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      "${data.previousPeriod}",
-                                      textAlign: TextAlign.center,
-                                      textScaler: TextScaler.linear(1),
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600),
-                                    ))),
-                            DataColumn(
-                                headingRowAlignment:
-                                MainAxisAlignment.center,
-                                columnWidth: FixedColumnWidth(width * 0.3),
-                                label: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: Radius.circular(10),
-                                        bottomLeft: Radius.circular(10),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '${data.currentPeriod}',
-                                      textAlign: TextAlign.center,
-                                      textScaler: TextScaler.linear(1),
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600),
-                                    )))
-                          ],
-                          rows: [
-                            DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    'Total Orders',
-                                    style:
-                                    GoogleFonts.poppins(fontSize: 13),
-                                  ),
-                                ),
-                                DataCell(
-                                  Center(
-                                      child: Text(
-                                        data.previousOrders.toString(),
-                                        style:
-                                        GoogleFonts.poppins(fontSize: 13),
-                                      )),
-                                ),
-                                DataCell(
-                                  Center(
-                                      child: Text(
-                                        data.currentOrders.toString(),
-                                        style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.primary),
-                                      )),
-                                ),
-                              ],
-                            ),
-                            DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    'Total Amount (${CurrencyHelper.currentSymbol})',
-                                    style:
-                                    GoogleFonts.poppins(fontSize: 13),
-                                  ),
-                                ),
-                                DataCell(
-                                  Center(
-                                      child: Text(
-                                        DecimalSettings.formatAmount(data.previousAmount),
-                                        style:
-                                        GoogleFonts.poppins(fontSize: 13),
-                                      )),
-                                ),
-                                DataCell(
-                                  Center(
-                                      child: Text(
-                                        DecimalSettings.formatAmount(data.currentAmount),
-                                        style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.green.shade700),
-                                      )),
-                                ),
-                              ],
-                            ),
-                            DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    'Growth %',
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                                DataCell(
-                                  Center(child: Text('-')),
-                                ),
-                                DataCell(
-                                  Center(
-                                      child: Text(
-                                        _calculateGrowth(
-                                            data.previousAmount,
-                                            data.currentAmount),
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: _getGrowthColor(
-                                              data.previousAmount,
-                                              data.currentAmount),
-                                        ),
-                                      )),
-                                ),
-                              ],
-                            ),
-                          ]),
+                      ),
                     ),
-                  )
+                    DataCell(
+                      Center(
+                        child: Text(
+                          DecimalSettings.formatAmount(data.previousAmount),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          DecimalSettings.formatAmount(data.currentAmount),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        'Growth %',
+                        style: GoogleFonts.poppins(
+                          fontSize: cellFontSize,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(child: Text('-', style: GoogleFonts.poppins(fontSize: cellFontSize))),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          _calculateGrowth(data.previousAmount, data.currentAmount),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: _getGrowthColor(data.previousAmount, data.currentAmount),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-        );
-      }),
+        ),
+      ),
     );
   }
 
@@ -379,6 +474,53 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
     if (current > previous) return Colors.green.shade700;
     if (current < previous) return Colors.red.shade700;
     return Colors.grey;
+  }
+
+  Future<void> _exportReport(ComparisonData data) async {
+    // Prepare headers
+    final headers = ['Details', data.previousPeriod, data.currentPeriod];
+
+    // Calculate growth percentages
+    final orderGrowth = data.previousOrders == 0
+        ? (data.currentOrders > 0 ? 100.0 : 0.0)
+        : ((data.currentOrders - data.previousOrders) / data.previousOrders) * 100;
+    final amountGrowth = data.previousAmount == 0
+        ? (data.currentAmount > 0 ? 100.0 : 0.0)
+        : ((data.currentAmount - data.previousAmount) / data.previousAmount) * 100;
+
+    // Prepare data rows
+    final dataRows = [
+      ['Total Orders', data.previousOrders.toString(), data.currentOrders.toString()],
+      [
+        'Total Amount',
+        ReportExportService.formatCurrency(data.previousAmount),
+        ReportExportService.formatCurrency(data.currentAmount)
+      ],
+      [
+        'Growth %',
+        '-',
+        '${amountGrowth >= 0 ? '+' : ''}${amountGrowth.toStringAsFixed(1)}%'
+      ],
+    ];
+
+    // Prepare summary
+    final summary = {
+      'Report Type': 'Month Comparison',
+      'Previous Period': data.previousPeriod,
+      'Current Period': data.currentPeriod,
+      'Order Growth': '${orderGrowth >= 0 ? '+' : ''}${orderGrowth.toStringAsFixed(1)}%',
+      'Amount Growth': '${amountGrowth >= 0 ? '+' : ''}${amountGrowth.toStringAsFixed(1)}%',
+    };
+
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'sales_comparison_month_${data.currentPeriod.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Sales Comparison by Month',
+      headers: headers,
+      data: dataRows,
+      summary: summary,
+    );
   }
 }
 

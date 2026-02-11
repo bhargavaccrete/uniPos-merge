@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:csv/csv.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -123,7 +120,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
     return customerDataList;
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     final customerData = _calculateCustomerData();
 
     if (customerData.isEmpty) {
@@ -132,72 +129,56 @@ class _CustomerListReportState extends State<CustomerListReport> {
       return;
     }
 
-    try {
-      // Prepare CSV data
-      List<List<dynamic>> rows = [];
+    // Prepare headers
+    final headers = [
+      'Sr No',
+      'Customer Name',
+      'Mobile',
+      'Total Orders',
+      'Total Spent',
+      'Last Order Date',
+      'Registration Date'
+    ];
 
-      // Header
-      rows.add([
-        'Sr No',
-        'Customer Name',
-        'Mobile',
-        'Total Orders',
-        'Total Spent',
-        'Last Order Date',
-        'Registration Date'
-      ]);
+    // Prepare data rows
+    final data = customerData.map((customer) => [
+      customer.srNo.toString(),
+      customer.name,
+      customer.phone,
+      customer.totalOrders.toString(),
+      ReportExportService.formatCurrency(customer.totalSpent),
+      customer.lastOrderDate != null
+          ? ReportExportService.formatDate(customer.lastOrderDate!)
+          : 'Never',
+      customer.registrationDate != null
+          ? ReportExportService.formatDate(customer.registrationDate!)
+          : '-',
+    ]).toList();
 
-      // Data rows
-      for (var customer in customerData) {
-        rows.add([
-          customer.srNo,
-          customer.name,
-          customer.phone,
-          customer.totalOrders,
-          DecimalSettings.formatAmount(customer.totalSpent),
-          customer.lastOrderDate != null
-              ? DateFormat('dd/MM/yyyy').format(customer.lastOrderDate!)
-              : 'Never',
-          customer.registrationDate != null
-              ? DateFormat('dd/MM/yyyy').format(customer.registrationDate!)
-              : '-',
-        ]);
-      }
+    // Calculate summary
+    final totalCustomers = customerData.length;
+    final activeCustomers = customerData.where((c) => c.totalOrders > 0).length;
+    final totalRevenue = customerData.fold<double>(0, (sum, c) => sum + c.totalSpent);
+    final avgSpentPerCustomer = totalCustomers > 0 ? totalRevenue / totalCustomers : 0.0;
 
-      // Summary row
-      final totalCustomers = customerData.length;
-      final activeCustomers = customerData.where((c) => c.totalOrders > 0).length;
-      final totalRevenue = customerData.fold<double>(0, (sum, c) => sum + c.totalSpent);
+    // Prepare summary
+    final summary = {
+      'Total Customers': totalCustomers.toString(),
+      'Active Customers': '$activeCustomers (${((activeCustomers / totalCustomers) * 100).toStringAsFixed(1)}%)',
+      'Total Revenue': ReportExportService.formatCurrency(totalRevenue),
+      'Avg Spent/Customer': ReportExportService.formatCurrency(avgSpentPerCustomer),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      rows.add([]);
-      rows.add(['Summary']);
-      rows.add(['Total Customers', totalCustomers]);
-      rows.add(['Active Customers', activeCustomers]);
-      rows.add(['Total Revenue', DecimalSettings.formatAmount(totalRevenue)]);
-
-      // Convert to CSV
-      String csv = const ListToCsvConverter().convert(rows);
-
-      // Get temporary directory
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/customer_list_${DateTime.now().millisecondsSinceEpoch}.csv';
-      final file = File(path);
-
-      // Write to file
-      await file.writeAsString(csv);
-
-      // Share the file
-      await Share.shareXFiles(
-        [XFile(path)],
-        subject: 'Customer List Report',
-      );
-
-      if (!mounted) return;
-      NotificationService.instance.showSuccess('Report exported successfully');
-    } catch (e) {
-      if (!mounted) return;
-      NotificationService.instance.showError('Export failed: $e');
-    }
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'customer_list_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Customer List Report',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
   }
 
   @override
@@ -428,7 +409,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: customerData.isNotEmpty ? _exportToExcel : null,
+                              onPressed: customerData.isNotEmpty ? _exportReport : null,
                               icon: const Icon(Icons.file_download_outlined),
                               label: Text(
                                 'Export to Excel',

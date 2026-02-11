@@ -342,6 +342,7 @@ class RestaurantBulkImportServiceV3 {
       if (bytes == null) return 'Failed to encode Excel file';
 
       if (kIsWeb) {
+        // Web platform: Use FilePicker with bytes
         final result = await FilePicker.platform.saveFile(
           dialogTitle: 'Save Template',
           fileName: fileName,
@@ -351,48 +352,26 @@ class RestaurantBulkImportServiceV3 {
         );
         return result != null ? 'Template downloaded successfully' : 'Download cancelled';
       } else if (Platform.isAndroid || Platform.isIOS) {
-        // For Android 10+ (API 29+), use app's external storage directory (no permission needed)
-        // This directory is accessible and won't be deleted on app uninstall
-        try {
-          final directory = await getExternalStorageDirectory();
-          if (directory != null) {
-            // Navigate to public Downloads folder
-            // From: /storage/emulated/0/Android/data/com.app/files
-            // To: /storage/emulated/0/Download/
-            final pathParts = directory.path.split('/');
-            final publicPath = pathParts.sublist(0, 4).join('/'); // Get /storage/emulated/0
+        // ✅ FIXED: Use FilePicker for Android/iOS to handle permissions automatically
+        // This shows a native file picker dialog and handles all storage permissions
+        // On Android/iOS, bytes parameter is REQUIRED and FilePicker handles the write
+        final result = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Template',
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['xlsx'],
+          bytes: Uint8List.fromList(bytes), // Required on Android/iOS
+        );
 
-            // Try to save in Downloads folder
-            final downloadsDir = Directory('$publicPath/Download');
-            if (await downloadsDir.exists()) {
-              final filePath = '${downloadsDir.path}/$fileName';
-              await File(filePath).writeAsBytes(bytes);
-              return 'Template saved to Downloads/$fileName';
-            }
-
-            // Fallback: save in Documents folder
-            final documentsDir = Directory('$publicPath/Documents');
-            try {
-              if (!await documentsDir.exists()) {
-                await documentsDir.create(recursive: true);
-              }
-              final filePath = '${documentsDir.path}/$fileName';
-              await File(filePath).writeAsBytes(bytes);
-              return 'Template saved to Documents/$fileName';
-            } catch (e) {
-              // If Documents fails, use app's directory
-            }
-          }
-
-          // Final fallback: use app's directory (always works, no permission needed)
-          final appDir = await getApplicationDocumentsDirectory();
-          final filePath = '${appDir.path}/$fileName';
-          await File(filePath).writeAsBytes(bytes);
-          return 'Template saved to: $filePath\nYou can find it in your file manager.';
-        } catch (e) {
-          return 'Error saving file: $e';
+        if (result != null) {
+          // FilePicker automatically writes the bytes on Android/iOS
+          return 'Template saved successfully to Downloads';
+        } else {
+          // User cancelled the save dialog
+          return 'Download cancelled';
         }
       } else {
+        // Desktop platforms (Windows, macOS, Linux)
         final result = await FilePicker.platform.saveFile(
           dialogTitle: 'Save Template',
           fileName: fileName,

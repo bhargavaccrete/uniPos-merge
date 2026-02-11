@@ -1,10 +1,6 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
@@ -12,6 +8,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 enum TimePeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -280,52 +277,70 @@ class _SalesDataViewState extends State<SalesDataView> {
     });
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     if (_filteredOrders.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    List<String> headers = [
-      'Date',
-      'Invoice ID',
-      'Customer Name',
+    // Prepare headers
+    final headers = [
+      'Date & Time',
+      'Bill #',
+      'Customer',
       'Payment Method',
       'Order Type',
-      'Total Amount'
+      'Amount',
     ];
 
-    List<List<dynamic>> rows = [headers];
-
-    for (var order in _filteredOrders) {
-      rows.add([
-        order.orderAt != null ? DateFormat('dd-MM-yyyy HH:mm').format(order.orderAt!) : 'N/A',
-        order.id,
-        order.customerName,
+    // Prepare data rows
+    final data = _filteredOrders.map((order) {
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      return [
+        ReportExportService.formatDateTime(order.orderAt),
+        order.billNumber?.toString() ?? order.id.substring(0, 8),
+        order.customerName ?? 'Guest',
         order.paymentmode ?? 'N/A',
         order.orderType ?? 'N/A',
-        (order.totalPrice - (order.refundAmount ?? 0.0)).toStringAsFixed(2),
-      ]);
-    }
+        ReportExportService.formatCurrency(netAmount),
+      ];
+    }).toList();
 
-    String csv = const ListToCsvConverter().convert(rows);
+    // Prepare summary
+    final periodName = _getPeriodDisplayName();
+    final summary = {
+      'Report Period': periodName,
+      'Total Orders': _totalOrdersCount.toString(),
+      'Total Sales': ReportExportService.formatCurrency(_totalSales),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final periodName = widget.period.name;
-      final path = '${directory.path}/sales_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'total_sales_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Total Sales Report - $periodName',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
+  }
 
-      await Share.shareXFiles([XFile(path)], text: "Sales Report - $periodName");
-
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case TimePeriod.Today:
+        return 'Today';
+      case TimePeriod.ThisWeek:
+        return 'This Week';
+      case TimePeriod.Month:
+        return 'This Month';
+      case TimePeriod.Year:
+        return 'This Year';
+      case TimePeriod.Custom:
+        if (_startDate != null && _endDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 
@@ -657,10 +672,10 @@ class _SalesDataViewState extends State<SalesDataView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(fontSize: isDesktop ? 17 : (isTablet ? 16 : 15), fontWeight: FontWeight.w600),
         ),
         style: ElevatedButton.styleFrom(

@@ -1,12 +1,9 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -303,60 +300,78 @@ class _RefundDataViewState extends State<RefundDataView> {
     return mostCommon.key;
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     if (_refundedOrders.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    List<String> headers = [
-      'Date',
-      'Order ID',
-      'Customer Name',
+    // Prepare headers
+    final headers = [
+      'Date & Time',
+      'Bill #',
+      'Customer',
       'Payment Method',
       'Order Type',
       'Refund Amount',
       'Reason'
     ];
 
-    List<List<dynamic>> rows = [headers];
-
-    for (var order in _refundedOrders) {
+    // Prepare data rows
+    final data = _refundedOrders.map((order) {
       String reason = '';
       if (order.refundReason != null && order.refundReason!.isNotEmpty) {
         final lines = order.refundReason!.split('\n');
         reason = lines.isNotEmpty ? lines.last.trim() : '';
       }
 
-      rows.add([
-        order.refundedAt != null ? DateFormat('dd-MM-yyyy HH:mm').format(order.refundedAt!) : 'N/A',
-        order.id,
-        order.customerName,
+      return [
+        ReportExportService.formatDateTime(order.refundedAt),
+        order.billNumber?.toString() ?? order.id.substring(0, 8),
+        order.customerName ?? 'Guest',
         order.paymentmode ?? 'N/A',
         order.orderType ?? 'N/A',
-        DecimalSettings.formatAmount(order.refundAmount ?? 0.0),
+        ReportExportService.formatCurrency(order.refundAmount ?? 0.0),
         reason,
-      ]);
-    }
+      ];
+    }).toList();
 
-    String csv = const ListToCsvConverter().convert(rows);
+    // Prepare summary
+    final periodName = _getPeriodDisplayName();
+    final summary = {
+      'Report Period': periodName,
+      'Total Refunds': _totalRefundCount.toString(),
+      'Total Refund Amount': ReportExportService.formatCurrency(_totalRefundAmount),
+      'Most Common Reason': _getMostCommonReason(),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final periodName = widget.period.name;
-      final path = '${directory.path}/refunds_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'refund_details_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Refund Details - $periodName',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
+  }
 
-      await Share.shareXFiles([XFile(path)], text: "Refund Report - $periodName");
-
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case RefundPeriod.Today:
+        return 'Today';
+      case RefundPeriod.ThisWeek:
+        return 'This Week';
+      case RefundPeriod.Month:
+        return 'This Month';
+      case RefundPeriod.Year:
+        return 'This Year';
+      case RefundPeriod.Custom:
+        if (_startDate != null && _endDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 
@@ -729,7 +744,7 @@ class _RefundDataViewState extends State<RefundDataView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
           'Export to Excel',

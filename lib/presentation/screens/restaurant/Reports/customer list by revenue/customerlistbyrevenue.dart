@@ -1,13 +1,10 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -90,55 +87,46 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     return _calculateTotalRevenue(customers) / customers.length;
   }
 
-  Future<void> _exportToExcel(List<CustomerRevenueData> customers) async {
+  Future<void> _exportReport(List<CustomerRevenueData> customers) async {
     if (customers.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    List<String> headers = [
+    final headers = [
       'Rank',
       'Customer Name',
       'Total Orders',
       'Total Revenue',
     ];
 
-    List<List<dynamic>> rows = [headers];
+    final data = customers.map((customer) => [
+      customer.srNo.toString(),
+      customer.name,
+      customer.orderCount.toString(),
+      ReportExportService.formatCurrency(customer.revenue),
+    ]).toList();
 
-    for (var customer in customers) {
-      rows.add([
-        customer.srNo.toString(),
-        customer.name,
-        customer.orderCount.toString(),
-        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(customer.revenue)}',
-      ]);
-    }
+    final totalRevenue = _calculateTotalRevenue(customers);
+    final averageRevenue = _calculateAverageRevenue(customers);
+    final totalOrders = customers.fold<int>(0, (sum, c) => sum + c.orderCount);
 
-    // Add summary
-    rows.add([]);
-    rows.add(['Summary', '', '', '']);
-    rows.add(['Total Customers', customers.length.toString(), '', '']);
-    rows.add(['Total Revenue', '', '', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_calculateTotalRevenue(customers))}']);
-    rows.add(['Average Revenue', '', '', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_calculateAverageRevenue(customers))}']);
+    final summary = {
+      'Total Customers': customers.length.toString(),
+      'Total Orders': totalOrders.toString(),
+      'Total Revenue': ReportExportService.formatCurrency(totalRevenue),
+      'Average Revenue per Customer': ReportExportService.formatCurrency(averageRevenue),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-    String csv = const ListToCsvConverter().convert(rows);
-
-    try {
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/customer_revenue_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
-
-      await Share.shareXFiles([XFile(path)], text: "Customer Revenue Report");
-
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
-    }
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'customer_revenue_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Customer Revenue Report',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
   }
 
   @override
@@ -456,7 +444,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () => _exportToExcel(customers),
+        onPressed: () => _exportReport(customers),
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
           'Export to Excel',

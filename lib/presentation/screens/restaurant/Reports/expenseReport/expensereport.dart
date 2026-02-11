@@ -1,13 +1,10 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -280,7 +277,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
     });
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     if (_filteredExpenses.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
@@ -288,49 +285,57 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
 
     final categoryNames = _getCategoryNames();
 
-    List<String> headers = [
-      'Date',
+    final headers = [
+      'Date & Time',
       'Category',
       'Reason',
-      'Amount',
       'Payment Type',
+      'Amount',
     ];
 
-    List<List<dynamic>> rows = [headers];
+    final data = _filteredExpenses.map((expense) => [
+      ReportExportService.formatDateTime(expense.dateandTime),
+      categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
+      expense.reason ?? '-',
+      expense.paymentType ?? '-',
+      ReportExportService.formatCurrency(expense.amount),
+    ]).toList();
 
-    for (var expense in _filteredExpenses) {
-      rows.add([
-        DateFormat('dd-MM-yyyy HH:mm').format(expense.dateandTime),
-        categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
-        expense.reason ?? '-',
-        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
-        expense.paymentType ?? '-',
-      ]);
-    }
+    String periodDisplay = _getPeriodDisplayName();
 
-    rows.add([]);
-    rows.add(['Summary', '', '', '', '']);
-    rows.add(['Total Expenses', _totalCount.toString(), '', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}', '']);
-    rows.add(['Average Expense', '', '', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageExpense)}', '']);
+    final summary = {
+      'Report Period': periodDisplay,
+      'Total Expenses Count': _totalCount.toString(),
+      'Total Expenses Amount': ReportExportService.formatCurrency(_totalExpenses),
+      'Average Expense': ReportExportService.formatCurrency(_averageExpense),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-    String csv = const ListToCsvConverter().convert(rows);
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'expenses_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Expense Report - $periodDisplay',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
+  }
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final periodName = widget.period.name;
-      final path = '${directory.path}/expenses_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
-
-      await Share.shareXFiles([XFile(path)], text: "Expense Report - $periodName");
-
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case TimePeriod.Today:
+        return 'Today';
+      case TimePeriod.ThisWeek:
+        return 'This Week';
+      case TimePeriod.Month:
+        return 'This Month';
+      case TimePeriod.Year:
+        return 'This Year';
+      case TimePeriod.Custom:
+        if (_startDate != null && _endDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 
@@ -704,7 +709,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
           'Export to Excel',

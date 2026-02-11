@@ -1,4 +1,4 @@
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -80,19 +80,54 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Future<void> _loadData() async {
     // Prevent concurrent loads
-    if (_isLoadingData) return;
+    if (_isLoadingData) {
+      print('⚠️ MenuScreen: Already loading, skipping...');
+      return;
+    }
 
-    _isLoadingData = true;
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingData = true;
+    });
+
     try {
       print('📥 MenuScreen: Loading data...');
+
+      // Add 10-second timeout to prevent infinite hanging
       await Future.wait([
         categoryStore.loadCategories(),
         itemStore.loadItems(),
         restaurantCartStore.loadCartItems(),
-      ]);
+      ]).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('⏱️ MenuScreen: Data loading timed out');
+          throw TimeoutException('Data loading timed out after 10 seconds');
+        },
+      );
+
       print('✅ MenuScreen: Data loaded - ${categoryStore.categories.length} categories, ${itemStore.items.length} items');
+    } catch (e, stackTrace) {
+      print('❌ MenuScreen: Error loading data: $e');
+      print('Stack trace: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading menu: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     } finally {
-      _isLoadingData = false;
+      if (mounted) {
+        setState(() {
+          _isLoadingData = false;
+        });
+      }
+      print('🔄 MenuScreen: Loading complete');
     }
   }
 
@@ -423,7 +458,9 @@ class _MenuScreenState extends State<MenuScreen> {
             heroTag: 'refresh',
             onPressed: () {
               print('🔄 Manual refresh triggered');
-              _isLoadingData = false; // Reset flag
+              setState(() {
+                _isLoadingData = false; // Reset flag
+              });
               _loadData();
             },
             backgroundColor: AppColors.success,
@@ -456,109 +493,129 @@ class _MenuScreenState extends State<MenuScreen> {
     final width = size.width;
 
     return Stack(
-        children: [
-          Observer(
-            builder: (_) {
-              final hasItems = restaurantCartStore.cartItems.isNotEmpty;
-              return Padding(
+      children: [
+        Observer(
+          builder: (_) {
+            final hasItems = restaurantCartStore.cartItems.isNotEmpty;
+            return Padding(
                 padding: EdgeInsets.only(top: 10, bottom: hasItems ? 80 : 0),
                 child: Column(
-              children: [
-                // Search text field
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Container(
-                            height: height * 0.04,
-                            child: TextField(
-                              textAlign: TextAlign.center,
-                              controller: _codeController,
-                              focusNode: _codehereFocusNode,
-                              readOnly: AppSettings.visualKeyboard,
-                              onTap: AppSettings.visualKeyboard? (){
-                                VisualKeyboardHelper.show(
-                                  context: context,
+                  children: [
+                    // Search text field
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Container(
+                                height: height * 0.04,
+                                child: TextField(
+                                  textAlign: TextAlign.center,
                                   controller: _codeController,
-                                  keyboardType: KeyboardType.text,
-                                );
-                              } : null,
-                              decoration: InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                  hintText: 'Code Here',
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  suffixIcon: AppSettings.visualKeyboard
-                                      ? Icon(Icons.keyboard, size: 18, color: AppColors.primary)
-                                      : null,
-                                  hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                  border: OutlineInputBorder()),
-                            )),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                            height: height * 0.04,
-                            child: TextField(
-                              textAlign: TextAlign.center,
-                              controller: _searchController,
-                              focusNode: _searchFocusNode,
-                              readOnly: AppSettings.visualKeyboard,
-                              onTap: AppSettings.visualKeyboard ? () {
-                                VisualKeyboardHelper.show(
-                                  context: context,
-                                  controller: _searchController,
-                                  keyboardType: KeyboardType.text,
-                                );
-                              } : null,
-                              decoration: InputDecoration(
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                  hintText: 'Search Items',
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  suffixIcon: AppSettings.visualKeyboard
-                                      ? Icon(Icons.keyboard, size: 18, color: AppColors.primary)
-                                      : Icon(Icons.search, size: 18, color: Colors.grey),
-                                  hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                  border: OutlineInputBorder()),
-                            )),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Collapsible Category Sections
-                Expanded(
-                  child: Observer(
-                    builder: (_) {
-                      final allCategories = categoryStore.categories;
-
-                      if (allCategories.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.category_outlined, size: 64, color: Colors.grey),
-                              SizedBox(height: 16),
-                              Text(
-                                'No Categories Found',
-                                style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500),
-                              ),
-                            ],
+                                  focusNode: _codehereFocusNode,
+                                  readOnly: AppSettings.visualKeyboard,
+                                  onTap: AppSettings.visualKeyboard? (){
+                                    VisualKeyboardHelper.show(
+                                      context: context,
+                                      controller: _codeController,
+                                      keyboardType: KeyboardType.text,
+                                    );
+                                  } : null,
+                                  decoration: InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      hintText: 'Code Here',
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      suffixIcon: AppSettings.visualKeyboard
+                                          ? Icon(Icons.keyboard, size: 18, color: AppColors.primary)
+                                          : null,
+                                      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+                                      border: OutlineInputBorder()),
+                                )),
                           ),
-                        );
-                      }
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Container(
+                                height: height * 0.04,
+                                child: TextField(
+                                  textAlign: TextAlign.center,
+                                  controller: _searchController,
+                                  focusNode: _searchFocusNode,
+                                  readOnly: AppSettings.visualKeyboard,
+                                  onTap: AppSettings.visualKeyboard ? () {
+                                    VisualKeyboardHelper.show(
+                                      context: context,
+                                      controller: _searchController,
+                                      keyboardType: KeyboardType.text,
+                                    );
+                                  } : null,
+                                  decoration: InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      hintText: 'Search Items',
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      suffixIcon: AppSettings.visualKeyboard
+                                          ? Icon(Icons.keyboard, size: 18, color: AppColors.primary)
+                                          : Icon(Icons.search, size: 18, color: Colors.grey),
+                                      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+                                      border: OutlineInputBorder()),
+                                )),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                      final allItems = itemStore.items;
-                      final visibleItems = allItems.where((item) => item.isEnabled).toList();
+                    // Collapsible Category Sections
+                    Expanded(
+                      child: _isLoadingData
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Loading menu...',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Observer(
+                        builder: (_) {
+                          final allCategories = categoryStore.categories;
 
-                      return ListView.builder(
+                          if (allCategories.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.category_outlined, size: 64, color: Colors.grey),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No Categories Found',
+                                    style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final allItems = itemStore.items;
+                          final visibleItems = allItems.where((item) => item.isEnabled).toList();
+
+                          return ListView.builder(
                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             itemCount: allCategories.length,
                             itemBuilder: (context, index) {
@@ -576,8 +633,8 @@ class _MenuScreenState extends State<MenuScreen> {
                               final searchFilteredItems = query.isEmpty
                                   ? categoryItems
                                   : categoryItems.where((item) {
-                                      return item.name.toLowerCase().contains(query.toLowerCase());
-                                    }).toList();
+                                return item.name.toLowerCase().contains(query.toLowerCase());
+                              }).toList();
 
                               // Don't show empty categories when searching
                               if (query.isNotEmpty && searchFilteredItems.isEmpty) {
@@ -658,28 +715,28 @@ class _MenuScreenState extends State<MenuScreen> {
                               );
                             },
                           );
-                    },
-                  ),
-                ),
-              ],
-            ));
-            },
-          ),
+                        },
+                      ),
+                    ),
+                  ],
+                ));
+          },
+        ),
 
-          // Fixed Cart Bar at Bottom
-          Observer(
-            builder: (_) {
-              if (restaurantCartStore.cartItems.isEmpty) return SizedBox.shrink();
-              return Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: _buildCartBar(context, size),
-              );
-            },
-          ),
-        ],
-      );
+        // Fixed Cart Bar at Bottom
+        Observer(
+          builder: (_) {
+            if (restaurantCartStore.cartItems.isEmpty) return SizedBox.shrink();
+            return Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildCartBar(context, size),
+            );
+          },
+        ),
+      ],
+    );
   }
 
   Widget _buildTabletLayout(BuildContext context, Size size) {
@@ -753,62 +810,82 @@ class _MenuScreenState extends State<MenuScreen> {
 
         // Main Content Area
         Expanded(
-          child: Stack(
+          child: _isLoadingData
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Loading menu...',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Stack(
             children: [
               Observer(
                 builder: (_) {
                   final hasItems = restaurantCartStore.cartItems.isNotEmpty;
                   return Padding(
-                    padding: EdgeInsets.only(bottom: hasItems ? 80 : 16),
-                    child: Observer(
-                  builder: (_) {
-                    final allItems = itemStore.items;
-                    var filteredItems = allItems.where((item) => item.isEnabled).toList();
+                      padding: EdgeInsets.only(bottom: hasItems ? 80 : 16),
+                      child: Observer(
+                        builder: (_) {
+                          final allItems = itemStore.items;
+                          var filteredItems = allItems.where((item) => item.isEnabled).toList();
 
-                    // Filter by category
-                    if (activeCategory != null) {
-                      filteredItems = filteredItems.where((item) => item.categoryOfItem == activeCategory).toList();
-                    }
+                          // Filter by category
+                          if (activeCategory != null) {
+                            filteredItems = filteredItems.where((item) => item.categoryOfItem == activeCategory).toList();
+                          }
 
-                    // Filter by search query
-                    if (query.isNotEmpty) {
-                      filteredItems = filteredItems.where((item) {
-                        return item.name.toLowerCase().contains(query.toLowerCase());
-                      }).toList();
-                    }
+                          // Filter by search query
+                          if (query.isNotEmpty) {
+                            filteredItems = filteredItems.where((item) {
+                              return item.name.toLowerCase().contains(query.toLowerCase());
+                            }).toList();
+                          }
 
-                    if (filteredItems.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.search_off, size: 64, color: AppColors.divider),
-                            SizedBox(height: 16),
-                            Text(
-                              'No items found',
-                              style: GoogleFonts.poppins(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                          if (filteredItems.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.search_off, size: 64, color: AppColors.divider),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No items found',
+                                    style: GoogleFonts.poppins(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return GridView.builder(
+                            padding: EdgeInsets.all(16),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.75,
                             ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return GridView.builder(
-                      padding: EdgeInsets.all(16),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 0.75,
-                      ),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (context, index) {
-                        final item = filteredItems[index];
-                        return _buildGridItemCard(item);
-                      },
-                    );
-                  },
-                  ));
+                            itemCount: filteredItems.length,
+                            itemBuilder: (context, index) {
+                              final item = filteredItems[index];
+                              return _buildGridItemCard(item);
+                            },
+                          );
+                        },
+                      ));
                 },
               ),
 
@@ -825,8 +902,8 @@ class _MenuScreenState extends State<MenuScreen> {
                 },
               ),
             ],
-          ),
-        ),
+          ), // closes Stack
+        ), // closes Expanded child (_isLoadingData ? Center : Stack)
       ],
     );
   }

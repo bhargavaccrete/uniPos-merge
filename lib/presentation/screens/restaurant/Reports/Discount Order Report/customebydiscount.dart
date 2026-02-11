@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 import 'package:unipos/util/common/currency_helper.dart';
@@ -71,6 +72,56 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
       totalDiscount += (order.Discount ?? 0.0);
     }
     return totalDiscount;
+  }
+
+  Future<void> _exportReport(List<PastOrderModel> orders, double totalDiscount) async {
+    final headers = [
+      'Bill #',
+      'Date & Time',
+      'Customer',
+      'Order Type',
+      'Total Amount',
+      'Discount',
+      'Final Amount',
+    ];
+
+    final data = orders.map((order) {
+      final netAmount = order.totalPrice - (order.Discount ?? 0);
+      return [
+        order.billNumber?.toString() ?? 'N/A',
+        ReportExportService.formatDateTime(order.orderAt),
+        order.customerName ?? 'Guest',
+        order.orderType ?? 'N/A',
+        ReportExportService.formatCurrency(order.totalPrice),
+        ReportExportService.formatCurrency(order.Discount ?? 0),
+        ReportExportService.formatCurrency(netAmount),
+      ];
+    }).toList();
+
+    final totalAmount = orders.fold<double>(0, (sum, order) => sum + order.totalPrice);
+    final finalAmount = totalAmount - totalDiscount;
+
+    String periodDisplay = 'Custom Period';
+    if (_fromDate != null && _toDate != null) {
+      periodDisplay = '${DateFormat('dd MMM yyyy').format(_fromDate!)} - ${DateFormat('dd MMM yyyy').format(_toDate!)}';
+    }
+
+    final summary = {
+      'Report Period': periodDisplay,
+      'Total Orders': orders.length.toString(),
+      'Total Amount': ReportExportService.formatCurrency(totalAmount),
+      'Total Discount': ReportExportService.formatCurrency(totalDiscount),
+      'Final Amount': ReportExportService.formatCurrency(finalAmount),
+    };
+
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'discount_orders_custom_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Discount Orders Report - $periodDisplay',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
   }
 
   // Function to  pick "From Date"
@@ -236,18 +287,16 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
                   width: width * 0.5,
                   height: height * 0.07,
                   bordercircular: 5,
-                  onTap: () {
-                     NotificationService.instance.showSuccess("Export coming soon");
-                  },
+                  onTap: () => _exportReport(discountedOrders, totalDiscountAmount),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.note_add_outlined,
+                        Icons.file_download_outlined,
                         color: Colors.white,
                       ),
                       Text(
-                        'Export To Excel',
+                        'Export Report',
                         textScaler: TextScaler.linear(1),
                         style: GoogleFonts.poppins(
                             color: Colors.white, fontWeight: FontWeight.w500),

@@ -1,14 +1,11 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -328,57 +325,78 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     }
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     if (_reportCount == 0) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    List<String> headers = ['Metric', 'Value'];
-    List<List<dynamic>> rows = [headers];
+    // Prepare main data rows
+    final dataRows = <List<dynamic>>[];
 
-    // Summary section
-    rows.add(['SALES SUMMARY', '']);
-    rows.add(['Total Sales', DecimalSettings.formatAmount(_totalSales)]);
-    rows.add(['Total Expenses', DecimalSettings.formatAmount(_totalExpenses)]);
-    rows.add(['Net Amount', DecimalSettings.formatAmount(_totalSales - _totalExpenses)]);
-    rows.add(['Reports Count', _reportCount.toString()]);
-    rows.add(['', '']);
+    // Add financial summary
+    dataRows.add(['Total Sales', ReportExportService.formatCurrency(_totalSales)]);
+    dataRows.add(['Total Expenses', ReportExportService.formatCurrency(_totalExpenses)]);
+    dataRows.add(['Net Amount', ReportExportService.formatCurrency(_totalSales - _totalExpenses)]);
+    dataRows.add(['', '']); // Empty row separator
 
-    // Order types
-    rows.add(['ORDER BREAKDOWN', '']);
+    // Add order breakdown
     for (var entry in _orderTypeTotals.entries) {
-      rows.add([
-        '${entry.key} (${_orderTypeCounts[entry.key]} orders)',
-        DecimalSettings.formatAmount(entry.value)
+      dataRows.add([
+        '${entry.key} Orders (${_orderTypeCounts[entry.key]} count)',
+        ReportExportService.formatCurrency(entry.value)
       ]);
     }
-    rows.add(['', '']);
+    dataRows.add(['', '']); // Empty row separator
 
-    // Payment types
-    rows.add(['PAYMENT BREAKDOWN', '']);
+    // Add payment breakdown
     for (var entry in _paymentTypeTotals.entries) {
-      rows.add([entry.key, DecimalSettings.formatAmount(entry.value)]);
+      dataRows.add([
+        '$entry.key} Payments',
+        ReportExportService.formatCurrency(entry.value)
+      ]);
     }
 
-    String csv = const ListToCsvConverter().convert(rows);
+    // Prepare summary
+    final periodName = _getPeriodDisplayName();
+    final summary = {
+      'Report Type': 'Daily Closing Report',
+      'Period': periodName,
+      'Days Covered': _reportCount.toString(),
+      'Total Sales': ReportExportService.formatCurrency(_totalSales),
+      'Total Expenses': ReportExportService.formatCurrency(_totalExpenses),
+      'Net Amount': ReportExportService.formatCurrency(_totalSales - _totalExpenses),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final periodName = widget.period.name;
-      final path = '${directory.path}/closing_report_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'daily_closing_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Daily Closing Report - $periodName',
+      headers: ['Description', 'Amount'],
+      data: dataRows,
+      summary: summary,
+    );
+  }
 
-      await Share.shareXFiles([XFile(path)], text: "Daily Closing Report - $periodName");
-
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case ClosingPeriod.DayWise:
+        if (_selectedDate != null) {
+          return DateFormat('dd MMM yyyy').format(_selectedDate!);
+        }
+        return 'Day Wise';
+      case ClosingPeriod.MonthWise:
+        if (_selectedMonth != null && _selectedYear != null) {
+          return '$_selectedMonth $_selectedYear';
+        }
+        return 'Month Wise';
+      case ClosingPeriod.Custom:
+        if (_fromDate != null && _toDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_fromDate!)} - ${DateFormat('dd MMM yyyy').format(_toDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 
@@ -976,10 +994,10 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: AppResponsive.iconSize(context)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.buttonFontSize(context),
             fontWeight: FontWeight.w600,

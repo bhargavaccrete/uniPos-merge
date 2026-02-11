@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:csv/csv.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -383,71 +380,54 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     );
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     final data = _calculateComparisonData();
 
-    try {
-      // Prepare CSV data
-      List<List<dynamic>> rows = [];
+    final headers = ['Metric', data.previousPeriod, data.currentPeriod, 'Growth %'];
 
-      // Header
-      rows.add(['Sales Comparison Report']);
-      rows.add(['Period', data.currentPeriod, 'vs', data.previousPeriod]);
-      rows.add([]);
-
-      // Data rows
-      rows.add(['Metric', data.previousPeriod, data.currentPeriod, 'Growth %']);
-      rows.add([
+    final dataRows = [
+      [
         'Total Orders',
-        data.previousOrders,
-        data.currentOrders,
+        data.previousOrders.toString(),
+        data.currentOrders.toString(),
         '${data.ordersGrowth >= 0 ? '+' : ''}${data.ordersGrowth.toStringAsFixed(1)}%'
-      ]);
-      rows.add([
+      ],
+      [
         'Total Amount',
-        DecimalSettings.formatAmount(data.previousAmount),
-        DecimalSettings.formatAmount(data.currentAmount),
+        ReportExportService.formatCurrency(data.previousAmount),
+        ReportExportService.formatCurrency(data.currentAmount),
         '${data.amountGrowth >= 0 ? '+' : ''}${data.amountGrowth.toStringAsFixed(1)}%'
-      ]);
-      rows.add([
+      ],
+      [
         'Average Order Value',
-        DecimalSettings.formatAmount(data.previousAOV),
-        DecimalSettings.formatAmount(data.currentAOV),
+        ReportExportService.formatCurrency(data.previousAOV),
+        ReportExportService.formatCurrency(data.currentAOV),
         '-'
-      ]);
-      rows.add([
+      ],
+      [
         'Orders Per Day',
         data.previousOrdersPerDay.toStringAsFixed(1),
         data.currentOrdersPerDay.toStringAsFixed(1),
         '-'
-      ]);
+      ],
+    ];
 
-      rows.add([]);
-      rows.add(['Performance', _getTrendLabel(data.trendCategory)]);
+    final summary = {
+      'Comparison Period': '${data.previousPeriod} vs ${data.currentPeriod}',
+      'Performance Status': _getTrendLabel(data.trendCategory),
+      'Revenue Growth': '${data.amountGrowth >= 0 ? '+' : ''}${data.amountGrowth.toStringAsFixed(1)}%',
+      'Order Growth': '${data.ordersGrowth >= 0 ? '+' : ''}${data.ordersGrowth.toStringAsFixed(1)}%',
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      // Convert to CSV
-      String csv = const ListToCsvConverter().convert(rows);
-
-      // Get temporary directory
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/sales_comparison_${DateTime.now().millisecondsSinceEpoch}.csv';
-      final file = File(path);
-
-      // Write to file
-      await file.writeAsString(csv);
-
-      // Share the file
-      await Share.shareXFiles(
-        [XFile(path)],
-        subject: 'Sales Comparison Report - ${data.currentPeriod}',
-      );
-
-      if (!mounted) return;
-      NotificationService.instance.showSuccess('Report exported successfully');
-    } catch (e) {
-      if (!mounted) return;
-      NotificationService.instance.showError('Export failed: $e');
-    }
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'sales_comparison_${data.currentPeriod.toLowerCase().replaceAll(' ', '_')}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Sales Comparison Report - ${data.previousPeriod} vs ${data.currentPeriod}',
+      headers: headers,
+      data: dataRows,
+      summary: summary,
+    );
   }
 
   @override
@@ -663,7 +643,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _exportToExcel,
+                    onPressed: _exportReport,
                     icon: const Icon(Icons.file_download_outlined),
                     label: Text(
                       'Export to Excel',

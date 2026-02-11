@@ -1,12 +1,9 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
@@ -357,41 +354,55 @@ class _ItemsDataViewState extends State<ItemsDataView> {
     return reportList;
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     if (_filteredData.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    List<String> headers = ['Item Name', 'Quantity Sold', 'Total Revenue'];
-    List<List<dynamic>> rows = [headers];
+    final headers = ['Item Name', 'Quantity Sold', 'Total Revenue'];
+    final data = _filteredData.map((item) => [
+      item.itemName,
+      item.totalQuantity.toString(),
+      ReportExportService.formatCurrency(item.totalRevenue),
+    ]).toList();
 
-    for (var item in _filteredData) {
-      rows.add([
-        item.itemName,
-        item.totalQuantity.toString(),
-        DecimalSettings.formatAmount(item.totalRevenue),
-      ]);
-    }
+    final totalItems = _filteredData.length;
+    final totalQuantity = _filteredData.fold(0, (sum, item) => sum + item.totalQuantity);
+    final totalRevenue = _filteredData.fold(0.0, (sum, item) => sum + item.totalRevenue);
 
-    String csv = const ListToCsvConverter().convert(rows);
+    final summary = {
+      'Report Period': _getPeriodDisplayName(),
+      'Total Items': totalItems.toString(),
+      'Total Quantity Sold': totalQuantity.toString(),
+      'Total Revenue': ReportExportService.formatCurrency(totalRevenue),
+    };
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final periodName = widget.period.name;
-      final path = '${directory.path}/items_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'sales_by_items_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Sales by Items Report',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
+  }
 
-      await Share.shareXFiles([XFile(path)], text: "Items Report - $periodName");
-
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case ItemPeriod.Today:
+        return 'Today';
+      case ItemPeriod.ThisWeek:
+        return 'This Week';
+      case ItemPeriod.ThisMonth:
+        return 'This Month';
+      case ItemPeriod.ThisYear:
+        return 'This Year';
+      case ItemPeriod.Custom:
+        if (_startDate != null && _endDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 
@@ -779,10 +790,10 @@ class _ItemsDataViewState extends State<ItemsDataView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: AppResponsive.iconSize(context)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.buttonFontSize(context),
             fontWeight: FontWeight.w600,

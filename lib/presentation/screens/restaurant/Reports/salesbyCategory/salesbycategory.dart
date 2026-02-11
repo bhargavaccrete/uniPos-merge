@@ -1,11 +1,7 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
@@ -14,6 +10,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 enum CategoryPeriod { Today, ThisWeek, ThisMonth, ThisYear, Custom }
 
@@ -388,41 +385,63 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     return reportList;
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     if (_filteredData.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    List<String> headers = ['Category Name', 'Items Sold', 'Total Revenue'];
-    List<List<dynamic>> rows = [headers];
+    // Prepare headers
+    final headers = ['Category Name', 'Items Sold', 'Total Revenue'];
 
-    for (var category in _filteredData) {
-      rows.add([
-        category.categoryName,
-        category.totalItemsSold.toString(),
-        DecimalSettings.formatAmount(category.totalRevenue),
-      ]);
-    }
+    // Prepare data rows
+    final data = _filteredData.map((category) => [
+      category.categoryName,
+      category.totalItemsSold.toString(),
+      ReportExportService.formatCurrency(category.totalRevenue),
+    ]).toList();
 
-    String csv = const ListToCsvConverter().convert(rows);
+    // Calculate totals
+    final totalCategories = _filteredData.length;
+    final totalItemsSold = _filteredData.fold<int>(0, (sum, cat) => sum + cat.totalItemsSold);
+    final totalRevenue = _filteredData.fold<double>(0, (sum, cat) => sum + cat.totalRevenue);
 
-    try {
-      final directory = await getTemporaryDirectory();
-      final periodName = widget.period.name;
-      final path = '${directory.path}/categories_${periodName}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
+    // Prepare summary
+    final periodName = _getPeriodDisplayName();
+    final summary = {
+      'Report Period': periodName,
+      'Total Categories': totalCategories.toString(),
+      'Total Items Sold': totalItemsSold.toString(),
+      'Total Revenue': ReportExportService.formatCurrency(totalRevenue),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      await Share.shareXFiles([XFile(path)], text: "Categories Report - $periodName");
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'sales_by_category_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Sales by Category - $periodName',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
+  }
 
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Error exporting: $e');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case CategoryPeriod.Today:
+        return 'Today';
+      case CategoryPeriod.ThisWeek:
+        return 'This Week';
+      case CategoryPeriod.ThisMonth:
+        return 'This Month';
+      case CategoryPeriod.ThisYear:
+        return 'This Year';
+      case CategoryPeriod.Custom:
+        if (_startDate != null && _endDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 
@@ -810,10 +829,10 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _exportToExcel,
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: AppResponsive.iconSize(context)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.buttonFontSize(context),
             fontWeight: FontWeight.w600,

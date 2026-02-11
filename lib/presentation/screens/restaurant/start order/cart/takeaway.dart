@@ -666,6 +666,58 @@ class _TakeawayState extends State<Takeaway> {
     }
   }
 
+  // Check if customer exists or create new customer
+  Future<RestaurantCustomer?> _getOrCreateCustomer(String name, String phone, String orderType) async {
+    try {
+      // If customer is already selected, return it
+      if (selectedCustomer != null) {
+        return selectedCustomer;
+      }
+
+      // Skip if both name and phone are empty
+      if (name.trim().isEmpty && phone.trim().isEmpty) {
+        print('ℹ️ No customer details provided, skipping customer creation');
+        return null;
+      }
+
+      // Search for existing customer by phone number (phone is more unique than name)
+      if (phone.trim().isNotEmpty) {
+        print('🔍 Searching for existing customer with phone: $phone');
+        final searchResults = await restaurantCustomerStore.searchCustomers(phone.trim());
+
+        // Check if we have an exact phone match
+        for (var customer in searchResults) {
+          if (customer.phone?.trim().toLowerCase() == phone.trim().toLowerCase()) {
+            print('✅ Found existing customer: ${customer.name} (${customer.customerId})');
+            return customer;
+          }
+        }
+        print('ℹ️ No existing customer found with phone: $phone');
+      }
+
+      // If not found and we have at least phone or name, create new customer
+      if (phone.trim().isNotEmpty || name.trim().isNotEmpty) {
+        print('➕ Creating new customer: Name=$name, Phone=$phone');
+
+        final newCustomer = RestaurantCustomer.create(
+          customerId: Uuid().v4(),
+          name: name.trim().isEmpty ? null : name.trim(),
+          phone: phone.trim().isEmpty ? null : phone.trim(),
+        );
+
+        await restaurantCustomerStore.addCustomer(newCustomer);
+        print('✅ New customer created successfully: ${newCustomer.customerId}');
+
+        return newCustomer;
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Error in _getOrCreateCustomer: $e');
+      return null;
+    }
+  }
+
   TextEditingController nameController = TextEditingController();
   TextEditingController mobileController = TextEditingController();
   TextEditingController emailController = TextEditingController();
@@ -756,6 +808,17 @@ class _TakeawayState extends State<Takeaway> {
       return; // Stop order placement
     }
 
+    // Get or create customer BEFORE creating the order so we can link them
+    final customer = await _getOrCreateCustomer(
+      nameController.text.trim(),
+      mobileController.text.trim(),
+      widget.isDineIn ? 'Dine In' : 'Take Away',
+    );
+
+    if (customer != null) {
+      print('✅ Customer linked to order: ${customer.name} (${customer.customerId})');
+    }
+
     final int newKotNumber = await orderStore.getNextKotNumber();
 
     // Generate daily order number
@@ -789,14 +852,14 @@ class _TakeawayState extends State<Takeaway> {
       kotBoundaries: [plainItems.length], // First KOT boundary at item count
       kotStatuses: {newKotNumber: 'Processing'}, // Initialize first KOT status
       orderNumber: orderNumber, // Daily order number
-      customerId: selectedCustomer?.customerId, // Link to customer
+      customerId: customer?.customerId, // Link to customer (now properly set)
     );
 
     await orderStore.addOrder(neworder);
 
-    // Update customer stats if customer is linked
-    if (selectedCustomer != null) {
-      await _updateCustomerStats(selectedCustomer!, widget.isDineIn ? 'Dine In' : 'Take Away');
+    // Update customer stats after order is created
+    if (customer != null) {
+      await _updateCustomerStats(customer, widget.isDineIn ? 'Dine In' : 'Take Away');
     }
 
     print("✅ New active order saved with Total: ${neworder.totalPrice}");

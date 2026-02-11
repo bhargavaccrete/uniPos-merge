@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:csv/csv.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 enum TopSellingPeriod { Today, ThisWeek, DayWise, MonthWise, YearWise }
 
@@ -393,7 +390,7 @@ class _TopSellingReportViewState extends State<TopSellingReportView> {
     }
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     final topSellingItems = _calculateTopSellingItems();
 
     if (topSellingItems.isEmpty) {
@@ -402,52 +399,39 @@ class _TopSellingReportViewState extends State<TopSellingReportView> {
       return;
     }
 
-    try {
-      // Prepare CSV data
-      List<List<dynamic>> rows = [];
+    // Prepare headers
+    final headers = ['Item Name', 'Quantity Sold', 'Total Revenue'];
 
-      // Header
-      rows.add(['Period', 'Item Name', 'Quantity', 'Total Amount']);
+    // Prepare data rows
+    final data = topSellingItems.map((item) => [
+      item['itemName'],
+      item['quantity'].toString(),
+      ReportExportService.formatCurrency(item['totalAmount']),
+    ]).toList();
 
-      // Data rows
-      final periodDisplay = _getPeriodDisplay();
-      for (var item in topSellingItems) {
-        rows.add([
-          periodDisplay,
-          item['itemName'],
-          item['quantity'],
-          DecimalSettings.formatAmount(item['totalAmount']),
-        ]);
-      }
+    // Calculate totals
+    final totalQuantity = topSellingItems.fold<int>(0, (sum, item) => sum + (item['quantity'] as int));
+    final totalRevenue = topSellingItems.fold<double>(0, (sum, item) => sum + (item['totalAmount'] as double));
 
-      // Summary row
-      final totalQuantity = topSellingItems.fold<int>(0, (sum, item) => sum + (item['quantity'] as int));
-      final totalRevenue = topSellingItems.fold<double>(0, (sum, item) => sum + (item['totalAmount'] as double));
-      rows.add(['', 'TOTAL', totalQuantity, DecimalSettings.formatAmount(totalRevenue)]);
+    // Prepare summary
+    final periodDisplay = _getPeriodDisplay();
+    final summary = {
+      'Report Period': periodDisplay,
+      'Total Items': topSellingItems.length.toString(),
+      'Total Quantity Sold': totalQuantity.toString(),
+      'Total Revenue': ReportExportService.formatCurrency(totalRevenue),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      // Convert to CSV
-      String csv = const ListToCsvConverter().convert(rows);
-
-      // Get temporary directory
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/top_selling_${DateTime.now().millisecondsSinceEpoch}.csv';
-      final file = File(path);
-
-      // Write to file
-      await file.writeAsString(csv);
-
-      // Share the file
-      await Share.shareXFiles(
-        [XFile(path)],
-        subject: 'Top Selling Items Report - ${_getPeriodDisplay()}',
-      );
-
-      if (!mounted) return;
-      NotificationService.instance.showSuccess('Report exported successfully');
-    } catch (e) {
-      if (!mounted) return;
-      NotificationService.instance.showError('Export failed: $e');
-    }
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'top_selling_items_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Top Selling Items - $periodDisplay',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
   }
 
   @override
@@ -593,10 +577,10 @@ class _TopSellingReportViewState extends State<TopSellingReportView> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: topSellingItems.isNotEmpty ? _exportToExcel : null,
+                    onPressed: topSellingItems.isNotEmpty ? _exportReport : null,
                     icon: const Icon(Icons.file_download_outlined),
                     label: Text(
-                      'Export to Excel',
+                      'Export Report',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.buttonFontSize(context),
                         fontWeight: FontWeight.w600,

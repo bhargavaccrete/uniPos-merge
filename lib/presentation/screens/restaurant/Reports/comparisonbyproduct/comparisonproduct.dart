@@ -2,13 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:csv/csv.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 
 enum ComparisonPeriod { Today, ThisWeek, MonthWise, YearWise }
@@ -322,77 +319,53 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     return comparisonList;
   }
 
-  Future<void> _exportToExcel() async {
+  Future<void> _exportReport() async {
     final comparisonData = _calculateComparisonData();
 
     if (comparisonData.isEmpty) {
-      if (!mounted) return;
       NotificationService.instance.showError('No data to export');
-
       return;
     }
 
-    try {
-      // Prepare CSV data
-      List<List<dynamic>> rows = [];
+    final headers = [
+      'Product Name',
+      comparisonData.first.previousLabel,
+      comparisonData.first.currentLabel,
+      'Difference',
+      'Growth %'
+    ];
 
-      // Header
-      rows.add([
-        'Product Name',
-        comparisonData.first.previousLabel,
-        comparisonData.first.currentLabel,
-        'Difference',
-        'Growth %'
-      ]);
+    final data = comparisonData.map((product) => [
+      product.productName,
+      product.previousPeriodQty.toString(),
+      product.currentPeriodQty.toString(),
+      '${product.difference > 0 ? '+' : ''}${product.difference}',
+      '${product.growthPercentage.toStringAsFixed(1)}%',
+    ]).toList();
 
-      // Data rows
-      for (var product in comparisonData) {
-        rows.add([
-          product.productName,
-          product.previousPeriodQty,
-          product.currentPeriodQty,
-          product.difference > 0 ? '+${product.difference}' : '${product.difference}',
-          '${product.growthPercentage.toStringAsFixed(1)}%',
-        ]);
-      }
+    final totalCurrent = comparisonData.fold<int>(0, (sum, p) => sum + p.currentPeriodQty);
+    final totalPrevious = comparisonData.fold<int>(0, (sum, p) => sum + p.previousPeriodQty);
+    final totalDifference = totalCurrent - totalPrevious;
+    final overallGrowth = totalPrevious > 0 ? ((totalCurrent - totalPrevious) / totalPrevious) * 100 : 0.0;
 
-      // Summary row
-      final totalCurrent = comparisonData.fold<int>(0, (sum, p) => sum + p.currentPeriodQty);
-      final totalPrevious = comparisonData.fold<int>(0, (sum, p) => sum + p.previousPeriodQty);
-      final totalDifference = totalCurrent - totalPrevious;
-      final overallGrowth = totalPrevious > 0 ? ((totalCurrent - totalPrevious) / totalPrevious) * 100 : 0.0;
+    final summary = {
+      'Comparison Period': '${comparisonData.first.previousLabel} vs ${comparisonData.first.currentLabel}',
+      'Total Products': comparisonData.length.toString(),
+      'Total Previous Period': totalPrevious.toString(),
+      'Total Current Period': totalCurrent.toString(),
+      'Total Difference': '${totalDifference > 0 ? '+' : ''}$totalDifference',
+      'Overall Growth': '${overallGrowth >= 0 ? '+' : ''}${overallGrowth.toStringAsFixed(1)}%',
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      rows.add([]);
-      rows.add(['Summary']);
-      rows.add(['Total Products', comparisonData.length]);
-      rows.add(['Total Previous', totalPrevious]);
-      rows.add(['Total Current', totalCurrent]);
-      rows.add(['Total Difference', totalDifference]);
-      rows.add(['Overall Growth', '${overallGrowth.toStringAsFixed(1)}%']);
-
-      // Convert to CSV
-      String csv = const ListToCsvConverter().convert(rows);
-
-      // Get temporary directory
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/product_comparison_${DateTime.now().millisecondsSinceEpoch}.csv';
-      final file = File(path);
-
-      // Write to file
-      await file.writeAsString(csv);
-
-      // Share the file
-      await Share.shareXFiles(
-        [XFile(path)],
-        subject: 'Product Comparison Report - ${comparisonData.first.currentLabel}',
-      );
-
-      if (!mounted) return;
-      NotificationService.instance.showSuccess('Report exported successfully');
-    } catch (e) {
-      if (!mounted) return;
-      NotificationService.instance.showError('Export failed: $e');
-    }
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'product_comparison_${comparisonData.first.currentLabel.toLowerCase().replaceAll(' ', '_')}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Product Comparison Report - ${comparisonData.first.previousLabel} vs ${comparisonData.first.currentLabel}',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
   }
 
   @override
@@ -527,7 +500,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: comparisonData.isNotEmpty ? _exportToExcel : null,
+                    onPressed: comparisonData.isNotEmpty ? _exportReport : null,
                     icon: const Icon(Icons.file_download_outlined),
                     label: Text(
                       'Export to Excel',

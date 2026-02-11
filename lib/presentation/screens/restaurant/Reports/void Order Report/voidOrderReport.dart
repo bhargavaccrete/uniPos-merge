@@ -1,10 +1,6 @@
-import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -13,6 +9,7 @@ import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 enum VoidOrderPeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -455,7 +452,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _exportToCSV,
+                  onPressed: _exportReport,
                 ),
               ),
             ),
@@ -1176,54 +1173,68 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     );
   }
 
-  Future<void> _exportToCSV() async {
-    try {
-      List<List<dynamic>> rows = [
-        ['Order ID', 'Date', 'Time', 'Amount', 'Payment Method', 'Status'],
-      ];
+  Future<void> _exportReport() async {
+    if (_voidOrders.isEmpty) {
+      NotificationService.instance.showError('No data to export');
+      return;
+    }
 
-      for (var order in _voidOrders) {
-        final orderDate = order.orderAt!;
-        final formattedDate = DateFormat('dd/MM/yyyy').format(orderDate);
-        final formattedTime = DateFormat('hh:mm a').format(orderDate);
-        final amount = double.tryParse(order.totalPrice.toString()) ?? 0.0;
+    // Prepare headers
+    final headers = [
+      'Bill #',
+      'Date & Time',
+      'Customer',
+      'Payment Method',
+      'Amount',
+      'Status'
+    ];
 
-        rows.add([
-          order.billNumber ?? 'N/A',
-          formattedDate,
-          formattedTime,
-          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(amount)}',
-          order.paymentmode ?? 'N/A',
-          'Void',
-        ]);
-      }
+    // Prepare data rows
+    final data = _voidOrders.map((order) => [
+      order.billNumber?.toString() ?? order.id.substring(0, 8),
+      ReportExportService.formatDateTime(order.orderAt),
+      order.customerName ?? 'Guest',
+      order.paymentmode ?? 'N/A',
+      ReportExportService.formatCurrency(order.totalPrice ?? 0.0),
+      'Void',
+    ]).toList();
 
-      rows.add([]);
-      rows.add(['Summary', '', '', '', '', '']);
-      rows.add(['Total Void Orders', _totalVoidCount.toString(), '', '', '', '']);
-      rows.add(['Total Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalVoidAmount)}', '', '', '', '']);
-      rows.add(['Average Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageVoidAmount)}', '', '', '', '']);
+    // Prepare summary
+    final periodName = _getPeriodDisplayName();
+    final summary = {
+      'Report Period': periodName,
+      'Total Void Orders': _totalVoidCount.toString(),
+      'Total Void Amount': ReportExportService.formatCurrency(_totalVoidAmount),
+      'Average Void Amount': ReportExportService.formatCurrency(_averageVoidAmount),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-      String csv = const ListToCsvConverter().convert(rows);
+    // Show export dialog
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'void_orders_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Void Orders Report - $periodName',
+      headers: headers,
+      data: data,
+      summary: summary,
+    );
+  }
 
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/void_orders_${DateTime.now().millisecondsSinceEpoch}.csv';
-      final file = File(path);
-      await file.writeAsString(csv);
-
-      await Share.shareXFiles(
-        [XFile(path)],
-        text: 'Void Orders Report',
-      );
-
-      if (mounted) {
-        NotificationService.instance.showSuccess('Report exported successfully');
-      }
-    } catch (e) {
-      debugPrint('Error exporting CSV: $e');
-      if (mounted) {
-        NotificationService.instance.showError('Failed to export report');
-      }
+  String _getPeriodDisplayName() {
+    switch (widget.period) {
+      case VoidOrderPeriod.Today:
+        return 'Today';
+      case VoidOrderPeriod.ThisWeek:
+        return 'This Week';
+      case VoidOrderPeriod.Month:
+        return '$_selectedMonth $_selectedMonthYear';
+      case VoidOrderPeriod.Year:
+        return '$_selectedYear';
+      case VoidOrderPeriod.Custom:
+        if (_startDate != null && _endDate != null) {
+          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
+        }
+        return 'Custom Period';
     }
   }
 }

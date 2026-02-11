@@ -407,14 +407,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                             onTap: () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings),
                             isTablet: isTablet,
                           ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.settings_rounded,
-                            title: 'Settings',
-                            color: Colors.blueGrey,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantSettings),
-                            isTablet: isTablet,
-                          ),
+
                           _buildMenuCard(
                             context: context,
                             icon: Icons.account_balance_wallet_rounded,
@@ -430,6 +423,14 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                             title: 'Inventory',
                             color: Colors.amber,
                             onTap: () => Navigator.pushNamed(context, RouteNames.restaurantInventory),
+                            isTablet: isTablet,
+                          ),
+                          _buildMenuCard(
+                            context: context,
+                            icon: Icons.settings_rounded,
+                            title: 'Settings',
+                            color: Colors.blueGrey,
+                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantSettings),
                             isTablet: isTablet,
                           ),
                           _buildMenuCard(
