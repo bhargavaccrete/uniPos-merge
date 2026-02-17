@@ -16,6 +16,7 @@ import 'util/restaurant/staticswitch.dart';
 import 'util/restaurant/print_settings.dart';
 import 'util/restaurant/order_settings.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
+import 'domain/services/restaurant/auto_backup_service.dart';
 final appStore = AppStore();
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -39,8 +40,6 @@ void main() async {
       print('🔴🔴🔴 INITIALIZATION ERROR 🔴🔴🔴');
       print('Error: $e');
       print('Stack trace: $stackTrace');
-
-      // Show error screen instead of white screen
       runApp(ErrorApp(error: e.toString()));
       return;
     }
@@ -127,21 +126,18 @@ Future<void> _initializeApp() async {
     ]);
     print('   ✅ Restaurant settings loaded');
 
+    // Start auto-backup timer (runs hourly, triggers daily backups)
+    AutoBackupService.initialize();
+    print('   ✅ Auto-backup service initialized');
 
 
-
-
-    // Start the local server with proper error handling
-    print('🌐 Step 7/7: Starting local server...');
-    try {
-      await startServer();
+    // Start local server in background — don't block app launch
+    print('🌐 Step 7/7: Starting local server (background)...');
+    startServer().then((_) {
       print('   ✅ UniPOS Local Server Started Successfully');
-    } catch (e, stackTrace) {
+    }).catchError((e) {
       print('   ⚠️  Failed to start UniPOS Local Server: $e');
-      print('   Stack trace: $stackTrace');
-      // Continue app initialization even if server fails
-      print('   ℹ️  App will continue without local server');
-    }
+    });
 
   } else if (AppConfig.isRetail) {
     print('   Loading retail settings...');

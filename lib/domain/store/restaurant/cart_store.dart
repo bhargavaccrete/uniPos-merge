@@ -69,7 +69,33 @@ abstract class _CartStore with Store {
         final actualItem = await itemStore.getItemById(item.productId);
 
         if (actualItem != null && actualItem.trackInventory == true) {
-          final availableStock = actualItem.stockQuantity;
+          double availableStock;
+
+          // ✅ FIX: For items with variants, check variant stock, not base stock
+          if (item.variantName != null && actualItem.variant != null && actualItem.variant!.isNotEmpty) {
+            // Item has variants - check variant stock
+            try {
+              await variantStore.loadVariants();
+              final itemVariant = actualItem.variant!.firstWhere(
+                (v) {
+                  final variantDetails = variantStore.variants.where((vd) => vd.id == v.variantId).firstOrNull;
+                  return variantDetails?.name == item.variantName;
+                },
+              );
+              availableStock = itemVariant.stockQuantity ?? 0;
+              print('✅ STOCK CHECK: Variant "${item.variantName}" - Available: $availableStock');
+            } catch (e) {
+              print('❌ VARIANT NOT FOUND: ${item.variantName} for ${item.title}');
+              return {
+                'success': false,
+                'message': 'Variant "${item.variantName}" not found'
+              };
+            }
+          } else {
+            // No variants - use base item stock
+            availableStock = actualItem.stockQuantity;
+            print('✅ STOCK CHECK: Base item - Available: $availableStock');
+          }
 
           // Check if item is weight-based (already validated in dialog, but double-check)
           if (!actualItem.isSoldByWeight) {
@@ -83,7 +109,10 @@ abstract class _CartStore with Store {
             }
 
             // Also check if adding this would exceed stock (if already in cart)
-            final existingItem = cartItems.where((ci) => ci.productId == item.productId).firstOrNull;
+            final existingItem = cartItems.where((ci) =>
+              ci.productId == item.productId &&
+              ci.variantName == item.variantName
+            ).firstOrNull;
             if (existingItem != null) {
               final totalNeeded = existingItem.quantity + item.quantity;
               if (totalNeeded > availableStock) {
@@ -138,7 +167,31 @@ abstract class _CartStore with Store {
         final item = await itemStore.getItemById(cartItem.productId);
 
         if (item != null && item.trackInventory == true) {
-          final availableStock = item.stockQuantity;
+          double availableStock;
+
+          // ✅ FIX: For items with variants, check variant stock, not base stock
+          if (cartItem.variantName != null && item.variant != null && item.variant!.isNotEmpty) {
+            // Item has variants - check variant stock
+            try {
+              await variantStore.loadVariants();
+              final itemVariant = item.variant!.firstWhere(
+                (v) {
+                  final variantDetails = variantStore.variants.where((vd) => vd.id == v.variantId).firstOrNull;
+                  return variantDetails?.name == cartItem.variantName;
+                },
+              );
+              availableStock = itemVariant.stockQuantity ?? 0;
+              print('✅ UPDATE QTY: Variant "${cartItem.variantName}" - Available: $availableStock, Requested: $newQuantity');
+            } catch (e) {
+              print('❌ UPDATE QTY: Variant not found: ${cartItem.variantName}');
+              NotificationService.instance.showError('Variant "${cartItem.variantName}" not found');
+              return false;
+            }
+          } else {
+            // No variants - use base item stock
+            availableStock = item.stockQuantity;
+            print('✅ UPDATE QTY: Base item - Available: $availableStock, Requested: $newQuantity');
+          }
 
           if (item.isSoldByWeight == true) {
             // WEIGHT-BASED ITEMS

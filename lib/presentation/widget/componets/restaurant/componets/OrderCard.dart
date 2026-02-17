@@ -227,7 +227,7 @@ class OrderCard extends StatelessWidget {
                                 ),
                               if (item.choiceNames != null && item.choiceNames!.isNotEmpty)
                                 Text(
-                                  'Add-ons: ${item.choiceNames!.join(', ')}',
+                                  'Choices: ${item.choiceNames!.join(', ')}',
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,
                                     color: Colors.grey.shade600,

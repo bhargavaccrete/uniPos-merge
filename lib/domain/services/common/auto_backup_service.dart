@@ -19,6 +19,9 @@ class AutoBackupService {
 
   static Timer? _timer;
 
+  /// Observable backup state — UI can listen to show a small indicator.
+  static final ValueNotifier<bool> isBackingUp = ValueNotifier(false);
+
   /// Initialize auto backup service
   static Future<void> initialize() async {
     try {
@@ -29,8 +32,8 @@ class AutoBackupService {
         _checkAndBackup();
       });
 
-      // Also check immediately on startup
-      await _checkAndBackup();
+      // Delay the startup check so the app renders first
+      Future.delayed(const Duration(seconds: 10), _checkAndBackup);
 
       debugPrint('✅ Auto Backup Service initialized for ${AppConfig.businessMode.name} mode');
     } catch (e) {
@@ -69,6 +72,19 @@ class AutoBackupService {
       }
     } catch (e) {
       debugPrint('Error setting auto backup: $e');
+    }
+  }
+
+  /// Mark today's date as backed up (without running a backup).
+  /// Call this after a successful manual/start-of-day backup.
+  static Future<void> markTodayAsBackedUp() async {
+    try {
+      final appBox = Hive.box('app_state');
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      await appBox.put(_lastBackupDateKey, today);
+      debugPrint('📅 Backup date marked as: $today');
+    } catch (e) {
+      debugPrint('❌ Failed to mark backup date: $e');
     }
   }
 
@@ -113,13 +129,15 @@ class AutoBackupService {
 
   /// Perform the actual backup (mode-aware)
   static Future<void> _performBackup() async {
+    isBackingUp.value = true;
     try {
       debugPrint('📦 Starting automatic backup for ${AppConfig.businessMode.name} mode...');
 
-      // Use UnifiedBackupService (works for both Restaurant and Retail)
+      // Auto-backup skips images to keep file size small (~1-5 MB vs 100+ MB).
+      // Images are included only in manual "Download Backup" from the drawer.
       String? filePath;
       try {
-        filePath = await UnifiedBackupService.exportToDownloads();
+        filePath = await UnifiedBackupService.exportToDownloads(includeImages: false);
       } catch (e) {
         debugPrint('❌ Unified backup failed: $e');
         return;
@@ -138,6 +156,8 @@ class AutoBackupService {
       }
     } catch (e) {
       debugPrint('❌ Automatic backup error: $e');
+    } finally {
+      isBackingUp.value = false;
     }
   }
 

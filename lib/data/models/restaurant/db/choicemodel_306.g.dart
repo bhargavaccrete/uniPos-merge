@@ -24,13 +24,14 @@ class ChoicesModelAdapter extends TypeAdapter<ChoicesModel> {
       lastEditedTime: fields[4] as DateTime?,
       editedBy: fields[5] as String?,
       editCount: fields[6] as int,
+      allowMultipleSelection: fields[7] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ChoicesModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class ChoicesModelAdapter extends TypeAdapter<ChoicesModel> {
       ..writeByte(5)
       ..write(obj.editedBy)
       ..writeByte(6)
-      ..write(obj.editCount);
+      ..write(obj.editCount)
+      ..writeByte(7)
+      ..write(obj.allowMultipleSelection);
   }
 
   @override

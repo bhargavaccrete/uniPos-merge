@@ -90,6 +90,9 @@ class PastOrderModel extends HiveObject{
   @HiveField(24)
   final double? changeReturn; // Total change to return to customer
 
+  @HiveField(25)
+  final bool? isTaxInclusive; // Whether tax was inclusive when order was created
+
   PastOrderModel({
     required this.id,
     required this.customerName,
@@ -117,6 +120,8 @@ class PastOrderModel extends HiveObject{
     this.isSplitPayment,
     this.totalPaid,
     this.changeReturn,
+    // Tax settings at order creation
+    this.isTaxInclusive,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -148,6 +153,7 @@ class PastOrderModel extends HiveObject{
     bool? isSplitPayment,
     double? totalPaid,
     double? changeReturn,
+    bool? isTaxInclusive,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -175,6 +181,7 @@ class PastOrderModel extends HiveObject{
       isSplitPayment: isSplitPayment ?? this.isSplitPayment,
       totalPaid: totalPaid ?? this.totalPaid,
       changeReturn: changeReturn ?? this.changeReturn,
+      isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
     );
   }
 
@@ -230,6 +237,7 @@ class PastOrderModel extends HiveObject{
       'isSplitPayment': isSplitPayment,
       'totalPaid': totalPaid,
       'changeReturn': changeReturn,
+      'isTaxInclusive': isTaxInclusive,
     };
   }
 
@@ -261,6 +269,7 @@ class PastOrderModel extends HiveObject{
       isSplitPayment: map['isSplitPayment'],
       totalPaid: map['totalPaid']?.toDouble(),
       changeReturn: map['changeReturn']?.toDouble(),
+      isTaxInclusive: map['isTaxInclusive'],
     );
   }
 

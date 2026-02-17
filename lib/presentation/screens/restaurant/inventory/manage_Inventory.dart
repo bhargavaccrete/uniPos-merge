@@ -11,6 +11,7 @@ import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import '../../../../util/common/currency_helper.dart';
 
 
 class ManageInventory extends StatefulWidget {
@@ -396,7 +397,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            '\$${variant.price.toStringAsFixed(2)}',
+                            '${CurrencyHelper.currentSymbol}${variant.price.toStringAsFixed(2)}',
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w700,
                               fontSize: isTablet ? 13 : 12,

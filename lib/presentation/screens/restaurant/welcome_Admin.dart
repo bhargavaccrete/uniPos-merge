@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import '../../../core/routes/routes_name.dart';
 import '../../../domain/services/common/notification_service.dart';
+import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
 
@@ -33,6 +34,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       if (balance != null) {
         // Save the opening balance to mark the day as started
         await DayManagementService.setOpeningBalance(balance);
+
+        // Ask about backup right after day is started
+        if (mounted) await StartOfDayBackupPrompt.show(context);
 
         if (mounted) {
           NotificationService.instance.showSuccess(

@@ -28,6 +28,9 @@ class ChoicesModel extends HiveObject{
   @HiveField(6)
   int editCount;
 
+  @HiveField(7)
+  bool? allowMultipleSelection; // true = can select multiple options, false/null = only one option
+
   ChoicesModel({
     required this.id,
     required this.name,
@@ -36,6 +39,7 @@ class ChoicesModel extends HiveObject{
     this.lastEditedTime,
     this.editedBy,
     this.editCount = 0,
+    this.allowMultipleSelection,
   });
 
   ChoicesModel copyWith({
@@ -46,6 +50,7 @@ class ChoicesModel extends HiveObject{
     DateTime? lastEditedTime,
     String? editedBy,
     int? editCount,
+    bool? allowMultipleSelection,
   }){
     return ChoicesModel(
       id: id?? this.id,
@@ -55,6 +60,7 @@ class ChoicesModel extends HiveObject{
       lastEditedTime: lastEditedTime ?? this.lastEditedTime,
       editedBy: editedBy ?? this.editedBy,
       editCount: editCount ?? this.editCount,
+      allowMultipleSelection: allowMultipleSelection ?? this.allowMultipleSelection,
     );
   }
 
@@ -69,6 +75,7 @@ class ChoicesModel extends HiveObject{
       'lastEditedTime': lastEditedTime?.toIso8601String(),
       'editedBy': editedBy,
       'editCount': editCount,
+      'allowMultipleSelection': allowMultipleSelection,
     };
   }
 
@@ -86,6 +93,7 @@ class ChoicesModel extends HiveObject{
       lastEditedTime: map['lastEditedTime'] != null ? DateTime.parse(map['lastEditedTime']) : null,
       editedBy: map['editedBy'],
       editCount: map['editCount'] ?? 0,
+      allowMultipleSelection: map['allowMultipleSelection'] as bool?,
     );
   }
 }

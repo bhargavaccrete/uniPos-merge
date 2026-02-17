@@ -198,10 +198,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addCategory,
         backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add,color: AppColors.white),
         label: Text(
           'Add Category',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600,color: AppColors.white),
         ),
       ),
     );
@@ -214,7 +214,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.category_outlined, size: 100, color: Colors.grey[300]),
+            Icon(Icons.category_outlined,
+                size: 100, color: Colors.grey[300]),
             const SizedBox(height: 20),
             Text(
               'No Categories Yet',

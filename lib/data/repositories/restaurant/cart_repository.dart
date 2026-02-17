@@ -45,12 +45,20 @@ class CartRepository {
       Items? inventoryItem;
 
       try {
-        // Try to find by title (item name)
-        inventoryItem = _itemBox.values.firstWhere(
-          (invItem) =>
-              invItem.name.toLowerCase().trim() ==
-              item.title.toLowerCase().trim(),
-        );
+        // ✅ FIX: Get fresh item data from Hive, not cached values
+        // First try to find by productId if available
+        if (item.productId.isNotEmpty) {
+          inventoryItem = _itemBox.get(item.productId);
+        }
+
+        // If not found by ID, try by title (item name)
+        if (inventoryItem == null) {
+          inventoryItem = _itemBox.values.firstWhere(
+            (invItem) =>
+                invItem.name.toLowerCase().trim() ==
+                item.title.toLowerCase().trim(),
+          );
+        }
       } catch (e) {
         // Item not found in inventory, allow adding (no inventory tracking)
         if (existingItem != null) {
@@ -70,13 +78,24 @@ class CartRepository {
           if (item.variantName != null && inventoryItem.variant != null) {
             // Check variant stock
             try {
+              print('🔍 CART DEBUG: Looking for variant "${item.variantName}"');
+              print('🔍 CART DEBUG: Item has ${inventoryItem.variant!.length} variants');
+
               final variant = inventoryItem.variant!.firstWhere(
-                (v) => _variantBox.get(v.variantId)?.name == item.variantName,
+                (v) {
+                  final variantDetails = _variantBox.get(v.variantId);
+                  final variantName = variantDetails?.name;
+                  print('🔍 CART DEBUG: Checking variant ID ${v.variantId}: name="$variantName", stock=${v.stockQuantity}');
+                  return variantName == item.variantName;
+                },
               );
               final availableStock = variant.stockQuantity ?? 0;
 
+              print('🔍 CART DEBUG: Found variant! Stock available: $availableStock, Requested: $finalQuantity');
+
               if (availableStock < finalQuantity) {
                 // Insufficient stock
+                print('❌ CART DEBUG: Insufficient stock!');
                 return {
                   'success': false,
                   'message':
@@ -85,7 +104,7 @@ class CartRepository {
                 };
               }
             } catch (e) {
-              print('Error checking variant stock: $e');
+              print('❌ CART DEBUG: Error checking variant stock: $e');
             }
           } else {
             // Check regular item stock

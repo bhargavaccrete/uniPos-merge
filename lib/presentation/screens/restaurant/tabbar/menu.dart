@@ -78,9 +78,9 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
-  Future<void> _loadData() async {
-    // Prevent concurrent loads
-    if (_isLoadingData) {
+  Future<void> _loadData({bool force = false}) async {
+    // Prevent concurrent loads (unless forced)
+    if (_isLoadingData && !force) {
       print('⚠️ MenuScreen: Already loading, skipping...');
       return;
     }
@@ -452,19 +452,25 @@ class _MenuScreenState extends State<MenuScreen> {
       floatingActionButton: isTablet ? null : Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // Refresh button for debugging
+          // Refresh button
           FloatingActionButton(
             mini: true,
             heroTag: 'refresh',
-            onPressed: () {
+            onPressed: _isLoadingData ? null : () async {
               print('🔄 Manual refresh triggered');
-              setState(() {
-                _isLoadingData = false; // Reset flag
-              });
-              _loadData();
+              await _loadData(force: true);
             },
-            backgroundColor: AppColors.success,
-            child: Icon(Icons.refresh, color: Colors.white, size: 20),
+            backgroundColor: _isLoadingData ? AppColors.success.withOpacity(0.5) : AppColors.success,
+            child: _isLoadingData
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Icon(Icons.refresh, color: Colors.white, size: 20),
           ),
           SizedBox(height: 10),
           Observer(
@@ -948,86 +954,94 @@ class _MenuScreenState extends State<MenuScreen> {
     final stockStatus = _getStockStatus(item);
     final isDisabled = stockStatus == StockStatus.outOfStock;
 
-    return GestureDetector(
-      onTap: isDisabled ? null : () => _handleItemTap(item),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDisabled ? AppColors.surfaceMedium.withOpacity(0.5) : AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isDisabled ? AppColors.divider : AppColors.divider.withOpacity(0.5)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Item Image
-            Expanded(
-              flex: 3,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMedium,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Center(
-                  child: _buildItemImageForGrid(item),
-                ),
-              ),
-            ),
+    return ValueListenableBuilder<Map<String, bool>>(
+      valueListenable: AppSettings.settingsNotifier,
+      builder: (context, _, __) {
+        final showImage = AppSettings.showItemImage;
+        final showPrice = AppSettings.showItemPrice;
 
-            // Item Details
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      item.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary,
+        return GestureDetector(
+          onTap: isDisabled ? null : () => _handleItemTap(item),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDisabled ? AppColors.surfaceMedium.withOpacity(0.5) : AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDisabled ? AppColors.divider : AppColors.divider.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Item Image — conditionally shown
+                if (showImage)
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMedium,
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                       ),
+                      child: Center(child: _buildItemImageForGrid(item)),
                     ),
-                    Row(
+                  ),
+
+                // Item Details
+                Expanded(
+                  flex: showImage ? 2 : 1,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _getPriceDisplayForGrid(item),
+                          item.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary,
                           ),
                         ),
-                        if (!isDisabled)
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.add, color: AppColors.white, size: 16),
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (showPrice)
+                              Text(
+                                _getPriceDisplayForGrid(item),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            if (!isDisabled)
+                              Container(
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(Icons.add, color: AppColors.white, size: 16),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -1167,55 +1181,69 @@ class _ItemListTileState extends State<_ItemListTile> {
     final stockStatus = widget.getStockStatus(widget.item);
     final isDisabled = stockStatus == StockStatus.outOfStock;
 
-    return GestureDetector(
-      onTapDown: isDisabled ? null : (_) => setState(() => _isPressed = true),
-      onTapUp: isDisabled ? null : (_) { setState(() => _isPressed = false); widget.onTap(); },
-      onTapCancel: isDisabled ? null : () => setState(() => _isPressed = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.all(14),
-        transform: Matrix4.identity()..scale(_isPressed ? 0.98 : 1.0),
-        decoration: BoxDecoration(
-          color: _isPressed ? AppColors.primary.withOpacity(0.08) : isDisabled ? AppColors.surfaceMedium.withOpacity(0.5) : AppColors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _isPressed ? AppColors.primary.withOpacity(0.3) : isDisabled ? AppColors.divider : AppColors.divider.withOpacity(0.5)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 58, height: 58,
-              decoration: BoxDecoration(color: AppColors.surfaceMedium, borderRadius: BorderRadius.circular(12)),
-              child: ClipRRect(borderRadius: BorderRadius.circular(12), child: _buildItemImage()),
+    return ValueListenableBuilder<Map<String, bool>>(
+      valueListenable: AppSettings.settingsNotifier,
+      builder: (context, _, __) {
+        final showImage = AppSettings.showItemImage;
+        final showPrice = AppSettings.showItemPrice;
+
+        return GestureDetector(
+          onTapDown: isDisabled ? null : (_) => setState(() => _isPressed = true),
+          onTapUp: isDisabled ? null : (_) { setState(() => _isPressed = false); widget.onTap(); },
+          onTapCancel: isDisabled ? null : () => setState(() => _isPressed = false),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.all(14),
+            transform: Matrix4.identity()..scale(_isPressed ? 0.98 : 1.0),
+            decoration: BoxDecoration(
+              color: _isPressed ? AppColors.primary.withOpacity(0.08) : isDisabled ? AppColors.surfaceMedium.withOpacity(0.5) : AppColors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _isPressed ? AppColors.primary.withOpacity(0.3) : isDisabled ? AppColors.divider : AppColors.divider.withOpacity(0.5)),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary)),
-                  const SizedBox(height: 6),
-                  Row(
+            child: Row(
+              children: [
+                if (showImage) ...[
+                  Container(
+                    width: 58, height: 58,
+                    decoration: BoxDecoration(color: AppColors.surfaceMedium, borderRadius: BorderRadius.circular(12)),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(12), child: _buildItemImage()),
+                  ),
+                  const SizedBox(width: 14),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_getPriceDisplay(), style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                      if (widget.item.trackInventory) ...[const SizedBox(width: 10), _buildStockBadge(stockStatus)],
+                      Text(widget.item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          if (showPrice)
+                            Text(_getPriceDisplay(), style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                          if (widget.item.trackInventory) ...[
+                            if (showPrice) const SizedBox(width: 10),
+                            _buildStockBadge(stockStatus),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            if (!isDisabled)
-              Container(
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [AppColors.primary, AppColors.primary]),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
                 ),
-                child: const Icon(Icons.add_rounded, color: AppColors.white, size: 20),
-              ),
-          ],
-        ),
-      ),
+                if (!isDisabled)
+                  Container(
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [AppColors.primary, AppColors.primary]),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
+                    ),
+                    child: const Icon(Icons.add_rounded, color: AppColors.white, size: 20),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

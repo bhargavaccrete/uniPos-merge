@@ -205,9 +205,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
     for (int i = 0; i < data.allVariants.length; i++) {
       if (_variantCheckedList[i]) {
         final priceText = _variantPriceControllers[i].text.trim();
+        final variantId = data.allVariants[i].id;
+
+        // ✅ FIX: Preserve existing stock quantities when editing
+        // Find the existing variant with this variantId to preserve stock data
+        final existingVariant = widget.items.variant?.firstWhere(
+          (v) => v.variantId == variantId,
+          orElse: () => ItemVariante(
+            variantId: variantId,
+            price: 0.0,
+            trackInventory: null,
+            stockQuantity: null,
+          ),
+        );
+
         selectedVariants.add(ItemVariante(
-            variantId: data.allVariants[i].id,
-            price: double.tryParse(priceText) ?? 0.0));
+            variantId: variantId,
+            price: double.tryParse(priceText) ?? 0.0,
+            trackInventory: existingVariant?.trackInventory,
+            stockQuantity: existingVariant?.stockQuantity));
       }
     }
 

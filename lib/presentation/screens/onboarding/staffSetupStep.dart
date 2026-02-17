@@ -208,7 +208,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.person_add, color: AppColors.primary, size: 20),
+                    Icon(Icons.person_add, color: AppColors.primary, size: 20,),
                     const SizedBox(width: 8),
                     Text(
                       'Add Staff Member',
@@ -417,7 +417,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: _addStaff,
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(Icons.add,color: AppColors.white),
                     label: const Text('Add Staff Member',style: TextStyle(color: AppColors.white),),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,

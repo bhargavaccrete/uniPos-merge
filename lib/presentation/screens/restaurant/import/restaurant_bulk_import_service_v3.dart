@@ -118,8 +118,8 @@ class RestaurantBulkImportServiceV3 {
     _addTextRow(sheet, row++, ['🔧 Variants: Available sizes (Small, Medium, Large)']);
     _addTextRow(sheet, row++, ['➕ Extras: Customization groups (Toppings, Sauces)']);
     _addTextRow(sheet, row++, ['🧀 Toppings: Individual toppings with prices']);
-    _addTextRow(sheet, row++, ['🎯 Choices: Selection options (Crust Type, Spice Level)']);
-    _addTextRow(sheet, row++, ['✅ ChoiceOptions: Available choices (Thin Crust, Thick Crust)']);
+    _addTextRow(sheet, row++, ['🎯 Choices: Selection options with available choices listed']);
+    _addTextRow(sheet, row++, ['✅ ChoiceOptions: Individual choice options (auto-linked to choices)']);
     row++;
 
     // Tips
@@ -207,16 +207,43 @@ class RestaurantBulkImportServiceV3 {
 
   void _createChoicesSheet(Excel excel) {
     var sheet = excel[SHEET_CHOICES];
-    _addHeader(sheet, 0, ['id', 'name']);
-    _addRow(sheet, 1, ['choice_crust', 'Crust Type']);
-    _addRow(sheet, 2, ['choice_spice', 'Spice Level']);
+    _addHeader(sheet, 0, ['id', 'name', 'allowMultiple', 'options']);
+
+    // Instructions row
+    _addInstructionRow(sheet, 1, [
+      'Unique ID (e.g., choice_crust)',
+      'Choice name (e.g., Crust Type)',
+      'Yes = multiple selections, No = single selection only',
+      'Available options (e.g., Thin, Thick, Stuffed)'
+    ]);
+
+    // Sample data with options listed
+    _addRow(sheet, 2, ['choice_crust', 'Crust Type', 'No', 'Thin Crust, Thick Crust, Stuffed Crust']);
+    _addRow(sheet, 3, ['choice_spice', 'Spice Level', 'No', 'Mild, Medium, Hot, Extra Hot']);
+    _addRow(sheet, 4, ['choice_toppings', 'Extra Toppings', 'Yes', 'Cheese, Olives, Pepperoni, Mushrooms']);
   }
 
   void _createChoiceOptionsSheet(Excel excel) {
     var sheet = excel[SHEET_CHOICE_OPTIONS];
     _addHeader(sheet, 0, ['choiceId', 'id', 'name']);
-    _addRow(sheet, 1, ['choice_crust', 'opt_thin', 'Thin Crust']);
-    _addRow(sheet, 2, ['choice_crust', 'opt_thick', 'Thick Crust']);
+
+    // Instructions row
+    _addInstructionRow(sheet, 1, [
+      'Must match choice ID from Choices sheet',
+      'Unique option ID (e.g., opt_thin)',
+      'Display name (e.g., Thin Crust)'
+    ]);
+
+    // Sample data - Crust options
+    _addRow(sheet, 2, ['choice_crust', 'opt_thin', 'Thin Crust']);
+    _addRow(sheet, 3, ['choice_crust', 'opt_thick', 'Thick Crust']);
+    _addRow(sheet, 4, ['choice_crust', 'opt_stuffed', 'Stuffed Crust']);
+
+    // Sample data - Spice options
+    _addRow(sheet, 5, ['choice_spice', 'opt_mild', 'Mild']);
+    _addRow(sheet, 6, ['choice_spice', 'opt_medium', 'Medium']);
+    _addRow(sheet, 7, ['choice_spice', 'opt_hot', 'Hot']);
+    _addRow(sheet, 8, ['choice_spice', 'opt_extra_hot', 'Extra Hot']);
   }
 
   /// Enhanced Items sheet with CategoryName and ImageURL - USER FRIENDLY VERSION
@@ -922,9 +949,10 @@ class RestaurantBulkImportServiceV3 {
   }
 
   Future<void> _importChoices(List<List<dynamic>>? rows, ImportResultV3 result) async {
-    if (rows == null || rows.length < 2) return;
+    if (rows == null || rows.length < 3) return; // Need at least: header + instruction + 1 data row
 
-    for (int i = 1; i < rows.length; i++) {
+    // Start from row 2 to skip the instruction row (row 1)
+    for (int i = 2; i < rows.length; i++) {
       try {
         var row = rows[i];
         if (row.isEmpty || _getValue(row, 0).isEmpty) continue;
@@ -936,11 +964,16 @@ class RestaurantBulkImportServiceV3 {
           continue;
         }
 
+        // Read allowMultiple field (column 2)
+        final allowMultipleStr = _getValue(row, 2);
+        final allowMultiple = _parseBool(allowMultipleStr, false);
+
         ChoicesModel choice = ChoicesModel(
           id: id,
           name: _getValue(row, 1),
           choiceOption: [],
           createdTime: DateTime.now(),
+          allowMultipleSelection: allowMultiple,
         );
 
         final success = await choiceStore.addChoice(choice);
@@ -955,11 +988,12 @@ class RestaurantBulkImportServiceV3 {
   }
 
   Future<void> _importChoiceOptions(List<List<dynamic>>? rows, ImportResultV3 result) async {
-    if (rows == null || rows.length < 2) return;
+    if (rows == null || rows.length < 3) return; // Need at least: header + instruction + 1 data row
 
     Map<String, List<List<dynamic>>> optionGroups = {};
 
-    for (int i = 1; i < rows.length; i++) {
+    // Start from row 2 to skip the instruction row (row 1)
+    for (int i = 2; i < rows.length; i++) {
       var row = rows[i];
       if (row.isEmpty) continue;
 
@@ -974,9 +1008,12 @@ class RestaurantBulkImportServiceV3 {
       try {
         var choice = _choiceCache[choiceId];
         if (choice == null) {
-          result.errors.add('Choice $choiceId not found for options');
+          result.errors.add('Choice "$choiceId" not found for options. Make sure the choice ID exists in Choices sheet.');
+          print('❌ Choice "$choiceId" not found. Available choices: ${_choiceCache.keys.join(", ")}');
           continue;
         }
+
+        print('✅ Found choice "$choiceId" (${choice.name}), adding ${optionGroups[choiceId]!.length} options');
 
         List<ChoiceOption> options = choice.choiceOption.toList();
 
@@ -993,7 +1030,17 @@ class RestaurantBulkImportServiceV3 {
           result.choiceOptionsImported++;
         }
 
-        var updatedChoice = choice.copyWith(option: options);
+        // Create new ChoicesModel with updated options
+        var updatedChoice = ChoicesModel(
+          id: choice.id,
+          name: choice.name,
+          choiceOption: options,
+          createdTime: choice.createdTime,
+          lastEditedTime: DateTime.now(),
+          editedBy: 'BulkImport',
+          editCount: choice.editCount + 1,
+          allowMultipleSelection: choice.allowMultipleSelection, // Preserve the selection type
+        );
         await choiceStore.updateChoice(updatedChoice);
         _choiceCache[choiceId] = updatedChoice;
       } catch (e) {

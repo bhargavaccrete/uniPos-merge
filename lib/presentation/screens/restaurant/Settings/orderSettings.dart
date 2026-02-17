@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 import '../../../../util/restaurant/order_settings.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -36,9 +37,6 @@ class _orderSettingsState extends State<Ordersettings> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -48,7 +46,7 @@ class _orderSettingsState extends State<Ordersettings> {
         title: Text(
           'Order Settings',
           style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
+            fontSize: AppResponsive.headingFontSize(context),
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
@@ -56,29 +54,29 @@ class _orderSettingsState extends State<Ordersettings> {
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
-              vertical: 8,
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: AppResponsive.smallSpacing(context),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(isTablet ? 10 : 8),
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                   ),
                   child: Icon(
                     Icons.person,
-                    size: isTablet ? 22 : 20,
+                    size: AppResponsive.iconSize(context),
                     color: AppColors.primary,
                   ),
                 ),
-                if (isTablet) ...[
-                  SizedBox(width: 10),
+                if (AppResponsive.isTablet(context) || AppResponsive.isDesktop(context)) ...[
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Text(
                     'Admin',
                     style: GoogleFonts.poppins(
-                      fontSize: 15,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w500,
                       color: Colors.black87,
                     ),
@@ -93,45 +91,94 @@ class _orderSettingsState extends State<Ordersettings> {
         children: [
           // Filter Section
           Container(
-            color: Colors.white,
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
-            child: Row(
-              children: [
-                Filterbutton(
-                  title: 'Take Away',
-                  selectedFilter: selectedFilter,
-                  onpressed: () {
-                    setState(() {
-                      selectedFilter = "Take Away";
-                    });
-                  },
-                ),
-                SizedBox(width: 8),
-                Filterbutton(
-                  title: 'dine in',
-                  selectedFilter: selectedFilter,
-                  onpressed: () {
-                    setState(() {
-                      selectedFilter = "dine in";
-                    });
-                  },
-                ),
-                SizedBox(width: 8),
-                Filterbutton(
-                  title: 'Home Delivery',
-                  selectedFilter: selectedFilter,
-                  onpressed: () {
-                    setState(() {
-                      selectedFilter = "Home Delivery";
-                    });
-                  },
+            width: double.infinity,
+            padding: AppResponsive.padding(context),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: AppResponsive.shadowBlurRadius(context),
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
+            child: AppResponsive.isDesktop(context)
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Filterbutton(
+                        title: 'Take Away',
+                        selectedFilter: selectedFilter,
+                        onpressed: () {
+                          setState(() {
+                            selectedFilter = "Take Away";
+                          });
+                        },
+                      ),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
+                      Filterbutton(
+                        title: 'dine in',
+                        selectedFilter: selectedFilter,
+                        onpressed: () {
+                          setState(() {
+                            selectedFilter = "dine in";
+                          });
+                        },
+                      ),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
+                      Filterbutton(
+                        title: 'Home Delivery',
+                        selectedFilter: selectedFilter,
+                        onpressed: () {
+                          setState(() {
+                            selectedFilter = "Home Delivery";
+                          });
+                        },
+                      ),
+                    ],
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Filterbutton(
+                          title: 'Take Away',
+                          selectedFilter: selectedFilter,
+                          onpressed: () {
+                            setState(() {
+                              selectedFilter = "Take Away";
+                            });
+                          },
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        Filterbutton(
+                          title: 'dine in',
+                          selectedFilter: selectedFilter,
+                          onpressed: () {
+                            setState(() {
+                              selectedFilter = "dine in";
+                            });
+                          },
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        Filterbutton(
+                          title: 'Home Delivery',
+                          selectedFilter: selectedFilter,
+                          onpressed: () {
+                            setState(() {
+                              selectedFilter = "Home Delivery";
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              padding: AppResponsive.screenPadding(context),
               child: _getBody(),
             ),
           ),
@@ -144,16 +191,16 @@ class _orderSettingsState extends State<Ordersettings> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: Offset(0, 2),
           ),
         ],
       ),
-      padding: EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       child: Column(
         children: [
           ValueListenableBuilder<bool>(
@@ -169,7 +216,7 @@ class _orderSettingsState extends State<Ordersettings> {
               );
             },
           ),
-          SizedBox(height: 16),
+          AppResponsive.verticalSpace(context, size: SpacingSize.medium),
           ValueListenableBuilder<bool>(
             valueListenable: OrderSettings.showTakeAwayDialogNotifier,
             builder: (context, showDialog, child) {
@@ -192,16 +239,16 @@ class _orderSettingsState extends State<Ordersettings> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: Offset(0, 2),
           ),
         ],
       ),
-      padding: EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       child: Column(
         children: [
           ValueListenableBuilder<bool>(
@@ -217,7 +264,7 @@ class _orderSettingsState extends State<Ordersettings> {
               );
             },
           ),
-          SizedBox(height: 16),
+          AppResponsive.verticalSpace(context, size: SpacingSize.medium),
           ValueListenableBuilder<bool>(
             valueListenable: OrderSettings.showDineInDialogNotifier,
             builder: (context, showDialog, child) {
@@ -240,16 +287,16 @@ class _orderSettingsState extends State<Ordersettings> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: Offset(0, 2),
           ),
         ],
       ),
-      padding: EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       child: Column(
         children: [
           ValueListenableBuilder<bool>(

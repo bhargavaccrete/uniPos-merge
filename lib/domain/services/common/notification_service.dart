@@ -49,14 +49,14 @@ class NotificationService {
 
   // Method to add a new notification
   void show(
-    String message, {
-    Color? color,
-    NotificationType type = NotificationType.info,
-    IconData? icon,
-    Duration duration = const Duration(seconds: 3),
-    VoidCallback? onTap,
-    bool dismissible = true,
-  }) {
+      String message, {
+        Color? color,
+        NotificationType type = NotificationType.info,
+        IconData? icon,
+        Duration duration = const Duration(seconds: 3),
+        VoidCallback? onTap,
+        bool dismissible = true,
+      }) {
     // Determine color based on type if not provided
     color ??= _getColorForType(type);
     icon ??= _getIconForType(type);
@@ -130,7 +130,7 @@ class NotificationService {
       // Animate the removal from the list
       listKey.currentState?.removeItem(
         index,
-        (context, animation) => buildNotificationItem(removedItem, animation),
+            (context, animation) => buildNotificationItem(removedItem, animation),
         duration: const Duration(milliseconds: 300),
       );
     }
@@ -148,7 +148,7 @@ class NotificationService {
       final removedItem = _notifications.removeAt(i);
       listKey.currentState?.removeItem(
         i,
-        (context, animation) => buildNotificationItem(removedItem, animation),
+            (context, animation) => buildNotificationItem(removedItem, animation),
         duration: const Duration(milliseconds: 200),
       );
     }
@@ -348,35 +348,6 @@ class NotificationOverlay extends StatefulWidget {
 }
 
 class _NotificationOverlayState extends State<NotificationOverlay> {
-  bool _isIgnoring = true; // Start with ignoring enabled (no notifications)
-
-  @override
-  void initState() {
-    super.initState();
-    // Listen to notification changes
-    _updateIgnoringState();
-  }
-
-  @override
-  void didUpdateWidget(NotificationOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _updateIgnoringState();
-  }
-
-  void _updateIgnoringState() {
-    // Update the state whenever we rebuild
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final hasNotifications = widget.service.notifications.isNotEmpty;
-        if (_isIgnoring == hasNotifications) {
-          setState(() {
-            _isIgnoring = !hasNotifications;
-          });
-        }
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -384,29 +355,29 @@ class _NotificationOverlayState extends State<NotificationOverlay> {
         // Your main screen content
         widget.child,
 
-        // The notification list on top - Positioned with IgnorePointer inside
+        // The notification list on top - allows touches to pass through to content below
         Positioned(
           top: MediaQuery.of(context).padding.top + 16,
           left: 0,
           right: 0,
           child: IgnorePointer(
-            ignoring: _isIgnoring,
+            ignoring: true,
             child: AnimatedList(
               key: widget.service.listKey,
               initialItemCount: widget.service.notifications.length,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemBuilder: (context, index, animation) {
-                // Update ignoring state when list changes
-                _updateIgnoringState();
-
                 if (index >= widget.service.notifications.length) {
                   return const SizedBox.shrink();
                 }
                 // Get the specific notification
                 final notification = widget.service.notifications[index];
-                // Build the animated item
-                return widget.service.buildNotificationItem(notification, animation);
+                // Build the animated item with its own touch handling
+                return IgnorePointer(
+                  ignoring: false,
+                  child: widget.service.buildNotificationItem(notification, animation),
+                );
               },
             ),
           ),

@@ -631,13 +631,28 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             SizedBox(height: 12),
             ...choiceGroup.choiceOption.map((option) {
               final isSelected = _selectedChoices.contains(option);
+              final allowMultiple = choiceGroup.allowMultipleSelection ?? false;
+
               return GestureDetector(
                 onTap: () {
                   setState(() {
-                    if (isSelected) {
-                      _selectedChoices.remove(option);
+                    if (allowMultiple) {
+                      // Multiple selection allowed - toggle checkbox
+                      if (isSelected) {
+                        _selectedChoices.remove(option);
+                      } else {
+                        _selectedChoices.add(option);
+                      }
                     } else {
-                      _selectedChoices.add(option);
+                      // Single selection only - behave like radio button
+                      // Remove all other options from this choice group first
+                      _selectedChoices.removeWhere((selected) =>
+                        choiceGroup.choiceOption.any((opt) => opt.id == selected.id)
+                      );
+                      // Then add the selected option
+                      if (!isSelected) {
+                        _selectedChoices.add(option);
+                      }
                     }
                     _recalculateTotal();
                   });
@@ -659,7 +674,8 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                         width: 20,
                         height: 20,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
+                          // Radio button (circle) for single select, checkbox (square) for multi-select
+                          borderRadius: BorderRadius.circular(allowMultiple ? 4 : 10),
                           border: Border.all(
                             color: isSelected ? AppColors.primary : AppColors.divider,
                             width: 2,
@@ -667,7 +683,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                           color: isSelected ? AppColors.primary : Colors.transparent,
                         ),
                         child: isSelected
-                            ? Icon(Icons.check, size: 14, color: AppColors.white)
+                            ? Icon(
+                                allowMultiple ? Icons.check : Icons.circle,
+                                size: allowMultiple ? 14 : 10,
+                                color: AppColors.white,
+                              )
                             : null,
                       ),
                       SizedBox(width: 14),

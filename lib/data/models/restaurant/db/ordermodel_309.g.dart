@@ -48,13 +48,14 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       isSplitPayment: fields[28] as bool?,
       totalPaid: fields[29] as double?,
       changeReturn: fields[30] as double?,
+      isTaxInclusive: fields[31] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, OrderModel obj) {
     writer
-      ..writeByte(31)
+      ..writeByte(32)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -116,7 +117,9 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       ..writeByte(29)
       ..write(obj.totalPaid)
       ..writeByte(30)
-      ..write(obj.changeReturn);
+      ..write(obj.changeReturn)
+      ..writeByte(31)
+      ..write(obj.isTaxInclusive);
   }
 
   @override

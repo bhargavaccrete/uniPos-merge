@@ -499,7 +499,7 @@ class _TakeawayState extends State<Takeaway> {
                     SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Add-ons: ${item.choiceNames!.join(', ')}',
+                        'Choices: ${item.choiceNames!.join(', ')}',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -584,7 +584,7 @@ class _TakeawayState extends State<Takeaway> {
                       }
                     }).join(', ');
 
-                    return Text('extra : $extrasText');
+                    return Text('Extra : $extrasText');
                   },
                 ),
               ),
@@ -853,6 +853,7 @@ class _TakeawayState extends State<Takeaway> {
       kotStatuses: {newKotNumber: 'Processing'}, // Initialize first KOT status
       orderNumber: orderNumber, // Daily order number
       customerId: customer?.customerId, // Link to customer (now properly set)
+      isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
     );
 
     await orderStore.addOrder(neworder);
@@ -1002,6 +1003,14 @@ class _TakeawayState extends State<Takeaway> {
       print('   Items count: ${updateOrder.items.length}');
 
       await orderStore.updateOrder(updateOrder);
+
+      // Deduct stock for newly added items only
+      if (hasNewItems) {
+        // Extract only the newly added items (items after the previous count)
+        final newlyAddedItems = plainItems.skip(previousItemCount).toList();
+        await InventoryService.deductStockForOrder(newlyAddedItems);
+        print("✅ Stock deducted for ${newlyAddedItems.length} newly added items");
+      }
 
       // Broadcast update to KDS via WebSocket
       if (hasNewItems && newKotNumber != null) {
@@ -1995,6 +2004,7 @@ class _TakeawayState extends State<Takeaway> {
       kotNumbers: activeModel.kotNumbers, // Always present in new orders
       kotBoundaries: activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
+      isTaxInclusive: activeModel.isTaxInclusive, // Use stored tax mode from active order
     );
 
     await pastOrderStore.addOrder(pastOrder);
@@ -2101,6 +2111,7 @@ class _TakeawayState extends State<Takeaway> {
       kotNumbers: [quickSettleKotNumber],
       kotBoundaries: [plainItems.length], // Single KOT with all items
       billNumber: billNumber, // Daily bill number (resets every day)
+      isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
     );
 
     // 1. Add the completed order to history

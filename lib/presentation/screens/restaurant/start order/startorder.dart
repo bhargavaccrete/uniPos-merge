@@ -5,6 +5,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../util/color.dart';
 import '../../../widget/componets/restaurant/componets/drawer.dart';
+import '../../../../domain/services/common/auto_backup_service.dart';
 import '../tabbar/menu.dart';
 import '../tabbar/order.dart';
 import '../tabbar/table.dart';
@@ -277,6 +278,17 @@ class _StartorderState extends State<Startorder>
       drawer: Drawerr(),
       body: Column(
         children: [
+          // Auto-backup progress indicator — thin bar at the very top
+          ValueListenableBuilder<bool>(
+            valueListenable: AutoBackupService.isBackingUp,
+            builder: (_, backing, __) => backing
+                ? LinearProgressIndicator(
+                    minHeight: 3,
+                    backgroundColor: Colors.transparent,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
+                  )
+                : const SizedBox.shrink(),
+          ),
           // Header
           Container(
             padding: EdgeInsets.fromLTRB(20, 16, 20, 16),

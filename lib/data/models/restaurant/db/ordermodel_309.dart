@@ -103,6 +103,9 @@ class OrderModel extends HiveObject {
   @HiveField(30)
   final double? changeReturn; // Total change to return to customer
 
+  @HiveField(31)
+  final bool? isTaxInclusive; // Whether tax was inclusive when order was created
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -138,6 +141,8 @@ class OrderModel extends HiveObject {
     this.isSplitPayment,
     this.totalPaid,
     this.changeReturn,
+    // Tax settings at order creation
+    this.isTaxInclusive,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -175,6 +180,7 @@ class OrderModel extends HiveObject {
     bool? isSplitPayment,
     double? totalPaid,
     double? changeReturn,
+    bool? isTaxInclusive,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -208,6 +214,7 @@ class OrderModel extends HiveObject {
       isSplitPayment: isSplitPayment ?? this.isSplitPayment,
       totalPaid: totalPaid ?? this.totalPaid,
       changeReturn: changeReturn ?? this.changeReturn,
+      isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
     );
   }
 
@@ -287,6 +294,7 @@ class OrderModel extends HiveObject {
       'isSplitPayment': isSplitPayment,
       'totalPaid': totalPaid,
       'changeReturn': changeReturn,
+      'isTaxInclusive': isTaxInclusive,
     };
   }
 
@@ -341,6 +349,7 @@ class OrderModel extends HiveObject {
       isSplitPayment: map['isSplitPayment'] as bool?,
       totalPaid: map['totalPaid'] != null ? (map['totalPaid'] as num).toDouble() : null,
       changeReturn: map['changeReturn'] != null ? (map['changeReturn'] as num).toDouble() : null,
+      isTaxInclusive: map['isTaxInclusive'] as bool?,
     );
   }
 

@@ -449,7 +449,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                                                   SizedBox(width: 4),
                                                   Expanded(
                                                     child: Text(
-                                                      'Add-ons: ${it.choiceNames!.join(", ")}',
+                                                      'Choices: ${it.choiceNames!.join(", ")}',
                                                       style: GoogleFonts.poppins(
                                                         fontSize: 11,
                                                         color: Colors.blue.shade900,
@@ -610,6 +610,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         serviceChargePercentage: 0, // Not stored in pastOrderModel
         deliveryCharge: 0, // Not stored in pastOrderModel
         isDeliveryOrder: isDelivery,
+        isTaxInclusive: currentOrder.isTaxInclusive, // Use stored tax mode from order
       );
 
       // Print using RestaurantPrintHelper

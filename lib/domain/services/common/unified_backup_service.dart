@@ -3,12 +3,14 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb, compute;
 import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/core/config/app_config.dart';
+import 'package:unipos/domain/services/common/backup_encryption_service.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/core/init/hive_init.dart';
@@ -75,6 +77,33 @@ import 'package:unipos/data/models/retail/hive_model/billing_tab_model_173.dart'
 /// - Auto-save to Downloads or custom folder
 /// - Import with automatic mode detection
 /// - Complete data backup including EOD and Expenses
+
+// Top-level functions — must be outside the class for compute() to use them.
+
+// Serialises data map to JSON string in a background isolate.
+String _jsonEncodeMap(Map<String, dynamic> data) => jsonEncode(data);
+
+// Decodes a ZIP file (CPU-heavy) in a background isolate. Returns file entries
+// as list of {name, bytes} maps — only data/meta/enc/item_img/prod_img files.
+List<Map<String, dynamic>> _decodeZipInIsolate(List<int> zipBytes) {
+  final archive = ZipDecoder().decodeBytes(zipBytes);
+  return archive
+      .where((f) => f.content != null)
+      .map((f) => {'name': f.name, 'bytes': f.content as List<int>})
+      .toList();
+}
+
+// Encodes a list of {name, bytes} entries into a ZIP Uint8List in a separate isolate.
+Uint8List? _encodeArchiveInIsolate(List<Map<String, dynamic>> entries) {
+  final archive = Archive();
+  for (final entry in entries) {
+    final bytes = entry['bytes'] as List<int>;
+    archive.addFile(ArchiveFile(entry['name'] as String, bytes.length, bytes));
+  }
+  final result = ZipEncoder().encode(archive);
+  return result == null ? null : Uint8List.fromList(result);
+}
+
 class UnifiedBackupService {
   static const String _backupDirectoryName = 'UniPOS_Backups';
 
@@ -109,20 +138,20 @@ class UnifiedBackupService {
   /// ---------------------------
   /// Automatically saves backup to Downloads folder
   /// Returns the file path or null if failed
-  static Future<String?> exportToDownloads() async {
+  static Future<String?> exportToDownloads({bool includeImages = true}) async {
     if (kIsWeb) {
       debugPrint("⚠️ Web platform detected - downloads not supported");
       return null;
     }
 
     try {
-      debugPrint("📦 Starting auto-save backup to Downloads...");
+      debugPrint("📦 Starting backup to Downloads (images: $includeImages)...");
 
       // Collect all data
       final data = await _collectAllData();
 
       // Create ZIP backup
-      return await _createZipBackup(data, saveToDownloads: true);
+      return await _createZipBackup(data, saveToDownloads: true, includeImages: includeImages);
     } catch (e, stackTrace) {
       debugPrint("❌ Auto-save backup failed: $e");
       debugPrint("Stack trace: $stackTrace");
@@ -159,13 +188,12 @@ class UnifiedBackupService {
   /// ---------------------------
   /// ✅ IMPORT/RESTORE FROM BACKUP
   /// ---------------------------
-  /// Imports backup file and automatically detects mode
-  /// Returns true if successful
+  /// Imports backup file and automatically detects mode.
+  /// Shows a password dialog if the backup is encrypted.
   static Future<bool> importData(BuildContext context) async {
     try {
       debugPrint("📦 Starting import process...");
 
-      // Pick ZIP or JSON file
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'json'],
@@ -188,8 +216,6 @@ class UnifiedBackupService {
   /// ---------------------------
   /// ✅ IMPORT FROM FILE PATH
   /// ---------------------------
-  /// Imports backup from a specific file path (for pre-selected files)
-  /// Returns true if successful
   static Future<bool> importFromFilePath(BuildContext context, String filePath) async {
     try {
       final file = File(filePath);
@@ -200,31 +226,26 @@ class UnifiedBackupService {
         return false;
       }
 
-      // Check file extension
       final extension = p.extension(file.path).toLowerCase();
       debugPrint("📦 File extension: $extension");
 
       Map<String, dynamic> data;
 
       if (extension == '.json') {
-        // JSON backup
-        debugPrint("📦 Reading JSON file...");
         final jsonString = await file.readAsString();
         data = jsonDecode(jsonString);
       } else {
-        // ZIP backup
-        debugPrint("📦 Extracting ZIP file...");
-        data = await _extractZipBackup(file);
+        // Pass a password dialog as the provider for encrypted backups
+        data = await _extractZipBackup(
+          file,
+          passwordProvider: () => _showPasswordDialog(context),
+        );
       }
 
-      // Detect mode from backup
       final backupMode = _detectModeFromBackup(data);
       debugPrint("📦 Detected backup mode: $backupMode");
 
-      // Open necessary boxes for the detected mode BEFORE restoring
       await _ensureBoxesOpened(backupMode);
-
-      // Restore data
       await _restoreAllData(data, backupMode);
 
       debugPrint("✅ Import completed successfully!");
@@ -234,6 +255,62 @@ class UnifiedBackupService {
       debugPrint("Stack trace: $stackTrace");
       return false;
     }
+  }
+
+  /// ---------------------------
+  /// 🔧 PASSWORD DIALOG FOR RESTORE
+  /// ---------------------------
+  static Future<String?> _showPasswordDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    bool obscure = true;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.lock_outline, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Encrypted Backup'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('This backup is encrypted. Enter your backup password to restore.'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: obscure,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Backup Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => obscure = !obscure),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Restore'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// ---------------------------
@@ -314,8 +391,13 @@ class UnifiedBackupService {
       // Categories
       exportMap["categories"] = Hive.box<Category>("categories").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
-      // Items
-      exportMap["items"] = Hive.box<Items>("itemBoxs").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
+      // Items — imageBytes stripped from JSON (raw pixels = 100+ MB as List<int>).
+      // Each item's image is stored separately as item_img_{id} binary in the ZIP.
+      exportMap["items"] = Hive.box<Items>("itemBoxs").values.map((e) {
+        final map = _deepCleanMap(e.toMap()) as Map<String, dynamic>;
+        map.remove('imageBytes');
+        return map;
+      }).toList();
 
       // Variants
       exportMap["variants"] = Hive.box<VariantModel>("variante").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
@@ -811,66 +893,90 @@ class UnifiedBackupService {
       Map<String, dynamic> data, {
         bool saveToDownloads = false,
         String? customPath,
+        bool includeImages = true,
       }) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final backupDir = Directory('${appDir.path}/temp_backup');
       if (!backupDir.existsSync()) backupDir.createSync(recursive: true);
 
-      // 1️⃣ Write JSON data
-      final jsonString = jsonEncode(data);
-      final dataFile = File('${backupDir.path}/data.json');
-      await dataFile.writeAsString(jsonString);
-      debugPrint("📦 JSON data written: ${await dataFile.length()} bytes");
+      // 1️⃣ Serialize data to JSON string (CPU-heavy — runs off main thread)
+      final jsonString = await compute(_jsonEncodeMap, data);
 
-      // 2️⃣ Collect images (if available)
-      final productDir = Directory('${appDir.path}/product_images');
-      final imageFiles = productDir.existsSync()
-          ? productDir.listSync().whereType<File>().toList()
-          : [];
+      // 2️⃣ Check if encryption is enabled
+      final password = await BackupEncryptionService.getStoredPassword();
+      final isEncrypted = password != null && password.isNotEmpty;
 
-      debugPrint("📦 Found ${imageFiles.length} images");
+      // 3️⃣ Build list of archive entries (name + bytes)
+      final entries = <Map<String, dynamic>>[];
 
-      // 3️⃣ Build ZIP archive
-      final archive = Archive();
-
-      // Add JSON
-      final dataBytes = await dataFile.readAsBytes();
-      archive.addFile(ArchiveFile('data.json', dataBytes.length, dataBytes));
-
-      // Add images (if any)
-
-      if (imageFiles.isNotEmpty) {
-        for (final img in imageFiles) {
-          final bytes = await img.readAsBytes();
-          archive.addFile(ArchiveFile(p.basename(img.path), bytes.length, bytes));
-        }
-        debugPrint("📦 Added ${imageFiles.length} images to ZIP");
+      if (isEncrypted) {
+        debugPrint("🔐 Encrypting backup data...");
+        final encResult = BackupEncryptionService.encryptData(jsonString, password);
+        final meta = jsonEncode({
+          'encrypted': true,
+          'salt': encResult['salt'],
+          'iv': encResult['iv'],
+          'version': '2.0.0',
+        });
+        entries.add({'name': 'data.enc',         'bytes': utf8.encode(encResult['encryptedData']!)});
+        entries.add({'name': 'backup_meta.json', 'bytes': utf8.encode(meta)});
+        debugPrint("🔐 Backup encrypted successfully");
+      } else {
+        debugPrint("📦 JSON size: ${jsonString.length} bytes");
+        entries.add({'name': 'data.json', 'bytes': utf8.encode(jsonString)});
       }
 
-      // Encode ZIP
+      // 4️⃣ Add item images as named binary entries (item_img_{id})
+      // Always included — stored as efficient binary, NOT as JSON integers.
+      if (AppConfig.isRestaurant) {
+        try {
+          final itemBox = Hive.box<Items>("itemBoxs");
+          int imgCount = 0;
+          for (final item in itemBox.values) {
+            if (item.imageBytes != null && item.imageBytes!.isNotEmpty) {
+              entries.add({'name': 'item_img_${item.id}', 'bytes': item.imageBytes!.toList()});
+              imgCount++;
+            }
+          }
+          if (imgCount > 0) debugPrint("📦 Added $imgCount item images to ZIP");
+        } catch (e) {
+          debugPrint("⚠️ Could not add item images: $e");
+        }
+      }
 
-      final zipEncoder = ZipEncoder();
-      final zipData = zipEncoder.encode(archive);
+      // 4b️⃣ Also include product_images folder (manual backup only)
+      if (includeImages) {
+        final productDir = Directory('${appDir.path}/product_images');
+        final imageFiles = productDir.existsSync()
+            ? productDir.listSync().whereType<File>().toList()
+            : <File>[];
+
+        for (final img in imageFiles) {
+          entries.add({'name': 'prod_img_${p.basename(img.path)}', 'bytes': await img.readAsBytes()});
+        }
+        if (imageFiles.isNotEmpty) {
+          debugPrint("📦 Added ${imageFiles.length} product folder images to ZIP");
+        }
+      }
+
+      // 5️⃣ Encode ZIP in a background isolate — keeps UI responsive
+      final zipData = await compute(_encodeArchiveInIsolate, entries);
 
       if (zipData == null || zipData.isEmpty) {
-
         throw Exception("ZIP creation failed");
       }
 
       debugPrint("📦 ZIP created: ${zipData.length} bytes (${(zipData.length / 1024 / 1024).toStringAsFixed(2)} MB)");
 
-      // Clean up temp file
-      await dataFile.delete();
-
-      // 4️⃣ Save ZIP to destination
+      // 6️⃣ Save ZIP to destination
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-      final fileName = 'UniPOS_backup_$timestamp.zip';
+      final suffix = isEncrypted ? 'encrypted' : 'backup';
+      final fileName = 'UniPOS_${suffix}_$timestamp.zip';
 
       File outputFile;
 
       if (saveToDownloads) {
-        // Save to Downloads
         final downloadsPath = '/storage/emulated/0/Download';
         final downloadsDir = Directory(downloadsPath);
         if (!downloadsDir.existsSync()) {
@@ -878,7 +984,6 @@ class UnifiedBackupService {
         }
         outputFile = File('$downloadsPath/$fileName');
       } else if (customPath != null) {
-        // Save to custom folder
         outputFile = File('$customPath/$fileName');
       } else {
         throw Exception("No save location specified");
@@ -887,7 +992,7 @@ class UnifiedBackupService {
       await outputFile.writeAsBytes(zipData);
 
       debugPrint("✅ Backup saved: ${outputFile.path}");
-      debugPrint("✅ File size: ${await outputFile.length()} bytes");
+      debugPrint("✅ Encrypted: $isEncrypted");
 
       return outputFile.path;
     } catch (e, stackTrace) {
@@ -900,14 +1005,18 @@ class UnifiedBackupService {
   /// ---------------------------
   /// 🔧 EXTRACT ZIP BACKUP
   /// ---------------------------
-  static Future<Map<String, dynamic>> _extractZipBackup(File file) async {
+  /// [passwordProvider] is called only if the backup is encrypted.
+  /// It should return the password entered by the user, or null to cancel.
+  static Future<Map<String, dynamic>> _extractZipBackup(
+    File file, {
+    Future<String?> Function()? passwordProvider,
+  }) async {
     final zipBytes = await file.readAsBytes();
-    final archive = ZipDecoder().decodeBytes(zipBytes);
+    // Decode ZIP in background isolate — avoids freezing UI on large files
+    final entries = await compute(_decodeZipInIsolate, zipBytes);
 
-    debugPrint("📦 Extracted ZIP: ${archive.length} files");
+    debugPrint("📦 Extracted ZIP: ${entries.length} files");
 
-    // Find data.json
-    File? jsonFile;
     final appDir = await getApplicationDocumentsDirectory();
     final restoreDir = Directory('${appDir.path}/restored_backup');
 
@@ -916,23 +1025,81 @@ class UnifiedBackupService {
     }
     restoreDir.createSync(recursive: true);
 
-    for (final f in archive) {
-      if (f.content == null) continue;
+    File? jsonFile;
+    File? metaFile;
+    File? encFile;
 
-      final outFile = File(p.join(restoreDir.path, f.name))
-        ..createSync(recursive: true)
-        ..writeAsBytesSync(f.content!);
+    final productDir = Directory('${appDir.path}/product_images');
 
-      if (f.name.toLowerCase() == 'data.json') {
-        jsonFile = outFile;
+    for (final f in entries) {
+      final name = f['name'] as String;
+      final bytes = f['bytes'] as List<int>;
+      // ignore: parameter_assignments
+      final content = bytes;
+
+      // item_img_{id} files go straight to product_images/ for restore
+      if (name.startsWith('item_img_') || name.startsWith('prod_img_')) {
+        if (!productDir.existsSync()) productDir.createSync(recursive: true);
+        final imgName = name.startsWith('prod_img_')
+            ? name.replaceFirst('prod_img_', '')
+            : name;
+        File('${productDir.path}/$imgName')
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(content);
+        continue;
       }
+
+      final outFile = File(p.join(restoreDir.path, name))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(content);
+
+      if (name.toLowerCase() == 'data.json') jsonFile = outFile;
+      if (name.toLowerCase() == 'backup_meta.json') metaFile = outFile;
+      if (name.toLowerCase() == 'data.enc') encFile = outFile;
     }
 
+    // --- ENCRYPTED BACKUP ---
+    if (metaFile != null && encFile != null) {
+      debugPrint("🔐 Encrypted backup detected");
+
+      final meta = jsonDecode(await metaFile.readAsString()) as Map<String, dynamic>;
+      final salt = meta['salt'] as String;
+      final iv = meta['iv'] as String;
+      final encryptedData = await encFile.readAsString();
+
+      // Try stored password first (for auto-restore scenarios)
+      String? password = await BackupEncryptionService.getStoredPassword();
+
+      // If no stored password or user wants to enter manually, prompt
+      if (password == null || password.isEmpty) {
+        if (passwordProvider == null) {
+          throw Exception("Backup is encrypted but no password provider was given");
+        }
+        password = await passwordProvider();
+        if (password == null) throw Exception("Restore cancelled: no password entered");
+      }
+
+      // Attempt decryption
+      final jsonString = BackupEncryptionService.decryptData(
+        encryptedBase64: encryptedData,
+        salt: salt,
+        ivBase64: iv,
+        password: password,
+      );
+
+      if (jsonString == null) {
+        throw Exception("Wrong password — cannot decrypt backup");
+      }
+
+      debugPrint("🔐 Backup decrypted successfully");
+      return jsonDecode(jsonString);
+    }
+
+    // --- PLAIN BACKUP ---
     if (jsonFile == null) {
       throw Exception("Backup data file missing in ZIP");
     }
 
-    // Parse JSON
     final jsonString = await jsonFile.readAsString();
     return jsonDecode(jsonString);
   }
@@ -1227,22 +1394,14 @@ class UnifiedBackupService {
         T Function(Map<String, dynamic>) fromMap,
         ) async {
       if (data[keyName] == null) return;
-
       debugPrint("📦 Restoring $keyName...");
       await box.clear();
-
       final items = data[keyName] as List;
-      for (var item in items) {
-        final map = Map<String, dynamic>.from(item);
-        await box.add(fromMap(map));
-      }
-
+      // addAll = single batch write, far faster than N individual add() calls
+      await box.addAll(items.map((item) => fromMap(Map<String, dynamic>.from(item))).toList());
       debugPrint("📦 $keyName: ${items.length} items restored");
     }
 
-    // ✅ Helper function to restore boxes WITH ID as key
-    // This preserves the original ID from the model as the Hive box key
-    // Use this for models that are looked up by their ID
     Future<void> restoreBoxWithId<T>(
         String keyName,
         Box<T> box,
@@ -1250,23 +1409,58 @@ class UnifiedBackupService {
         String Function(T) getIdFunc,
         ) async {
       if (data[keyName] == null) return;
-
       debugPrint("📦 Restoring $keyName (with ID keys)...");
       await box.clear();
-
       final items = data[keyName] as List;
-      for (var item in items) {
-        final map = Map<String, dynamic>.from(item);
-        final model = fromMap(map);
-        final id = getIdFunc(model);
-        await box.put(id, model);  // ✅ Use ID as key, not auto-increment
+      // putAll = single batch write, far faster than N individual put() calls
+      final Map<String, T> batch = {};
+      for (final item in items) {
+        final model = fromMap(Map<String, dynamic>.from(item));
+        batch[getIdFunc(model)] = model;
       }
-
+      await box.putAll(batch);
       debugPrint("📦 $keyName: ${items.length} items restored with ID keys");
     }
 
     await restoreBoxWithId("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m), (c) => c.id);
     await restoreBoxWithId("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m), (i) => i.id);
+
+    // Reload imageBytes for each item from its item_img_{id} file.
+    // O(n) approach: build a key-by-ID lookup map first, then match files.
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final productDir = Directory('${appDir.path}/product_images');
+      if (productDir.existsSync()) {
+        final itemBox = Hive.box<Items>("itemBoxs");
+
+        // Build ID → Hive key map in one pass
+        final idToKey = <String, dynamic>{};
+        for (final key in itemBox.keys) {
+          final item = itemBox.get(key);
+          if (item != null) idToKey[item.id] = key;
+        }
+
+        final imgFiles = productDir.listSync().whereType<File>()
+            .where((f) => p.basename(f.path).startsWith('item_img_'))
+            .toList();
+
+        // Build batch update map
+        final Map<dynamic, Items> imageBatch = {};
+        for (final imgFile in imgFiles) {
+          final itemId = p.basename(imgFile.path).replaceFirst('item_img_', '');
+          final key = idToKey[itemId];
+          if (key != null) {
+            final item = itemBox.get(key)!;
+            final bytes = await imgFile.readAsBytes();
+            imageBatch[key] = item.copyWith(imageBytes: bytes);
+          }
+        }
+        if (imageBatch.isNotEmpty) await itemBox.putAll(imageBatch);
+        debugPrint("✅ Item images reloaded: ${imageBatch.length}");
+      }
+    } catch (e) {
+      debugPrint("⚠️ Could not reload item images: $e");
+    }
     await restoreBoxWithId("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m), (v) => v.id);
     await restoreBoxWithId("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m), (ch) => ch.id);
     await restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m));

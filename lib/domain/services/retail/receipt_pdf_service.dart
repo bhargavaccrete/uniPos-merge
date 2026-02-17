@@ -450,9 +450,9 @@ class ReceiptPdfService {
               // TAX INCLUSIVE MODE - Labels only
               return pw.Column(
                 children: [
-                  // Sub Total - Pre-calculated
+                  // Sub Total - Use itemTotal (before discount) if available
                   if (showSubtotal)
-                    _buildThermalTotalRow('Sub Total', data.sale.subtotal),
+                    _buildThermalTotalRow('Sub Total', data.itemTotal ?? data.sale.subtotal),
                   // Discount - Pre-calculated (only show if > 0)
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),
@@ -465,9 +465,9 @@ class ReceiptPdfService {
               // TAX EXCLUSIVE MODE - Labels only
               return pw.Column(
                 children: [
-                  // Sub Total (Before Tax) - Pre-calculated
+                  // Sub Total - Use itemTotal (before discount) if available
                   if (showSubtotal)
-                    _buildThermalTotalRow('Sub Total', data.sale.subtotal),
+                    _buildThermalTotalRow('Sub Total', data.itemTotal ?? data.sale.subtotal),
                   // Discount - Pre-calculated (only show if > 0)
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),

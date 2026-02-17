@@ -11,7 +11,6 @@ class AppSettings {
 
   static final Map<String, bool> _defaultSettingValues = {
     // Layout Settings
-    "GridView Category": false,
     "Item Image": true,
     "Item Price": true,
     "Fix Item Card": false,
@@ -52,7 +51,6 @@ class AppSettings {
   /// ---- Grouped Settings for UI ----
   static final Map<String, List<String>> groupedSettings = {
     "Layout Settings": [
-      "GridView Category",
       "Item Image",
       "Item Price",
       "Fix Item Card",
@@ -142,7 +140,6 @@ class AppSettings {
 
 
 // -------- Optional: Individual Getters --------
-  static bool get useGridViewCategory => values["GridView Category"] ?? false;
   static bool get showItemImage => values["Item Image"] ?? true;
   static bool get showItemPrice => values["Item Price"] ?? true;
   // static bool get showDefaultItemImage => values["Item Default Image"] ?? false;

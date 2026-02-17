@@ -12,8 +12,8 @@ class CartCalculationService {
   final double serviceChargePercentage;
   final double deliveryCharge;
   final bool isDeliveryOrder;
-
-
+  final bool? isTaxInclusive; // Optional: if provided, use this instead of AppSettings
+  final bool? discountOnItems; // Optional: if provided, use this instead of AppSettings
 
   // --- Final Calculated Properties ---
   /// Item Total = Gross total of all items (before discount)
@@ -43,6 +43,8 @@ class CartCalculationService {
     this.serviceChargePercentage = 0.0,
     this.deliveryCharge = 0.0,
     this.isDeliveryOrder = false,
+    this.isTaxInclusive, // If provided, use this instead of AppSettings
+    this.discountOnItems, // If provided, use this instead of AppSettings
   }) {
     // The calculation is triggered the moment the service is created.
     _calculate();
@@ -79,7 +81,9 @@ class CartCalculationService {
       double itemGST;
 
       // ================= DISCOUNT ON ITEMS =================
-      if (AppSettings.discountOnItems) {
+      // Use provided value if available, otherwise use AppSettings
+      final bool useDiscountOnItems = discountOnItems ?? AppSettings.discountOnItems;
+      if (useDiscountOnItems) {
         // Calculate discount per item
         if (discountType == DiscountType.percentage) {
           itemDiscount = itemOriginalAmount * (discountValue / 100);
@@ -93,7 +97,9 @@ class CartCalculationService {
         // Discount applied FIRST, then GST on discounted amount
         final discountedItemAmount = itemOriginalAmount - itemDiscount;
 
-        if (AppSettings.isTaxInclusive) {
+        // Use provided value if available, otherwise use AppSettings
+        final bool useTaxInclusive = isTaxInclusive ?? AppSettings.isTaxInclusive;
+        if (useTaxInclusive) {
           itemBase = itemTaxRate > 0
               ? discountedItemAmount / (1 + itemTaxRate)
               : discountedItemAmount;
@@ -124,7 +130,9 @@ class CartCalculationService {
         itemDiscount = itemOriginalAmount - itemShare;
 
         // GST calculated on discounted share
-        if (AppSettings.isTaxInclusive) {
+        // Use provided value if available, otherwise use AppSettings
+        final bool useTaxInclusive = isTaxInclusive ?? AppSettings.isTaxInclusive;
+        if (useTaxInclusive) {
           itemBase = itemTaxRate > 0
               ? itemShare / (1 + itemTaxRate)
               : itemShare;

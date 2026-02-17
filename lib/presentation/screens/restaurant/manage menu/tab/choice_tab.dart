@@ -24,6 +24,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
   String query = '';
   List<ChoiceOption> tempOptions = [];
   ChoicesModel? editingChoice;
+  bool allowMultipleSelection = false; // Track if choice allows multiple selections
 
   @override
   void initState() {
@@ -49,11 +50,13 @@ class _ChoiceTabState extends State<ChoiceTab> {
         choiceController.text = choicemodel.name;
         tempOptions = List<ChoiceOption>.from(choicemodel.choiceOption);
         editingChoice = choicemodel;
+        allowMultipleSelection = choicemodel.allowMultipleSelection ?? false;
       } else {
         choiceController.clear();
         optionController.clear();
         tempOptions = [];
         editingChoice = null;
+        allowMultipleSelection = false;
       }
     });
 
@@ -117,6 +120,128 @@ class _ChoiceTabState extends State<ChoiceTab> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: AppColors.primary, width: 2),
                     ),
+                  ),
+                ),
+                SizedBox(height: 20),
+
+                // Selection Type Section
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.radio_button_checked, size: 20, color: AppColors.primary),
+                          SizedBox(width: 8),
+                          Text(
+                            'Selection Type',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  allowMultipleSelection = false;
+                                });
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: !allowMultipleSelection ? AppColors.primary : Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: !allowMultipleSelection ? AppColors.primary : Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.radio_button_checked,
+                                      size: 18,
+                                      color: !allowMultipleSelection ? Colors.white : Colors.grey,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Single',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: !allowMultipleSelection ? Colors.white : Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  allowMultipleSelection = true;
+                                });
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: allowMultipleSelection ? AppColors.primary : Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: allowMultipleSelection ? AppColors.primary : Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.check_box,
+                                      size: 18,
+                                      color: allowMultipleSelection ? Colors.white : Colors.grey,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Multiple',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: allowMultipleSelection ? Colors.white : Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        allowMultipleSelection
+                            ? '✓ Customers can select multiple options'
+                            : '✓ Customers can select only one option',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 SizedBox(height: 20),
@@ -359,6 +484,11 @@ class _ChoiceTabState extends State<ChoiceTab> {
         id: editId,
         name: trimmedName,
         choiceOption: option,
+        createdTime: editingChoice?.createdTime,
+        lastEditedTime: DateTime.now(),
+        editedBy: 'Admin',
+        editCount: (editingChoice?.editCount ?? 0) + 1,
+        allowMultipleSelection: allowMultipleSelection,
       );
       await choiceStore.updateChoice(updateChoice);
     } else {
@@ -366,6 +496,8 @@ class _ChoiceTabState extends State<ChoiceTab> {
         id: Uuid().v4(),
         name: trimmedName,
         choiceOption: option,
+        createdTime: DateTime.now(),
+        allowMultipleSelection: allowMultipleSelection,
       );
       await choiceStore.addChoice(newchoice);
     }

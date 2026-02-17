@@ -4,11 +4,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
 import 'package:unipos/domain/services/common/unified_backup_service.dart';
+import 'package:unipos/domain/services/common/backup_encryption_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/main.dart' as main_app;
@@ -698,7 +700,129 @@ class _DrawerrState extends State<Drawerr> {
                     Divider(),
                     SizedBox(height: 8),
 
+                    // Backup Encryption Password Setup
+                    StatefulBuilder(
+                      builder: (context, setEncState) {
+                        return FutureBuilder<bool>(
+                          future: BackupEncryptionService.hasPassword(),
+                          builder: (context, snapshot) {
+                            final hasPassword = snapshot.data ?? false;
+
+                            Future<void> showPasswordDialog({bool isChange = false}) async {
+                              final pwdController = TextEditingController();
+                              bool obscure = true;
+                              await showDialog(
+                                context: context,
+                                builder: (ctx) => StatefulBuilder(
+                                  builder: (ctx, setDlgState) => AlertDialog(
+                                    title: Text(
+                                      isChange ? 'Change Password' : 'Set Backup Password',
+                                      style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
+                                    ),
+                                    content: TextField(
+                                      controller: pwdController,
+                                      obscureText: obscure,
+                                      decoration: InputDecoration(
+                                        hintText: 'Enter password',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        suffixIcon: IconButton(
+                                          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                                          onPressed: () => setDlgState(() => obscure = !obscure),
+                                        ),
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () async {
+                                          final pwd = pwdController.text.trim();
+                                          if (pwd.isNotEmpty) {
+                                            await BackupEncryptionService.setPassword(pwd);
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                            setEncState(() {});
+                                          }
+                                        },
+                                        child: Text('Confirm'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.lock_outline, size: 18, color: Colors.grey.shade700),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Backup Encryption',
+                                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                    Spacer(),
+                                    if (!hasPassword)
+                                      OutlinedButton(
+                                        onPressed: () => showPasswordDialog(),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                          minimumSize: Size(0, 32),
+                                          side: BorderSide(color: AppColors.success),
+                                        ),
+                                        child: Text(
+                                          'Set Password',
+                                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.success),
+                                        ),
+                                      )
+                                    else ...[
+                                      TextButton(
+                                        onPressed: () => showPasswordDialog(isChange: true),
+                                        style: TextButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          minimumSize: Size(0, 32),
+                                        ),
+                                        child: Text(
+                                          'Change',
+                                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.clear, size: 18, color: Colors.red),
+                                        tooltip: 'Remove password',
+                                        padding: EdgeInsets.zero,
+                                        constraints: BoxConstraints(),
+                                        onPressed: () async {
+                                          await BackupEncryptionService.clearPassword();
+                                          setEncState(() {});
+                                        },
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                if (hasPassword)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 26, top: 2),
+                                    child: Text(
+                                      'Backups will be encrypted',
+                                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.success),
+                                    ),
+                                  ),
+                                SizedBox(height: 12),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+
                     // Download to Downloads Button
+
+
+
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,

@@ -554,7 +554,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
           ),
 
           // "Don't show again" checkbox (only show on last page)
-          if (_currentPage == _walkthroughItems.length - 1) ...[
+  /*        if (_currentPage == _walkthroughItems.length - 1) ...[
             const SizedBox(height: 16),
             InkWell(
               onTap: () {
@@ -589,7 +589,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                 ],
               ),
             ),
-          ],
+          ],*/
         ],
       ),
     );

@@ -492,6 +492,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
+                        color: AppColors.white
                     ),
                   ),
                 ),

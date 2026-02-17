@@ -371,7 +371,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
                   child: const Icon(Icons.add),
                 ),
                 const SizedBox(width: 5),
-                const Text("Add Item")
+                 Text("Add Item",style: GoogleFonts.poppins(color: Colors.white),)
               ],
             ),
           ),

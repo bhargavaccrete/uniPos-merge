@@ -10,6 +10,7 @@ import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
+import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
@@ -1062,6 +1063,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
       print('🎫 Generated new KOT #$newKotNumber during settlement');
       print('   Previous items: $previousItemCount, Current items: $currentItemCount');
       print('   All KOTs: $finalKotNumbers, Boundaries: $finalKotBoundaries');
+
+      // Deduct stock for newly added items
+      final newlyAddedItems = itemsToSettle.skip(previousItemCount).toList();
+      await InventoryService.deductStockForOrder(newlyAddedItems);
+      print('✅ Stock deducted for ${newlyAddedItems.length} newly added items during settlement');
     }
 
     final OrderModel completedOrder = widget.existingModel!.copyWith(
@@ -1096,6 +1102,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
       if (selectedCustomer != null) {
         await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
       }
+
+      // Clear the cart after successful settlement
+      await restaurantCartStore.clearCart();
+      print('✅ Cart cleared after settling order');
 
       await tableStore.updateTableStatus(widget.tableid!, 'Available');
       // _showSnackBar('Order Completed Successfully!');
@@ -1143,6 +1153,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       kotBoundaries:
           activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
+      isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
     );
     await pastOrderStore.addOrder(pastOrder);
     await orderStore.deleteOrder(activeModel.id);
@@ -1195,11 +1206,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
         isSplitPayment: isSplit,
         totalPaid: _totalPaid,
         changeReturn: _changeReturn,
+        isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
       try {
         await pastOrderStore.addOrder(pastOrder);
+
+        // Deduct stock for direct settlement (order not placed first)
+        await InventoryService.deductStockForOrder(orderItems);
+        print("✅ Stock deducted for settle & print bill");
 
         // Update customer stats if customer is linked
         if (selectedCustomer != null) {
@@ -1257,6 +1273,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       isSplitPayment: isSplit,
       totalPaid: _totalPaid,
       changeReturn: _changeReturn,
+      isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
     );
     try {
       await orderStore.addOrder(newOrder);
@@ -1376,6 +1393,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       isPaid: true,
       paymentStatus: 'Paid',
       completedAt: DateTime.now(),
+      isTaxInclusive: pastOrder.isTaxInclusive, // Use stored tax mode from past order
     );
     print('🔍 DEBUG: orderForPrint.paymentMethod = ${orderForPrint.paymentMethod}');
     print('🔍 DEBUG: orderForPrint.isPaid = ${orderForPrint.isPaid}');

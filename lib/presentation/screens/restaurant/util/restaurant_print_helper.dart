@@ -85,7 +85,7 @@ class RestaurantPrintHelper {
         // Format choices for display
         String? choicesInfo;
         if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
-          choicesInfo = 'Add-ons: ${item.choiceNames!.join(', ')}';
+          choicesInfo = 'Choices: ${item.choiceNames!.join(', ')}';
         }
 
         // Combine extras and choices with instruction
@@ -315,7 +315,7 @@ class RestaurantPrintHelper {
         // Format choices for display
         String? choicesInfo;
         if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
-          choicesInfo = 'Add-ons: ${item.choiceNames!.join(', ')}';
+          choicesInfo = 'Choices: ${item.choiceNames!.join(', ')}';
         }
 
         // Combine extras and choices into weight field for display
@@ -479,6 +479,7 @@ class RestaurantPrintHelper {
       serviceChargePercentage: isDelivery ? 0 : (order.serviceCharge ?? 0),
       deliveryCharge: isDelivery ? (order.serviceCharge ?? 0) : 0,
       isDeliveryOrder: isDelivery,
+      isTaxInclusive: order.isTaxInclusive, // Use stored tax mode from order
     );
 
     // Check if new items were added (for KOT boundary tracking)

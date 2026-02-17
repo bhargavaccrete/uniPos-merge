@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service_v3.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 /// Test screen for V3 Bulk Import with Phase 1 improvements
 class BulkImportTestScreenV3 extends StatefulWidget {
@@ -22,94 +25,181 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Bulk Import V3 - Phase 1 Test'),
-        backgroundColor: Colors.blue,
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black87),
+        title: Text(
+          'Bulk Import',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.headingFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: AppResponsive.screenPadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Header Card
-            Card(
-              color: Colors.blue[50],
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: AppResponsive.shadowBlurRadius(context),
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: AppResponsive.cardPadding(context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '🚀 Phase 1 Features:',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                          ),
+                          child: Icon(
+                            Icons.rocket_launch,
+                            color: AppColors.primary,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Text(
+                          'Enhanced Features',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    _buildFeatureLine('✅ Row-level validation'),
-                    _buildFeatureLine('✅ Auto-category creation'),
-                    _buildFeatureLine('✅ In-memory caching'),
-                    _buildFeatureLine('✅ Image URL download'),
-                    _buildFeatureLine('✅ Progress callbacks'),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    _buildFeatureLine(context, Icons.check_circle, 'Row-level validation'),
+                    _buildFeatureLine(context, Icons.check_circle, 'Auto-category creation'),
+                    _buildFeatureLine(context, Icons.check_circle, 'In-memory caching'),
+                    _buildFeatureLine(context, Icons.check_circle, 'Image URL download'),
+                    _buildFeatureLine(context, Icons.check_circle, 'Progress callbacks'),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            AppResponsive.verticalSpace(context, size: SpacingSize.large),
 
             // Download Template Button
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _downloadTemplate,
-              icon: const Icon(Icons.download),
-              label: const Text('Download Template V3'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.all(16),
+            SizedBox(
+              width: double.infinity,
+              height: AppResponsive.buttonHeight(context),
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _downloadTemplate,
+                icon: Icon(Icons.download, size: AppResponsive.iconSize(context)),
+                label: Text(
+                  'Download Template',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.buttonFontSize(context),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 12),
+            AppResponsive.verticalSpace(context, size: SpacingSize.medium),
 
             // Import Button
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _startImport,
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Pick Excel and Import'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.all(16),
+            SizedBox(
+              width: double.infinity,
+              height: AppResponsive.buttonHeight(context),
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _startImport,
+                icon: Icon(Icons.upload_file, size: AppResponsive.iconSize(context)),
+                label: Text(
+                  'Pick Excel and Import',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.buttonFontSize(context),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 20),
+            AppResponsive.verticalSpace(context, size: SpacingSize.large),
 
             // Progress Section
             if (_isLoading) ...[
-              Card(
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: AppResponsive.shadowBlurRadius(context),
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: AppResponsive.cardPadding(context),
                   child: Column(
                     children: [
-                      LinearProgressIndicator(
-                        value: _progressTotal > 0
-                            ? _progressCurrent / _progressTotal
-                            : null,
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                        child: LinearProgressIndicator(
+                          value: _progressTotal > 0
+                              ? _progressCurrent / _progressTotal
+                              : null,
+                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          minHeight: 8,
+                        ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
                       Text(
                         _statusMessage,
-                        style: const TextStyle(fontSize: 14),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
                         textAlign: TextAlign.center,
                       ),
-                      if (_progressTotal > 0)
+                      if (_progressTotal > 0) ...[
+                        SizedBox(height: AppResponsive.smallSpacing(context)),
                         Text(
                           '$_progressCurrent / $_progressTotal',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -118,41 +208,67 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
 
             // Results Section
             if (_lastResult != null) ...[
-              const SizedBox(height: 20),
+              AppResponsive.verticalSpace(context, size: SpacingSize.large),
               Expanded(
-                child: Card(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: AppResponsive.shadowBlurRadius(context),
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: AppResponsive.cardPadding(context),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              _lastResult!.success
-                                  ? Icons.check_circle
-                                  : Icons.error,
-                              color: _lastResult!.success
-                                  ? Colors.green
-                                  : Colors.red,
-                              size: 28,
+                            Container(
+                              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                              decoration: BoxDecoration(
+                                color: (_lastResult!.success
+                                        ? AppColors.success
+                                        : AppColors.danger)
+                                    .withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                              ),
+                              child: Icon(
+                                _lastResult!.success
+                                    ? Icons.check_circle
+                                    : Icons.error,
+                                color: _lastResult!.success
+                                    ? AppColors.success
+                                    : AppColors.danger,
+                                size: AppResponsive.largeIconSize(context),
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            const Text(
+                            SizedBox(width: AppResponsive.mediumSpacing(context)),
+                            Text(
                               'Import Results',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.subheadingFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
                         ),
-                        const Divider(height: 20),
+                        Divider(
+                          height: AppResponsive.largeSpacing(context) * 2,
+                          thickness: 1,
+                          color: AppColors.divider,
+                        ),
                         Text(
                           _lastResult!.getSummary(),
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 13,
+                          style: GoogleFonts.robotoMono(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -164,44 +280,75 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
 
             // Instructions
             if (!_isLoading && _lastResult == null) ...[
-              const SizedBox(height: 20),
+              AppResponsive.verticalSpace(context, size: SpacingSize.large),
               Expanded(
-                child: Card(
-                  color: Colors.grey[100],
-                  child: const Padding(
-                    padding: EdgeInsets.all(16.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Padding(
+                    padding: AppResponsive.cardPadding(context),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '📝 Testing Instructions:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.info.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                                ),
+                                child: Icon(
+                                  Icons.info_outline,
+                                  color: AppColors.info,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                              ),
+                              SizedBox(width: AppResponsive.mediumSpacing(context)),
+                              Text(
+                                'How to Use',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(context),
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 12),
-                          Text(
-                            '1. Download Template V3\n'
-                            '   - Contains enhanced Items sheet with CategoryName and ImageURL\n\n'
-                            '2. Edit the Items sheet:\n'
-                            '   - Use category names (e.g., "Pizza") instead of IDs\n'
-                            '   - Add image URLs (e.g., https://example.com/image.jpg)\n'
-                            '   - Test validation by leaving ItemName empty\n'
-                            '   - Test validation by setting Price to 0 or negative\n'
-                            '   - Test VegType validation with invalid values\n\n'
-                            '3. Import the file:\n'
-                            '   - Watch real-time progress\n'
-                            '   - See auto-created categories\n'
-                            '   - Check downloaded images count\n'
-                            '   - Review validation errors for failed rows\n\n'
-                            '4. Verify results:\n'
-                            '   - Check items were created\n'
-                            '   - Verify categories auto-created\n'
-                            '   - Check images downloaded to product_images/\n'
-                            '   - Review failed rows and error messages',
-                            style: TextStyle(fontSize: 13),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          _buildInstructionStep(
+                            context,
+                            '1',
+                            'Download Template',
+                            'Get the enhanced Excel template with CategoryName and ImageURL columns',
+                          ),
+                          _buildInstructionStep(
+                            context,
+                            '2',
+                            'Edit Items Sheet',
+                            'Use category names (e.g., "Pizza") instead of IDs\n'
+                            'Add image URLs (e.g., https://example.com/image.jpg)\n'
+                            'Fill in all required fields',
+                          ),
+                          _buildInstructionStep(
+                            context,
+                            '3',
+                            'Import File',
+                            'Click import and select your Excel file\n'
+                            'Watch real-time progress updates\n'
+                            'Categories will be auto-created if needed',
+                          ),
+                          _buildInstructionStep(
+                            context,
+                            '4',
+                            'Review Results',
+                            'Check imported items count\n'
+                            'Verify auto-created categories\n'
+                            'Review any validation errors',
                           ),
                         ],
                       ),
@@ -216,12 +363,89 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
     );
   }
 
-  Widget _buildFeatureLine(String text) {
+  Widget _buildFeatureLine(BuildContext context, IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(left: 8, top: 4),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 14),
+      padding: EdgeInsets.only(
+        left: AppResponsive.smallSpacing(context),
+        top: AppResponsive.smallSpacing(context),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: AppResponsive.smallIconSize(context),
+            color: AppColors.success,
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionStep(
+    BuildContext context,
+    String number,
+    String title,
+    String description,
+  ) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: AppResponsive.getValue(context, mobile: 32.0, tablet: 36.0, desktop: 40.0),
+            height: AppResponsive.getValue(context, mobile: 32.0, tablet: 36.0, desktop: 40.0),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: AppResponsive.smallSpacing(context) / 2),
+                Text(
+                  description,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -322,15 +546,33 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
   void _showResultDialog(ImportResultV3 result) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        ),
         title: Row(
           children: [
-            Icon(
-              result.success ? Icons.check_circle : Icons.error,
-              color: result.success ? Colors.green : Colors.red,
+            Container(
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+              decoration: BoxDecoration(
+                color: (result.success ? AppColors.success : AppColors.danger)
+                    .withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+              ),
+              child: Icon(
+                result.success ? Icons.check_circle : Icons.error,
+                color: result.success ? AppColors.success : AppColors.danger,
+                size: AppResponsive.iconSize(context),
+              ),
             ),
-            const SizedBox(width: 8),
-            const Text('Import Complete'),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            Text(
+              'Import Complete',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -338,38 +580,100 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Items Imported: ${result.itemsImported}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              _buildResultItem(
+                context,
+                Icons.inventory,
+                'Items Imported',
+                '${result.itemsImported}',
+                AppColors.primary,
               ),
-              const SizedBox(height: 8),
               if (result.categoriesAutoCreated > 0)
-                Text(
-                  '🎉 Auto-created ${result.categoriesAutoCreated} categories',
-                  style: const TextStyle(color: Colors.green),
+                _buildResultItem(
+                  context,
+                  Icons.category,
+                  'Categories Created',
+                  '${result.categoriesAutoCreated}',
+                  AppColors.success,
                 ),
               if (result.imagesDownloaded > 0)
-                Text(
-                  '🖼️ Downloaded ${result.imagesDownloaded} images',
-                  style: const TextStyle(color: Colors.blue),
+                _buildResultItem(
+                  context,
+                  Icons.image,
+                  'Images Downloaded',
+                  '${result.imagesDownloaded}',
+                  AppColors.info,
                 ),
               if (result.failedRows.isNotEmpty)
-                Text(
-                  '❌ ${result.failedRows.length} rows failed validation',
-                  style: const TextStyle(color: Colors.red),
+                _buildResultItem(
+                  context,
+                  Icons.error_outline,
+                  'Failed Rows',
+                  '${result.failedRows.length}',
+                  AppColors.danger,
                 ),
-              const SizedBox(height: 12),
-              const Text(
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              Text(
                 'See full results below for details.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.largeSpacing(context),
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
+            ),
+            child: Text(
+              'OK',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultItem(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      child: Row(
+        children: [
+          Icon(icon, size: AppResponsive.iconSize(context), color: color),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
