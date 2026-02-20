@@ -259,7 +259,9 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     Map<String, int> previousQuantities = {};
 
     for (final order in allOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      final orderStatus = order.orderStatus?.toUpperCase() ?? '';
+      if (orderStatus == 'FULLY_REFUNDED') continue;
+      if (orderStatus == 'VOID' || orderStatus == 'VOIDED') continue;
       if (order.orderAt == null) continue;
 
       // Check if current period

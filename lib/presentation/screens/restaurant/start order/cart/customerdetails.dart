@@ -54,6 +54,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   // Customer selection
   RestaurantCustomer? selectedCustomer;
+  String? _mobileError;
   final _serviceChargeController = TextEditingController();
   final _deliveryChargeController = TextEditingController();
   final _discountController = TextEditingController();
@@ -162,6 +163,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
       serviceChargePercentage: isDelivery ? 0.0 : serviceChargeValue,
       deliveryCharge: isDelivery ? serviceChargeValue : 0.0,
       isDeliveryOrder: isDelivery,
+      // Use stored tax mode from existing order; fall back to app setting for new orders
+      isTaxInclusive: widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive,
     );
 
     // ✅ Step 3: Build the UI using the final, calculated values.
@@ -455,6 +458,18 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   );
                 },
               ),
+              if (_mobileError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 12, bottom: 4),
+                  child: Text(
+                    _mobileError!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.red.shade600,
+                    ),
+                  ),
+                ),
+
               SizedBox(height: 10),
 
               widget.orderType == 'Delivery'
@@ -887,7 +902,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       onTap: () {
         setState(() {
           _amountpercentageContorller.text = percentage.toString();
-          discountApply = false;
+          discountApply = true;
         });
       },
       child: Container(
@@ -1035,7 +1050,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     if (widget.existingModel == null || widget.tableid == null) {
       // _showSnackBar('Error: No active order or table found.', isError: true);
       NotificationService.instance.showError(
-        'Error: No active order or table found.to cart',
+        'Error: No active order or table found.',
       );
 
       return;
@@ -1096,6 +1111,30 @@ class _CustomerdetailsState extends State<Customerdetails> {
       changeReturn: _changeReturn,
     );
     try {
+      // For Dine In orders that haven't been served yet: just record the payment
+      // and keep the order active so kitchen/staff can still serve it.
+      // The order will move to past automatically when staff marks it as Served.
+      final bool isDineIn = (widget.existingModel!.orderType == 'Dine In');
+      final bool alreadyServed = (widget.existingModel!.status == 'Served');
+
+      if (isDineIn && !alreadyServed) {
+        // Generate a bill number now so the receipt can show "Bill No" immediately
+        final int billNumber = await orderStore.getNextBillNumber();
+
+        // Store the bill number on the order so later prints use the same number
+        final orderWithBill = completedOrder.copyWith(billNumber: billNumber);
+        await orderStore.updateOrder(orderWithBill);
+        await restaurantCartStore.clearCart();
+        if (selectedCustomer != null) {
+          await _updateCustomerStats(selectedCustomer!, 'Dine In');
+        }
+
+        // Show success + print dialog (same as completed orders)
+        await _showOrderSuccessDialog(orderWithBill, calculations, billNumber: billNumber);
+        return;
+      }
+
+      // Take Away / Delivery / already Served → complete immediately
       final int billNumber = await completeOrder(completedOrder, calculations);
 
       // Update customer stats if customer is linked
@@ -1108,7 +1147,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
       print('✅ Cart cleared after settling order');
 
       await tableStore.updateTableStatus(widget.tableid!, 'Available');
-      // _showSnackBar('Order Completed Successfully!');
 
       NotificationService.instance.showSuccess(
         'Order Completed Successfully!',
@@ -1117,7 +1155,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
       // Show success dialog with print option
       await _showOrderSuccessDialog(completedOrder, calculations, billNumber: billNumber);
     } catch (e) {
-      // _showSnackBar('Failed to proceed with the order: $e', isError: true);
       NotificationService.instance.showError(
         'Failed to proceed with the order: $e',
       );
@@ -1142,7 +1179,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
       items: activeModel.items,
       orderAt: activeModel.timeStamp,
       orderType: activeModel.orderType,
-      paymentmode: SelectedFilter,
+      paymentmode: _paymentEntries.isNotEmpty
+          ? (_paymentEntries.length > 1 ? 'Split Payment' : _paymentEntries.first.method)
+          : 'Cash',
       remark:
           SelectedRemark == 'other' ? _remarkController.text : SelectedRemark,
       Discount: calculations.discountAmount,
@@ -1154,6 +1193,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
           activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+      tableNo: activeModel.tableNo,
     );
     await pastOrderStore.addOrder(pastOrder);
     await orderStore.deleteOrder(activeModel.id);
@@ -1207,6 +1247,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         totalPaid: _totalPaid,
         changeReturn: _changeReturn,
         isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+        tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
@@ -1380,7 +1421,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       status: 'Completed',
       timeStamp: pastOrder.orderAt ?? DateTime.now(),
       orderType: pastOrder.orderType ?? 'Take Away',
-      tableNo: '',
+      tableNo: pastOrder.tableNo,
       totalPrice: pastOrder.totalPrice,
       kotNumbers: pastOrder.kotNumbers,
       itemCountAtLastKot: pastOrder.items.length,
@@ -1468,8 +1509,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
     } catch (e) {
       print('Error clearing cart: $e');
       if (mounted) {
-        NotificationService.instance.showInfo(
-          '$Error clearing cart',
+        NotificationService.instance.showError(
+          'Error clearing cart',
         );
       }
     }
@@ -1500,8 +1541,73 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
   }
 
+  /// If the user typed a name or phone but did not select from autocomplete,
+  /// find-or-create a customer record and link them to this order.
+  Future<void> _autoSaveNewCustomer() async {
+    if (selectedCustomer != null) return; // already linked via autocomplete
+
+    final name = _nameController.text.trim();
+    final phone = _mobileController.text.trim();
+    if (name.isEmpty && phone.isEmpty) return; // nothing entered
+
+    try {
+      // Search by phone first to avoid creating duplicates
+      if (phone.isNotEmpty) {
+        final results = await restaurantCustomerStore.searchCustomers(phone);
+        final match = results.where((c) => c.phone == phone).firstOrNull;
+        if (match != null) {
+          if (mounted) setState(() => selectedCustomer = match);
+          print('✅ Linked to existing customer by phone: ${match.name}');
+          return;
+        }
+      }
+
+      // Search by name if phone didn't match
+      if (name.isNotEmpty) {
+        final results = await restaurantCustomerStore.searchCustomers(name);
+        final match = results.where((c) =>
+          c.name?.toLowerCase() == name.toLowerCase() &&
+          (phone.isEmpty || c.phone == phone)
+        ).firstOrNull;
+        if (match != null) {
+          if (mounted) setState(() => selectedCustomer = match);
+          print('✅ Linked to existing customer by name: ${match.name}');
+          return;
+        }
+      }
+
+      // No existing customer found — create new
+      final newCustomer = RestaurantCustomer.create(
+        customerId: const Uuid().v4(),
+        name: name.isNotEmpty ? name : null,
+        phone: phone.isNotEmpty ? phone : null,
+      );
+      final saved = await restaurantCustomerStore.addCustomer(newCustomer);
+      if (saved && mounted) {
+        setState(() => selectedCustomer = newCustomer);
+        print('✅ New customer auto-saved: $name ($phone)');
+      }
+    } catch (e) {
+      print('⚠️ Failed to auto-save customer: $e');
+      // Non-fatal — order proceeds even if customer save fails
+    }
+  }
+
   Future<void> _submitOrder(CartCalculationService calculations) async {
-    // Debug log to verify customer selection
+    // Validate mobile number if entered
+    final phone = _mobileController.text.trim();
+    if (phone.isNotEmpty) {
+      final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+      if (digitsOnly.length != 10) {
+        setState(() => _mobileError = 'Mobile number must be exactly 10 digits');
+        return;
+      }
+    }
+    setState(() => _mobileError = null);
+
+    // Auto-save customer if name/phone was typed but not picked from list
+    await _autoSaveNewCustomer();
+
     if (selectedCustomer != null) {
       print('📋 Order being placed for customer: ${selectedCustomer!.name} (ID: ${selectedCustomer!.customerId})');
     } else {

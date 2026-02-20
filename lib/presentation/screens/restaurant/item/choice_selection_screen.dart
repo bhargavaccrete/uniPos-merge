@@ -196,12 +196,51 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: 5),
-                    Text(
-                      '${choice.choiceOption.length} option${choice.choiceOption.length != 1 ? 's' : ''} available',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.grey[500],
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          '${choice.choiceOption.length} option${choice.choiceOption.length != 1 ? 's' : ''} available',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (choice.allowMultipleSelection ?? false)
+                                ? Colors.blue.shade100
+                                : Colors.purple.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                (choice.allowMultipleSelection ?? false)
+                                    ? Icons.check_box_outlined
+                                    : Icons.radio_button_checked,
+                                size: 11,
+                                color: (choice.allowMultipleSelection ?? false)
+                                    ? Colors.blue.shade700
+                                    : Colors.purple.shade700,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                (choice.allowMultipleSelection ?? false) ? 'Multi-select' : 'Single',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: (choice.allowMultipleSelection ?? false)
+                                      ? Colors.blue.shade700
+                                      : Colors.purple.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     SizedBox(height: 8),
                     Wrap(

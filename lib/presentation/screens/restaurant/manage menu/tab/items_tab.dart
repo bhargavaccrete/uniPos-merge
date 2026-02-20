@@ -192,14 +192,14 @@ class _AllTabState extends State<ItemsTab> {
         final allItem = itemStore.items.toList();
         final categorybox = categoryStore.categories;
 
-        // Filter items by search query
-        final filteredItems = query.isEmpty
-            ? allItem
-            : allItem.where((item) {
-                final name = item.name.toLowerCase();
-                final queryLower = query.toLowerCase();
-                return name.contains(queryLower);
-              }).toList();
+        // Filter items by search query and selected category
+        final filteredItems = allItem.where((item) {
+          final matchesQuery = query.isEmpty ||
+              item.name.toLowerCase().contains(query.toLowerCase());
+          final matchesCategory = widget.selectedCategory == null ||
+              item.categoryOfItem == widget.selectedCategory;
+          return matchesQuery && matchesCategory;
+        }).toList();
 
         if (filteredItems.isEmpty) {
           return Center(
@@ -209,7 +209,9 @@ class _AllTabState extends State<ItemsTab> {
                 Lottie.asset(AppImages.notfoundanimation, height: size.height * 0.25),
                 SizedBox(height: 16),
                 Text(
-                  query.isEmpty ? 'No Items Found!' : 'No matching items',
+                  query.isEmpty && widget.selectedCategory == null
+                      ? 'No Items Found!'
+                      : 'No matching items',
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -444,7 +446,7 @@ class _AllTabState extends State<ItemsTab> {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      // QR Code Icon
+                                  /*    // QR Code Icon
                                       Container(
                                         padding: EdgeInsets.all(8),
                                         decoration: BoxDecoration(
@@ -454,7 +456,7 @@ class _AllTabState extends State<ItemsTab> {
                                         child: Icon(Icons.qr_code, size: 20, color: Colors.grey.shade700),
                                       ),
                                       SizedBox(width: 8),
-
+*/
                                       // Edit Button
                                       InkWell(
                                         onTap: () => editItems(item),
@@ -502,14 +504,14 @@ class _AllTabState extends State<ItemsTab> {
         final allItem = itemStore.items.toList();
         final categorybox = categoryStore.categories;
 
-        // Filter items by search query
-        final filteredItems = query.isEmpty
-            ? allItem
-            : allItem.where((item) {
-                final name = item.name.toLowerCase();
-                final queryLower = query.toLowerCase();
-                return name.contains(queryLower);
-              }).toList();
+        // Filter items by search query and selected category
+        final filteredItems = allItem.where((item) {
+          final matchesQuery = query.isEmpty ||
+              item.name.toLowerCase().contains(query.toLowerCase());
+          final matchesCategory = widget.selectedCategory == null ||
+              item.categoryOfItem == widget.selectedCategory;
+          return matchesQuery && matchesCategory;
+        }).toList();
 
         if (filteredItems.isEmpty) {
           return Center(
@@ -519,7 +521,9 @@ class _AllTabState extends State<ItemsTab> {
                 Lottie.asset(AppImages.notfoundanimation, height: size.height * 0.25),
                 SizedBox(height: 16),
                 Text(
-                  query.isEmpty ? 'No Items Found!' : 'No matching items',
+                  query.isEmpty && widget.selectedCategory == null
+                      ? 'No Items Found!'
+                      : 'No matching items',
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,

@@ -19,30 +19,45 @@ class ManageCategory extends StatefulWidget {
 
 
 
-TextEditingController categoryController = TextEditingController();
-
-
-
 class _ManageCategoryState extends State<ManageCategory> {
+  final TextEditingController categoryController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     expenseCategoryStore.loadCategories();
   }
 
+  @override
+  void dispose() {
+    categoryController.dispose();
+    super.dispose();
+  }
+
   Future<void> AddECategory() async {
-    if (categoryController.text.trim().isEmpty) {
-      Navigator.pop(context);
-      NotificationService.instance.showError('Category Name Cannot Be Empty');
+    final name = categoryController.text.trim();
+
+    if (name.isEmpty) {
+      NotificationService.instance.showError('Category name cannot be empty');
       return;
     }
+
+    final isDuplicate = expenseCategoryStore.categories.any(
+      (c) => c.name.toLowerCase() == name.toLowerCase(),
+    );
+    if (isDuplicate) {
+      NotificationService.instance.showError('A category with this name already exists');
+      return;
+    }
+
     final category = ExpenseCategory(
       id: Uuid().v4(),
-      name: categoryController.text.trim(),
+      name: name,
     );
 
     final success = await expenseCategoryStore.addCategory(category);
     if (success) {
+      NotificationService.instance.showSuccess('Category added successfully');
       _clear();
       if (mounted) {
         Navigator.pop(context);

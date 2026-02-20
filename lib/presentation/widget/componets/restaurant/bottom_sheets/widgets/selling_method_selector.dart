@@ -57,7 +57,7 @@ class SellingMethodSelector extends StatelessWidget {
               labelText: 'Select Unit',
               border: OutlineInputBorder(),
             ),
-            items: ['kg', 'gm'].map((String unit) {
+            items: ['kg', 'gm', 'lbs', 'litre', 'ml', 'pcs'].map((String unit) {
               return DropdownMenuItem<String>(
                 value: unit,
                 child: Text(unit),

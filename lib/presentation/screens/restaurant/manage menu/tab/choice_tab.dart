@@ -6,6 +6,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/images.dart';
 import 'package:uuid/uuid.dart';
@@ -469,10 +470,16 @@ class _ChoiceTabState extends State<ChoiceTab> {
 
   Future<void> _addOrEditChoice(List<ChoiceOption> option) async {
     final trimmedName = choiceController.text.trim();
-    if (trimmedName.isEmpty) return;
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Choice name cannot be empty');
+      return;
+    }
 
     final isEditing = editingChoice != null;
     final editId = editingChoice?.id;
+    // Capture before clearing state, otherwise these read null below
+    final existingCreatedTime = editingChoice?.createdTime;
+    final existingEditCount = editingChoice?.editCount ?? 0;
 
     choiceController.clear();
     optionController.clear();
@@ -484,10 +491,10 @@ class _ChoiceTabState extends State<ChoiceTab> {
         id: editId,
         name: trimmedName,
         choiceOption: option,
-        createdTime: editingChoice?.createdTime,
+        createdTime: existingCreatedTime,
         lastEditedTime: DateTime.now(),
         editedBy: 'Admin',
-        editCount: (editingChoice?.editCount ?? 0) + 1,
+        editCount: existingEditCount + 1,
         allowMultipleSelection: allowMultipleSelection,
       );
       await choiceStore.updateChoice(updateChoice);

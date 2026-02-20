@@ -198,7 +198,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                     bordercircular: 10,
                     height: AppResponsive.height(context, 0.06),
                     child: Text(
-                      'Continue',
+                      'Back',
                       style: GoogleFonts.poppins(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w500,

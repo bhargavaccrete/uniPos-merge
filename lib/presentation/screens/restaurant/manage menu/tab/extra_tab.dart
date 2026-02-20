@@ -22,7 +22,8 @@ class ExtraTab extends StatefulWidget {
 }
 
 class _ExtraTabState extends State<ExtraTab> {
-  int? editingIndex, editingToppingIndex;
+  String? editingId;
+  int? editingToppingIndex;
 
   final _extrasController = TextEditingController();
   final _toppingController = TextEditingController();
@@ -64,17 +65,17 @@ class _ExtraTabState extends State<ExtraTab> {
     super.dispose();
   }
 
-  void _openExtraBottomSheet({Extramodel? extra, int? index}) {
+  void _openExtraBottomSheet({Extramodel? extra}) {
     if (extra != null) {
       _extrasController.text = extra.Ename;
       _minimumController.text = extra.minimum?.toString() ?? '';
       _maximumController.text = extra.maximum?.toString() ?? '';
-      editingIndex = index;
+      editingId = extra.Id;
     } else {
       _extrasController.clear();
       _minimumController.clear();
       _maximumController.clear();
-      editingIndex = null;
+      editingId = null;
     }
 
     showModalBottomSheet(
@@ -110,7 +111,7 @@ class _ExtraTabState extends State<ExtraTab> {
               ),
               SizedBox(width: 12),
               Text(
-                editingIndex == null ? 'Add Extra Category' : 'Edit Extra Category',
+                editingId == null ? 'Add Extra Category' : 'Edit Extra Category',
                 style: GoogleFonts.poppins(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
@@ -135,6 +136,48 @@ class _ExtraTabState extends State<ExtraTab> {
               ),
             ),
           ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _minimumController,
+                  keyboardType: TextInputType.number,
+                  style: GoogleFonts.poppins(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: "Min Selection",
+                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
+                    prefixIcon: Icon(Icons.remove_circle_outline, color: AppColors.primary),
+                    hintText: '0',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _maximumController,
+                  keyboardType: TextInputType.number,
+                  style: GoogleFonts.poppins(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: "Max Selection",
+                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
+                    prefixIcon: Icon(Icons.add_circle_outline, color: AppColors.primary),
+                    hintText: '0',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
           SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -151,14 +194,14 @@ class _ExtraTabState extends State<ExtraTab> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    editingIndex == null
+                    editingId == null
                         ? Icons.add_circle_outline
                         : Icons.check_circle_outline,
                     color: Colors.white,
                   ),
                   SizedBox(width: 8),
                   Text(
-                    editingIndex == null ? 'Add' : 'Update',
+                    editingId == null ? 'Add' : 'Update',
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       color: Colors.white,
@@ -175,6 +218,7 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   void _openToppingBottomSheet({required Extramodel extra, int? toppingIndex}) {
+    _loadAvailableVariants(); // Always refresh before opening
     if (toppingIndex != null) {
       final topping = extra.topping![toppingIndex];
       _toppingController.text = topping.name;
@@ -249,7 +293,7 @@ class _ExtraTabState extends State<ExtraTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Add Topping',
+                          editingToppingIndex != null ? 'Edit Topping' : 'Add Topping',
                           style: GoogleFonts.poppins(
                             fontSize: 20,
                             fontWeight: FontWeight.w600,
@@ -606,26 +650,29 @@ class _ExtraTabState extends State<ExtraTab> {
     if (trimmedName.isEmpty) return;
 
     try {
-      if (editingIndex != null) {
-        final allExtras = extraStore.extras.toList();
-        final currentExtra = allExtras[editingIndex!];
+      if (editingId != null) {
+        final currentExtra = extraStore.extras.firstWhere((e) => e.Id == editingId);
 
         final updatedExtra = Extramodel(
           Id: currentExtra.Id,
           Ename: trimmedName,
           topping: currentExtra.topping,
+          minimum: int.tryParse(_minimumController.text.trim()),
+          maximum: int.tryParse(_maximumController.text.trim()),
         );
         await extraStore.updateExtra(updatedExtra);
       } else {
         final newExtra = Extramodel(
           Id: const Uuid().v4(),
           Ename: trimmedName,
+          minimum: int.tryParse(_minimumController.text.trim()),
+          maximum: int.tryParse(_maximumController.text.trim()),
         );
         await extraStore.addExtra(newExtra);
       }
 
       _extrasController.clear();
-      editingIndex = null;
+      editingId = null;
       Navigator.pop(context);
     } catch (e) {
       NotificationService.instance.showError('Error: $e');
@@ -672,10 +719,44 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Future<void> _deleteTopping(Extramodel extra, int toppingIndex) async {
-    try {
-      await extraStore.removeTopping(extra.Id, toppingIndex);
-    } catch (e) {
-      NotificationService.instance.showError('Error: $e');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Text('Delete Topping', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete this topping?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await extraStore.removeTopping(extra.Id, toppingIndex);
+      } catch (e) {
+        NotificationService.instance.showError('Error: $e');
+      }
     }
   }
 
@@ -807,7 +888,7 @@ class _ExtraTabState extends State<ExtraTab> {
           itemCount: filteredExtras.length,
           itemBuilder: (context, index) {
             final extra = filteredExtras[index];
-            return _buildMobileExtraCard(extra, index);
+            return _buildMobileExtraCard(extra);
           },
         );
       },
@@ -834,7 +915,7 @@ class _ExtraTabState extends State<ExtraTab> {
           itemCount: filteredExtras.length,
           itemBuilder: (context, index) {
             final extra = filteredExtras[index];
-            return _buildGridExtraCard(extra, index);
+            return _buildGridExtraCard(extra);
           },
         );
       },
@@ -883,7 +964,7 @@ class _ExtraTabState extends State<ExtraTab> {
     );
   }
 
-  Widget _buildMobileExtraCard(Extramodel extra, int index) {
+  Widget _buildMobileExtraCard(Extramodel extra) {
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -949,7 +1030,7 @@ class _ExtraTabState extends State<ExtraTab> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     InkWell(
-                      onTap: () => _openExtraBottomSheet(extra: extra, index: index),
+                      onTap: () => _openExtraBottomSheet(extra: extra),
                       child: Container(
                         padding: EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -1102,7 +1183,7 @@ class _ExtraTabState extends State<ExtraTab> {
     );
   }
 
-  Widget _buildGridExtraCard(Extramodel extra, int index) {
+  Widget _buildGridExtraCard(Extramodel extra) {
     return Card(
       elevation: 2,
       shadowColor: Colors.black.withOpacity(0.1),
@@ -1267,7 +1348,7 @@ class _ExtraTabState extends State<ExtraTab> {
                   children: [
                     Expanded(
                       child: InkWell(
-                        onTap: () => _openExtraBottomSheet(extra: extra, index: index),
+                        onTap: () => _openExtraBottomSheet(extra: extra),
                         child: Container(
                           padding: EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(

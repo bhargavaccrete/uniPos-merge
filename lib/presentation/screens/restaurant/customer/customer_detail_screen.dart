@@ -52,6 +52,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   }
 
   Future<void> _addLoyaltyPoints() async {
+    if (_isLoading) return;
     final pointsController = TextEditingController();
     final result = await showDialog<bool>(
       context: context,
@@ -150,21 +151,36 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       ),
     );
 
-    if (result == true && pointsController.text.isNotEmpty) {
-      final points = int.tryParse(pointsController.text);
-      if (points != null && points > 0) {
-        final success = await restaurantCustomerStore.addLoyaltyPoints(_customer.customerId, points);
-        if (success) {
-          await _refreshCustomerData();
-          if (mounted) {
-            NotificationService.instance.showSuccess('$points loyalty points added');
-          }
+    final rawText = pointsController.text.trim();
+    pointsController.dispose();
+
+    if (result != true) return;
+    if (rawText.isEmpty) {
+      NotificationService.instance.showError('Please enter the number of points');
+      return;
+    }
+    final points = int.tryParse(rawText);
+    if (points == null || points <= 0) {
+      NotificationService.instance.showError('Points must be a number greater than 0');
+      return;
+    }
+
+    setState(() { _isLoading = true; });
+    try {
+      final success = await restaurantCustomerStore.addLoyaltyPoints(_customer.customerId, points);
+      if (success) {
+        await _refreshCustomerData();
+        if (mounted) {
+          NotificationService.instance.showSuccess('$points loyalty points added');
         }
       }
+    } finally {
+      if (mounted) setState(() { _isLoading = false; });
     }
   }
 
   Future<void> _deleteCustomer() async {
+    if (_isLoading) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -233,9 +249,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
 
     if (confirm == true) {
-      final success = await restaurantCustomerStore.deleteCustomer(_customer.customerId);
-      if (mounted && success) {
-        Navigator.pop(context, 'deleted');
+      setState(() { _isLoading = true; });
+      try {
+        final success = await restaurantCustomerStore.deleteCustomer(_customer.customerId);
+        if (mounted && success) {
+          Navigator.pop(context, 'deleted');
+        } else if (mounted) {
+          setState(() { _isLoading = false; });
+        }
+      } catch (_) {
+        if (mounted) setState(() { _isLoading = false; });
       }
     }
   }
@@ -249,6 +272,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       return 'Unknown';
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

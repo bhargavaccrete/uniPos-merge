@@ -27,7 +27,6 @@ class _manageStaffState extends State<manageStaff> {
   TextEditingController userNameController = TextEditingController();
   TextEditingController firstNameController = TextEditingController();
   TextEditingController lastNameController = TextEditingController();
-  TextEditingController roleController = TextEditingController();
   TextEditingController mobileController = TextEditingController();
   TextEditingController mailController = TextEditingController();
   TextEditingController pinNoController = TextEditingController();
@@ -36,6 +35,7 @@ class _manageStaffState extends State<manageStaff> {
   String selectedrole = 'Select Role';
   String searchQuery = '';
   final _formKey = GlobalKey<FormState>();
+  final _editFormKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
@@ -90,7 +90,6 @@ class _manageStaffState extends State<manageStaff> {
     userNameController.clear();
     firstNameController.clear();
     lastNameController.clear();
-    roleController.clear();
     mobileController.clear();
     mailController.clear();
     pinNoController.clear();
@@ -517,6 +516,7 @@ class _manageStaffState extends State<manageStaff> {
                           controller: userNameController,
                           BorderColor: AppColors.primary,
                           borderc: 12,
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Username is required' : null,
                         ),
                         SizedBox(height: 16),
                         Row(
@@ -529,6 +529,7 @@ class _manageStaffState extends State<manageStaff> {
                                 controller: firstNameController,
                                 BorderColor: AppColors.primary,
                                 borderc: 12,
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                               ),
                             ),
                             SizedBox(width: 12),
@@ -540,6 +541,7 @@ class _manageStaffState extends State<manageStaff> {
                                 controller: lastNameController,
                                 BorderColor: AppColors.primary,
                                 borderc: 12,
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                               ),
                             ),
                           ],
@@ -596,6 +598,12 @@ class _manageStaffState extends State<manageStaff> {
                           controller: mobileController,
                           BorderColor: AppColors.primary,
                           borderc: 12,
+                          keyboardType: TextInputType.phone,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Mobile number is required';
+                            if (!RegExp(r'^\d{7,15}$').hasMatch(v.trim())) return 'Enter a valid mobile number';
+                            return null;
+                          },
                         ),
                         SizedBox(height: 16),
                         CommonTextForm(
@@ -605,6 +613,12 @@ class _manageStaffState extends State<manageStaff> {
                           controller: mailController,
                           BorderColor: AppColors.primary,
                           borderc: 12,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Email is required';
+                            if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Enter a valid email';
+                            return null;
+                          },
                         ),
                         SizedBox(height: 16),
                         CommonTextForm(
@@ -614,6 +628,12 @@ class _manageStaffState extends State<manageStaff> {
                           controller: pinNoController,
                           BorderColor: AppColors.primary,
                           borderc: 12,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'PIN is required';
+                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
+                            return null;
+                          },
                         ),
                         SizedBox(height: 28),
                         Row(
@@ -641,6 +661,16 @@ class _manageStaffState extends State<manageStaff> {
                               onPressed: () {
                                 if (_formKey.currentState!.validate()) {
                                   if (selectedrole != 'Select Role') {
+                                    final username = userNameController.text.trim().toLowerCase();
+                                    final isDuplicate = staffStore.staff.any(
+                                      (s) => s.userName.toLowerCase() == username,
+                                    );
+                                    if (isDuplicate) {
+                                      NotificationService.instance.showError(
+                                        'Username already exists. Please choose a different one.',
+                                      );
+                                      return;
+                                    }
                                     _addStaff();
                                     Navigator.pop(context);
                                     NotificationService.instance.showSuccess(
@@ -713,7 +743,9 @@ class _manageStaffState extends State<manageStaff> {
                 borderRadius: BorderRadius.circular(16),
               ),
               insetPadding: EdgeInsets.all(isTablet ? 24 : 16),
-              child: SingleChildScrollView(
+              child: Form(
+                key: _editFormKey,
+                child: SingleChildScrollView(
                 child: Container(
                   padding: EdgeInsets.all(isTablet ? 24 : 20),
                   child: Column(
@@ -755,6 +787,7 @@ class _manageStaffState extends State<manageStaff> {
                         controller: editUserNameController,
                         BorderColor: Colors.orange,
                         borderc: 12,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Username is required' : null,
                       ),
                       SizedBox(height: 16),
                       Row(
@@ -767,6 +800,7 @@ class _manageStaffState extends State<manageStaff> {
                               controller: editFirstNameController,
                               BorderColor: Colors.orange,
                               borderc: 12,
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                             ),
                           ),
                           SizedBox(width: 12),
@@ -778,6 +812,7 @@ class _manageStaffState extends State<manageStaff> {
                               controller: editLastNameController,
                               BorderColor: Colors.orange,
                               borderc: 12,
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                             ),
                           ),
                         ],
@@ -823,6 +858,12 @@ class _manageStaffState extends State<manageStaff> {
                         controller: editMobileController,
                         BorderColor: Colors.orange,
                         borderc: 12,
+                        keyboardType: TextInputType.phone,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Mobile number is required';
+                          if (!RegExp(r'^\d{7,15}$').hasMatch(v.trim())) return 'Enter a valid mobile number';
+                          return null;
+                        },
                       ),
                       SizedBox(height: 16),
                       CommonTextForm(
@@ -832,6 +873,12 @@ class _manageStaffState extends State<manageStaff> {
                         controller: editEmailController,
                         BorderColor: Colors.orange,
                         borderc: 12,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Email is required';
+                          if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Enter a valid email';
+                          return null;
+                        },
                       ),
                       SizedBox(height: 16),
                       CommonTextForm(
@@ -841,6 +888,12 @@ class _manageStaffState extends State<manageStaff> {
                         controller: editPinController,
                         BorderColor: Colors.orange,
                         borderc: 12,
+                        keyboardType: TextInputType.number,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'PIN is required';
+                          if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
+                          return null;
+                        },
                       ),
                       SizedBox(height: 16),
                       Container(
@@ -908,6 +961,7 @@ class _manageStaffState extends State<manageStaff> {
                           SizedBox(width: 12),
                           ElevatedButton(
                             onPressed: () async {
+                              if (!_editFormKey.currentState!.validate()) return;
                               final updatedStaff = staff.copyWith(
                                 userName: editUserNameController.text.trim(),
                                 firstName: editFirstNameController.text.trim(),
@@ -952,6 +1006,7 @@ class _manageStaffState extends State<manageStaff> {
                   ),
                 ),
               ),
+            ),
             );
           },
         );

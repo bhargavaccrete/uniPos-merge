@@ -27,6 +27,7 @@ class _ManageInventoryState extends State<ManageInventory> {
 
   final Map<String, TextEditingController> _stockControllers = {};
   final Map<String, bool> _expandedCategories = {};
+  final Set<String> _busyKeys = {};
 
   @override
   void initState() {
@@ -52,7 +53,6 @@ class _ManageInventoryState extends State<ManageInventory> {
     try {
       final variant = variantStore.variants.firstWhere(
         (v) => v.id == variantId,
-        orElse: () => variantStore.variants.first,
       );
       return variant.name;
     } catch (e) {
@@ -68,8 +68,10 @@ class _ManageInventoryState extends State<ManageInventory> {
   }
 
   void _addStock(Items item, {ItemVariante? variant}) async {
-    final controller = _getStockController(
-        variant != null ? '${item.id}_${variant.variantId}' : item.id);
+    final key = variant != null ? '${item.id}_${variant.variantId}' : item.id;
+    if (_busyKeys.contains(key)) return;
+
+    final controller = _getStockController(key);
 
     if (controller.text.isEmpty) {
       if (mounted) {
@@ -97,6 +99,7 @@ class _ManageInventoryState extends State<ManageInventory> {
       return;
     }
 
+    setState(() => _busyKeys.add(key));
     try {
       if (variant != null) {
         // Update the variant's stock quantity
@@ -116,14 +119,12 @@ class _ManageInventoryState extends State<ManageInventory> {
           trackInventory: true,
           variant: updatedVariants,
         ));
-        print('✅ Added stock to variant ${variant.variantId}. New stock: ${(variant.stockQuantity ?? 0) + stockToAdd}');
       } else {
         // Use store's updateItem to ensure MobX observers are notified
         await itemStore.updateItem(item.copyWith(
           trackInventory: true,
           stockQuantity: item.stockQuantity + stockToAdd,
         ));
-        print('✅ Added stock to item ${item.name}. New stock: ${item.stockQuantity + stockToAdd}, trackInventory: true');
       }
 
       controller.clear();
@@ -136,10 +137,11 @@ class _ManageInventoryState extends State<ManageInventory> {
         );
       }
     } catch (e) {
-      print('Error adding stock: $e');
       if (mounted) {
-        NotificationService.instance.showError('Error adding stock: $e');
+        NotificationService.instance.showError('Error adding stock. Please try again.');
       }
+    } finally {
+      if (mounted) setState(() => _busyKeys.remove(key));
     }
   }
 
@@ -147,8 +149,10 @@ class _ManageInventoryState extends State<ManageInventory> {
   // Add this new function inside your _ManageInventoryState class
 
   void _removeStock(Items item, {ItemVariante? variant}) async {
-    final controller = _getStockController(
-        variant != null ? '${item.id}_${variant.variantId}' : item.id);
+    final key = variant != null ? '${item.id}_${variant.variantId}' : item.id;
+    if (_busyKeys.contains(key)) return;
+
+    final controller = _getStockController(key);
 
     if (controller.text.isEmpty) {
       if (mounted) {
@@ -170,8 +174,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     final isWeightBased = item.isSoldByWeight;
     final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
 
-    // ** CRUCIAL VALIDATION STEP **
-    // Check if there is enough stock to remove.
+    // Check if there is enough stock to remove
     if (currentStock < stockToRemove) {
       if (mounted) {
         NotificationService.instance.showError('Not enough stock. Only ${currentStock.toStringAsFixed(isWeightBased ? 2 : 0)} $unit available.');
@@ -187,9 +190,10 @@ class _ManageInventoryState extends State<ManageInventory> {
       return;
     }
 
+    setState(() => _busyKeys.add(key));
     try {
       if (variant != null) {
-        // ** SUBTRACT from variant stock **
+        // Subtract from variant stock
         final updatedVariants = item.variant?.map((v) {
           if (v.variantId == variant.variantId) {
             return ItemVariante(
@@ -205,14 +209,11 @@ class _ManageInventoryState extends State<ManageInventory> {
         await itemStore.updateItem(item.copyWith(
           variant: updatedVariants,
         ));
-        print('✅ Removed stock from variant ${variant.variantId}. New stock: ${(variant.stockQuantity ?? 0) - stockToRemove}');
       } else {
-        // ** SUBTRACT from item stock **
-        // Use store's updateItem to ensure MobX observers are notified
+        // Subtract from item stock
         await itemStore.updateItem(item.copyWith(
           stockQuantity: item.stockQuantity - stockToRemove,
         ));
-        print('✅ Removed stock from item ${item.name}. New stock: ${item.stockQuantity - stockToRemove}');
       }
 
       controller.clear();
@@ -225,10 +226,11 @@ class _ManageInventoryState extends State<ManageInventory> {
         );
       }
     } catch (e) {
-      print('Error removing stock: $e');
       if (mounted) {
-        NotificationService.instance.showError('Error removing stock: $e');
+        NotificationService.instance.showError('Error removing stock. Please try again.');
       }
+    } finally {
+      if (mounted) setState(() => _busyKeys.remove(key));
     }
   }
 

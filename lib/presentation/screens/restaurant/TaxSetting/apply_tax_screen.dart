@@ -23,6 +23,7 @@ class ApplyTaxScreen extends StatefulWidget {
 
 class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
   final Set<String> _selectedItemIds = {};
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -53,50 +54,60 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
 
 
   Future<void> _applyTaxToSelected() async {
-    if (_selectedItemIds.isEmpty) return;
+    if (_selectedItemIds.isEmpty || _isLoading) return;
 
-    final double rate = widget.taxToApply.taxperecentage! / 100.0;
+    setState(() => _isLoading = true);
+    try {
+      final double rate = widget.taxToApply.taxperecentage! / 100.0;
 
-    debugPrint("🔵 Applying tax: ${widget.taxToApply.taxname} at rate: $rate (${widget.taxToApply.taxperecentage}%)");
-    debugPrint("🔵 Selected items: ${_selectedItemIds.length}");
+      debugPrint("🔵 Applying tax: ${widget.taxToApply.taxname} at rate: $rate (${widget.taxToApply.taxperecentage}%)");
+      debugPrint("🔵 Selected items: ${_selectedItemIds.length}");
 
-    for (String id in _selectedItemIds) {
-      try {
-        final item = itemStore.items.firstWhere((item) => item.id == id);
-        debugPrint("🔵 Applying tax to: ${item.name}, current taxRate: ${item.taxRate}");
-        item.applyTax(rate);
-        await itemStore.updateItem(item);
-        debugPrint("🔵 After apply - ${item.name}, new taxRate: ${item.taxRate}");
-      } catch (e) {
-        debugPrint("❌ Item not found with id: $id");
+      for (String id in _selectedItemIds) {
+        try {
+          final item = itemStore.items.firstWhere((item) => item.id == id);
+          debugPrint("🔵 Applying tax to: ${item.name}, current taxRate: ${item.taxRate}");
+          item.applyTax(rate);
+          await itemStore.updateItem(item);
+          debugPrint("🔵 After apply - ${item.name}, new taxRate: ${item.taxRate}");
+        } catch (e) {
+          debugPrint("❌ Item not found with id: $id");
+        }
       }
+
+      setState(() => _selectedItemIds.clear());
+
+      NotificationService.instance.showSuccess(
+        '${widget.taxToApply.taxname} (${widget.taxToApply.taxperecentage}%) applied to selected items.',
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    setState(() => _selectedItemIds.clear());
-
-    NotificationService.instance.showInfo(
-      '${widget.taxToApply.taxname} (${widget.taxToApply.taxperecentage}%) applied to selected items.',
-    );
   }
 
   Future<void> _removeTaxFromSelected() async {
-    if (_selectedItemIds.isEmpty) return;
+    if (_selectedItemIds.isEmpty || _isLoading) return;
 
-    for (String id in _selectedItemIds) {
-      try {
-        final item = itemStore.items.firstWhere((item) => item.id == id);
-        item.removeTax();
-        await itemStore.updateItem(item);
-      } catch (e) {
-        debugPrint("❌ Item not found with id: $id");
+    setState(() => _isLoading = true);
+    try {
+      for (String id in _selectedItemIds) {
+        try {
+          final item = itemStore.items.firstWhere((item) => item.id == id);
+          item.removeTax();
+          await itemStore.updateItem(item);
+        } catch (e) {
+          debugPrint("❌ Item not found with id: $id");
+        }
       }
+
+      setState(() => _selectedItemIds.clear());
+
+      NotificationService.instance.showSuccess(
+        'Tax removed from selected items.',
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    setState(() => _selectedItemIds.clear());
-
-    NotificationService.instance.showInfo(
-      'Tax removed from selected items.',
-    );
   }
   @override
   Widget build(BuildContext context) {
@@ -168,7 +179,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _selectedItemIds.isEmpty ? null : _applyTaxToSelected,
+                        onPressed: (_selectedItemIds.isEmpty || _isLoading) ? null : _applyTaxToSelected,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -194,7 +205,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                     SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _selectedItemIds.isEmpty ? null : _removeTaxFromSelected,
+                        onPressed: (_selectedItemIds.isEmpty || _isLoading) ? null : _removeTaxFromSelected,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
                           foregroundColor: Colors.white,

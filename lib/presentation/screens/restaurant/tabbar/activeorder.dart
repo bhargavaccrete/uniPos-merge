@@ -26,6 +26,8 @@ class Activeorder extends StatefulWidget {
 
 class _ActiveorderState extends State<Activeorder> {
   String dropDownValue = 'All';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
   StreamSubscription? _wsSubscription;
   final _wsService = WebSocketClientService();
 
@@ -94,6 +96,7 @@ class _ActiveorderState extends State<Activeorder> {
   @override
   void dispose() {
     _wsSubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -119,7 +122,38 @@ class _ActiveorderState extends State<Activeorder> {
 
     // Only delete if the user confirmed
     if (shouldDelete == true) {
+      final order = orderStore.orders.where((o) => o.id == orderId).firstOrNull;
+
+      if (order != null) {
+        // Save to past orders as VOID so it appears in the Void Order Report
+        final voidRecord = PastOrderModel(
+
+          id: order.id,
+          customerName: order.customerName ?? '',
+          totalPrice: order.totalPrice,
+          items: order.items,
+          orderAt: order.timeStamp ?? DateTime.now(),
+          orderType: order.orderType,
+          paymentmode: 'N/A',
+          subTotal: order.subTotal,
+          gstAmount: order.gstAmount,
+          Discount: order.discount,
+          remark: order.remark,
+          tableNo: order.tableNo,
+          orderStatus: 'VOID',
+          billNumber: order.billNumber,
+          kotNumbers: order.kotNumbers,
+          kotBoundaries: order.kotBoundaries,
+        );
+        await pastOrderStore.addOrder(voidRecord);
+      }
+
       await orderStore.deleteOrder(orderId);
+
+      // Reset the table to Available so it no longer shows as occupied
+      if (order?.tableNo != null && order!.tableNo!.isNotEmpty) {
+        await tableStore.updateTableStatus(order.tableNo!, 'Available');
+      }
     }
   }
 
@@ -260,31 +294,31 @@ class _ActiveorderState extends State<Activeorder> {
                                 spacing: 8,
                                 children: [
                                   if (currentStatus != 'Cooking')
-                                    _buildStatusButton('Cooking', Colors.orange, () {
-                                      _updateKotStatus(order, kotNum, 'Cooking');
+                                    _buildStatusButton('Cooking', Colors.orange, () async {
                                       Navigator.pop(context);
+                                      await _updateKotStatus(order, kotNum, 'Cooking');
                                     }),
                                   if (currentStatus != 'Ready')
-                                    _buildStatusButton('Ready', Colors.blue, () {
-                                      _updateKotStatus(order, kotNum, 'Ready');
+                                    _buildStatusButton('Ready', Colors.blue, () async {
                                       Navigator.pop(context);
+                                      await _updateKotStatus(order, kotNum, 'Ready');
                                     }),
                                   if (currentStatus != 'Served')
-                                    _buildStatusButton('Served', Colors.green, () {
-                                      if (order.paymentStatus == 'Paid') {
-                                        // Check if all KOTs are served
-                                        final allServed = order.kotNumbers.every((k) =>
-                                          (k == kotNum) || (kotStatuses[k] == 'Served')
-                                        );
-                                        if (allServed) {
-                                          _moveOrderToPast(order);
-                                        } else {
-                                          _updateKotStatus(order, kotNum, 'Served');
-                                        }
-                                      } else {
-                                        _updateKotStatus(order, kotNum, 'Served');
-                                      }
+                                    _buildStatusButton('Served', Colors.green, () async {
                                       Navigator.pop(context);
+                                      // Get latest order state from store before deciding
+                                      final latestOrder = orderStore.orders.firstWhere(
+                                        (o) => o.id == order.id,
+                                        orElse: () => order,
+                                      );
+                                      final allServed = order.kotNumbers.every((k) =>
+                                        (k == kotNum) || (kotStatuses[k] == 'Served')
+                                      );
+                                      if (allServed && latestOrder.paymentStatus == 'Paid') {
+                                        await _moveOrderToPast(latestOrder);
+                                      } else {
+                                        await _updateKotStatus(order, kotNum, 'Served');
+                                      }
                                     }),
                                 ],
                               ),
@@ -415,32 +449,46 @@ class _ActiveorderState extends State<Activeorder> {
 
 // ACTION 2: Moves the order to the past orders box
   Future<void> _moveOrderToPast(OrderModel order) async {
-    // Create a past order record from the active order
-    final pastOrder = PastOrderModel(
-      id: order.id,
-      customerName: order.customerName,
-      totalPrice: order.totalPrice,
-      items: order.items,
-      orderAt: order.timeStamp,
-      orderType: order.orderType,
-      paymentmode: order.paymentMethod ?? 'N/A',
-      subTotal: order.subTotal,
-      gstAmount: order.gstAmount,
-      Discount: order.discount,
-      remark: order.remark,
-      // ✅ KOT tracking - REQUIRED
-      kotNumbers: order.kotNumbers,
-      kotBoundaries: order.kotBoundaries, // KOT boundaries for grouping items
+    // Always use the latest version of the order from the store
+    // (payment details may have been updated after the dialog was opened)
+    final latestOrder = orderStore.orders.firstWhere(
+      (o) => o.id == order.id,
+      orElse: () => order,
     );
 
-    // Add to past orders and delete from active orders
+    // Reuse the stored bill number if payment was recorded earlier (Dine In paid-but-not-served flow),
+    // otherwise generate a fresh one now.
+    final int billNumber = latestOrder.billNumber ?? await orderStore.getNextBillNumber();
+
+    final pastOrder = PastOrderModel(
+      id: latestOrder.id,
+      customerName: latestOrder.customerName,
+      totalPrice: latestOrder.totalPrice,
+      items: latestOrder.items,
+      orderAt: latestOrder.timeStamp,
+      orderType: latestOrder.orderType,
+      paymentmode: latestOrder.paymentMethod ?? 'N/A',
+      subTotal: latestOrder.subTotal,
+      gstAmount: latestOrder.gstAmount,
+      Discount: latestOrder.discount,
+      remark: latestOrder.remark,
+      kotNumbers: latestOrder.kotNumbers,
+      kotBoundaries: latestOrder.kotBoundaries,
+      billNumber: billNumber,
+      isSplitPayment: latestOrder.isSplitPayment,
+      paymentListJson: latestOrder.paymentListJson,
+      totalPaid: latestOrder.totalPaid,
+      changeReturn: latestOrder.changeReturn,
+      tableNo: latestOrder.tableNo,
+    );
+
     await pastOrderStore.addOrder(pastOrder);
-    await orderStore.deleteOrder(order.id);
-    if (order.tableNo != null && order.tableNo!.isNotEmpty) {
-      await tableStore.updateTableStatus(order.tableNo!, 'Available');
+    await orderStore.deleteOrder(latestOrder.id);
+    if (latestOrder.tableNo != null && latestOrder.tableNo!.isNotEmpty) {
+      await tableStore.updateTableStatus(latestOrder.tableNo!, 'Available');
     }
 
-    print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} moved to past orders.");
+    print("Order ${latestOrder.kotNumbers.isNotEmpty ? latestOrder.kotNumbers.first : latestOrder.id} moved to past orders (Bill #$billNumber).");
   }
 
 
@@ -564,6 +612,44 @@ class _ActiveorderState extends State<Activeorder> {
             ),
           ),
 
+          // Search Bar
+          Container(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+            color: AppColors.white,
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              style: GoogleFonts.poppins(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search by customer, table or KOT…',
+                hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary, fontSize: 13),
+                prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: AppColors.divider),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: AppColors.divider),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+
           // Orders List
           Expanded(
             child: Observer(
@@ -605,11 +691,21 @@ class _ActiveorderState extends State<Activeorder> {
                   );
                 }
 
-                final filterOrderList = dropDownValue == 'All'
+                var filterOrderList = dropDownValue == 'All'
                     ? activeOrders
                     : activeOrders
                         .where((order) => order.orderType == dropDownValue)
                         .toList();
+
+                // Apply search query: match customer name, table, or KOT number
+                if (_searchQuery.isNotEmpty) {
+                  filterOrderList = filterOrderList.where((order) {
+                    final nameMatch = order.customerName.toLowerCase().contains(_searchQuery);
+                    final tableMatch = (order.tableNo ?? '').toLowerCase().contains(_searchQuery);
+                    final kotMatch = order.kotNumbers.any((k) => k.toString().contains(_searchQuery));
+                    return nameMatch || tableMatch || kotMatch;
+                  }).toList();
+                }
 
                 if (filterOrderList.isEmpty) {
                   return Center(
@@ -644,7 +740,12 @@ class _ActiveorderState extends State<Activeorder> {
                       color: _getColorForStatus(order.status),
                       order: order,
                       onDelete: _deleteOrder,
-                      onPrintKot: () => _showKotPrintSelectionDialog(order), // Pass print callback
+                      onPrintKot: () => _showKotPrintSelectionDialog(order),
+                      onPrintBill: () => RestaurantPrintHelper.printBillForActiveOrder(
+                        context: context,
+                        order: order,
+                        currentItems: order.items,
+                      ),
                       ontapcooking: () async {
                         if (order.status == 'Processing' ||
                             order.status == 'Cooking' ||

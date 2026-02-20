@@ -56,6 +56,19 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
 
     try {
       if (_isEditMode) {
+        // Check if phone changed and now conflicts with another customer
+        final newPhone = _phoneController.text.trim();
+        if (newPhone != (widget.customer!.phone ?? '')) {
+          final existingCustomer = await restaurantCustomerStore.getCustomerByPhone(newPhone);
+          if (existingCustomer != null && existingCustomer.customerId != widget.customer!.customerId) {
+            if (mounted) {
+              NotificationService.instance.showError('A customer with this phone number already exists');
+              setState(() { _isLoading = false; });
+            }
+            return;
+          }
+        }
+
         // Update existing customer
         final updatedCustomer = widget.customer!.copyWith(
           name: _nameController.text.trim(),

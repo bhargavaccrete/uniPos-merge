@@ -68,7 +68,7 @@ abstract class _CartStore with Store {
         // Get the actual item to check stock
         final actualItem = await itemStore.getItemById(item.productId);
 
-        if (actualItem != null && actualItem.trackInventory == true) {
+        if (actualItem != null && actualItem.trackInventory == true && !actualItem.allowOrderWhenOutOfStock) {
           double availableStock;
 
           // ✅ FIX: For items with variants, check variant stock, not base stock
@@ -166,7 +166,7 @@ abstract class _CartStore with Store {
         // Get the actual item to check stock
         final item = await itemStore.getItemById(cartItem.productId);
 
-        if (item != null && item.trackInventory == true) {
+        if (item != null && item.trackInventory == true && !item.allowOrderWhenOutOfStock) {
           double availableStock;
 
           // ✅ FIX: For items with variants, check variant stock, not base stock

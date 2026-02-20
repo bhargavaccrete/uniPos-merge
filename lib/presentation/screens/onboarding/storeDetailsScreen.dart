@@ -62,7 +62,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
       text: getValue(widget.store.email, 'info@apple.com')
     );
     _addressController = TextEditingController(
-      text: getValue(widget.store.address, 'Inocicity, Gandhinnagar')
+      text: getValue(widget.store.address, 'Infocity, Gandhinnagar')
     );
     _gstController = TextEditingController(
       text: getValue(widget.store.gstin, 'GVFU415151YVBF')

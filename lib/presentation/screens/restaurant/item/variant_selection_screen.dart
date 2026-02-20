@@ -370,8 +370,17 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
           Expanded(
             child: CommonButton(
               onTap: () {
-                final selectedVariants = _getSelectedVariants();
-                Navigator.pop(context, selectedVariants);
+                final selected = _getSelectedVariants();
+                if (selected.isEmpty) {
+                  Navigator.pop(context, selected);
+                  return;
+                }
+                final hasInvalidPrice = selected.any((v) => (v['price'] as double) <= 0);
+                if (hasInvalidPrice) {
+                  NotificationService.instance.showError('Please enter a price greater than 0 for all selected variants');
+                  return;
+                }
+                Navigator.pop(context, selected);
               },
               bordercircular: 10,
               height: AppResponsive.height(context, 0.06),

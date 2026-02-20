@@ -21,6 +21,7 @@ class ViewExpense extends StatefulWidget {
 class _ViewExpenseState extends State<ViewExpense> {
   DateTime? _fromDatee;
   DateTime? _toDate;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -42,7 +43,6 @@ class _ViewExpenseState extends State<ViewExpense> {
     try {
       final category = expenseCategoryStore.categories.firstWhere(
         (cat) => cat.id == categoryId,
-        orElse: () => expenseCategoryStore.categories.first,
       );
       return category.name;
     } catch (e) {
@@ -381,6 +381,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () async {
+                              if (_isSubmitting) return;
                               final confirm = await showDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
@@ -440,10 +441,15 @@ class _ViewExpenseState extends State<ViewExpense> {
                                 ),
                               );
                               if (confirm == true) {
-                                await expenseStore.deleteExpense(expense.id);
-                                Navigator.pop(context);
-                                _loadExpenses();
-                                NotificationService.instance.showSuccess('Expense deleted successfully');
+                                setState(() => _isSubmitting = true);
+                                try {
+                                  await expenseStore.deleteExpense(expense.id);
+                                  Navigator.pop(context);
+                                  _loadExpenses();
+                                  NotificationService.instance.showSuccess('Expense deleted successfully');
+                                } finally {
+                                  if (mounted) setState(() => _isSubmitting = false);
+                                }
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -469,9 +475,14 @@ class _ViewExpenseState extends State<ViewExpense> {
                           flex: 2,
                           child: ElevatedButton(
                             onPressed: () async {
+                              if (_isSubmitting) return;
+                              final amount = double.tryParse(amountController.text.trim());
+                              if (amount == null || amount <= 0) {
+                                NotificationService.instance.showError('Please enter a valid amount greater than 0');
+                                return;
+                              }
+                              setState(() => _isSubmitting = true);
                               try {
-                                final amount = double.parse(amountController.text.trim());
-
                                 // Combine selected date with current time if editing today's expense
                                 final now = DateTime.now();
                                 final isSameDay = selectedDate.year == now.year &&
@@ -502,7 +513,9 @@ class _ViewExpenseState extends State<ViewExpense> {
                                 _loadExpenses();
                                 NotificationService.instance.showSuccess('Expense updated successfully');
                               } catch (e) {
-                                NotificationService.instance.showError('Please enter a valid amount');
+                                NotificationService.instance.showError('Failed to update expense. Please try again.');
+                              } finally {
+                                if (mounted) setState(() => _isSubmitting = false);
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -532,7 +545,10 @@ class _ViewExpenseState extends State<ViewExpense> {
           },
         );
       },
-    );
+    ).then((_) {
+      amountController.dispose();
+      reasonController.dispose();
+    });
   }
 
   @override

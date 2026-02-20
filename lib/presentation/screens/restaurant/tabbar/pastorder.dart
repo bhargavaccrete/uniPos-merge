@@ -6,6 +6,7 @@ import 'package:unipos/util/color.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
+import '../util/restaurant_print_helper.dart';
 import 'orderDetails.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -128,7 +129,7 @@ class _PastorderState extends State<Pastorder> {
                 child: TextField(
                   controller: _searchCtrl,
                   decoration: InputDecoration(
-                    hintText: 'Search by name / KOT / phone',
+                    hintText: 'Search name / KOT / bill no',
                     prefixIcon: Icon(Icons.search, color: AppColors.primary),
                     isDense: true,
                     border: inputBorder,
@@ -231,13 +232,16 @@ class _PastorderState extends State<Pastorder> {
                 final typeOk = _orderType == 'All' ||
                     (o.orderType ?? '').toLowerCase() == _orderType.toLowerCase();
                 final dateOk = _withinRange(o.orderAt);
+                final kotStr = o.kotNumbers.map((k) => k.toString()).join(' ');
+                final billStr = o.billNumber != null ? 'inv${o.billNumber} ${o.billNumber}' : '';
                 final text = [
                   o.customerName,
-                  o.kotNumber?.toString(),
-                  // o.customerPhone,
+                  kotStr,
+                  billStr,
                   o.orderType,
-                  o.paymentmode
-                ].where((e) => e != null).map((e) => e!.toLowerCase()).join(' ');
+                  o.paymentmode,
+                  o.tableNo,
+                ].where((e) => e != null && e!.isNotEmpty).map((e) => e!.toLowerCase()).join(' ');
                 final searchOk = q.isEmpty || text.contains(q);
                 return typeOk && dateOk && searchOk;
               }).toList();
@@ -257,6 +261,7 @@ class _PastorderState extends State<Pastorder> {
                 itemBuilder: (context, index) {
                   final o = filtered[index];
                   final isRefunded = o.isRefunded == true;
+                  final isVoided = (o.orderStatus ?? '').contains('VOID');
                   return InkWell(
                     onTap: () {
                       Navigator.push(
@@ -270,49 +275,56 @@ class _PastorderState extends State<Pastorder> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        border: Border.all(color: const Color(0xFFDEE1E6)),
+                        border: Border.all(
+                          color: isVoided
+                              ? Colors.grey.shade400
+                              : const Color(0xFFDEE1E6),
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Top row
+                          // Top row — KOT chips + bill number + date
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                 child: Wrap(
                                   spacing: 6,
                                   runSpacing: 4,
                                   children: [
-                                    Text('KOT: ', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                                    Text('KOT:', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12)),
                                     ...o.getKotNumbers().map((kotNum) => Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: Colors.blue.shade100,
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(color: Colors.blue.shade300),
                                       ),
-                                      child: Text(
-                                        '#$kotNum',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.blue.shade700,
-                                        ),
-                                      ),
+                                      child: Text('#$kotNum',
+                                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
                                     )),
+                                    if (o.billNumber != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.shade100,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.green.shade300),
+                                        ),
+                                        child: Text('INV${o.billNumber}',
+                                          style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade700)),
+                                      ),
                                   ],
                                 ),
                               ),
                               Text(_fmtDateTime(o.orderAt),
-                                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+                                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
                             ],
                           ),
                           const SizedBox(height: 6),
-                          // Name + total
+                          // Name + total + reprint button
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                 child: Text(
@@ -324,30 +336,75 @@ class _PastorderState extends State<Pastorder> {
                               const SizedBox(width: 8),
                               Text(_money(o.totalPrice),
                                   style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 8),
+                              // Reprint button
+                              if (!isVoided)
+                                InkWell(
+                                  onTap: () async {
+                                    try {
+                                      await RestaurantPrintHelper.printPastOrder(
+                                        context: context,
+                                        pastOrder: o,
+                                      );
+                                    } catch (e) {
+                                      // handled inside helper
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.print_outlined, size: 14, color: AppColors.primary),
+                                        const SizedBox(width: 4),
+                                        Text('Print', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          // Type + payment + refunded
+                          // Type + table + payment + status badges
                           Row(
                             children: [
                               Text(o.orderType ?? '',
                                   style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
+                              if ((o.tableNo ?? '').isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Text('• Table ${o.tableNo}',
+                                    style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
+                              ],
                               const Spacer(),
                               if ((o.paymentmode ?? '').isNotEmpty)
                                 Text(o.paymentmode!,
                                     style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
-                              if (isRefunded) ...[
+                              if (isVoided) ...[
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding:
-                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text('Voided',
+                                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
+                                ),
+                              ] else if (isRefunded) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
                                     color: Colors.red.shade50,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text('Refunded',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 11, color: Colors.red.shade700)),
+                                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.red.shade700)),
                                 ),
                               ],
                             ],

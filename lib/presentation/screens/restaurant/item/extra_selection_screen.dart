@@ -195,12 +195,42 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: 5),
-                    Text(
-                      '$toppingCount topping${toppingCount != 1 ? 's' : ''} available',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.grey[500],
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          '$toppingCount topping${toppingCount != 1 ? 's' : ''} available',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        if (extra.minimum != null || extra.maximum != null) ...[
+                          SizedBox(width: 8),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.teal.shade200),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.tune, size: 11, color: Colors.teal.shade700),
+                                SizedBox(width: 3),
+                                Text(
+                                  '${extra.minimum ?? 0}–${extra.maximum ?? '∞'}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.teal.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     if (extra.topping != null && extra.topping!.isNotEmpty) ...[
                       SizedBox(height: 8),

@@ -132,6 +132,29 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   }
 
   @override
+  void didUpdateWidget(SplitPaymentWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // When bill total changes (e.g. discount applied), auto-update the single
+    // payment entry so the user doesn't have to close/reopen the section.
+    if (oldWidget.billTotal != widget.billTotal && _payments.length == 1) {
+      final entry = _payments[0];
+      entry.amount = widget.billTotal;
+      entry.amountController.text =
+          widget.billTotal > 0 ? widget.billTotal.toStringAsFixed(2) : '';
+      // Reset cash fields so they stay consistent with the new amount
+      entry.cashReceived = 0;
+      entry.cashReceivedController.clear();
+      entry.cashChange = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+          _notifyChanges();
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     for (var payment in _payments) {
       payment.dispose();

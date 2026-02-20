@@ -7,7 +7,6 @@ import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/categor
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/choice_tab.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/extra_tab.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/items_tab.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/items_tab_new.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/variant_tab.dart';
 import 'package:unipos/util/color.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';

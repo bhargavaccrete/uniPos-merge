@@ -589,26 +589,37 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Expenses',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                    Expanded(
+                      child: Text(
+                        'Total Expenses',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                      ),
                     ),
+                    SizedBox(width: 4),
                     Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
                       decoration: BoxDecoration(
                         color: Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.money_off, color: Colors.red, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                      child: Icon(Icons.money_off, color: Colors.red, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
                     ),
                   ],
                 ),
                 SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
+                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -631,26 +642,37 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Count',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                    Expanded(
+                      child: Text(
+                        'Total Count',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                      ),
                     ),
+                    SizedBox(width: 4),
                     Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
                       decoration: BoxDecoration(
                         color: Colors.orange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.receipt_long, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                      child: Icon(Icons.receipt_long, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
                     ),
                   ],
                 ),
                 SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  _totalCount.toString(),
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _totalCount.toString(),
+                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -673,26 +695,37 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Average',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                    Expanded(
+                      child: Text(
+                        'Average',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                      ),
                     ),
+                    SizedBox(width: 4),
                     Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.analytics, color: AppColors.primary, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                      child: Icon(Icons.analytics, color: AppColors.primary, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
                     ),
                   ],
                 ),
                 SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageExpense)}',
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageExpense)}',
+                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                  ),
                 ),
               ],
             ),

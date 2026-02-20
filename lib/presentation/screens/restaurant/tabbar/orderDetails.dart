@@ -43,7 +43,8 @@ class _OrderdetailsState extends State<Orderdetails> {
     }
 
     final items = currentOrder.items ?? <CartItem>[];
-    final String status = currentOrder.orderStatus ?? 'COMPLETED';
+    final String status = currentOrder.orderStatus?.toUpperCase() ?? 'COMPLETED';
+    final bool isVoid = status == 'VOID' || status == 'VOIDED';
     final bool isFullyRefunded = status == 'FULLY_REFUNDED';
     final bool isPartiallyRefunded = status == 'PARTIALLY_REFUNDED';
 
@@ -75,26 +76,25 @@ class _OrderdetailsState extends State<Orderdetails> {
           children: [
             Expanded(
               child: _ActionBtn(
-                label: 'Void',
-                color: Colors.red,
-                onTap: () => _deleteOrder(context),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ActionBtn(
                 label: 'Print',
                 outlined: true,
                 onTap: () => _printBill(context),
               ),
             ),
             const SizedBox(width: 12),
-            if (!isFullyRefunded)
+            if (!isFullyRefunded && !isVoid)
               Expanded(
-                child: _ActionBtn(
-                  label: 'Refund',
-                  color: isRefundEligible ? Colors.orange : Colors.grey,
-                  onTap: () => _showRefundDialog(context),
+                child: Tooltip(
+                  message: isRefundEligible ? '' : 'Refund window (60 min) has passed',
+                  child: _ActionBtn(
+                    label: 'Refund',
+                    color: isRefundEligible ? Colors.orange : Colors.grey,
+                    onTap: isRefundEligible ? () => _showRefundDialog(context) : () {
+                      NotificationService.instance.showError(
+                        'Refund window has passed (must be within 60 minutes of order).',
+                      );
+                    },
+                  ),
                 ),
               ),
           ],
@@ -102,6 +102,36 @@ class _OrderdetailsState extends State<Orderdetails> {
       ),
       body: CustomScrollView(
         slivers: [
+          // VOID Status Banner
+          if (isVoid)
+            SliverToBoxAdapter(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  border: Border.all(color: Colors.red.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'This order was voided (deleted before payment). No refund is applicable.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // KOT Numbers Display Section
           SliverToBoxAdapter(
             child: Container(
@@ -584,7 +614,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         status: 'COMPLETED',
         timeStamp: currentOrder.orderAt ?? DateTime.now(),
         orderType: currentOrder.orderType ?? 'Take Away',
-        tableNo: null, // pastOrderModel doesn't have table info
+        tableNo: currentOrder.tableNo, // Preserved from original order
         totalPrice: currentOrder.totalPrice ?? 0,
         discount: currentOrder.Discount,
         serviceCharge: 0, // pastOrderModel doesn't store service charge separately

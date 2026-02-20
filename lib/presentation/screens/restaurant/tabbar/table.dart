@@ -15,7 +15,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 
 class TableScreen extends StatefulWidget {
   final bool? isfromcart;
-  const TableScreen({super.key, this.isfromcart= false});
+  const TableScreen({super.key, this.isfromcart = false});
 
   @override
   State<TableScreen> createState() => _TableScreenState();
@@ -28,20 +28,22 @@ class _TableScreenState extends State<TableScreen> {
     tableStore.loadTables();
   }
 
+  // ── Add ────────────────────────────────────────────────────────────────────
+
   void _addTable() {
-    final Tcontroller = TextEditingController();
+    final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'Add New Tablee',
+          'Add New Table',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
         ),
-        content: Container(
+        content: SizedBox(
           width: 300,
           child: TextField(
-            controller: Tcontroller,
+            controller: controller,
             autofocus: true,
             style: GoogleFonts.poppins(),
             decoration: InputDecoration(
@@ -60,19 +62,15 @@ class _TableScreenState extends State<TableScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: AppColors.textSecondary),
-            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (Tcontroller.text.isNotEmpty) {
-                final newTable = TableModel(id: Tcontroller.text.trim());
-                await tableStore.addTable(newTable);
-                Navigator.pop(context);
-              }
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+              await tableStore.addTable(TableModel(id: name));
+              Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
@@ -89,6 +87,254 @@ class _TableScreenState extends State<TableScreen> {
     );
   }
 
+  // ── Long-press action sheet ─────────────────────────────────────────────────
+
+  void _showTableActions(TableModel table) {
+    final isOccupied = table.status != 'Available' && table.status != 'Reserved';
+
+    // Resolve status color for the chip in the header
+    Color statusColor;
+    if (isOccupied) {
+      statusColor = AppColors.danger;
+    } else if (table.status == 'Reserved') {
+      statusColor = AppColors.warning;
+    } else {
+      statusColor = AppColors.success;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40, height: 4,
+              margin: EdgeInsets.only(top: 12, bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Text(
+                    'Table ${table.id}',
+                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  Spacer(),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      table.status,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1),
+
+            // Reserve / Unreserve (only for non-occupied tables)
+            if (!isOccupied)
+              ListTile(
+                leading: Icon(
+                  table.status == 'Reserved'
+                      ? Icons.event_available_outlined
+                      : Icons.event_seat_outlined,
+                  color: AppColors.warning,
+                ),
+                title: Text(
+                  table.status == 'Reserved' ? 'Mark as Available' : 'Reserve Table',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final newStatus = table.status == 'Reserved' ? 'Available' : 'Reserved';
+                  await tableStore.updateTableStatus(table.id, newStatus);
+                  NotificationService.instance.showSuccess(
+                    'Table ${table.id} is now $newStatus',
+                  );
+                },
+              ),
+
+            // Rename
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: AppColors.primary),
+              title: Text('Rename Table', style: GoogleFonts.poppins()),
+              onTap: () {
+                Navigator.pop(ctx);
+                _renameTable(table);
+              },
+            ),
+
+            // Delete
+            ListTile(
+              enabled: !isOccupied,
+              leading: Icon(
+                Icons.delete_outline,
+                color: isOccupied ? Colors.grey.shade400 : AppColors.danger,
+              ),
+              title: Text(
+                'Delete Table',
+                style: GoogleFonts.poppins(
+                  color: isOccupied ? Colors.grey.shade400 : AppColors.danger,
+                ),
+              ),
+              subtitle: isOccupied
+                  ? Text(
+                      'Cannot delete an occupied table',
+                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade400),
+                    )
+                  : null,
+              onTap: isOccupied
+                  ? null
+                  : () {
+                      Navigator.pop(ctx);
+                      _deleteTable(table);
+                    },
+            ),
+            SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Rename ─────────────────────────────────────────────────────────────────
+
+  void _renameTable(TableModel table) {
+    final controller = TextEditingController(text: table.id);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Rename Table', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: SizedBox(
+          width: 300,
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            style: GoogleFonts.poppins(),
+            decoration: InputDecoration(
+              hintText: 'Enter new table name',
+              hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.divider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isEmpty || newName == table.id) {
+                Navigator.pop(ctx);
+                return;
+              }
+              final exists = await tableStore.tableExists(newName);
+              if (exists) {
+                if (ctx.mounted) {
+                  NotificationService.instance.showError('Table "$newName" already exists.');
+                }
+                return;
+              }
+              // Rename = delete old + add new with same status/capacity
+              await tableStore.deleteTable(table.id);
+              await tableStore.addTable(
+                TableModel(
+                  id: newName,
+                  status: table.status,
+                  tableCapacity: table.tableCapacity,
+                ),
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+              NotificationService.instance.showSuccess('Table renamed to "$newName"');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'Rename',
+              style: GoogleFonts.poppins(color: AppColors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Delete ──────────────────────────────────────────────────────────────────
+
+  void _deleteTable(TableModel table) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Delete Table',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: AppColors.danger),
+        ),
+        content: Text(
+          'Delete "${table.id}"? This action cannot be undone.',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await tableStore.deleteTable(table.id);
+              if (ctx.mounted) Navigator.pop(ctx);
+              NotificationService.instance.showSuccess('Table "${table.id}" deleted.');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.poppins(color: AppColors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -98,13 +344,12 @@ class _TableScreenState extends State<TableScreen> {
       backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
-          // Add Table Button and Legend
+          // Header: Add Table + Legend
           Container(
             padding: EdgeInsets.all(isTablet ? 24 : 20),
             color: AppColors.white,
             child: Column(
               children: [
-                // Add Table Button
                 GestureDetector(
                   onTap: _addTable,
                   child: Container(
@@ -139,7 +384,6 @@ class _TableScreenState extends State<TableScreen> {
                   ),
                 ),
                 SizedBox(height: isTablet ? 20 : 16),
-                // Legend
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -165,11 +409,7 @@ class _TableScreenState extends State<TableScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.table_restaurant_outlined,
-                          size: 80,
-                          color: AppColors.divider,
-                        ),
+                        Icon(Icons.table_restaurant_outlined, size: 80, color: AppColors.divider),
                         SizedBox(height: 16),
                         Text(
                           'No tables found.',
@@ -193,11 +433,7 @@ class _TableScreenState extends State<TableScreen> {
                   );
                 }
 
-                final allTable = tableStore.tables;
-
-                // Responsive grid columns
-                final size = MediaQuery.of(context).size;
-                final isTablet = size.width > 600;
+                final allTables = tableStore.tables;
                 final crossAxisCount = isTablet ? 4 : 2;
 
                 return GridView.builder(
@@ -208,48 +444,105 @@ class _TableScreenState extends State<TableScreen> {
                     mainAxisSpacing: 16,
                     childAspectRatio: 1.1,
                   ),
-                  itemCount: allTable.length,
+                  itemCount: allTables.length,
                   itemBuilder: (context, index) {
-                    final table = allTable[index];
+                    final table = allTables[index];
+
+                    // Show customer name from the linked active order (if any)
+                    final activeOrder = orderStore.getActiveOrderByTableId(table.id);
+                    final customerName = activeOrder?.customerName?.isNotEmpty == true
+                        ? activeOrder!.customerName!
+                        : null;
+
                     return TableCard(
                       table: table,
+                      customerName: customerName,
+                      onLongPress: () => _showTableActions(table),
                       onTap: () {
-                        // SCENARIO 1: Table is OCCUPIED (includes Processing, Cooking, Reserved, Running, Ready, Served)
-                        if (table.status == 'Processing' || table.status == 'Cooking' || table.status == 'Reserved' || table.status == 'Running'|| table.status == 'Ready'  || table.status == 'Served') {
-                          print('🔍 Table ${table.id} tapped - Status: ${table.status}');
-                          print('🔍 Looking for active order for table ${table.id}');
-                          print('🔍 Total orders in store: ${orderStore.orders.length}');
+                        final isOccupied = table.status == 'Processing' ||
+                            table.status == 'Cooking' ||
+                            table.status == 'Running' ||
+                            table.status == 'Ready' ||
+                            table.status == 'Served';
 
-                          final existingOrder = orderStore.getActiveOrderByTableId(table.id);
-
-                          if (existingOrder != null) {
-                            print('✅ Found order ${existingOrder.id} for table ${table.id}');
+                        if (isOccupied) {
+                          // Open active order in cart
+                          if (activeOrder != null) {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => CartScreen(
-                                  existingOrder: existingOrder,
+                                  existingOrder: activeOrder,
                                   selectedTableNo: table.id,
                                 ),
                               ),
                             );
                           } else {
-                            print('❌ No active order found for table ${table.id}');
-                            NotificationService.instance.showError(
-                              'Could not find an active order for Table ${table.id}.',
+                            // Orphaned table — status is occupied but no order exists
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                                title: Text(
+                                  'No Active Order Found',
+                                  style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                content: Text(
+                                  'Table "${table.id}" shows as ${table.status} but has no linked order.\n\nWhat would you like to do?',
+                                  style: GoogleFonts.poppins(fontSize: 14),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: Text('Cancel',
+                                        style: GoogleFonts.poppins(
+                                            color: AppColors.textSecondary)),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      await tableStore.deleteTable(table.id);
+                                      NotificationService.instance.showSuccess(
+                                          'Table "${table.id}" deleted.');
+                                    },
+                                    child: Text('Delete Table',
+                                        style: GoogleFonts.poppins(
+                                            color: Colors.red)),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      await tableStore.updateTableStatus(
+                                          table.id, 'Available');
+                                      NotificationService.instance.showSuccess(
+                                          'Table "${table.id}" reset to Available.');
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10)),
+                                    ),
+                                    child: Text('Reset to Available',
+                                        style: GoogleFonts.poppins(
+                                            color: Colors.white)),
+                                  ),
+                                ],
+                              ),
                             );
                           }
-                        }
-                        // SCENARIO 2: Table is AVAILABLE
-                        else {
+                        } else {
+                          // Available or Reserved — start a new order
                           if (widget.isfromcart == true) {
-                            print(table.id);
                             Navigator.pop(context, table.id);
                           } else {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => Startorder(newOrderForTableId: table.id),
+                                builder: (context) =>
+                                    Startorder(newOrderForTableId: table.id),
                               ),
                             );
                           }
@@ -272,10 +565,7 @@ class _TableScreenState extends State<TableScreen> {
         Container(
           width: isTablet ? 14 : 12,
           height: isTablet ? 14 : 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         SizedBox(width: isTablet ? 10 : 8),
         Text(
@@ -291,29 +581,34 @@ class _TableScreenState extends State<TableScreen> {
   }
 }
 
-/// A reusable widget to display a single table card.
+// ═══════════════════════════════════════════════════════════════════════════
+// TABLE CARD
+// ═══════════════════════════════════════════════════════════════════════════
+
 class TableCard extends StatelessWidget {
   final TableModel table;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final String? customerName;
 
-  const TableCard({super.key, required this.table, required this.onTap});
+  const TableCard({
+    super.key,
+    required this.table,
+    required this.onTap,
+    this.onLongPress,
+    this.customerName,
+  });
 
   String _formatOrderTime(String? timestamp) {
     if (timestamp == null || timestamp.isEmpty) return '';
-
     try {
       final dateTime = DateTime.parse(timestamp);
       final now = DateTime.now();
       final difference = now.difference(dateTime);
-
-      if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h ago';
-      } else {
-        return DateFormat('hh:mm a').format(dateTime);
-      }
-    } catch (e) {
+      if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+      if (difference.inHours < 24) return '${difference.inHours}h ago';
+      return DateFormat('hh:mm a').format(dateTime);
+    } catch (_) {
       return '';
     }
   }
@@ -338,6 +633,7 @@ class TableCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -354,7 +650,7 @@ class TableCard extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // Main content of the card
+            // Main card content
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -384,7 +680,9 @@ class TableCard extends StatelessWidget {
                         Icon(Icons.person, size: 14, color: AppColors.textSecondary),
                         SizedBox(width: 4),
                         Text(
-                          '#Admin',
+                          customerName ?? 'Guest',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
                             color: AppColors.textSecondary,
                             fontSize: 12,
@@ -410,11 +708,12 @@ class TableCard extends StatelessWidget {
                         ],
                       ),
                     ],
-                  ]
+                  ],
                 ],
               ),
             ),
-            // Status label positioned over the top border
+
+            // Status label badge over the top border
             Positioned(
               top: -12,
               left: 20,

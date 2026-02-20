@@ -148,6 +148,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                 ),
               ],
             ),
+
             child: SafeArea(
               bottom: false,
               child: Row(
@@ -307,7 +308,9 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     final totalRevenue = _calculateTotalRevenue(customers);
     final averageRevenue = _calculateAverageRevenue(customers);
 
-    return Row(
+    return IntrinsicHeight(
+      child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: _buildSummaryCard(
@@ -345,6 +348,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
           ),
         ),
       ],
+    ),
     );
   }
 
@@ -375,18 +379,22 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: isDesktop ? 16 : (isTablet ? 14 : 13),
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: isDesktop ? 16 : (isTablet ? 14 : 11),
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
+              SizedBox(width: 4),
               Container(
-                padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -394,18 +402,25 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                 child: Icon(
                   icon,
                   color: iconColor,
-                  size: isDesktop ? 28 : (isTablet ? 22 : 20),
+                  size: isDesktop ? 28 : (isTablet ? 22 : 14),
                 ),
               ),
             ],
           ),
           SizedBox(height: isDesktop ? 16 : 12),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: isDesktop ? 32 : (isTablet ? 24 : 22),
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: isDesktop ? 32 : (isTablet ? 24 : 20),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
           ),
         ],

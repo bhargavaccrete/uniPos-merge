@@ -147,9 +147,11 @@ class _CartScreenState extends State<CartScreen>
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
 
-    NotificationService.instance.showInfo(
-      message,
-    );
+    if (isError) {
+      NotificationService.instance.showError(message);
+    } else {
+      NotificationService.instance.showInfo(message);
+    }
 
 
     // ScaffoldMessenger.of(context).showSnackBar(
@@ -625,7 +627,7 @@ class _CartScreenState extends State<CartScreen>
                                 } catch (e, stackTrace) {
                                   print('❌ Error changing table: $e');
                                   print('Stack trace: $stackTrace');
-                                  NotificationService.instance.showInfo(
+                                  NotificationService.instance.showError(
                                     'Failed to change table. Please try again.',
                                   );
                                 }

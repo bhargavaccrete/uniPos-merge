@@ -43,13 +43,14 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       totalPaid: fields[23] as double?,
       changeReturn: fields[24] as double?,
       isTaxInclusive: fields[25] as bool?,
+      tableNo: fields[26] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PastOrderModel obj) {
     writer
-      ..writeByte(26)
+      ..writeByte(27)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -101,7 +102,9 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       ..writeByte(24)
       ..write(obj.changeReturn)
       ..writeByte(25)
-      ..write(obj.isTaxInclusive);
+      ..write(obj.isTaxInclusive)
+      ..writeByte(26)
+      ..write(obj.tableNo);
   }
 
   @override

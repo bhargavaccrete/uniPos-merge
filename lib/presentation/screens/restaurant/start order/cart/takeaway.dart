@@ -789,6 +789,16 @@ class _TakeawayState extends State<Takeaway> {
   Future<void> _placeOrder(CartCalculationService calculations) async {
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
+    // Validate mobile number if entered
+    final phone = mobileController.text.trim();
+    if (phone.isNotEmpty) {
+      final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+      if (digitsOnly.length != 10) {
+        NotificationService.instance.showError('Mobile number must be exactly 10 digits');
+        return;
+      }
+    }
+
     // Check stock availability before placing order
     final bool stockAvailable = await InventoryService.checkStockAvailability(plainItems);
     if (!stockAvailable) {
@@ -983,6 +993,11 @@ class _TakeawayState extends State<Takeaway> {
         // The `widget.cartItems` now correctly contains the merged list
         items: plainItems,
         totalPrice: calculations.grandTotal,
+        // Update financial summary so receipts reflect new items
+        subTotal: AppSettings.isTaxInclusive
+            ? calculations.subtotal - calculations.totalGST
+            : calculations.subtotal,
+        gstAmount: calculations.totalGST,
         // You can also update customer details if they were edited
         customerName: nameController.text.isNotEmpty ? nameController.text : existingModel.customerName,
         customerNumber: mobileController.text.isNotEmpty ? mobileController.text : existingModel.customerNumber,
@@ -1129,8 +1144,11 @@ class _TakeawayState extends State<Takeaway> {
       discountValue: discountValue,
       serviceChargePercentage: serviceChargeValue,
       deliveryCharge: deliveryChargeValue,
-      isDeliveryOrder: widget.isdelivery ?? false,
-      // orderType: widget.isdelivery? 'Delivery' : 'Take Away'
+      isDeliveryOrder: widget.isdelivery,
+      // Use stored tax mode from existing order, or current app setting for new orders
+      isTaxInclusive: widget.isexisting
+          ? (widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive)
+          : AppSettings.isTaxInclusive,
     );
 
 
@@ -1239,10 +1257,11 @@ class _TakeawayState extends State<Takeaway> {
               : Column(
             children: [
               Container(
+                padding: EdgeInsets.all(5),
                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: AppColors.primary)),
                   child: widget.isDineIn
-                      ? Text("Table no:${widget.selectedTableNo.toString()}")
-                      : Text(widget.isexisting ? 'Existing Order' : 'New Order')),
+                      ? Text("Table no:${widget.selectedTableNo.toString()}",style: GoogleFonts.poppins(fontWeight: FontWeight.w500),)
+                      : Text(widget.isexisting ? 'Existing Order' : 'New Order',style: GoogleFonts.poppins(fontWeight: FontWeight.w500),)),
               Expanded(
                 child: _buildGroupedCartItems(),
               ),
@@ -1439,7 +1458,7 @@ class _TakeawayState extends State<Takeaway> {
           },
           child: Center(
             child: Text(
-              'Place Orderr',
+              'Place Order',
               textScaler: TextScaler.linear(1),
               style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
             ),
@@ -1492,6 +1511,7 @@ class _TakeawayState extends State<Takeaway> {
                             ),
                           ),
                           content: Container(
+
                             width: width * 0.9,
                             height: height * 0.7,
                             child: SingleChildScrollView(
@@ -1894,7 +1914,7 @@ class _TakeawayState extends State<Takeaway> {
               onTap: ()=> _qucikSettleNewOrder(calculations),
               child: Center(
                 child: Text(
-                  'Quick Settlee',
+                  'Quick Settle',
                   textScaler: TextScaler.linear(1),
                   style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
                 ),
@@ -2105,13 +2125,14 @@ class _TakeawayState extends State<Takeaway> {
           ? calculations.subtotal - calculations.totalGST
           : calculations.subtotal,
       gstAmount: calculations.totalGST,
-      gstRate: 0, // You can enhance your service to calculate and provide this if needed
+      gstRate: 0,
 
       // ✅ KOT tracking - REQUIRED
       kotNumbers: [quickSettleKotNumber],
       kotBoundaries: [plainItems.length], // Single KOT with all items
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+      tableNo: widget.isDineIn ? (widget.selectedTableNo ?? widget.tableid) : null,
     );
 
     // 1. Add the completed order to history
@@ -2121,7 +2142,16 @@ class _TakeawayState extends State<Takeaway> {
     await InventoryService.deductStockForOrder(plainItems);
     print("✅ Stock deducted for quick settle order");
 
-    // 3. Clear the user's cart
+    // 3. Free the table for Dine In quick settle
+    final String? tableForQuickSettle = widget.isDineIn
+        ? (widget.selectedTableNo ?? widget.tableid)
+        : null;
+    if (tableForQuickSettle != null && tableForQuickSettle.isNotEmpty) {
+      await tableStore.updateTableStatus(tableForQuickSettle, 'Available');
+      print("✅ Table $tableForQuickSettle freed after quick settle");
+    }
+
+    // 4. Clear the user's cart
     await restaurantCartStore.clearCart();
 
     // 4. Navigate and show success message

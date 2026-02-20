@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:unipos/data/models/restaurant/db/ordermodel_309.dart';
+import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
@@ -513,6 +514,71 @@ class RestaurantPrintHelper {
       context: context,
       order: updatedOrder, // Pass updated order with all items and KOT info
       calculations: calculations,
+      billNumber: order.billNumber, // Pass stored bill number if payment was recorded
     );
+  }
+
+  /// Reprint a receipt for a completed (past) order
+  static Future<void> printPastOrder({
+    required BuildContext context,
+    required PastOrderModel pastOrder,
+  }) async {
+    try {
+      // Convert PastOrderModel to OrderModel for printing
+      final orderForPrint = OrderModel(
+        id: pastOrder.id,
+        customerName: pastOrder.customerName,
+        customerNumber: '',
+        customerEmail: '',
+        items: pastOrder.items,
+        status: 'COMPLETED',
+        timeStamp: pastOrder.orderAt ?? DateTime.now(),
+        orderType: pastOrder.orderType ?? 'Take Away',
+        tableNo: pastOrder.tableNo,
+        totalPrice: pastOrder.totalPrice,
+        discount: pastOrder.Discount,
+        serviceCharge: 0,
+        paymentMethod: pastOrder.paymentmode,
+        paymentStatus: 'PAID',
+        isPaid: true,
+        isSplitPayment: pastOrder.isSplitPayment,
+        paymentListJson: pastOrder.paymentListJson,
+        totalPaid: pastOrder.totalPaid,
+        changeReturn: pastOrder.changeReturn,
+        completedAt: pastOrder.orderAt,
+        subTotal: pastOrder.subTotal,
+        gstAmount: pastOrder.gstAmount,
+        kotNumbers: pastOrder.kotNumbers,
+        itemCountAtLastKot: pastOrder.items.length,
+        kotBoundaries: pastOrder.kotBoundaries,
+        isTaxInclusive: pastOrder.isTaxInclusive,
+        billNumber: pastOrder.billNumber,
+      );
+
+      final bool isDelivery =
+          (pastOrder.orderType ?? '').toLowerCase().contains('delivery');
+
+      final calculations = CartCalculationService(
+        items: pastOrder.items,
+        discountType: DiscountType.amount,
+        discountValue: pastOrder.Discount ?? 0,
+        serviceChargePercentage: 0,
+        deliveryCharge: 0,
+        isDeliveryOrder: isDelivery,
+        isTaxInclusive: pastOrder.isTaxInclusive,
+      );
+
+      await printOrderReceipt(
+        context: context,
+        order: orderForPrint,
+        calculations: calculations,
+        billNumber: pastOrder.billNumber,
+      );
+    } catch (e) {
+      debugPrint('Error reprinting past order: $e');
+      if (context.mounted) {
+        NotificationService.instance.showError('Failed to reprint: $e');
+      }
+    }
   }
 }

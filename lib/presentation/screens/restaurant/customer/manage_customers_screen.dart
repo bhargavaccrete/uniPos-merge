@@ -83,6 +83,11 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
               obsecureText: false,
               BorderColor: AppColors.primary,
               icon: Icon(Icons.search, color: AppColors.primary),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
               gesture: _searchQuery.isNotEmpty
                   ? GestureDetector(
                       onTap: () {
@@ -344,12 +349,14 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   controller: phoneController,
                   hintText: 'Phone Number',
                   obsecureText: false,
-                  keyboardType: TextInputType.number,
+                  keyboardType: TextInputType.phone,
                   BorderColor: AppColors.primary,
                   icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
-                    if (value != null && value.isNotEmpty && value.length < 10) {
-                      return 'Enter valid phone number';
+                    if (value != null && value.trim().isNotEmpty) {
+                      if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
+                        return 'Enter a valid 10-digit phone number';
+                      }
                     }
                     return null;
                   },
@@ -415,7 +422,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      nameController.dispose();
+      phoneController.dispose();
+      emailController.dispose();
+      addressController.dispose();
+      notesController.dispose();
+    });
   }
 
   void _showEditCustomerDialog(BuildContext context, CustomerModel customer) {
@@ -457,12 +470,14 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   controller: phoneController,
                   hintText: 'Phone Number',
                   obsecureText: false,
-                  keyboardType: TextInputType.number,
+                  keyboardType: TextInputType.phone,
                   BorderColor: AppColors.primary,
                   icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
-                    if (value != null && value.isNotEmpty && value.length < 10) {
-                      return 'Enter valid phone number';
+                    if (value != null && value.trim().isNotEmpty) {
+                      if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
+                        return 'Enter a valid 10-digit phone number';
+                      }
                     }
                     return null;
                   },
@@ -529,7 +544,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      nameController.dispose();
+      phoneController.dispose();
+      emailController.dispose();
+      addressController.dispose();
+      notesController.dispose();
+    });
   }
 
   void _showCustomerDetailsDialog(BuildContext context, CustomerModel customer) {

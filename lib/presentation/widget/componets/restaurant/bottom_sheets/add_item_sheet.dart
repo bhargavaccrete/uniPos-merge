@@ -1,6 +1,10 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/app_responsive.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import '../componets/Button.dart';
@@ -52,6 +56,7 @@ class AddItemSheet extends StatefulWidget {
 
 class _AddItemSheetState extends State<AddItemSheet> {
   final _formState = AddItemFormState();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -60,11 +65,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   Future<void> _pickImage() async {
-    final image = await ImagePickerSheet.show(context);
-    if (image != null) {
-      setState(() {
-        _formState.setImage(image);
-      });
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (pickedFile == null) return;
+
+      final Uint8List bytes = await pickedFile.readAsBytes();
+      const maxSizeInBytes = 3 * 1024 * 1024;
+      if (bytes.length > maxSizeInBytes) {
+        NotificationService.instance.showError('Image size must be less than 3MB. Please choose a smaller image.');
+        return;
+      }
+      setState(() { _formState.setImage(bytes); });
+    } catch (e) {
+      NotificationService.instance.showError('Failed to pick image. Please try again.');
     }
   }
 
@@ -74,9 +88,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
       selectedCategoryId: _formState.selectedCategoryId,
       onAddCategory: () async {
         Navigator.pop(context);
-        await AddCategoryDialog.show(context);
-        // Re-open category selector after adding
-        _selectCategory();
+        final wasAdded = await AddCategoryDialog.show(context);
+        if (wasAdded) _selectCategory();
       },
     );
 
@@ -101,22 +114,26 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   Future<void> _saveItem() async {
+    if (_isSaving) return;
     final validation = _formState.validate();
     if (!validation.isValid) {
       _showValidationError(validation);
       return;
     }
 
-    final item = await _formState.toItem();
-    await itemStore.addItem(item);
-
-    widget.onItemAdded?.call();
-
-    if (mounted) {
-      Navigator.pop(context);
-      if (widget.onCategorySelected != null && _formState.selectedCategoryId != null) {
-        widget.onCategorySelected!(_formState.selectedCategoryId!);
+    setState(() { _isSaving = true; });
+    try {
+      final item = await _formState.toItem();
+      await itemStore.addItem(item);
+      widget.onItemAdded?.call();
+      if (mounted) {
+        Navigator.pop(context);
+        if (widget.onCategorySelected != null && _formState.selectedCategoryId != null) {
+          widget.onCategorySelected!(_formState.selectedCategoryId!);
+        }
       }
+    } finally {
+      if (mounted) setState(() { _isSaving = false; });
     }
   }
 
@@ -176,6 +193,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return DraggableScrollableSheet(
       initialChildSize: 0.9,
       minChildSize: 0.5,
@@ -187,12 +205,27 @@ class _AddItemSheetState extends State<AddItemSheet> {
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(15, 15, 15, 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: Column(
+            children: [
+              // Drag handle
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 4),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: EdgeInsets.fromLTRB(15, 5, 15, 40 + bottomInset),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 _buildHeader(),
                 const SizedBox(height: 20),
                 _buildItemNameField(),
@@ -215,6 +248,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
               ],
             ),
           ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -224,7 +260,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return Center(
       child: Text(
         "Add Item",
-        style: TextStyle(
+        style: GoogleFonts.poppins(
           fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
           fontWeight: FontWeight.bold,
         ),
@@ -275,9 +311,19 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   Widget _buildCategorySelector() {
-    return CategorySelectorButton(
-      selectedCategoryName: _formState.selectedCategoryName,
-      onTap: _selectCategory,
+    return Observer(
+      builder: (_) {
+        final liveName = _formState.selectedCategoryId != null
+            ? categoryStore.categories
+                .where((c) => c.id == _formState.selectedCategoryId)
+                .map((c) => c.name)
+                .firstOrNull
+            : null;
+        return CategorySelectorButton(
+          selectedCategoryName: liveName ?? _formState.selectedCategoryName,
+          onTap: _selectCategory,
+        );
+      },
     );
   }
 
@@ -289,13 +335,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   Widget _buildDescriptionField() {
-    return SizedBox(
-      height: AppResponsive.height(context, 0.06),
-      child: CommonTextForm(
-        borderc: 5,
+    return TextField(
+      controller: _formState.descriptionController,
+      maxLines: 3,
+      minLines: 1,
+      style: GoogleFonts.poppins(fontSize: 14),
+      decoration: InputDecoration(
         labelText: 'Description (Optional)',
-        controller: _formState.descriptionController,
-        obsecureText: false,
+        labelStyle: GoogleFonts.poppins(color: Colors.grey),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(5),
+          borderSide: const BorderSide(color: Colors.deepOrange),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     );
   }
@@ -358,22 +411,28 @@ class _AddItemSheetState extends State<AddItemSheet> {
         const SizedBox(width: 10),
         Expanded(
           child: CommonButton(
-            onTap: _saveItem,
+            onTap: _isSaving ? () {} : _saveItem,
             height: AppResponsive.height(context, 0.06),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.add, color: Colors.deepOrange),
+                      ),
+                      const SizedBox(width: 5),
+                      Text("Add Item", style: GoogleFonts.poppins(color: Colors.white)),
+                    ],
                   ),
-                  child: const Icon(Icons.add),
-                ),
-                const SizedBox(width: 5),
-                 Text("Add Item",style: GoogleFonts.poppins(color: Colors.white),)
-              ],
-            ),
           ),
         ),
       ],

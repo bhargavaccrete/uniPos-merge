@@ -23,11 +23,19 @@ class _AddexpenceState extends State<Addexpence> {
   DateTime? _dateselect;
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     expenseCategoryStore.loadCategories();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _reasonController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickedDate(BuildContext context) async {
@@ -49,6 +57,8 @@ class _AddexpenceState extends State<Addexpence> {
   final List<String> items2 = ['Cash','Card/Online','Other'];
 
   Future<void> _addExpense() async {
+    if (_isSaving) return;
+
     if (_dateselect == null) {
       NotificationService.instance.showError('Please select a date');
       return;
@@ -62,9 +72,14 @@ class _AddexpenceState extends State<Addexpence> {
       return;
     }
 
-    try {
-      final amount = double.parse(_amountController.text.trim());
+    final amount = double.tryParse(_amountController.text.trim());
+    if (amount == null || amount <= 0) {
+      NotificationService.instance.showError('Please enter a valid amount greater than 0');
+      return;
+    }
 
+    setState(() => _isSaving = true);
+    try {
       // Combine selected date with current time (not just midnight)
       // This ensures expenses show up in EOD reports filtered by day start time
       final now = DateTime.now();
@@ -95,7 +110,9 @@ class _AddexpenceState extends State<Addexpence> {
         NotificationService.instance.showError('Failed to add expense');
       }
     } catch (e) {
-      NotificationService.instance.showError('Please enter a valid amount');
+      NotificationService.instance.showError('Failed to add expense. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -418,7 +435,7 @@ class _AddexpenceState extends State<Addexpence> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _addExpense,
+                      onPressed: _isSaving ? null : _addExpense,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -428,13 +445,19 @@ class _AddexpenceState extends State<Addexpence> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(
-                        'Add Expense',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(
+                              'Add Expense',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ],

@@ -8,6 +8,7 @@ import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/images.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class VariantTab extends StatefulWidget {
   const VariantTab({super.key});
@@ -143,7 +144,10 @@ class _VariantTabState extends State<VariantTab> {
 
   Future<void> _addOrEditVariante() async {
     final trimmedName = variantController.text.trim();
-    if (trimmedName.isEmpty) return;
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Variant name cannot be empty');
+      return;
+    }
 
     if (editingVariante != null) {
       final updateVariante = VariantModel(id: editingVariante!.id, name: trimmedName);

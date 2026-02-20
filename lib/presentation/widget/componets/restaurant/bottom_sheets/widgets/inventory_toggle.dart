@@ -78,22 +78,16 @@ class InventoryToggle extends StatelessWidget {
                 const SizedBox(width: 10),
                 Row(
                   children: [
-                    Transform.scale(
-                      scale: 0.8,
-                      child: Filterbutton(
-                        title: 'YES',
-                        selectedFilter: allowOrderWhenOutOfStock ? 'YES' : 'NO',
-                        onpressed: () => onAllowOutOfStockChanged(true),
-                      ),
+                    Filterbutton(
+                      title: 'YES',
+                      selectedFilter: allowOrderWhenOutOfStock ? 'YES' : 'NO',
+                      onpressed: () => onAllowOutOfStockChanged(true),
                     ),
                     const SizedBox(width: 6),
-                    Transform.scale(
-                      scale: 0.8,
-                      child: Filterbutton(
-                        title: 'NO',
-                        selectedFilter: allowOrderWhenOutOfStock ? 'YES' : 'NO',
-                        onpressed: () => onAllowOutOfStockChanged(false),
-                      ),
+                    Filterbutton(
+                      title: 'NO',
+                      selectedFilter: allowOrderWhenOutOfStock ? 'YES' : 'NO',
+                      onpressed: () => onAllowOutOfStockChanged(false),
                     ),
                   ],
                 ),

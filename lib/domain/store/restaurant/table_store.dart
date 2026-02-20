@@ -119,23 +119,21 @@ abstract class _TableStore with Store {
         orderTime: orderTime,
       );
 
-      // Update local state
+      // Replace with a new instance so MobX ObservableList detects the change
+      // (mutating the existing object + same-reference re-assign is invisible to MobX)
       final index = tables.indexWhere((t) => t.id == tableId);
       if (index != -1) {
-        final table = tables[index];
-        table.status = newStatus;
-        if (newStatus == 'Available') {
-          table.currentOrderTotal = null;
-          table.currentOrderId = null;
-          table.timeStamp = null;
-        } else {
-          table.currentOrderTotal = total;
-          table.currentOrderId = orderId;
-          if (orderTime != null) {
-            table.timeStamp = orderTime.toIso8601String();
-          }
-        }
-        tables[index] = table;
+        final existing = tables[index];
+        tables[index] = TableModel(
+          id: tableId,
+          status: newStatus,
+          currentOrderTotal: newStatus == 'Available' ? null : (total ?? existing.currentOrderTotal),
+          currentOrderId: newStatus == 'Available' ? null : (orderId ?? existing.currentOrderId),
+          timeStamp: newStatus == 'Available'
+              ? null
+              : (orderTime?.toIso8601String() ?? existing.timeStamp),
+          tableCapacity: existing.tableCapacity,
+        );
       }
 
       return true;

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +12,7 @@ import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/domain/services/retail/retail_printer_settings_service.dart';
 import 'package:unipos/core/config/app_config.dart';
+import 'package:unipos/util/color.dart';
 
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
@@ -149,37 +151,26 @@ class PrintService {
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
+          backgroundColor: const Color(0xFFF7F8FA),
           appBar: AppBar(
-            title: Text(format == ReceiptFormat.thermal ? 'Receipt Preview' : 'Invoice Preview',style: TextStyle(color: Colors.white),),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share),
-                onPressed: () async {
-                  await sharePdf(
-                    sale: sale,
-                    items: items,
-                    customer: customer,
-                    format: format,
-                    storeName: storeName,
-                    storeAddress: storeAddress,
-                    storePhone: storePhone,
-                    storeEmail: storeEmail,
-                    gstNumber: gstNumber,
-                    orderType: orderType,
-                    tableNo: tableNo,
-                    kotNumber: kotNumber,
-                    orderTimestamp: orderTimestamp,
-                    billNumber: billNumber,
-                    itemTotal: itemTotal, // Pass item total
-                  );
-                },
-              ),
-            ],
+            backgroundColor: AppColors.primary,
+            surfaceTintColor: Colors.transparent,
+            automaticallyImplyLeading: false,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              format == ReceiptFormat.thermal ? 'Receipt Preview' : 'Invoice Preview',
+              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            centerTitle: true,
           ),
           body: PdfPreview(
             build: (pageFormat) async => pdf.save(),
             canChangePageFormat: false,
             canChangeOrientation: false,
+            canDebug: false,
             pdfFileName: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
             initialPageFormat: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
           ),

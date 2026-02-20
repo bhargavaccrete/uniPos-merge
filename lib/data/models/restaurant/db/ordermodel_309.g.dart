@@ -49,13 +49,14 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       totalPaid: fields[29] as double?,
       changeReturn: fields[30] as double?,
       isTaxInclusive: fields[31] as bool?,
+      billNumber: fields[32] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, OrderModel obj) {
     writer
-      ..writeByte(32)
+      ..writeByte(33)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -119,7 +120,9 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       ..writeByte(30)
       ..write(obj.changeReturn)
       ..writeByte(31)
-      ..write(obj.isTaxInclusive);
+      ..write(obj.isTaxInclusive)
+      ..writeByte(32)
+      ..write(obj.billNumber);
   }
 
   @override

@@ -104,43 +104,8 @@ class _orderSettingsState extends State<Ordersettings> {
               ],
             ),
             child: AppResponsive.isDesktop(context)
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Filterbutton(
-                        title: 'Take Away',
-                        selectedFilter: selectedFilter,
-                        onpressed: () {
-                          setState(() {
-                            selectedFilter = "Take Away";
-                          });
-                        },
-                      ),
-                      SizedBox(width: AppResponsive.mediumSpacing(context)),
-                      Filterbutton(
-                        title: 'dine in',
-                        selectedFilter: selectedFilter,
-                        onpressed: () {
-                          setState(() {
-                            selectedFilter = "dine in";
-                          });
-                        },
-                      ),
-                      SizedBox(width: AppResponsive.mediumSpacing(context)),
-                      Filterbutton(
-                        title: 'Home Delivery',
-                        selectedFilter: selectedFilter,
-                        onpressed: () {
-                          setState(() {
-                            selectedFilter = "Home Delivery";
-                          });
-                        },
-                      ),
-                    ],
-                  )
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
+                ? Center(
+                  child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Filterbutton(
@@ -152,7 +117,7 @@ class _orderSettingsState extends State<Ordersettings> {
                             });
                           },
                         ),
-                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         Filterbutton(
                           title: 'dine in',
                           selectedFilter: selectedFilter,
@@ -162,7 +127,7 @@ class _orderSettingsState extends State<Ordersettings> {
                             });
                           },
                         ),
-                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         Filterbutton(
                           title: 'Home Delivery',
                           selectedFilter: selectedFilter,
@@ -174,7 +139,43 @@ class _orderSettingsState extends State<Ordersettings> {
                         ),
                       ],
                     ),
+                )
+                : Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Filterbutton(
+                        title: 'Take Away',
+                        selectedFilter: selectedFilter,
+                        onpressed: () {
+                          setState(() {
+                            selectedFilter = "Take Away";
+                          });
+                        },
+                      ),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                      Filterbutton(
+                        title: 'dine in',
+                        selectedFilter: selectedFilter,
+                        onpressed: () {
+                          setState(() {
+                            selectedFilter = "dine in";
+                          });
+                        },
+                      ),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                      Filterbutton(
+                        title: 'Home Delivery',
+                        selectedFilter: selectedFilter,
+                        onpressed: () {
+                          setState(() {
+                            selectedFilter = "Home Delivery";
+                          });
+                        },
+                      ),
+                    ],
                   ),
+                ),
           ),
           Expanded(
             child: SingleChildScrollView(

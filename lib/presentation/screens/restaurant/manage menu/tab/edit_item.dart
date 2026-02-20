@@ -21,6 +21,7 @@ import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
+import 'edit_category.dart';
 
 enum SellingMethod { byUnit, byWeight }
 
@@ -1084,9 +1085,14 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon:  Icon(Icons.edit, color: AppColors.primary),
-                        onPressed: () {
-                          // TODO: Implement navigation to an EditCategoryScreen
+                        icon: Icon(Icons.edit, color: AppColors.primary),
+                        onPressed: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditCategory(category: category),
+                            ),
+                          );
                         },
                       ),
                       IconButton(

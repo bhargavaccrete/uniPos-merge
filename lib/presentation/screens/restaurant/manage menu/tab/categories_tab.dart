@@ -10,7 +10,6 @@ import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_ca
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
-import 'package:unipos/util/common/app_responsive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
@@ -48,68 +47,9 @@ class _CategoryTabState extends State<CategoryTab> {
   }
 
   void _showImagePicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(20),
-          height: AppResponsive.height(context, 0.25),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildImageSourceOption(
-                icon: Icons.photo_library,
-                label: 'From Gallery',
-                onTap: () => _pickImage(ImageSource.gallery),
-              ),
-              _buildImageSourceOption(
-                icon: Icons.search,
-                label: 'From Search',
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    _pickImage(ImageSource.gallery);
   }
 
-  Widget _buildImageSourceOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: AppResponsive.width(context, 0.35),
-        height: AppResponsive.height(context, 0.18),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 50, color: AppColors.primary),
-            SizedBox(height: 8),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);

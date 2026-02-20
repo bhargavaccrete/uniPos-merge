@@ -5,6 +5,7 @@ import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
 import '../componets/Button.dart';
 import 'package:unipos/util/color.dart';
 /// Result from category selection
@@ -146,9 +147,12 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   }
 
   Widget _buildCategoryList() {
-    return Container(
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      child: Container(
       padding: const EdgeInsets.all(20),
-      height: 500,
       child: Column(
         children: [
           Row(
@@ -181,6 +185,7 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
           _buildAddCategoryButton(),
         ],
       ),
+    ),
     );
   }
 
@@ -228,14 +233,25 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
               ),
               Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(5),
+                  InkWell(
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditCategory(category: category),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: const Icon(Icons.edit, color: Colors.white),
                     ),
-                    child: const Icon(Icons.edit, color: Colors.white),
                   ),
                   const SizedBox(width: 5),
                   InkWell(

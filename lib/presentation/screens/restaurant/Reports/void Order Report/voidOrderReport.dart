@@ -295,7 +295,10 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     try {
       await pastOrderStore.loadPastOrders();
       final allOrders = pastOrderStore.pastOrders
-          .where((order) => order.orderStatus == 'void')
+          .where((order) {
+            final status = order.orderStatus?.toUpperCase() ?? '';
+            return status == 'VOID' || status == 'VOIDED';
+          })
           .toList();
 
       _filterOrdersByPeriod(allOrders);
@@ -896,18 +899,22 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: isDesktop ? 16 : (isTablet ? 14 : 13),
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: isDesktop ? 16 : (isTablet ? 14 : 12),
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
+              SizedBox(width: 4),
               Container(
-                padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 6)),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -915,18 +922,25 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                 child: Icon(
                   icon,
                   color: iconColor,
-                  size: isDesktop ? 28 : (isTablet ? 22 : 20),
+                  size: isDesktop ? 28 : (isTablet ? 22 : 16),
                 ),
               ),
             ],
           ),
           SizedBox(height: isTablet ? 16 : 12),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: isDesktop ? 32 : (isTablet ? 24 : 22),
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: isDesktop ? 32 : (isTablet ? 24 : 22),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
           ),
         ],
@@ -1089,7 +1103,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                     cells: [
                       DataCell(
                         Text(
-                          '#${order.billNumber ?? 'N/A'}',
+                          order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
                             fontWeight: FontWeight.w500,
@@ -1115,7 +1129,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                       ),
                       DataCell(
                         Text(
-                          '${CurrencyHelper.getCurrencySymbol()}${DecimalSettings.formatAmount(amount)}',
+                          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(amount)}',
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
                             fontWeight: FontWeight.w600,
@@ -1123,24 +1137,30 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                         ),
                       ),
                       DataCell(
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                            vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            order.paymentmode ?? 'N/A',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(context, mobile: 12.0, desktop: 13.0),
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.primary,
+                        Builder(builder: (context) {
+                          final pm = order.paymentmode;
+                          final isUnpaid = pm == null || pm == 'N/A';
+                          return Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
+                              vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
                             ),
-                          ),
-                        ),
+                            decoration: BoxDecoration(
+                              color: isUnpaid
+                                  ? Colors.grey.withValues(alpha: 0.15)
+                                  : AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isUnpaid ? 'Unpaid' : pm!,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.getValue(context, mobile: 12.0, desktop: 13.0),
+                                fontWeight: FontWeight.w500,
+                                color: isUnpaid ? Colors.grey.shade600 : AppColors.primary,
+                              ),
+                            ),
+                          );
+                        }),
                       ),
                       DataCell(
                         Container(

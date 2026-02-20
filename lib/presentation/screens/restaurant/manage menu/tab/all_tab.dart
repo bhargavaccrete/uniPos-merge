@@ -74,7 +74,7 @@ class _AllTabState extends State<AllTab> {
                     style: GoogleFonts.poppins(fontSize: 14),
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      hintText: 'Search categories, items, variants...',
+                      hintText: 'Search categories or items...',
                       hintStyle: GoogleFonts.poppins(
                         color: Colors.grey.shade500,
                         fontSize: 14,
@@ -102,22 +102,45 @@ class _AllTabState extends State<AllTab> {
                     final allItems = itemStore.items.toList();
                     final allVariants = variantStore.variants.toList();
 
-                    final filtercat = query.isEmpty
-                        ? allCategories
-                        : allCategories.where((cat) {
-                            final name = cat.name.toLowerCase();
-                            final queryLower = query.toLowerCase();
-                            return name.contains(queryLower);
-                          }).toList();
-
+                    // Build per-category item map, filtered by search when active
                     final Map<String, List<Items>> categoryItemsMap = {};
-                    for (var category in allCategories) {
-                      categoryItemsMap[category.id] = allItems
-                          .where((item) => item.categoryOfItem == category.id)
-                          .toList();
+                    if (query.isEmpty) {
+                      for (var category in allCategories) {
+                        categoryItemsMap[category.id] = allItems
+                            .where((item) => item.categoryOfItem == category.id)
+                            .toList();
+                      }
+                    } else {
+                      final queryLower = query.toLowerCase();
+                      for (var category in allCategories) {
+                        final catItems = allItems
+                            .where((item) => item.categoryOfItem == category.id)
+                            .toList();
+                        final catNameMatches =
+                            category.name.toLowerCase().contains(queryLower);
+                        if (catNameMatches) {
+                          // Category name matches — show all its items
+                          categoryItemsMap[category.id] = catItems;
+                        } else {
+                          // Show category only if it has items matching the query
+                          final matchingItems = catItems
+                              .where((item) =>
+                                  item.name.toLowerCase().contains(queryLower))
+                              .toList();
+                          if (matchingItems.isNotEmpty) {
+                            categoryItemsMap[category.id] = matchingItems;
+                          }
+                        }
+                      }
                     }
 
-                    if (allCategories.isEmpty) {
+                    final filtercat = query.isEmpty
+                        ? allCategories
+                        : allCategories
+                            .where((cat) => categoryItemsMap.containsKey(cat.id))
+                            .toList();
+
+                    if (filtercat.isEmpty) {
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -125,7 +148,7 @@ class _AllTabState extends State<AllTab> {
                             Lottie.asset(AppImages.notfoundanimation, height: height * 0.25),
                             SizedBox(height: 16),
                             Text(
-                              'No Categories Found!',
+                              query.isEmpty ? 'No Categories Found!' : 'No matching results',
                               style: GoogleFonts.poppins(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,

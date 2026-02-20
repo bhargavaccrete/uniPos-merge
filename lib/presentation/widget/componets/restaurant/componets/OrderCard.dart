@@ -11,9 +11,10 @@ class OrderCard extends StatelessWidget {
   final Function(String) onDelete;
   final VoidCallback? ontap;
   final VoidCallback? ontapcooking;
-  final VoidCallback? onPrintKot; // Add callback
+  final VoidCallback? onPrintKot;
+  final VoidCallback? onPrintBill;
   final Color? color;
-  const OrderCard({super.key, required this.order, required this.onDelete, this.ontap  , this.ontapcooking, this.onPrintKot, this.color});
+  const OrderCard({super.key, required this.order, required this.onDelete, this.ontap, this.ontapcooking, this.onPrintKot, this.onPrintBill, this.color});
 
 
 
@@ -153,31 +154,77 @@ class OrderCard extends StatelessWidget {
               ),
             ),
 
-            // 3. Admin & KOT Print Row
+            // 3. Table label + PAID badge + KOT/Bill print buttons
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               color: Colors.white,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.person_outline, color: Colors.teal.shade700, size: 20),
-                      const SizedBox(width: 4),
-                      Text('#Admin', style: GoogleFonts.poppins()),
-                    ],
+                  Icon(Icons.person_outline, color: Colors.teal.shade700, size: 20),
+                  const SizedBox(width: 4),
+                  Text(
+                    (order.tableNo != null && order.tableNo!.isNotEmpty)
+                        ? 'Table ${order.tableNo}'
+                        : order.orderType,
+                    style: GoogleFonts.poppins(),
                   ),
+                  // PAID badge when payment recorded but order still active
+                  if (order.isPaid == true) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.green.shade400),
+                      ),
+                      child: Text(
+                        'PAID',
+                        style: GoogleFonts.poppins(
+                          color: Colors.green.shade700,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  // Print Bill button
+                  if (onPrintBill != null)
+                    InkWell(
+                      onTap: onPrintBill,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade600,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.receipt, color: Colors.white, size: 14),
+                            const SizedBox(width: 4),
+                            Text('Bill', style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // KOT print button
                   InkWell(
-                    onTap: onPrintKot, // Trigger print callback
+                    onTap: onPrintKot,
                     borderRadius: BorderRadius.circular(4),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: const Color(0xff12b294), borderRadius: BorderRadius.circular(4)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xff12b294),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                       child: Row(
                         children: [
-                          const Icon(Icons.print, color: Colors.white, size: 16),
+                          const Icon(Icons.print, color: Colors.white, size: 14),
                           const SizedBox(width: 4),
-                          Text('Kot', style: GoogleFonts.poppins(color: Colors.white)),
+                          Text('KOT', style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -285,11 +332,6 @@ class OrderCard extends StatelessWidget {
                                 ),
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                          child: const Icon(Icons.delete_outline, color: Colors.white, size: 16),
                         ),
                       ],
                     ),

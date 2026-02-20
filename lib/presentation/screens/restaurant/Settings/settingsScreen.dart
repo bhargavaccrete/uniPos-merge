@@ -18,6 +18,8 @@ class Settingsscreen extends StatefulWidget {
 
 class _settingsScreenState extends State<Settingsscreen> {
   String selectedCurrency = "INR";
+  bool _isDecimalExpanded = false;
+  bool _isCurrencyExpanded = false;
 
   @override
   void initState() {
@@ -195,42 +197,46 @@ class _settingsScreenState extends State<Settingsscreen> {
                       return MultipleListViewWithNavigation(
                         screenheightt: screenheight * 0.16,
                         displayTitle: "Decimal Precision",
-                        displayicon: Icons.keyboard_arrow_down,
-                        onTap: () {},
-                        child: Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            Filterbutton(
-                              title: 'None',
-                              selectedFilter: selectedFilter,
-                              onpressed: () async {
-                                await DecimalSettings.updatePrecision(0);
-                              },
-                            ),
-                            Filterbutton(
-                              title: '0.0',
-                              selectedFilter: selectedFilter,
-                              onpressed: () async {
-                                await DecimalSettings.updatePrecision(1);
-                              },
-                            ),
-                            Filterbutton(
-                              title: '0.00',
-                              selectedFilter: selectedFilter,
-                              onpressed: () async {
-                                await DecimalSettings.updatePrecision(2);
-                              },
-                            ),
-                            Filterbutton(
-                              title: '0.000',
-                              selectedFilter: selectedFilter,
-                              onpressed: () async {
-                                await DecimalSettings.updatePrecision(3);
-                              },
-                            ),
-                          ],
-                        ),
+                        displayicon: _isDecimalExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        onTap: () => setState(() => _isDecimalExpanded = !_isDecimalExpanded),
+                        child: _isDecimalExpanded
+                            ? Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  Filterbutton(
+                                    title: 'None',
+                                    selectedFilter: selectedFilter,
+                                    onpressed: () async {
+                                      await DecimalSettings.updatePrecision(0);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '0.0',
+                                    selectedFilter: selectedFilter,
+                                    onpressed: () async {
+                                      await DecimalSettings.updatePrecision(1);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '0.00',
+                                    selectedFilter: selectedFilter,
+                                    onpressed: () async {
+                                      await DecimalSettings.updatePrecision(2);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '0.000',
+                                    selectedFilter: selectedFilter,
+                                    onpressed: () async {
+                                      await DecimalSettings.updatePrecision(3);
+                                    },
+                                  ),
+                                ],
+                              )
+                            : null,
                       );
                     },
                   ),
@@ -241,24 +247,28 @@ class _settingsScreenState extends State<Settingsscreen> {
                       return MultipleListViewWithNavigation(
                         screenheightt: screenheight * 0.25,
                         displayTitle: "Currency Symbol",
-                        displayicon: Icons.keyboard_arrow_down,
-                        onTap: () {},
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: CurrencyHelper.currencies.entries.map((entry) {
-                            final currencyInfo = entry.value;
-                            final buttonTitle = '${currencyInfo.symbol} ${currencyInfo.code}';
-                            final selectedDisplay = '${CurrencyHelper.currentSymbol} ${CurrencyHelper.currentCurrencyCode}';
-                            return Filterbutton(
-                              title: buttonTitle,
-                              selectedFilter: selectedDisplay,
-                              onpressed: () async {
-                                await CurrencyHelper.setCurrency(currencyInfo.code);
-                              },
-                            );
-                          }).toList(),
-                        ),
+                        displayicon: _isCurrencyExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        onTap: () => setState(() => _isCurrencyExpanded = !_isCurrencyExpanded),
+                        child: _isCurrencyExpanded
+                            ? Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: CurrencyHelper.currencies.entries.map((entry) {
+                                  final currencyInfo = entry.value;
+                                  final buttonTitle = '${currencyInfo.symbol} ${currencyInfo.code}';
+                                  final selectedDisplay = '${CurrencyHelper.currentSymbol} ${CurrencyHelper.currentCurrencyCode}';
+                                  return Filterbutton(
+                                    title: buttonTitle,
+                                    selectedFilter: selectedDisplay,
+                                    onpressed: () async {
+                                      await CurrencyHelper.setCurrency(currencyInfo.code);
+                                    },
+                                  );
+                                }).toList(),
+                              )
+                            : null,
                       );
                     },
                   ),

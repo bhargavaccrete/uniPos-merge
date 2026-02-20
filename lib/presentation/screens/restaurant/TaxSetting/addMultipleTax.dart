@@ -17,6 +17,7 @@ class Addtax extends StatefulWidget {
 
 class _AddtaxState extends State<Addtax> {
   bool _ischecked1 = false;
+  bool _isSaving = false;
 
   final TextEditingController _taxNameController = TextEditingController();
   final TextEditingController _taxNumberController = TextEditingController();
@@ -39,47 +40,73 @@ class _AddtaxState extends State<Addtax> {
     _taxNameController.clear();
   }
 
-  Future<void> _addOrUpdateTax({Tax? existingTax})async{
+  Future<void> _addOrUpdateTax({Tax? existingTax}) async {
+    if (_isSaving) return;
+
     final taxName = _taxNameController.text.trim();
     final taxPercentage = double.tryParse(_taxNumberController.text.trim());
 
-    if(taxName.isEmpty || taxPercentage == null){
-      NotificationService.instance.showInfo(
+    if (taxName.isEmpty || taxPercentage == null) {
+      NotificationService.instance.showError(
         'Enter a valid Tax Name/Number',
       );
-      return ;
+      return;
     }
 
-    bool success;
-    if(existingTax != null){
-      final updatedTax = Tax(
-        id: existingTax.id,
-        taxname: taxName,
-        taxperecentage: taxPercentage,
+    if (taxPercentage <= 0 || taxPercentage > 100) {
+      NotificationService.instance.showError(
+        'Tax percentage must be between 0 and 100',
       );
-      success = await taxStore.updateTax(updatedTax);
-    }else {
-      final newTax = Tax(
-        id: Uuid().v4(),
-        taxname: taxName,
-        taxperecentage: taxPercentage,
-      );
-      success = await taxStore.addTax(newTax);
-
-      // Apply tax to all items if checkbox is checked
-      if(_ischecked1 && success) {
-        await _applyTaxToAllItems(taxPercentage);
-      }
+      return;
     }
 
-    if(success) {
-      _clearControllers();
-      setState(() {
-        _ischecked1 = false;
-      });
-      if(mounted) {
-        Navigator.pop(context);
+    final isDuplicate = taxStore.taxes.any(
+      (t) =>
+          t.taxname.toLowerCase() == taxName.toLowerCase() &&
+          t.id != (existingTax?.id ?? ''),
+    );
+    if (isDuplicate) {
+      NotificationService.instance.showError(
+        'A tax with this name already exists',
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      bool success;
+      if (existingTax != null) {
+        final updatedTax = Tax(
+          id: existingTax.id,
+          taxname: taxName,
+          taxperecentage: taxPercentage,
+        );
+        success = await taxStore.updateTax(updatedTax);
+      } else {
+        final newTax = Tax(
+          id: Uuid().v4(),
+          taxname: taxName,
+          taxperecentage: taxPercentage,
+        );
+        success = await taxStore.addTax(newTax);
+
+        // Apply tax to all items if checkbox is checked
+        if (_ischecked1 && success) {
+          await _applyTaxToAllItems(taxPercentage);
+        }
       }
+
+      if (success) {
+        _clearControllers();
+        setState(() {
+          _ischecked1 = false;
+        });
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -99,7 +126,7 @@ class _AddtaxState extends State<Addtax> {
       await itemStore.updateItem(item);
     }
 
-    NotificationService.instance.showInfo(
+    NotificationService.instance.showSuccess(
       'Tax applied to all items',
     );
   }

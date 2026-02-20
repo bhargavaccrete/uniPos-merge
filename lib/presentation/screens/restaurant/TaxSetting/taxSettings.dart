@@ -120,18 +120,18 @@ class taxSetting extends StatelessWidget {
 
               SizedBox(height: isTablet ? 32 : 24),
 
-              // Tax Registration Card
-              // _buildOptionCard(
-              //   context: context,
-              //   icon: Icons.receipt_long_rounded,
-              //   title: 'Tax Registration',
-              //   description: 'Add your business tax name and registration number',
-              //   color: Colors.blue,
-              //   isTablet: isTablet,
-              //   onTap: () {
-              //     Navigator.pushNamed(context, RouteNames.restaurantTaxRegistration);
-              //   },
-              // ),
+             /* // Tax Registration Card
+              _buildOptionCard(
+                context: context,
+                icon: Icons.receipt_long_rounded,
+                title: 'Tax Registration',
+                description: 'Add your business tax name and registration number',
+                color: Colors.blue,
+                isTablet: isTablet,
+                onTap: () {
+                  Navigator.pushNamed(context, RouteNames.restaurantTaxRegistration);
+                },
+              ),*/
 
               SizedBox(height: isTablet ? 16 : 12),
 

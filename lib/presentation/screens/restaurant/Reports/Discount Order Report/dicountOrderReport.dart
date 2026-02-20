@@ -308,7 +308,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
 
     final data = _filteredOrders.map((order) => [
       ReportExportService.formatDateTime(order.orderAt),
-      order.id.substring(0, 8),
+      order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
       order.customerName.isNotEmpty ? order.customerName : 'Guest',
       order.paymentmode ?? 'N/A',
       order.orderType ?? 'N/A',
@@ -592,134 +592,98 @@ class _DiscountDataViewState extends State<DiscountDataView> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 1200;
 
-    return Row(
-      children: [
-        Expanded(
-          flex: isDesktop ? 1 : 1,
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider, width: 0.5),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total Orders',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                    ),
-                    Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.shopping_cart, color: AppColors.primary, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  _totalOrdersCount.toString(),
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                ),
-              ],
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _buildCard(
+              label: 'Total Orders',
+              value: _totalOrdersCount.toString(),
+              icon: Icons.shopping_cart,
+              color: AppColors.primary,
+              isTablet: isTablet,
+              isDesktop: isDesktop,
             ),
           ),
-        ),
-        SizedBox(width: isDesktop ? 24 : 16),
-        Expanded(
-          flex: isDesktop ? 1 : 1,
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider, width: 0.5),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total Discount',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                    ),
-                    Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1 * Colors.orange.a),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.discount, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscountAmount)}',
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                ),
-              ],
+          SizedBox(width: isDesktop ? 24 : 16),
+          Expanded(
+            child: _buildCard(
+              label: 'Total Discount',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscountAmount)}',
+              icon: Icons.discount,
+              color: Colors.orange,
+              isTablet: isTablet,
+              isDesktop: isDesktop,
             ),
           ),
-        ),
-        SizedBox(width: isDesktop ? 24 : 16),
-        Expanded(
-          flex: isDesktop ? 1 : 1,
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider, width: 0.5),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Average Discount',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                    ),
-                    Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1 * Colors.green.a),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.analytics, color: Colors.green, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageDiscount)}',
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                ),
-              ],
+          SizedBox(width: isDesktop ? 24 : 16),
+          Expanded(
+            child: _buildCard(
+              label: 'Avg Discount',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageDiscount)}',
+              icon: Icons.analytics,
+              color: Colors.green,
+              isTablet: isTablet,
+              isDesktop: isDesktop,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required bool isTablet,
+    required bool isDesktop,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(isTablet ? 24 : 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                ),
+              ),
+              SizedBox(width: 4),
+              Container(
+                padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: color, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
+              ),
+            ],
+          ),
+          SizedBox(height: isDesktop ? 16 : 12),
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -789,7 +753,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                 return DataRow(
                   cells: [
                     DataCell(Text(order.orderAt != null ? DateFormat('dd-MM-yy\nHH:mm').format(order.orderAt!) : 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
-                    DataCell(Text('#${order.id.substring(0, 8)}...', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
+                    DataCell(Text(order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
                     DataCell(Text(order.customerName.isNotEmpty ? order.customerName : 'Guest', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
                     DataCell(
                       Container(

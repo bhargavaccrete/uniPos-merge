@@ -298,7 +298,7 @@ class _SalesDataViewState extends State<SalesDataView> {
       final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
       return [
         ReportExportService.formatDateTime(order.orderAt),
-        order.billNumber?.toString() ?? order.id.substring(0, 8),
+        order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
         order.customerName ?? 'Guest',
         order.paymentmode ?? 'N/A',
         order.orderType ?? 'N/A',
@@ -594,26 +594,37 @@ class _SalesDataViewState extends State<SalesDataView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Sales',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                    Expanded(
+                      child: Text(
+                        'Total Sales',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 12), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                      ),
                     ),
+                    SizedBox(width: 6),
                     Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 6)),
                       decoration: BoxDecoration(
                         color: Colors.green.withValues(alpha: 0.1 * Colors.green.a),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.currency_rupee, color: Colors.green, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                      child: Icon(Icons.currency_rupee, color: Colors.green, size: isDesktop ? 28 : (isTablet ? 22 : 16)),
                     ),
                   ],
                 ),
                 SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalSales)}',
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalSales)}',
+                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -636,26 +647,37 @@ class _SalesDataViewState extends State<SalesDataView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Orders',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 13), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                    Expanded(
+                      child: Text(
+                        'Total Orders',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 12), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                      ),
                     ),
+                    SizedBox(width: 6),
                     Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : 8),
+                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 6)),
                       decoration: BoxDecoration(
                         color: Colors.orange.withValues(alpha: 0.1 * Colors.orange.a),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.receipt_long, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 20)),
+                      child: Icon(Icons.receipt_long, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 16)),
                     ),
                   ],
                 ),
                 SizedBox(height: isDesktop ? 16 : 12),
-                Text(
-                  _totalOrdersCount.toString(),
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _totalOrdersCount.toString(),
+                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 22), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -730,7 +752,7 @@ class _SalesDataViewState extends State<SalesDataView> {
                 return DataRow(
                   cells: [
                     DataCell(Text(order.orderAt != null ? DateFormat('dd-MM-yy\nHH:mm').format(order.orderAt!) : 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
-                    DataCell(Text('#${order.id.substring(0, 8)}...', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
+                    DataCell(Text(order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
                     DataCell(Text(order.customerName, style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
                     DataCell(
                       Container(
