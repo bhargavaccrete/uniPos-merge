@@ -40,6 +40,7 @@ class _DrawerrState extends State<Drawerr> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
@@ -206,7 +207,7 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
-                  _buildDrawerItem(
+               /*   _buildDrawerItem(
                     context: context,
                     icon: Icons.sync_rounded,
                     title: 'Sync Data',
@@ -215,15 +216,15 @@ class _DrawerrState extends State<Drawerr> {
                       _showSyncDialog(context);
                     },
                     isTablet: isTablet,
-                  ),
+                  ),*/
 
-                  _buildDrawerItem(
+              /*    _buildDrawerItem(
                     context: context,
                     icon: Icons.sync_alt_rounded,
                     title: 'Sync Order',
                     onTap: () {},
                     isTablet: isTablet,
-                  ),
+                  ),*/
 
                   _buildDrawerItem(
                     context: context,

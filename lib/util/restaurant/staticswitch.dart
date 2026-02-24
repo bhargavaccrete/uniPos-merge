@@ -93,9 +93,15 @@ class AppSettings {
   static final ValueNotifier<String> roundOffNotifier =
   ValueNotifier(_roundOffDefault);
 
+  static const String _refundWindowKey = 'refundWindowMinutes';
+  static const int _refundWindowDefault = 60;
+  static final ValueNotifier<int> refundWindowNotifier =
+      ValueNotifier(_refundWindowDefault);
+
   /// ---- Public Getters ----
   static Map<String, bool> get values => settingsNotifier.value;
   static String get selectedRoundOffValue => roundOffNotifier.value;
+  static int get refundWindowMinutes => refundWindowNotifier.value;
 
   static bool getSetting(String key) => values[key] ?? false;
 
@@ -112,9 +118,15 @@ class AppSettings {
     await _save();
   }
 
+  static Future<void> updateRefundWindow(int minutes) async {
+    refundWindowNotifier.value = minutes;
+    await _save();
+  }
+
   static Future<void> resetToDefaults() async {
     settingsNotifier.value = Map.from(_defaultSettingValues);
     roundOffNotifier.value = _roundOffDefault;
+    refundWindowNotifier.value = _refundWindowDefault;
     await _save();
   }
 
@@ -123,6 +135,7 @@ class AppSettings {
     final prefs = await SharedPreferences.getInstance();
     values.forEach((key, value) => prefs.setBool(key, value));
     await prefs.setString(_roundOffPrefKey, selectedRoundOffValue);
+    await prefs.setInt(_refundWindowKey, refundWindowMinutes);
   }
 
   static Future<void> load() async {
@@ -136,6 +149,8 @@ class AppSettings {
     settingsNotifier.value = loaded;
     roundOffNotifier.value =
         prefs.getString(_roundOffPrefKey) ?? _roundOffDefault;
+    refundWindowNotifier.value =
+        prefs.getInt(_refundWindowKey) ?? _refundWindowDefault;
   }
 
 

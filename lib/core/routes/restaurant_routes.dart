@@ -27,6 +27,7 @@ import 'package:unipos/presentation/screens/onboarding/setupWizardScreen.dart';
 // Restaurant - Auth
 import 'package:unipos/presentation/screens/restaurant/auth/restaurant_login.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/admin_login.dart';
+import 'package:unipos/presentation/screens/restaurant/auth/restaurant_guard.dart';
 
 // Restaurant - Home & Dashboard
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
@@ -110,6 +111,11 @@ import '../../presentation/screens/restaurant/Reports/void Order Report/voidOrde
 import '../../presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
 
 class RestaurantRoutes {
+  /// Wraps a widget builder with [RestaurantGuard] to enforce login + optional role check.
+  /// [permission] maps to a key in [RestaurantSession.canAccess].
+  static WidgetBuilder _guard(Widget child, [String? permission]) =>
+      (_) => RestaurantGuard(child: child, permissionKey: permission);
+
   static Map<String, WidgetBuilder> get routes => {
     // Core (restaurant flow)
     RouteNames.splash: (_) => const SplashScreen(),
@@ -127,31 +133,28 @@ class RestaurantRoutes {
     RouteNames.restaurantSupport: (_) => const Support(),*/
 
     // Restaurant - Home & Dashboard
-    RouteNames.restaurantHome: (_) => const AdminWelcome(),
-    // RouteNames.restaurantDashboard: (_) => const DashboardScreen(),
+    RouteNames.restaurantHome: _guard(const AdminWelcome()),
 
     // Restaurant - Orders
-    RouteNames.restaurantStartOrder: (_) => const Startorder(),
-    RouteNames.restaurantOrder: (_) => const Order(),
-
-    RouteNames.restaurantActiveOrders: (_) => const Activeorder(),
-    RouteNames.restaurantPastOrders: (_) => const Pastorder(),
-    RouteNames.restaurantOrderDetails: (_) => const Orderdetails(),
+    RouteNames.restaurantStartOrder: _guard(const Startorder(), 'startOrder'),
+    RouteNames.restaurantOrder: _guard(const Order(), 'startOrder'),
+    RouteNames.restaurantActiveOrders: _guard(const Activeorder(), 'startOrder'),
+    RouteNames.restaurantPastOrders: _guard(const Pastorder(), 'startOrder'),
+    RouteNames.restaurantOrderDetails: _guard(const Orderdetails(), 'startOrder'),
 
     // Restaurant - Tables
-    RouteNames.restaurantTables: (_) => const TableScreen(),
+    RouteNames.restaurantTables: _guard(const TableScreen(), 'startOrder'),
 
     // Restaurant - Menu
-    RouteNames.restaurantAdminWelcome: (_) => const AdminWelcome(),
-    RouteNames.restaurantManageMenu: (_) => const Managemenu(),
-    RouteNames.restaurantAddItem: (_) => const SetupAddItemScreen(),
-    RouteNames.restaurantCategoryManagement: (_) => const CategoryManagementScreen(),
+    RouteNames.restaurantAdminWelcome: _guard(const AdminWelcome()),
+    RouteNames.restaurantManageMenu: _guard(const Managemenu(), 'manageMenu'),
+    RouteNames.restaurantAddItem: _guard(const SetupAddItemScreen(), 'manageMenu'),
+    RouteNames.restaurantCategoryManagement: _guard(const CategoryManagementScreen(), 'manageMenu'),
 
     // Restaurant - Customers
-    RouteNames.restaurantCustomers: (_) => const CustomerListScreen(),
-    RouteNames.restaurantManageCustomers: (_) => const ManageCustomersScreen(),
-    RouteNames.restaurantAddEditCustomer: (_) => const AddEditCustomerScreen(),
-    // RouteNames.restaurantCustomerDetail: (_) => const CustomerDetailScreen(),
+    RouteNames.restaurantCustomers: _guard(const CustomerListScreen(), 'customers'),
+    RouteNames.restaurantManageCustomers: _guard(const ManageCustomersScreen(), 'customers'),
+    RouteNames.restaurantAddEditCustomer: _guard(const AddEditCustomerScreen(), 'customers'),
 
 /*
     // Restaurant - Online Orders
@@ -162,72 +165,64 @@ class RestaurantRoutes {
 */
 
     // Restaurant - Inventory
-    RouteNames.restaurantInventory: (_) => const ManageInventory(),
-    RouteNames.restaurantStockHistory: (_) =>  StockHistory(),
+    RouteNames.restaurantInventory: _guard(const ManageInventory(), 'inventory'),
+    RouteNames.restaurantStockHistory: _guard(StockHistory(), 'inventory'),
 
     // Restaurant - Staff
-    RouteNames.restaurantStaff: (_) => const manageStaff(),
+    RouteNames.restaurantStaff: _guard(const manageStaff(), 'manageStaff'),
 
     // Restaurant - Expenses
-    RouteNames.restaurantExpenses: (_) => const ExpenseScreen(),
-    RouteNames.restaurantAddExpense: (_) => const Addexpence(),
-    RouteNames.restaurantViewExpense: (_) => const ViewExpense(),
-    RouteNames.restaurantExpenseCategory: (_) => const ManageCategory(),
+    RouteNames.restaurantExpenses: _guard(const ExpenseScreen(), 'expenses'),
+    RouteNames.restaurantAddExpense: _guard(const Addexpence(), 'expenses'),
+    RouteNames.restaurantViewExpense: _guard(const ViewExpense(), 'expenses'),
+    RouteNames.restaurantExpenseCategory: _guard(const ManageCategory(), 'expenses'),
 
     // Restaurant - Reports
-    RouteNames.restaurantReports: (_) => const ReportsScreen(),
-    // RouteNames.restaurantFilterOrders: (_) => const FilterOrders(),
-    RouteNames.restaurantPerformanceStats: (_) => const PerformanceStatisticsReport(),
-    RouteNames.restaurantReportsTotalSales: (_) => const Totalsales(),
-    RouteNames.restaurantReportsSalesBYItem: (_) =>  Salesbyitem(),
-    RouteNames.restaurantReportsSalesByCategory: (_) =>  SalesByCategory(),
-    RouteNames.restaurantReportsDailyClosingReport: (_) =>  DailyClosingReport(),
-    RouteNames.restaurantReportsSalesByTop: (_) =>  SalesByTopSelling(),
-    RouteNames.restaurantReportsCustomerList: (_) =>  CustomerListReport(),
-    RouteNames.restaurantReportsComparisionByWeek: (_) =>  SalesComparison(),
-    RouteNames.restaurantReportsComparisionByMonth: (_) =>  ComparisonByMonth(),
-    RouteNames.restaurantReportsComparisionByYear: (_) =>  ComparisonByYear(),
-    RouteNames.restaurantReportsComparisionByProduct: (_) =>  ComparisonByProduct(),
-    RouteNames.restaurantReportsRefundDetails: (_) =>  RefundDetails(),
-    RouteNames.restaurantReportsDiscountOrderReport: (_) =>  DiscountOrderReport(),
-    RouteNames.restaurantReportsPosOrder: (_) =>  Posenddayreport(),
-    RouteNames.restaurantReportsCustomerListByRevenue: (_) =>  CustomerListByRevenue(),
-    RouteNames.restaurantReportsExpense: (_) =>  ExpenseReport(),
-    RouteNames.restaurantReportsVoidOrderReport: (_) =>  VoidOrderReport(),
-    // RouteNames.restaurantReportsPerformanceStatistics: (_) =>  PerformanceStatisticsReport(),
-
-
-
+    RouteNames.restaurantReports: _guard(const ReportsScreen(), 'reports'),
+    RouteNames.restaurantPerformanceStats: _guard(const PerformanceStatisticsReport(), 'reports'),
+    RouteNames.restaurantReportsTotalSales: _guard(const Totalsales(), 'reports'),
+    RouteNames.restaurantReportsSalesBYItem: _guard(Salesbyitem(), 'reports'),
+    RouteNames.restaurantReportsSalesByCategory: _guard(SalesByCategory(), 'reports'),
+    RouteNames.restaurantReportsDailyClosingReport: _guard(DailyClosingReport(), 'reports'),
+    RouteNames.restaurantReportsSalesByTop: _guard(SalesByTopSelling(), 'reports'),
+    RouteNames.restaurantReportsCustomerList: _guard(CustomerListReport(), 'reports'),
+    RouteNames.restaurantReportsComparisionByWeek: _guard(SalesComparison(), 'reports'),
+    RouteNames.restaurantReportsComparisionByMonth: _guard(ComparisonByMonth(), 'reports'),
+    RouteNames.restaurantReportsComparisionByYear: _guard(ComparisonByYear(), 'reports'),
+    RouteNames.restaurantReportsComparisionByProduct: _guard(ComparisonByProduct(), 'reports'),
+    RouteNames.restaurantReportsRefundDetails: _guard(RefundDetails(), 'reports'),
+    RouteNames.restaurantReportsDiscountOrderReport: _guard(DiscountOrderReport(), 'reports'),
+    RouteNames.restaurantReportsPosOrder: _guard(Posenddayreport(), 'reports'),
+    RouteNames.restaurantReportsCustomerListByRevenue: _guard(CustomerListByRevenue(), 'reports'),
+    RouteNames.restaurantReportsExpense: _guard(ExpenseReport(), 'reports'),
+    RouteNames.restaurantReportsVoidOrderReport: _guard(VoidOrderReport(), 'reports'),
 
     // Restaurant - Settings
-    RouteNames.restaurantSettings: (_) => const  Settingsscreen(),
-    RouteNames.restaurantOrderSettings: (_) =>  Ordersettings(),
-    RouteNames.restaurantPaymentMethods: (_) =>  Paymentsmethods(),
-    // RouteNames.restaurantOrderNotifications: (_) => const OrderNotificationSettings(),
-    RouteNames.restaurantChangePassword: (_) =>  Changepassword(),
-    RouteNames.restaurantAddressCustomization: (_) =>  AddressCustomizationScreen(),
+    RouteNames.restaurantSettings: _guard(const Settingsscreen(), 'settings'),
+    RouteNames.restaurantOrderSettings: _guard(Ordersettings(), 'settings'),
+    RouteNames.restaurantPaymentMethods: _guard(Paymentsmethods(), 'settings'),
+    RouteNames.restaurantChangePassword: _guard(Changepassword(), 'settings'),
+    RouteNames.restaurantAddressCustomization: _guard(AddressCustomizationScreen(), 'settings'),
 
     // Restaurant - Tax
-    RouteNames.restaurantTaxSettings: (_) =>  taxSetting(),
-    RouteNames.restaurantTaxRegistration: (_) =>  Taxragistration(),
-    // RouteNames.restaurantApplyTax: (_) => const ApplyTaxScreen(),
-    RouteNames.restaurantAddMultipleTax: (_) =>  Addtax(),
+    RouteNames.restaurantTaxSettings: _guard(taxSetting(), 'taxSettings'),
+    RouteNames.restaurantTaxRegistration: _guard(Taxragistration(), 'taxSettings'),
+    RouteNames.restaurantAddMultipleTax: _guard(Addtax(), 'taxSettings'),
 
     // Restaurant - Printer
-    RouteNames.restaurantPrinterSettings: (_) => const Printersetting(),
-    RouteNames.restaurantPrinterCustomization: (_) => const CustomizationPrinter(),
-    RouteNames.restaurantAddPrinter: (_) => const AddPrinter(),
+    RouteNames.restaurantPrinterSettings: _guard(const Printersetting(), 'settings'),
+    RouteNames.restaurantPrinterCustomization: _guard(const CustomizationPrinter(), 'settings'),
+    RouteNames.restaurantAddPrinter: _guard(const AddPrinter(), 'settings'),
 
     // Restaurant - End Day
-    RouteNames.restaurantEndDay: (_) => const EndDayDrawer(),
+    RouteNames.restaurantEndDay: _guard(const EndDayDrawer(), 'endDay'),
 
     // Restaurant - Other
-    // RouteNames.restaurantLanguage: (_) => const LanguageScreen(),
-    RouteNames.restaurantNeedHelp: (_) => const NeedhelpDrawer(),
-    RouteNames.restaurantCustomizationDrawer: (_) => const CustomizationDrawer(),
-    RouteNames.restaurantTestData: (_) => const TestDataScreen(),
-    RouteNames.restaurantBulkImportTestScreen: (_) => const BulkImportTestScreenV3(),
-    RouteNames.restaurantDataGenratorScreen: (_) => const DataGeneratorScreen(),
+    RouteNames.restaurantNeedHelp: _guard(const NeedhelpDrawer()),
+    RouteNames.restaurantCustomizationDrawer: _guard(const CustomizationDrawer(), 'settings'),
+    RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
+    RouteNames.restaurantBulkImportTestScreen: _guard(const BulkImportTestScreenV3(), 'settings'),
+    RouteNames.restaurantDataGenratorScreen: _guard(const DataGeneratorScreen(), 'settings'),
 
   };
 }

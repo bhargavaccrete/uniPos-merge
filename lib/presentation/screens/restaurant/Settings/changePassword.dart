@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../util/restaurant/responsive_helper.dart';
+import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/color.dart';
@@ -60,12 +61,12 @@ class _ChangepasswordState extends State<Changepassword> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final storedPassword = prefs.getString(_passwordKey) ?? _defaultPassword;
+      final storedPassword = prefs.getString(_passwordKey) ?? RestaurantAuthHelper.hashPassword(_defaultPassword);
       final currentPassword = _currentPasswordController.text;
       final newPassword = _newPasswordController.text;
 
-      // Verify current password
-      if (currentPassword != storedPassword) {
+      // Verify current password (handles both hashed and legacy plaintext)
+      if (!RestaurantAuthHelper.verifyPassword(currentPassword, storedPassword)) {
         setState(() {
           _errorMessage = 'Current password is incorrect';
           _isLoading = false;
@@ -82,8 +83,8 @@ class _ChangepasswordState extends State<Changepassword> {
         return;
       }
 
-      // Save new password
-      await prefs.setString(_passwordKey, newPassword);
+      // Save new password as hash
+      await prefs.setString(_passwordKey, RestaurantAuthHelper.hashPassword(newPassword));
 
       // Clear form
       _currentPasswordController.clear();

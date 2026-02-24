@@ -214,6 +214,7 @@ class RestaurantPrintHelper {
     required OrderModel order,
     required CartCalculationService calculations,
     int? billNumber, // Bill number for completed orders (from pastOrderModel)
+    int loyaltyPointsDiscount = 0, // Points redeemed (reduces grand total)
   }) async {
     try {
       final storeSettings = StoreSettingsService();
@@ -393,10 +394,10 @@ class RestaurantPrintHelper {
         customerId: order.customerName.isNotEmpty ? 'GUEST' : null,
         totalItems: order.items.length,
         subtotal: calculations.subtotal,  // Base price (without tax)
-        discountAmount: calculations.discountAmount,
-        totalTaxableAmount: calculations.subtotal - calculations.discountAmount, // Discounted base
+        discountAmount: calculations.discountAmount, // regular discount only (points shown separately)
+        totalTaxableAmount: calculations.subtotal - calculations.discountAmount,
         totalGstAmount: calculations.totalGST,
-        grandTotal: calculations.grandTotal,
+        grandTotal: calculations.grandTotal - loyaltyPointsDiscount, // net payable after points
         paymentType: paymentType,
         isReturn: false,
       );
@@ -451,10 +452,11 @@ class RestaurantPrintHelper {
         storePhone: receiptData.storePhone,
         storeEmail: receiptData.storeEmail,
         gstNumber: receiptData.gstNumber,
-        billNumber: billNumber, // Pass bill number for bill receipts
-        kotNumbers: order.kotNumbers, // Pass all KOT numbers to display on bill
-        itemTotal: receiptData.itemTotal, // ✅ Pass pre-calculated item total
-        paymentBreakdown: paymentBreakdown, // Pass split payment breakdown if available
+        billNumber: billNumber,
+        kotNumbers: order.kotNumbers,
+        itemTotal: receiptData.itemTotal,
+        paymentBreakdown: paymentBreakdown,
+        loyaltyPointsDiscount: loyaltyPointsDiscount, // show Points Redeemed line on bill
       );
       
     } catch (e) {
@@ -573,6 +575,7 @@ class RestaurantPrintHelper {
         order: orderForPrint,
         calculations: calculations,
         billNumber: pastOrder.billNumber,
+        loyaltyPointsDiscount: pastOrder.loyaltyPointsUsed ?? 0,
       );
     } catch (e) {
       debugPrint('Error reprinting past order: $e');

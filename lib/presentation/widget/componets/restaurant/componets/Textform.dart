@@ -1,6 +1,7 @@
 // import 'dart:ffi';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 
@@ -21,6 +22,8 @@ class CommonTextForm extends StatelessWidget {
   final Color? LabelColor;
   final double? borderc;
   final int? maxline;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
   final TextInputType? keyboardType;
   // final String? labelText;
   final bool obsecureText;
@@ -33,7 +36,8 @@ class CommonTextForm extends StatelessWidget {
         this.keyboardType,
       this.hintText,
       required this.obsecureText,
-      this.validator, this.icon,  this.gesture, this.maxline,this.focusNode, this.onfieldsumbitted,
+      this.validator, this.icon,  this.gesture, this.maxline, this.maxLength,
+      this.inputFormatters, this.focusNode, this.onfieldsumbitted,
         this.onChanged,
         this.enabled,
         this.BorderColor, this.HintColor, this.borderc,
@@ -47,6 +51,8 @@ class CommonTextForm extends StatelessWidget {
     return TextFormField(
       enabled: enabled,
       maxLines: maxline?? 1,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       keyboardType: keyboardType??TextInputType.text,
       onFieldSubmitted:onfieldsumbitted ,
       onChanged: onChanged,
@@ -64,6 +70,7 @@ class CommonTextForm extends StatelessWidget {
         prefixIcon: icon,
         hintStyle: GoogleFonts.poppins(
             fontWeight: FontWeight.w600, color: HintColor ?? Colors.black),
+        counterText: '',
         // label: labelText,
         focusedBorder:
             OutlineInputBorder(

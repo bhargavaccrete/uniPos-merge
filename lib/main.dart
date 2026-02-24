@@ -13,6 +13,7 @@ import 'domain/store/restaurant/appStore.dart';
 import 'domain/services/common/notification_service.dart';
 import 'util/common/decimal_settings.dart';
 import 'util/restaurant/staticswitch.dart';
+import 'util/restaurant/restaurant_session.dart';
 import 'util/restaurant/print_settings.dart';
 import 'util/restaurant/order_settings.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
@@ -122,7 +123,8 @@ Future<void> _initializeApp() async {
       PrintSettings.load(),
       DecimalSettings.load(),
       OrderSettings.load(),
-      CurrencyHelper.load()
+      CurrencyHelper.load(),
+      RestaurantSession.load(),
     ]);
     print('   ✅ Restaurant settings loaded');
 

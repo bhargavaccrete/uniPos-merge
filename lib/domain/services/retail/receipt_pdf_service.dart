@@ -45,6 +45,9 @@ class ReceiptData {
   // This should come from CartCalculationService.itemTotal
   final double? itemTotal;
 
+  // Loyalty points redeemed as discount (shown as a separate line on bill)
+  final int? loyaltyPointsDiscount;
+
   ReceiptData({
     required this.sale,
     required this.items,
@@ -64,6 +67,7 @@ class ReceiptData {
     this.billNumber,
     this.logoBytes,
     this.itemTotal,
+    this.loyaltyPointsDiscount,
   });
 }
 
@@ -456,6 +460,9 @@ class ReceiptPdfService {
                   // Discount - Pre-calculated (only show if > 0)
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),
+                  // Points Redeemed - only show if loyalty points were used
+                  if ((data.loyaltyPointsDiscount ?? 0) > 0)
+                    _buildThermalTotalRow('Points Redeemed', -(data.loyaltyPointsDiscount!.toDouble())),
                   // GST (Included) - Pre-calculated
                   if (showTax && data.sale.taxAmount > 0)
                     _buildThermalTotalRow('GST', data.sale.taxAmount),
@@ -471,6 +478,9 @@ class ReceiptPdfService {
                   // Discount - Pre-calculated (only show if > 0)
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),
+                  // Points Redeemed - only show if loyalty points were used
+                  if ((data.loyaltyPointsDiscount ?? 0) > 0)
+                    _buildThermalTotalRow('Points Redeemed', -(data.loyaltyPointsDiscount!.toDouble())),
                   // GST - Pre-calculated
                   if (showTax && data.sale.taxAmount > 0)
                     _buildThermalTotalRow('GST', data.sale.taxAmount),
@@ -861,6 +871,9 @@ class ReceiptPdfService {
                     // Discount - Pre-calculated
                     if (showDiscount && data.sale.discountAmount > 0)
                       _buildInvoiceTotalRow('Discount', -data.sale.discountAmount, isRed: true),
+                    // Points Redeemed - only show if loyalty points were used
+                    if ((data.loyaltyPointsDiscount ?? 0) > 0)
+                      _buildInvoiceTotalRow('Points Redeemed', -(data.loyaltyPointsDiscount!.toDouble()), isRed: true),
 
                     // First Separator
                     if (showSubtotal) pw.Divider(thickness: 0.5),

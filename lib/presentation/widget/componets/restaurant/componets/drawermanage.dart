@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
+import 'package:unipos/util/restaurant/restaurant_session.dart';
 import '../../../../screens/restaurant/welcome_Admin.dart';
 import '../../../../screens/restaurant/AuthSelectionScreen.dart';
 import '../../../../screens/restaurant/need help/needhelp.dart';
@@ -105,6 +109,7 @@ class DrawerManage extends StatelessWidget {
                     },
                     isTablet: isTablet,
                   ),
+                  if (RestaurantSession.canAccess('reports'))
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.bar_chart_rounded,
@@ -154,19 +159,29 @@ class DrawerManage extends StatelessWidget {
                     isTablet: isTablet,
                   ),
 
+                  // Change PIN (staff only)
+                  if (!RestaurantSession.isAdmin)
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.lock_reset_rounded,
+                      title: 'Change PIN',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showChangePinDialog(context);
+                      },
+                      isTablet: isTablet,
+                    ),
+
                   // Divider before danger zone
                   if (isDelete || islogout) ...[
                     Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(
-                        color: Colors.grey.shade200,
-                        thickness: 1,
-                      ),
+                      child: Divider(color: Colors.grey.shade200, thickness: 1),
                     ),
                   ],
 
-                  // Danger zone
-                  if (isDelete)
+                  // Danger zone (admin only)
+                  if (isDelete && RestaurantSession.isAdmin)
                     _buildDrawerItem(
                       context: context,
                       icon: Icons.delete_outline_rounded,
@@ -289,6 +304,130 @@ class DrawerManage extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showChangePinDialog(BuildContext context) {
+    final currentPinCtrl = TextEditingController();
+    final newPinCtrl = TextEditingController();
+    final confirmPinCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    String? errorMsg;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            Icon(Icons.lock_reset_rounded, color: Colors.teal),
+            SizedBox(width: 10),
+            Text('Change PIN',
+                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
+          ]),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (errorMsg != null)
+                  Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(errorMsg!,
+                        style: GoogleFonts.poppins(fontSize: 13, color: Colors.red.shade700)),
+                  ),
+                TextFormField(
+                  controller: currentPinCtrl,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Current PIN',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Enter current PIN' : null,
+                ),
+                SizedBox(height: 12),
+                TextFormField(
+                  controller: newPinCtrl,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'New PIN (4–6 digits)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter new PIN';
+                    if (!RegExp(r'^\d{4,6}$').hasMatch(v)) return 'PIN must be 4–6 digits';
+                    return null;
+                  },
+                ),
+                SizedBox(height: 12),
+                TextFormField(
+                  controller: confirmPinCtrl,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New PIN',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Confirm your new PIN';
+                    if (v != newPinCtrl.text) return 'PINs do not match';
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey.shade700)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                await staffStore.loadStaff();
+                final staff = staffStore.staff.where(
+                  (s) => s.isActive && RestaurantAuthHelper.verifyPassword(currentPinCtrl.text.trim(), s.pinNo.trim()),
+                ).firstOrNull;
+                if (staff == null) {
+                  setState(() => errorMsg = 'Current PIN is incorrect');
+                  return;
+                }
+                final updated = staff.copyWith(pinNo: RestaurantAuthHelper.hashPassword(newPinCtrl.text.trim()));
+                await staffStore.updateStaff(updated);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('PIN changed successfully',
+                          style: GoogleFonts.poppins()),
+                      backgroundColor: Colors.teal,
+                    ),
+                  );
+                }
+              },
+              child: Text('Update PIN', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            ),
+          ],
         ),
       ),
     );
@@ -487,5 +626,6 @@ class DrawerManage extends StatelessWidget {
   Future<void> _clearLoginState() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('restaurant_is_logged_in', false);
+    await RestaurantSession.clearSession();
   }
 }

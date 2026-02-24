@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
@@ -642,7 +643,7 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
-  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType) async {
+  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
     try {
       print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
       print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
@@ -650,7 +651,7 @@ class _TakeawayState extends State<Takeaway> {
       await restaurantCustomerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
-        pointsToAdd: 10, // Award 10 points per order
+        pointsToAdd: pointsToEarn,
       );
 
       // Verify the update
@@ -868,10 +869,8 @@ class _TakeawayState extends State<Takeaway> {
 
     await orderStore.addOrder(neworder);
 
-    // Update customer stats after order is created
-    if (customer != null) {
-      await _updateCustomerStats(customer, widget.isDineIn ? 'Dine In' : 'Take Away');
-    }
+    // NOTE: Customer stats (visits + points) are updated only at settlement, not here.
+    // Adding points on order placement would double-count when the order is later settled.
 
     print("✅ New active order saved with Total: ${neworder.totalPrice}");
     print("✅ Order ID: ${neworder.id}");
@@ -1709,6 +1708,9 @@ class _TakeawayState extends State<Takeaway> {
                                 BorderColor: AppColors.primary,
                                 HintColor: AppColors.primary,
                                 obsecureText: false,
+                                keyboardType: TextInputType.number,
+                                maxLength: 10,
+                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                 onChanged: (value) async {
                                   if (value.isEmpty) {
                                     setDialogState(() {

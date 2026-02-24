@@ -1,31 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/presentation/screens/restaurant/AuthSelectionScreen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:unipos/core/routes/routes_name.dart';
+import 'package:unipos/util/restaurant/restaurant_session.dart';
 
 import '../../../widget/componets/restaurant/componets/Button.dart';
 
 class Logout extends StatelessWidget {
-  const Logout({Key? key}) : super(key: key);
+  const Logout({super.key});
+
+  Future<void> _performLogout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('restaurant_is_logged_in', false);
+    await RestaurantSession.clearSession();
+    if (context.mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        RouteNames.restaurantLogin,
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-
     return AlertDialog(
-      title: Text('Logout'),
-      content: Text('Are you sure you want to logout?'),
+      title: const Text('Logout'),
+      content: const Text('Are you sure you want to logout?'),
       actions: <Widget>[
         CommonButton(
-          onTap: () {
-            // Perform logout logic here
-            Navigator.push(context,MaterialPageRoute(builder: (context)=>AuthSelectionScreen()));
-          },
-          child: Text('Logout'),
+          onTap: () => _performLogout(context),
+          child: const Text('Logout'),
         ),
         CommonButton(
-          onTap: () {
-            // Cancel logout
-            Navigator.pop(context);
-          },
-          child: Text('Cancel'),
+          onTap: () => Navigator.pop(context),
+          child: const Text('Cancel'),
         ),
       ],
     );

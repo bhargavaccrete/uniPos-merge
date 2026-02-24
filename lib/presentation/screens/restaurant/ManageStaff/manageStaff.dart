@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -9,6 +10,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Textfo
 import 'package:unipos/presentation/widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../data/models/restaurant/db/staffModel_310.dart';
+import '../../../../util/restaurant/restaurant_auth_helper.dart';
 
 class manageStaff extends StatefulWidget {
   const manageStaff({super.key});
@@ -58,7 +60,7 @@ class _manageStaffState extends State<manageStaff> {
       isCashier: selectedrole,
       mobileNo: mobileController.text.trim(),
       emailId: mailController.text.trim(),
-      pinNo: pinNoController.text.trim(),
+      pinNo: RestaurantAuthHelper.hashPassword(pinNoController.text.trim()),
       createdAt: DateTime.now(),
     );
     await staffStore.addStaff(newstaff);
@@ -468,9 +470,7 @@ class _manageStaffState extends State<manageStaff> {
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               insetPadding: EdgeInsets.all(isTablet ? 24 : 16),
               child: Form(
                 key: _formKey,
@@ -489,22 +489,15 @@ class _manageStaffState extends State<manageStaff> {
                                 color: AppColors.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(
-                                Icons.person_add_rounded,
-                                size: isTablet ? 28 : 24,
-                                color: AppColors.primary,
-                              ),
+                              child: Icon(Icons.person_add_rounded, size: isTablet ? 28 : 24, color: AppColors.primary),
                             ),
                             SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                "Add New Staff",
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 20 : 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
-                              ),
+                              child: Text('Add New Staff',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: isTablet ? 20 : 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87)),
                             ),
                           ],
                         ),
@@ -561,33 +554,12 @@ class _manageStaffState extends State<manageStaff> {
                               contentPadding: EdgeInsets.symmetric(vertical: 8),
                               hintText: 'Select Role',
                             ),
-                            style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 15 : 14,
-                              color: Colors.black87,
-                            ),
-                            items: [
-                              'Select Role',
-                              'Cashier',
-                              'Waiter',
-                              'Manager',
-                              'Kitchen Staff'
-                            ].map((String value) {
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Text(value),
-                              );
-                            }).toList(),
-                            onChanged: (String? newValue) {
-                              setState(() {
-                                selectedrole = newValue ?? 'Select Role';
-                              });
-                            },
-                            validator: (value) {
-                              if (value == 'Select Role') {
-                                return 'Please select a role';
-                              }
-                              return null;
-                            },
+                            style: GoogleFonts.poppins(fontSize: isTablet ? 15 : 14, color: Colors.black87),
+                            items: ['Select Role', 'Cashier', 'Waiter', 'Manager', 'Kitchen Staff']
+                                .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                                .toList(),
+                            onChanged: (v) => setState(() => selectedrole = v ?? 'Select Role'),
+                            validator: (v) => v == 'Select Role' ? 'Please select a role' : null,
                           ),
                         ),
                         SizedBox(height: 16),
@@ -599,24 +571,27 @@ class _manageStaffState extends State<manageStaff> {
                           BorderColor: AppColors.primary,
                           borderc: 12,
                           keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Mobile number is required';
-                            if (!RegExp(r'^\d{7,15}$').hasMatch(v.trim())) return 'Enter a valid mobile number';
+                            if (v.trim().length != 10) return 'Mobile number must be exactly 10 digits';
                             return null;
                           },
                         ),
                         SizedBox(height: 16),
                         CommonTextForm(
                           obsecureText: false,
-                          labelText: 'Email Address',
+                          labelText: 'Email Address (Optional)',
                           LabelColor: AppColors.primary,
                           controller: mailController,
                           BorderColor: AppColors.primary,
                           borderc: 12,
                           keyboardType: TextInputType.emailAddress,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Email is required';
-                            if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Enter a valid email';
+                            if (v != null && v.trim().isNotEmpty) {
+                              if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Enter a valid email';
+                            }
                             return null;
                           },
                         ),
@@ -629,6 +604,7 @@ class _manageStaffState extends State<manageStaff> {
                           BorderColor: AppColors.primary,
                           borderc: 12,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'PIN is required';
                             if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
@@ -647,14 +623,11 @@ class _manageStaffState extends State<manageStaff> {
                                   vertical: isTablet ? 14 : 12,
                                 ),
                               ),
-                              child: Text(
-                                "Cancel",
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 15 : 14,
-                                  color: Colors.grey.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                              child: Text('Cancel',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: isTablet ? 15 : 14,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w500)),
                             ),
                             SizedBox(width: 12),
                             ElevatedButton(
@@ -673,13 +646,9 @@ class _manageStaffState extends State<manageStaff> {
                                     }
                                     _addStaff();
                                     Navigator.pop(context);
-                                    NotificationService.instance.showSuccess(
-                                      'Staff added successfully',
-                                    );
+                                    NotificationService.instance.showSuccess('Staff added successfully');
                                   } else {
-                                    NotificationService.instance.showInfo(
-                                      'Please select a role',
-                                    );
+                                    NotificationService.instance.showInfo('Please select a role');
                                   }
                                 }
                               },
@@ -690,18 +659,13 @@ class _manageStaffState extends State<manageStaff> {
                                   horizontal: isTablet ? 28 : 24,
                                   vertical: isTablet ? 14 : 12,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 elevation: 0,
                               ),
-                              child: Text(
-                                "Add Staff",
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 15 : 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                              child: Text('Add Staff',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: isTablet ? 15 : 14,
+                                      fontWeight: FontWeight.w600)),
                             ),
                           ],
                         ),
@@ -859,24 +823,27 @@ class _manageStaffState extends State<manageStaff> {
                         BorderColor: Colors.orange,
                         borderc: 12,
                         keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) return 'Mobile number is required';
-                          if (!RegExp(r'^\d{7,15}$').hasMatch(v.trim())) return 'Enter a valid mobile number';
+                          if (v.trim().length != 10) return 'Mobile number must be exactly 10 digits';
                           return null;
                         },
                       ),
                       SizedBox(height: 16),
                       CommonTextForm(
                         obsecureText: false,
-                        labelText: 'Email Address',
+                        labelText: 'Email Address (Optional)',
                         LabelColor: Colors.orange,
                         controller: editEmailController,
                         BorderColor: Colors.orange,
                         borderc: 12,
                         keyboardType: TextInputType.emailAddress,
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Email is required';
-                          if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Enter a valid email';
+                          if (v != null && v.trim().isNotEmpty) {
+                            if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Enter a valid email';
+                          }
                           return null;
                         },
                       ),
@@ -889,6 +856,7 @@ class _manageStaffState extends State<manageStaff> {
                         BorderColor: Colors.orange,
                         borderc: 12,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) return 'PIN is required';
                           if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
@@ -969,7 +937,7 @@ class _manageStaffState extends State<manageStaff> {
                                 isCashier: editSelectedRole,
                                 mobileNo: editMobileController.text.trim(),
                                 emailId: editEmailController.text.trim(),
-                                pinNo: editPinController.text.trim(),
+                                pinNo: RestaurantAuthHelper.hashPassword(editPinController.text.trim()),
                                 isActive: isActive,
                               );
                               await _updateStaff(updatedStaff);

@@ -6,6 +6,8 @@ import '../../../core/routes/routes_name.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
+import '../../../domain/services/retail/store_settings_service.dart';
+import '../../../util/restaurant/restaurant_session.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
 
 class AdminWelcome extends StatefulWidget {
@@ -16,10 +18,20 @@ class AdminWelcome extends StatefulWidget {
 }
 
 class _AdminWelcomeState extends State<AdminWelcome> {
+  String _storeName = '';
+
   @override
   void initState() {
     super.initState();
     _checkDayStarted();
+    _loadStoreName();
+  }
+
+  Future<void> _loadStoreName() async {
+    final name = await StoreSettingsService().getStoreName();
+    if (mounted && name != null && name.isNotEmpty) {
+      setState(() => _storeName = name);
+    }
   }
 
   Future<void> _checkDayStarted() async {
@@ -251,7 +263,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                           ),
                         ),
                         Text(
-                          'Orange Restaurant',
+                          _storeName.isNotEmpty ? _storeName : 'Restaurant',
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -261,17 +273,48 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: EdgeInsets.all(isTablet ? 10 : 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      size: isTablet ? 22 : 20,
-                      color: AppColors.primary,
-                    ),
+                  ValueListenableBuilder<String>(
+                    valueListenable: RestaurantSession.loginTypeNotifier,
+                    builder: (_, __, ___) {
+                      final role = RestaurantSession.effectiveRole;
+                      // final name = RestaurantSession.staffName;
+                      return Container(
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.person, size: isTablet ? 18 : 16, color: AppColors.primary),
+                            SizedBox(width: 6),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  role,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: isTablet ? 13 : 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                // if (name != null && name.isNotEmpty)
+                                //   Text(
+                                //     name,
+                                //     style: GoogleFonts.poppins(
+                                //       fontSize: isTablet ? 11 : 10,
+                                //       color: AppColors.primary.withOpacity(0.7),
+                                //     ),
+                                //   ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -355,6 +398,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                         columns = 3;
                       }
 
+                      final cards = _getVisibleCards(context);
                       return GridView.count(
                         shrinkWrap: true,
                         physics: NeverScrollableScrollPhysics(),
@@ -362,90 +406,14 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                         crossAxisSpacing: isTablet ? 16 : 12,
                         mainAxisSpacing: isTablet ? 16 : 12,
                         childAspectRatio: isTablet ? 1.3 : 1.2,
-                        children: [
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.shopping_cart_rounded,
-                            title: 'Start Order',
-                            color: Colors.blue,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantStartOrder),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.restaurant_menu_rounded,
-                            title: 'Manage Menu',
-                            color: Colors.purple,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantManageMenu),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.people_rounded,
-                            title: 'Manage Staff',
-                            color: Colors.teal,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantStaff),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.person_outline_rounded,
-                            title: 'Customers',
-                            color: Colors.indigo,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantCustomers),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.bar_chart_rounded,
-                            title: 'Reports',
-                            color: Colors.orange,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReports),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.receipt_long_rounded,
-                            title: 'Tax Settings',
-                            color: Colors.green,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings),
-                            isTablet: isTablet,
-                          ),
-
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.account_balance_wallet_rounded,
-
-                            title: 'Expenses',
-                            color: Colors.red,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantExpenses),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.inventory_2_rounded,
-                            title: 'Inventory',
-                            color: Colors.amber,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantInventory),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.settings_rounded,
-                            title: 'Settings',
-                            color: Colors.blueGrey,
-                            onTap: () => Navigator.pushNamed(context, RouteNames.restaurantSettings),
-                            isTablet: isTablet,
-                          ),
-                          _buildMenuCard(
-                            context: context,
-                            icon: Icons.logout_rounded,
-                            title: 'Logout',
-                            color: Colors.red.shade700,
-                            onTap: () => _showLogoutDialog(context),
-                            isTablet: isTablet,
-                          ),
-                        ],
+                        children: cards.map((card) => _buildMenuCard(
+                          context: context,
+                          icon: card.icon,
+                          title: card.title,
+                          color: card.color,
+                          onTap: card.onTap,
+                          isTablet: isTablet,
+                        )).toList(),
                       );
                     },
                   ),
@@ -456,6 +424,25 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         ],
       ),
     );
+  }
+
+  // Builds the list of dashboard cards visible to the current user.
+  // Permissions are defined in RestaurantSession.canAccess() in restaurant_session.dart.
+  // Admin and Manager see all cards. Other roles see only what canAccess() permits.
+  List<_MenuCardData> _getVisibleCards(BuildContext context) {
+    final all = [
+      _MenuCardData('Start Order',   Icons.shopping_cart_rounded,       Colors.blue,           'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantStartOrder)),
+      _MenuCardData('Manage Menu',   Icons.restaurant_menu_rounded,     Colors.purple,         'manageMenu',   () => Navigator.pushNamed(context, RouteNames.restaurantManageMenu)),
+      _MenuCardData('Manage Staff',  Icons.people_rounded,              Colors.teal,           'manageStaff',  () => Navigator.pushNamed(context, RouteNames.restaurantStaff)),
+      _MenuCardData('Customers',     Icons.person_outline_rounded,      Colors.indigo,         'customers',    () => Navigator.pushNamed(context, RouteNames.restaurantCustomers)),
+      _MenuCardData('Reports',       Icons.bar_chart_rounded,           Colors.orange,         'reports',      () => Navigator.pushNamed(context, RouteNames.restaurantReports)),
+      _MenuCardData('Tax Settings',  Icons.receipt_long_rounded,        Colors.green,          'taxSettings',  () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings)),
+      _MenuCardData('Expenses',      Icons.account_balance_wallet_rounded, Colors.red,         'expenses',     () => Navigator.pushNamed(context, RouteNames.restaurantExpenses)),
+      _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory)),
+      _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings)),
+      _MenuCardData('Logout',        Icons.logout_rounded,              Colors.red.shade700,   'logout',       () => _showLogoutDialog(context)),
+    ];
+    return all.where((c) => c.permission == 'logout' || RestaurantSession.canAccess(c.permission)).toList();
   }
 
   Widget _buildMenuCard({
@@ -636,5 +623,17 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   Future<void> _clearLoginState() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('restaurant_is_logged_in', false);
+    await RestaurantSession.clearSession();
   }
+}
+
+/// Simple data holder for a dashboard menu card.
+class _MenuCardData {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final String permission;
+  final VoidCallback onTap;
+
+  const _MenuCardData(this.title, this.icon, this.color, this.permission, this.onTap);
 }

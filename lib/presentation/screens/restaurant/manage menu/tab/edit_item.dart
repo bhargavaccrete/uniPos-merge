@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -280,7 +281,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     );
 
     // 🔍 AUDIT TRAIL: Track this edit
-    AuditTrailHelper.trackEdit(updateItem, editedBy: 'Admin'); // TODO: Replace 'Admin' with actual logged-in user
+    AuditTrailHelper.trackEdit(updateItem, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
 
     await itemStore.updateItem(updateItem);
 

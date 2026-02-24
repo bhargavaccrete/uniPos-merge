@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:unipos/util/color.dart';
@@ -117,7 +118,7 @@ class _EditCategoryState extends State<EditCategory> {
     );
 
     // 🔍 AUDIT TRAIL: Track this category edit
-    AuditTrailHelper.trackEdit(updateCategory, editedBy: 'Admin'); // TODO: Replace 'Admin' with actual logged-in user
+    AuditTrailHelper.trackEdit(updateCategory, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
 
     await categoryStore.updateCategory(updateCategory);
     Navigator.pop(context, true);

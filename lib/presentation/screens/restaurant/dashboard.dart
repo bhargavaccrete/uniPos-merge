@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
+import '../../../core/routes/routes_name.dart';
+import '../../../util/restaurant/restaurant_session.dart';
 import '../../../main.dart';
 
 import '../../../util/common/app_responsive.dart';
@@ -22,11 +24,15 @@ class Dashboard extends StatelessWidget {
     print("this is the device cat ---- ${appStore.deviceCategory}");
     Future<void> logout() async {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.clear(); // Clears isLoggedIn, email, and password
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => loginScreen()),
-      );
+      await prefs.setBool('restaurant_is_logged_in', false);
+      await RestaurantSession.clearSession();
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RouteNames.restaurantLogin,
+          (route) => false,
+        );
+      }
     }
 
     final height = MediaQuery.of(context).size.height * 1;
@@ -226,9 +232,8 @@ class Dashboard extends StatelessWidget {
                                       height: AppResponsive.height(context, 0.05),
                                       bgcolor: AppColors.primary,
                                       onTap: () {
-                                        Navigator.push(context,
-                                            MaterialPageRoute(builder: (context) => AuthSelectionScreen()));
-                                        ;
+                                        Navigator.of(context).pop();
+                                        logout();
                                       },
                                       child: Text("Yes",style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
                                       ),),

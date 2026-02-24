@@ -5,6 +5,7 @@ import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.
 import 'package:unipos/util/color.dart';
 
 import '../../../../util/common/currency_helper.dart';
+import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../../widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
@@ -20,6 +21,7 @@ class _settingsScreenState extends State<Settingsscreen> {
   String selectedCurrency = "INR";
   bool _isDecimalExpanded = false;
   bool _isCurrencyExpanded = false;
+  bool _isRefundWindowExpanded = false;
 
   @override
   void initState() {
@@ -34,6 +36,15 @@ class _settingsScreenState extends State<Settingsscreen> {
     setState(() {
       selectedCurrency = CurrencyHelper.currentCurrencyCode;
     });
+  }
+
+  // Get refund window label from minutes value
+  String _getRefundWindowLabel(int minutes) {
+    if (minutes == 0) return 'No Limit';
+    if (minutes < 60) return '$minutes min';
+    if (minutes == 60) return '1 hr';
+    if (minutes % 60 == 0) return '${minutes ~/ 60} hr';
+    return '${(minutes / 60).toStringAsFixed(1)} hr';
   }
 
   // Get decimal filter string from precision value
@@ -267,6 +278,92 @@ class _settingsScreenState extends State<Settingsscreen> {
                                     },
                                   );
                                 }).toList(),
+                              )
+                            : null,
+                      );
+                    },
+                  ),
+
+                  SizedBox(height: isTablet ? 24 : 20),
+
+                  // Order Policy Section
+                  Text(
+                    'Order Policy',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 18 : 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: isTablet ? 16 : 12),
+
+                  // ⏱ Refund Window Section
+                  ValueListenableBuilder<int>(
+                    valueListenable: AppSettings.refundWindowNotifier,
+                    builder: (context, currentWindow, child) {
+                      final selectedLabel = _getRefundWindowLabel(currentWindow);
+                      return MultipleListViewWithNavigation(
+                        screenheightt: screenheight * 0.16,
+                        displayTitle: "Refund Window",
+                        displayicon: _isRefundWindowExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        onTap: () => setState(() => _isRefundWindowExpanded = !_isRefundWindowExpanded),
+                        child: _isRefundWindowExpanded
+                            ? Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  Filterbutton(
+                                    title: '30 min',
+                                    selectedFilter: selectedLabel,
+                                    onpressed: () async {
+                                      await AppSettings.updateRefundWindow(30);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '1 hr',
+                                    selectedFilter: selectedLabel,
+                                    onpressed: () async {
+                                      await AppSettings.updateRefundWindow(60);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '2 hr',
+                                    selectedFilter: selectedLabel,
+                                    onpressed: () async {
+                                      await AppSettings.updateRefundWindow(120);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '4 hr',
+                                    selectedFilter: selectedLabel,
+                                    onpressed: () async {
+                                      await AppSettings.updateRefundWindow(240);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '8 hr',
+                                    selectedFilter: selectedLabel,
+                                    onpressed: () async {
+                                      await AppSettings.updateRefundWindow(480);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: '24 hr',
+                                    selectedFilter: selectedLabel,
+                                    onpressed: () async {
+                                      await AppSettings.updateRefundWindow(1440);
+                                    },
+                                  ),
+                                  Filterbutton(
+                                    title: 'No Limit',
+                                    selectedFilter: selectedLabel,
+                                    onpressed: () async {
+                                      await AppSettings.updateRefundWindow(0);
+                                    },
+                                  ),
+                                ],
                               )
                             : null,
                       );

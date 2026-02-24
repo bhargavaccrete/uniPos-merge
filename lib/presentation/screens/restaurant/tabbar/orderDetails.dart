@@ -13,6 +13,7 @@ import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import '../../../../util/restaurant/staticswitch.dart';
 class Orderdetails extends StatefulWidget {
   final PastOrderModel? Order;
   const Orderdetails({super.key, this.Order});
@@ -50,9 +51,14 @@ class _OrderdetailsState extends State<Orderdetails> {
 
     bool isRefundEligible = false;
     if (!isFullyRefunded && currentOrder.orderAt != null) {
-      final minuteSinceOrder = DateTime.now().difference(currentOrder.orderAt!).inMinutes;
-      if (minuteSinceOrder <= 60) {
-        isRefundEligible = true;
+      final window = AppSettings.refundWindowMinutes;
+      if (window == 0) {
+        isRefundEligible = true; // No limit
+      } else {
+        final minuteSinceOrder = DateTime.now().difference(currentOrder.orderAt!).inMinutes;
+        if (minuteSinceOrder <= window) {
+          isRefundEligible = true;
+        }
       }
     }
 
@@ -85,13 +91,15 @@ class _OrderdetailsState extends State<Orderdetails> {
             if (!isFullyRefunded && !isVoid)
               Expanded(
                 child: Tooltip(
-                  message: isRefundEligible ? '' : 'Refund window (60 min) has passed',
+                  message: isRefundEligible ? '' : AppSettings.refundWindowMinutes == 0 ? '' : 'Refund window has passed',
                   child: _ActionBtn(
                     label: 'Refund',
                     color: isRefundEligible ? Colors.orange : Colors.grey,
                     onTap: isRefundEligible ? () => _showRefundDialog(context) : () {
+                      final w = AppSettings.refundWindowMinutes;
+                      final label = w < 60 ? '$w min' : w == 60 ? '1 hour' : '${(w / 60).toStringAsFixed(w % 60 == 0 ? 0 : 1)} hours';
                       NotificationService.instance.showError(
-                        'Refund window has passed (must be within 60 minutes of order).',
+                        'Refund window has passed (must be within $label of order).',
                       );
                     },
                   ),
@@ -564,6 +572,10 @@ class _OrderdetailsState extends State<Orderdetails> {
                       const SizedBox(height: 6),
                       _totalRow('Discount', _money(currentOrder.Discount)),
                     ],
+                    if ((currentOrder.loyaltyPointsUsed ?? 0) > 0) ...[
+                      const SizedBox(height: 6),
+                      _totalRow('Points Redeemed', '-${CurrencyHelper.currentSymbol}${currentOrder.loyaltyPointsUsed}'),
+                    ],
                     if ((currentOrder.gstAmount ?? 0) > 0) ...[
                       const SizedBox(height: 6),
                       _totalRow('Total GST', _money(currentOrder.gstAmount)),
@@ -648,7 +660,8 @@ class _OrderdetailsState extends State<Orderdetails> {
         context: context,
         order: orderForPrint,
         calculations: calculations,
-        billNumber: currentOrder.billNumber, // Pass the bill number from past order
+        billNumber: currentOrder.billNumber,
+        loyaltyPointsDiscount: currentOrder.loyaltyPointsUsed ?? 0,
       );
     } catch (e) {
       NotificationService.instance.showError('Failed to print: $e');

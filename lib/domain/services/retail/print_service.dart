@@ -59,6 +59,7 @@ class PrintService {
     String? orderNo,
     bool? isAddonKot,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
+    int? loyaltyPointsDiscount, // Loyalty points redeemed
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -81,6 +82,7 @@ class PrintService {
       isAddonKot: isAddonKot,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
+      loyaltyPointsDiscount: loyaltyPointsDiscount,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -116,6 +118,7 @@ class PrintService {
     int? billNumber,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown
+    int? loyaltyPointsDiscount, // Loyalty points redeemed
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -139,6 +142,7 @@ class PrintService {
       billNumber: billNumber,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
+      loyaltyPointsDiscount: loyaltyPointsDiscount,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -197,6 +201,7 @@ class PrintService {
     int? billNumber,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown
+    int? loyaltyPointsDiscount, // Loyalty points redeemed
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -217,6 +222,7 @@ class PrintService {
       billNumber: billNumber,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
+      loyaltyPointsDiscount: loyaltyPointsDiscount,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -261,6 +267,7 @@ class PrintService {
     int? billNumber,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown
+    int? loyaltyPointsDiscount, // Loyalty points redeemed
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -277,6 +284,7 @@ class PrintService {
       billNumber: billNumber,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
+      loyaltyPointsDiscount: loyaltyPointsDiscount,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -363,6 +371,7 @@ class PrintService {
     List<int>? kotNumbers, // KOT numbers for restaurant orders
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown (e.g., "cash: ₹100, card: ₹200")
+    int? loyaltyPointsDiscount, // Loyalty points redeemed
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -422,6 +431,7 @@ class PrintService {
                   kotNumbers: kotNumbers,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
+                  loyaltyPointsDiscount: loyaltyPointsDiscount,
                 );
               },
             ),
@@ -448,6 +458,7 @@ class PrintService {
                   kotNumbers: kotNumbers,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
+                  loyaltyPointsDiscount: loyaltyPointsDiscount,
                 );
               },
             ),
@@ -472,6 +483,7 @@ class PrintService {
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
+                  loyaltyPointsDiscount: loyaltyPointsDiscount,
                 );
               },
             ),
@@ -496,6 +508,7 @@ class PrintService {
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
+                  loyaltyPointsDiscount: loyaltyPointsDiscount,
                 );
                 if (context.mounted && path != null) {
                   ScaffoldMessenger.of(context).showSnackBar(

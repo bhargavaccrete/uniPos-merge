@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
@@ -493,7 +494,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
         choiceOption: option,
         createdTime: existingCreatedTime,
         lastEditedTime: DateTime.now(),
-        editedBy: 'Admin',
+        editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
         editCount: existingEditCount + 1,
         allowMultipleSelection: allowMultipleSelection,
       );

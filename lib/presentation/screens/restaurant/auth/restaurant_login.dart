@@ -3,8 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
-import '../../../../constants/restaurant/color.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../util/common/app_responsive.dart';
+import '../../../../util/restaurant/restaurant_auth_helper.dart';
+import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import '../welcome_Admin.dart';
@@ -47,26 +49,27 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
     super.dispose();
   }
 
-  /// Initialize default credentials if not set
+  /// Initialize default credentials if not set, and migrate plaintext → hashed.
   Future<void> _initializeDefaultCredentials() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Set default username if not exists
     if (!prefs.containsKey(_usernameKey)) {
       await prefs.setString(_usernameKey, _defaultUsername);
     }
 
-    // Set default password if not exists
     if (!prefs.containsKey(_passwordKey)) {
-      await prefs.setString(_passwordKey, _defaultPassword);
+      await prefs.setString(_passwordKey, RestaurantAuthHelper.hashPassword(_defaultPassword));
+    } else {
+      final stored = prefs.getString(_passwordKey)!;
+      if (!RestaurantAuthHelper.isHashed(stored)) {
+        await prefs.setString(_passwordKey, RestaurantAuthHelper.hashPassword(stored));
+      }
     }
   }
 
-  /// Validate login credentials
+  /// Tries admin credentials first, then staff username + PIN.
   Future<void> _handleLogin() async {
-    if (!_formkey.currentState!.validate()) {
-      return;
-    }
+    if (!_formkey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
@@ -75,32 +78,51 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
+      final enteredUsername = _usernameController.text.trim();
+      final enteredPassword = _passwordController.text.trim();
+
+      // ── 1. Try admin ──────────────────────────────────────────────────────
       final storedUsername = prefs.getString(_usernameKey) ?? _defaultUsername;
       final storedPassword = prefs.getString(_passwordKey) ?? _defaultPassword;
 
-      final enteredUsername = _usernameController.text.trim();
-      final enteredPassword = _passwordController.text;
-
-      // Simulate network delay
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      if (enteredUsername == storedUsername && enteredPassword == storedPassword) {
-        // Login successful - Save login state
+      if (enteredUsername == storedUsername &&
+          RestaurantAuthHelper.verifyPassword(enteredPassword, storedPassword)) {
         await prefs.setBool(_isLoggedInKey, true);
-
+        await RestaurantSession.saveAdminSession();
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const AdminWelcome()),
+            MaterialPageRoute(builder: (_) => const AdminWelcome()),
           );
         }
-      } else {
-        // Login failed
-        setState(() {
-          _errorMessage = 'Invalid username or password';
-          _isLoading = false;
-        });
+        return;
       }
+
+      // ── 2. Try staff (username + PIN) ─────────────────────────────────────
+      await staffStore.loadStaff();
+      final match = staffStore.staff.where(
+        (s) => s.isActive &&
+            s.userName.trim() == enteredUsername &&
+            RestaurantAuthHelper.verifyPassword(enteredPassword, s.pinNo.trim()),
+      ).firstOrNull;
+
+      if (match != null) {
+        await prefs.setBool(_isLoggedInKey, true);
+        await RestaurantSession.saveStaffSession(match);
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminWelcome()),
+          );
+        }
+        return;
+      }
+
+      // ── 3. Both failed ────────────────────────────────────────────────────
+      setState(() {
+        _errorMessage = 'Invalid username or password';
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _errorMessage = 'An error occurred. Please try again.';
@@ -142,7 +164,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
 
                   // Title
                   Text(
-                    'Restaurant Admin',
+                    'Restaurant',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 24.0, tablet: 26.4, desktop: 28.8),
                       fontWeight: FontWeight.w700,
@@ -252,17 +274,10 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter password';
                         }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
                         return null;
                       },
                       gesture: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                        onTap: () => setState(() => _obscurePassword = !_obscurePassword),
                         child: Icon(
                           _obscurePassword ? Icons.visibility_off : Icons.visibility,
                           color: AppColors.primary,
@@ -283,10 +298,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                         ? const SizedBox(
                             height: 24,
                             width: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
                         : Center(
                             child: Text(
@@ -317,7 +329,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                         Expanded(
                           child: RichText(
                             text: TextSpan(
-                              text: 'Default credentials: ',
+                              text: 'Admin default: ',
                               style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.3, desktop: 15.6),
                                 color: Colors.blue.shade700,

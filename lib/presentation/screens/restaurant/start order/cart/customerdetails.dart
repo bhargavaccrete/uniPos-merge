@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
@@ -55,6 +56,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   // Customer selection
   RestaurantCustomer? selectedCustomer;
   String? _mobileError;
+  bool _usePoints = false;
   final _serviceChargeController = TextEditingController();
   final _deliveryChargeController = TextEditingController();
   final _discountController = TextEditingController();
@@ -111,7 +113,40 @@ class _CustomerdetailsState extends State<Customerdetails> {
     _mobileController = TextEditingController(
         text: widget.existingModel?.customerNumber ?? '');
 
+    // Auto-load existing customer so points toggle shows on settle screen
+    final hasPhone = widget.existingModel?.customerNumber?.trim().isNotEmpty == true;
+    final hasName = widget.existingModel?.customerName?.trim().isNotEmpty == true;
+    if (hasPhone || hasName) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadExistingCustomer());
+    }
+
     // Currency is loaded in main.dart via CurrencyHelper.load()
+  }
+
+  Future<void> _loadExistingCustomer() async {
+    final phone = widget.existingModel?.customerNumber?.trim() ?? '';
+    final name = widget.existingModel?.customerName?.trim() ?? '';
+    try {
+      if (phone.isNotEmpty) {
+        final results = await restaurantCustomerStore.searchCustomers(phone);
+        final match = results.where((c) => c.phone == phone).firstOrNull;
+        if (match != null && mounted) {
+          setState(() => selectedCustomer = match);
+          return;
+        }
+      }
+      if (name.isNotEmpty) {
+        final results = await restaurantCustomerStore.searchCustomers(name);
+        final match = results
+            .where((c) => c.name?.toLowerCase() == name.toLowerCase())
+            .firstOrNull;
+        if (match != null && mounted) {
+          setState(() => selectedCustomer = match);
+        }
+      }
+    } catch (e) {
+      print('⚠️ Could not auto-load customer: $e');
+    }
   }
 
   // Handle customer selection from autocomplete
@@ -167,7 +202,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
       isTaxInclusive: widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive,
     );
 
-    // ✅ Step 3: Build the UI using the final, calculated values.
+    // ✅ Step 3: Loyalty points discount
+    final int availablePoints = selectedCustomer?.loyaltyPoints ?? 0;
+    final int pointsDiscount = (_usePoints && availablePoints > 0)
+        ? availablePoints.clamp(0, calculations.grandTotal.floor())
+        : 0;
+    final double netPayable = calculations.grandTotal - pointsDiscount;
+
+    // ✅ Step 4: Build the UI using the final, calculated values.
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     final isTablet = width > 600;
@@ -266,6 +308,39 @@ class _CustomerdetailsState extends State<Customerdetails> {
                             _mobileController.clear();
                           });
                         },
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Loyalty Points Toggle
+              if (selectedCustomer != null && availablePoints > 0)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.stars_rounded, color: Colors.amber.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$availablePoints pts = ${CurrencyHelper.currentSymbol}$availablePoints discount',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.amber.shade900,
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        value: _usePoints,
+                        activeColor: AppColors.primary,
+                        onChanged: (val) => setState(() => _usePoints = val),
                       ),
                     ],
                   ),
@@ -388,7 +463,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
                   return CommonTextForm(
                     controller: controller,
-                    keyboardType: TextInputType.phone,
+                    keyboardType: TextInputType.number,
+                    maxLength: 10,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     borderc: 5,
                     BorderColor: AppColors.primary,
                     labelText: 'Mobile No (type to search)',
@@ -803,7 +880,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                       SizedBox(height: 5),
 
                       // Bill Summary
-                      _buildBillSummary(calculations)
+                      _buildBillSummary(calculations, pointsDiscount: pointsDiscount)
                         ],
                       ),
                     ]),
@@ -852,7 +929,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: SplitPaymentWidget(
-                        billTotal: calculations.grandTotal,
+                        billTotal: netPayable,
                         onPaymentChanged: _onPaymentChanged,
                         onValidationChanged: _onValidationChanged,
                       ),
@@ -928,7 +1005,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
 // ✅ Mode-aware labels matching PetPooja/Billberry standard
-  Widget _buildBillSummary(CartCalculationService calcs) {
+  Widget _buildBillSummary(CartCalculationService calcs, {int pointsDiscount = 0}) {
     final isInclusive = AppSettings.isTaxInclusive;
 
     return Padding(
@@ -979,20 +1056,28 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 'Round Off:',
                 '${calcs.roundOffAmount >= 0 ? '+' : ''}${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.roundOffAmount)}'),
 
+          // Points Redeemed
+          if (pointsDiscount > 0)
+            _buildSummaryRow(
+              'Points Redeemed:',
+              '-${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(pointsDiscount.toDouble())}',
+              color: Colors.amber.shade700,
+            ),
+
           // Final divider before grand total
           Divider(thickness: 2, height: 20),
 
-          // Grand Total
+          // Net Payable
           _buildSummaryRow(
-              'Grand Total:',
-              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal)}',
+              pointsDiscount > 0 ? 'Net Payable:' : 'Grand Total:',
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal - pointsDiscount)}',
               isBold: true),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
+  Widget _buildSummaryRow(String label, String value, {bool isBold = false, Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
@@ -1000,10 +1085,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
         children: [
           Text(label,
               style: TextStyle(
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                  color: color)),
           Text(value,
               style: TextStyle(
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                  color: color)),
         ],
       ),
     );
@@ -1045,7 +1132,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     });
   }
 
-  Future<void> proceed(CartCalculationService calculations) async {
+  Future<void> proceed(CartCalculationService calculations, {int pointsUsed = 0}) async {
     print('============THis is PRocced Function=============');
     if (widget.existingModel == null || widget.tableid == null) {
       // _showSnackBar('Error: No active order or table found.', isError: true);
@@ -1096,7 +1183,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       discount: calculations.discountAmount,
       // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
       serviceCharge: calculations.serviceChargeAmount,
-      totalPrice: calculations.grandTotal,
+      totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
       paymentMethod: isSplit ? 'Split Payment' : _paymentEntries.first.method,
       completedAt: DateTime.now(),
       status: 'Cooking',
@@ -1126,20 +1213,30 @@ class _CustomerdetailsState extends State<Customerdetails> {
         await orderStore.updateOrder(orderWithBill);
         await restaurantCartStore.clearCart();
         if (selectedCustomer != null) {
-          await _updateCustomerStats(selectedCustomer!, 'Dine In');
+          if (pointsUsed > 0) {
+            await restaurantCustomerStore.updateCustomerVisit(
+              customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
+          }
+          final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+          await _updateCustomerStats(selectedCustomer!, 'Dine In', pointsToEarn: earned);
         }
 
         // Show success + print dialog (same as completed orders)
-        await _showOrderSuccessDialog(orderWithBill, calculations, billNumber: billNumber);
+        await _showOrderSuccessDialog(orderWithBill, calculations, billNumber: billNumber, pointsUsed: pointsUsed);
         return;
       }
 
       // Take Away / Delivery / already Served → complete immediately
-      final int billNumber = await completeOrder(completedOrder, calculations);
+      final int billNumber = await completeOrder(completedOrder, calculations, pointsUsed: pointsUsed);
 
       // Update customer stats if customer is linked
       if (selectedCustomer != null) {
-        await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
+        if (pointsUsed > 0) {
+          await restaurantCustomerStore.updateCustomerVisit(
+            customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
+        }
+        final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+        await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
       }
 
       // Clear the cart after successful settlement
@@ -1153,7 +1250,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       );
 
       // Show success dialog with print option
-      await _showOrderSuccessDialog(completedOrder, calculations, billNumber: billNumber);
+      await _showOrderSuccessDialog(completedOrder, calculations, billNumber: billNumber, pointsUsed: pointsUsed);
     } catch (e) {
       NotificationService.instance.showError(
         'Failed to proceed with the order: $e',
@@ -1162,7 +1259,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   Future<int> completeOrder(
-      OrderModel activeModel, CartCalculationService calculations) async {
+      OrderModel activeModel, CartCalculationService calculations, {int pointsUsed = 0}) async {
     print('============this is complete order function=============');
 
     // Note: calculations.subtotal is already the base price (without tax)
@@ -1175,7 +1272,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final pastOrder = PastOrderModel(
       id: activeModel.id,
       customerName: activeModel.customerName,
-      totalPrice: calculations.grandTotal,
+      totalPrice: activeModel.totalPrice, // already net payable (set in proceed)
       items: activeModel.items,
       orderAt: activeModel.timeStamp,
       orderType: activeModel.orderType,
@@ -1184,7 +1281,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
           : 'Cash',
       remark:
           SelectedRemark == 'other' ? _remarkController.text : SelectedRemark,
-      Discount: calculations.discountAmount,
+      Discount: activeModel.discount, // regular discount only
+      loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
       subTotal: calculations.subtotal,
       gstRate: 0,
       gstAmount: calculations.totalGST,
@@ -1201,7 +1299,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     return billNumber; // Return the generated bill number
   }
 
-  Future<void> _placeOrder(CartCalculationService calculations) async {
+  Future<void> _placeOrder(CartCalculationService calculations, {int pointsUsed = 0}) async {
     print('============this is place order function=============');
     print(widget.orderType);
 
@@ -1228,13 +1326,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
       final pastOrder = PastOrderModel(
         id: newId,
         customerName: _nameController.text.trim(),
-        totalPrice: calculations.grandTotal,
+        totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
         items: orderItems,
         orderAt: DateTime.now(),
         orderType: widget.orderType ?? 'Take Away',
         paymentmode: paymentMethodDisplay,
         remark: calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
-        Discount: calculations.discountAmount,
+        Discount: calculations.discountAmount, // regular discount only
         subTotal: calculations.subtotal,
         gstRate: 0,
         gstAmount: calculations.totalGST,
@@ -1248,6 +1346,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         changeReturn: _changeReturn,
         isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
         tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
+        loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
@@ -1260,7 +1359,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
         // Update customer stats if customer is linked
         if (selectedCustomer != null) {
-          await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
+          if (pointsUsed > 0) {
+            await restaurantCustomerStore.updateCustomerVisit(
+              customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
+          }
+          final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+          await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
         }
 
         await restaurantCartStore.clearCart();
@@ -1270,7 +1374,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         );
 
         // Show success dialog with bill number for printing
-        await _showOrderSuccessDialogWithBillNumber(pastOrder, calculations, billNumber);
+        await _showOrderSuccessDialogWithBillNumber(pastOrder, calculations, billNumber, pointsUsed: pointsUsed);
       } catch (e) {
         NotificationService.instance.showError(
           'Failed to settle order: $e',
@@ -1319,10 +1423,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
     try {
       await orderStore.addOrder(newOrder);
 
-      // Update customer stats if customer is linked
-      if (selectedCustomer != null) {
-        await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away');
-      }
+      // NOTE: Customer stats (visits + points) are updated at settlement, NOT here.
+      // Updating here would cause double-counting when the order is later settled.
 
       if (widget.tableid != null && widget.tableid!.isNotEmpty) {
         await tableStore.updateTableStatus(
@@ -1351,7 +1453,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   // Success dialog with print option
   Future<void> _showOrderSuccessDialog(
-      OrderModel order, CartCalculationService calculations, {int? billNumber}) async {
+      OrderModel order, CartCalculationService calculations, {int? billNumber, int pointsUsed = 0}) async {
     if (!mounted) return;
 
     await showDialog(
@@ -1387,7 +1489,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 context: context,
                 order: order,
                 calculations: calculations,
-                billNumber: billNumber, // Pass the bill number if available
+                billNumber: billNumber,
+                loyaltyPointsDiscount: pointsUsed,
               );
               // We don't close the dialog automatically after print,
               // allowing user to print again or close manually
@@ -1406,7 +1509,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   // Success dialog for settled orders (with bill number)
   Future<void> _showOrderSuccessDialogWithBillNumber(
-      PastOrderModel pastOrder, CartCalculationService calculations, int billNumber) async {
+      PastOrderModel pastOrder, CartCalculationService calculations, int billNumber, {int pointsUsed = 0}) async {
     if (!mounted) return;
 
     // Convert pastOrderModel to OrderModel for printing
@@ -1472,7 +1575,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 context: context,
                 order: orderForPrint,
                 calculations: calculations,
-                billNumber: billNumber, // Pass the bill number
+                billNumber: billNumber,
+                loyaltyPointsDiscount: pointsUsed,
               );
               // We don't close the dialog automatically after print,
               // allowing user to print again or close manually
@@ -1517,7 +1621,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
-  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType) async {
+  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
     try {
       print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
       print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
@@ -1525,7 +1629,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       await restaurantCustomerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
-        pointsToAdd: 10, // Award 10 points per order
+        pointsToAdd: pointsToEarn,
       );
 
       // Verify the update
@@ -1605,6 +1709,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
     setState(() => _mobileError = null);
 
+    // Compute points usage
+    final int availablePoints = selectedCustomer?.loyaltyPoints ?? 0;
+    final int pointsUsed = (_usePoints && availablePoints > 0)
+        ? availablePoints.clamp(0, calculations.grandTotal.floor())
+        : 0;
+
     // Auto-save customer if name/phone was typed but not picked from list
     await _autoSaveNewCustomer();
 
@@ -1615,9 +1725,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
 
     if (widget.isSettle == true) {
-      await _placeOrder(calculations);
+      await _placeOrder(calculations, pointsUsed: pointsUsed);
     } else {
-      await proceed(calculations);
+      await proceed(calculations, pointsUsed: pointsUsed);
     }
   }
 

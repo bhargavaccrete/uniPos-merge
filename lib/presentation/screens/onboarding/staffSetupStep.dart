@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
 import 'package:unipos/data/models/restaurant/db/staffModel_310.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/di/service_locator.dart';
+import '../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../util/color.dart';
 
 /// Staff Setup Step - Business Mode Aware
@@ -60,8 +63,18 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   }
 
   void _addStaff() {
-    if (_firstNameController.text.isEmpty || _pinController.text.isEmpty) {
+    final pin = _pinController.text.trim();
+    final phone = _phoneController.text.trim();
+    if (_firstNameController.text.isEmpty || pin.isEmpty) {
       NotificationService.instance.showError('First name and PIN are required');
+      return;
+    }
+    if (!RegExp(r'^\d{4,6}$').hasMatch(pin)) {
+      NotificationService.instance.showError('PIN must be 4–6 digits');
+      return;
+    }
+    if (phone.isNotEmpty && phone.length != 10) {
+      NotificationService.instance.showError('Mobile number must be exactly 10 digits');
       return;
     }
 
@@ -93,9 +106,6 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
         _staffMembers.add(retailStaff);
       } else {
         // Create restaurant staff member
-        // Set isCashier based on role (Cashier and Manager can handle cash)
-        final isCashier = _selectedRole == 'Cashier' || _selectedRole == 'Manager';
-
         final restaurantStaff = StaffModel(
           id: _uuid.v4(),
           userName: _usernameController.text.isEmpty
@@ -103,10 +113,10 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
               : _usernameController.text,
           firstName: _firstNameController.text,
           lastName: _lastNameController.text,
-          isCashier: isCashier ? 'true' : 'false',
+          isCashier: _selectedRole,
           mobileNo: _phoneController.text,
           emailId: _emailController.text,
-          pinNo: _pinController.text,
+          pinNo: RestaurantAuthHelper.hashPassword(_pinController.text),
           createdAt: DateTime.now(),
         );
         _staffMembers.add(restaurantStaff);
@@ -135,20 +145,17 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   Future<void> _saveStaffToDatabase() async {
     try {
       if (AppConfig.isRetail) {
-        // Box is already opened during app startup in HiveInit
         final box = Hive.box<RetailStaffModel>('retail_staff');
         for (var staff in _staffMembers) {
           if (staff is RetailStaffModel) {
-            await box.add(staff);
+            await box.put(staff.id, staff);
             print('✅ Saved retail staff: ${staff.fullName}');
           }
         }
       } else {
-        // Box is already opened during app startup in HiveInit
-        final box = Hive.box<StaffModel>('staffBox');
         for (var staff in _staffMembers) {
           if (staff is StaffModel) {
-            await box.add(staff);
+            await staffStore.addStaff(staff);
             print('✅ Saved restaurant staff: ${staff.firstName} ${staff.lastName}');
           }
         }
@@ -276,6 +283,9 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                     Expanded(
                       child: TextField(
                         controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: InputDecoration(
                           labelText: 'Phone (Optional)',
                           border: OutlineInputBorder(
@@ -283,6 +293,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                           ),
                           filled: true,
                           fillColor: const Color(0xFFF8F9FA),
+                          counterText: '',
+                          helperText: '10 digits',
                         ),
                       ),
                     ),
@@ -313,6 +325,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         controller: _pinController,
                         keyboardType: TextInputType.number,
                         maxLength: 6,
+                        obscureText: true,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: InputDecoration(
                           labelText: 'PIN Code * (4-6 digits)',
                           border: OutlineInputBorder(
@@ -455,7 +469,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                 details = 'PIN: ${staff.pin}';
               } else if (staff is StaffModel) {
                 name = '${staff.firstName} ${staff.lastName}';
-                role = staff.isCashier == 'true' ? 'Cashier' : 'Staff';
+                role = staff.isCashier;
                 details = 'PIN: ${staff.pinNo}';
               } else {
                 name = 'Unknown';

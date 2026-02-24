@@ -1,6 +1,7 @@
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
+import '../../../util/restaurant/staticswitch.dart';
 import 'inventory_service.dart';
 
 /// Result class for partial refund operations
@@ -101,10 +102,18 @@ class RefundService {
       return 'Order time is missing. Cannot process refund.';
     }
 
-    // Check if within refund window (60 minutes)
-    final minutePassed = DateTime.now().difference(order.orderAt!).inMinutes;
-    if (minutePassed > 60) {
-      return 'Refund window (60 minutes) has passed.';
+    // Check if within refund window (configurable, 0 = no limit)
+    final window = AppSettings.refundWindowMinutes;
+    if (window > 0) {
+      final minutePassed = DateTime.now().difference(order.orderAt!).inMinutes;
+      if (minutePassed > window) {
+        final label = window < 60
+            ? '$window minutes'
+            : window == 60
+                ? '1 hour'
+                : '${(window / 60).toStringAsFixed(window % 60 == 0 ? 0 : 1)} hours';
+        return 'Refund window ($label) has passed.';
+      }
     }
 
     // Check if there are refundable items
