@@ -8,6 +8,7 @@ import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
 import '../../../domain/services/retail/store_settings_service.dart';
 import '../../../util/restaurant/restaurant_session.dart';
+import '../../../core/di/service_locator.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
 
 class AdminWelcome extends StatefulWidget {
@@ -23,8 +24,11 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   @override
   void initState() {
     super.initState();
-    _checkDayStarted();
     _loadStoreName();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkDayStarted();
+      await _startShiftIfNeeded();
+    });
   }
 
   Future<void> _loadStoreName() async {
@@ -75,6 +79,31 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         // );
         }
       }
+    }
+  }
+
+  Future<void> _startShiftIfNeeded() async {
+    final staffId = RestaurantSession.isAdmin
+        ? 'admin'
+        : (RestaurantSession.staffName ?? 'staff');
+    final staffName = RestaurantSession.staffName ??
+        (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+
+    // Restore from Hive in case of hot-restart
+    await shiftStore.loadActiveShiftForStaff(staffId);
+    if (shiftStore.hasOpenShift) {
+      // Re-persist the shift ID into session so currentShiftId is always set
+      await RestaurantSession.saveShiftSession(shiftStore.activeShift!.id);
+      return;
+    }
+
+    final ok = await shiftStore.startShift(
+      staffId: staffId,
+      staffName: staffName,
+    );
+    if (ok && shiftStore.activeShift != null && mounted) {
+      await RestaurantSession.saveShiftSession(shiftStore.activeShift!.id);
+      NotificationService.instance.showSuccess('Shift started');
     }
   }
 

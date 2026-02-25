@@ -130,6 +130,18 @@ class DrawerManage extends StatelessWidget {
                     },
                     isTablet: isTablet,
                   ),
+                  // End Shift — shown only when a shift is open
+                  if (RestaurantSession.hasOpenShift)
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.lock_clock_rounded,
+                      title: 'End Shift',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showEndShiftDialog(context);
+                      },
+                      isTablet: isTablet,
+                    ),
                   if (issync) ...[
                     _buildDrawerItem(
                       context: context,
@@ -306,6 +318,127 @@ class DrawerManage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _showEndShiftDialog(BuildContext context) {
+    final shift = shiftStore.activeShift;
+    if (shift == null) return;
+
+    final duration = DateTime.now().difference(shift.startTime);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    bool isClosing = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: EdgeInsets.zero,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(20),
+                child: Row(children: [
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.lock_clock_rounded, size: 28, color: Colors.orange),
+                  ),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Text('End Shift',
+                        style: GoogleFonts.poppins(
+                            fontSize: 20, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+              ),
+              Divider(height: 1, color: Colors.grey.shade200),
+              Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _infoRow(Icons.person, 'Staff', shift.staffName),
+                    SizedBox(height: 8),
+                    _infoRow(Icons.timer, 'Duration', '${hours}h ${minutes}m'),
+                    SizedBox(height: 8),
+                    _infoRow(Icons.play_arrow, 'Started',
+                        '${shift.startTime.hour.toString().padLeft(2, '0')}:${shift.startTime.minute.toString().padLeft(2, '0')}'),
+                    SizedBox(height: 12),
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        'Orders during this shift will be tallied and saved to the Shift Report.',
+                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+            ),
+            ElevatedButton(
+              onPressed: isClosing
+                  ? null
+                  : () async {
+                      setState(() => isClosing = true);
+                      final closed = await shiftStore.closeShift(shift.id);
+                      if (closed != null) {
+                        await RestaurantSession.clearShiftSession();
+                      }
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: isClosing
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : Text('End Shift',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade500),
+        SizedBox(width: 8),
+        Text('$label: ',
+            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade600)),
+        Text(value,
+            style: GoogleFonts.poppins(
+                fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+      ],
     );
   }
 

@@ -294,6 +294,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         iconColor: Colors.purple,
                         isTablet: isTablet,
                       ),
+                      _buildReportCard(
+                        icon: Icons.badge_outlined,
+                        title: 'Shift Report',
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantShiftReport),
+                        iconColor: Colors.teal,
+                        isTablet: isTablet,
+                      ),
+                      _buildReportCard(
+                        icon: Icons.leaderboard_rounded,
+                        title: 'Staff Performance',
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantStaffPerformance),
+                        iconColor: Colors.deepPurple,
+                        isTablet: isTablet,
+                      ),
                     ],
                   );
                 },

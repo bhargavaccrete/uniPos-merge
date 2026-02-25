@@ -254,6 +254,13 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       // Past orders should remain for historical reporting
       // await DataClearService.clearCompletedOrders(); // REMOVED - Keep past orders for reports
 
+      // 4b. Close the active shift for the current staff member (if any)
+      final activeShiftId = RestaurantSession.currentShiftId;
+      if (activeShiftId != null) {
+        await shiftStore.closeShift(activeShiftId);
+        await RestaurantSession.clearShiftSession();
+      }
+
       // 5. Mark day as completed
       await _markDayCompleted();
 

@@ -4,7 +4,6 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/dashboard.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 

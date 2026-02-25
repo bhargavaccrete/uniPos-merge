@@ -107,7 +107,7 @@ class AppConfig {
 
   // ==================== SETUP STATUS ====================
 
-  /// Check if initial setup is complete
+  /// Check if initial setup is completes
   static bool get isSetupComplete {
     return box.get(_isSetupCompleteKey, defaultValue: false) as bool;
   }

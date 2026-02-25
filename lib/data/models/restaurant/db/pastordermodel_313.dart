@@ -99,6 +99,9 @@ class PastOrderModel extends HiveObject{
   @HiveField(27)
   final int? loyaltyPointsUsed; // Loyalty points redeemed at settlement
 
+  @HiveField(28)
+  final String? shiftId; // Links the order to the active shift at settlement time
+
   PastOrderModel({
     required this.id,
     required this.customerName,
@@ -130,6 +133,7 @@ class PastOrderModel extends HiveObject{
     this.isTaxInclusive,
     this.tableNo,
     this.loyaltyPointsUsed,
+    this.shiftId,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -164,6 +168,7 @@ class PastOrderModel extends HiveObject{
     bool? isTaxInclusive,
     String? tableNo,
     int? loyaltyPointsUsed,
+    String? shiftId,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -194,6 +199,7 @@ class PastOrderModel extends HiveObject{
       isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
       tableNo: tableNo ?? this.tableNo,
       loyaltyPointsUsed: loyaltyPointsUsed ?? this.loyaltyPointsUsed,
+      shiftId: shiftId ?? this.shiftId,
     );
   }
 
@@ -252,6 +258,7 @@ class PastOrderModel extends HiveObject{
       'isTaxInclusive': isTaxInclusive,
       'tableNo': tableNo,
       'loyaltyPointsUsed': loyaltyPointsUsed,
+      'shiftId': shiftId,
     };
   }
 
@@ -286,6 +293,7 @@ class PastOrderModel extends HiveObject{
       isTaxInclusive: map['isTaxInclusive'],
       tableNo: map['tableNo'],
       loyaltyPointsUsed: map['loyaltyPointsUsed'] as int?,
+      shiftId: map['shiftId'] as String?,
     );
   }
 

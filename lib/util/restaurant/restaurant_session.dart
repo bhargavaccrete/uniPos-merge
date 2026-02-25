@@ -8,10 +8,11 @@ import '../../data/models/restaurant/db/staffModel_310.dart';
 class RestaurantSession {
   RestaurantSession._();
 
-  static const _loginTypeKey  = 'restaurant_login_type'; // 'admin' | 'staff'
-  static const _staffRoleKey  = 'restaurant_staff_role';
-  static const _staffNameKey  = 'restaurant_staff_name';
-  static const _isLoggedInKey = 'restaurant_is_logged_in';
+  static const _loginTypeKey      = 'restaurant_login_type'; // 'admin' | 'staff'
+  static const _staffRoleKey      = 'restaurant_staff_role';
+  static const _staffNameKey      = 'restaurant_staff_name';
+  static const _isLoggedInKey     = 'restaurant_is_logged_in';
+  static const _currentShiftIdKey = 'restaurant_current_shift_id';
 
   // ── Inactivity timeout ────────────────────────────────────────────────────
   static const _timeoutDuration = Duration(minutes: 15);
@@ -32,6 +33,15 @@ class RestaurantSession {
   // ── In-memory logged-in flag (avoids SharedPreferences hit on every guard) ─
   static bool _isLoggedIn = false;
   static bool get isLoggedIn => _isLoggedIn;
+
+  // ── Shift tracking ───────────────────────────────────────────────────────
+  static String? _currentShiftId;
+  static String? get currentShiftId => _currentShiftId;
+  static bool get hasOpenShift => _currentShiftId != null;
+
+  /// Registered by service_locator — called with the open shiftId before session is cleared.
+  /// Allows auto-closing the shift on logout without a circular import.
+  static Future<void> Function(String shiftId)? onShiftAutoClose;
 
   // ── Getters ──────────────────────────────────────────────────────────────
   static String  get loginType => loginTypeNotifier.value;
@@ -71,15 +81,33 @@ class RestaurantSession {
     resetInactivityTimer();
   }
 
+  static Future<void> saveShiftSession(String shiftId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_currentShiftIdKey, shiftId);
+    _currentShiftId = shiftId;
+  }
+
+  static Future<void> clearShiftSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_currentShiftIdKey);
+    _currentShiftId = null;
+  }
+
   static Future<void> clearSession() async {
     _inactivityTimer?.cancel();
     sessionExpiredNotifier.value = false;
     _isLoggedIn = false;
+    // Auto-close open shift before clearing session
+    if (_currentShiftId != null && onShiftAutoClose != null) {
+      await onShiftAutoClose!(_currentShiftId!);
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_loginTypeKey);
     await prefs.remove(_staffRoleKey);
     await prefs.remove(_staffNameKey);
     await prefs.setBool(_isLoggedInKey, false);
+    await prefs.remove(_currentShiftIdKey);
+    _currentShiftId = null;
     loginTypeNotifier.value = 'admin';
     staffRoleNotifier.value = null;
     staffNameNotifier.value = null;
@@ -91,6 +119,7 @@ class RestaurantSession {
     loginTypeNotifier.value = prefs.getString(_loginTypeKey) ?? 'admin';
     staffRoleNotifier.value = prefs.getString(_staffRoleKey);
     staffNameNotifier.value = prefs.getString(_staffNameKey);
+    _currentShiftId = prefs.getString(_currentShiftIdKey);
     if (_isLoggedIn) resetInactivityTimer();
   }
 

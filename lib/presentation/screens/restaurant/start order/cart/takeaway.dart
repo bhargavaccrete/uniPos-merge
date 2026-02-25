@@ -13,6 +13,7 @@ import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
@@ -2027,6 +2028,7 @@ class _TakeawayState extends State<Takeaway> {
       kotBoundaries: activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive: activeModel.isTaxInclusive, // Use stored tax mode from active order
+      shiftId: RestaurantSession.currentShiftId,
     );
 
     await pastOrderStore.addOrder(pastOrder);
@@ -2135,6 +2137,7 @@ class _TakeawayState extends State<Takeaway> {
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
       tableNo: widget.isDineIn ? (widget.selectedTableNo ?? widget.tableid) : null,
+      shiftId: RestaurantSession.currentShiftId,
     );
 
     // 1. Add the completed order to history

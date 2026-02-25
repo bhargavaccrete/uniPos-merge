@@ -181,6 +181,9 @@ class HiveBoxNames {
   static const String testBillBox = 'testBillBox';
   static const String restaurantCustomer = 'restaurantCustomers';
 
+  /// Restaurant shift management box
+  static const String restaurantShift = 'shiftBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode

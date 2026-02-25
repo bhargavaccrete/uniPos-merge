@@ -80,6 +80,8 @@ class RouteNames {
   static const restaurantReportsPosOrder  = '/restaurant-report-posorderreport';
   static const restaurantReportsCustomerListByRevenue = '/restaurant-report-customerlistbyrevenue';
   static const restaurantReportsExpense  = '/restaurant-report-expensereport';
+  static const restaurantShiftReport = '/restaurant-shift-report';
+  static const restaurantStaffPerformance = '/restaurant-staff-performance';
   // static const restaurantReportsPerformanceStatistics  = '/restaurant-report-performanxestatisticsreport';
 
 

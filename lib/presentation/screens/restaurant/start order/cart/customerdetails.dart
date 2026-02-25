@@ -15,6 +15,7 @@ import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../../../../stores/payment_method_store.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../widget/componets/common/split_payment_widget.dart';
@@ -1292,6 +1293,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
       tableNo: activeModel.tableNo,
+      shiftId: RestaurantSession.currentShiftId,
     );
     await pastOrderStore.addOrder(pastOrder);
     await orderStore.deleteOrder(activeModel.id);
@@ -1347,6 +1349,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
         tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
         loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
+        shiftId: RestaurantSession.currentShiftId,
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 

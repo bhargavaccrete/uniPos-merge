@@ -58,6 +58,7 @@ import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
+import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 
 /// Hive Initialization Class
 /// Handles all adapter registrations and box openings
@@ -534,6 +535,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.RestaurantCustomer)) {
       Hive.registerAdapter(RestaurantCustomerAdapter());
     }
+    // ShiftModel - 127
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantShift)) {
+      Hive.registerAdapter(ShiftModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -581,6 +586,9 @@ class HiveInit {
 
     // Restaurant Customer
     await Hive.openBox<RestaurantCustomer>(HiveBoxNames.restaurantCustomer);
+
+    // Restaurant Shifts
+    await Hive.openBox<ShiftModel>(HiveBoxNames.restaurantShift);
 
     _areRestaurantBoxesOpen = true;
     print('✅ All restaurant boxes opened successfully with correct names and guard flag set');
