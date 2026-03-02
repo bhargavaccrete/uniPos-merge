@@ -52,6 +52,10 @@ class HiveTypeIds {
   static const int restaurantStockLog = 126;
   static const int restaurantShift = 127;
 
+  // Cash Management (128-129)
+  static const int restaurantCashMovement = 128; // CashMovementModel — Cash In/Out events
+  static const int restaurantCashHandover  = 129; // CashHandoverModel — 2-step shift handover
+
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
   static const int retailVariant = 151;
@@ -153,5 +157,7 @@ class HiveTypeIds {
     RestaurantCustomer,
     restaurantStockLog,
     restaurantShift,
+    restaurantCashMovement,
+    restaurantCashHandover,
   ];
 }

@@ -108,7 +108,8 @@ abstract class _ShiftStore with Store {
           final orders = await _repository.getOrdersForShift(s);
           enriched.add(s.copyWith(
             orderCount: orders.length,
-            totalSales: orders.fold<double>(0.0, (sum, o) => sum + o.totalPrice),
+            totalSales: orders.fold<double>(
+                0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0))),
           ));
         } else {
           enriched.add(s);
@@ -174,8 +175,8 @@ abstract class _ShiftStore with Store {
 
       final orders = await _repository.getOrdersForShift(shift);
       final orderCount = orders.length;
-      final totalSales =
-          orders.fold<double>(0.0, (sum, o) => sum + o.totalPrice);
+      final totalSales = orders.fold<double>(
+          0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0)));
 
       final closed = shift.copyWith(
         endTime: DateTime.now(),

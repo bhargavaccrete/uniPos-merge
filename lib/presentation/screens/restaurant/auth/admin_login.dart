@@ -6,7 +6,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/util/common/app_responsive.dart';
-
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import '../welcome_Admin.dart';
 
 class AdminLogin extends StatefulWidget {
@@ -87,11 +87,13 @@ class _AdminLoginState extends State<AdminLogin> {
                       return CommonTextForm(
                         obsecureText: value,
                         controller: PasswordController,
-                        hintText: 'Enter Password',
-                        validator: (value) {
-                          if (value == null || value.isEmpty || value.length < 6) {
-                            return value!.isEmpty ? "Please Enter Password" : 'Please Enter Six Digit';
-                          }
+                        hintText: 'Enter Passwordd',
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'PIN is required';
+                          if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
+                          return null;
                         },
                         gesture: GestureDetector(
                             onTap: () {

@@ -328,102 +328,248 @@ class DrawerManage extends StatelessWidget {
     final duration = DateTime.now().difference(shift.startTime);
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
+
+    // Phase tracking: false = End Shift confirm, true = Cash Handover form
     bool isClosing = false;
+    bool showHandover = false;
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    bool isSaving = false;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          contentPadding: EdgeInsets.zero,
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: EdgeInsets.all(20),
-                child: Row(children: [
+        builder: (ctx, setS) {
+          // ── Phase 2: Cash Handover form ─────────────────────────────
+          if (showHandover) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              contentPadding: EdgeInsets.zero,
+              content: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                     ),
-                    child: Icon(Icons.lock_clock_rounded, size: 28, color: Colors.orange),
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.swap_horiz_rounded, color: Colors.orange, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Cash Handover',
+                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+                          Text('Count the drawer before you leave',
+                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+                        ]),
+                      ),
+                    ]),
                   ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Text('End Shift',
-                        style: GoogleFonts.poppins(
-                            fontSize: 20, fontWeight: FontWeight.w700)),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.person_outline, size: 18, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          Text('Handing over as: ${shift.staffName}',
+                              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                        ]),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Cash counted in drawer',
+                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: amountCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                        decoration: InputDecoration(
+                          prefixText: 'Rs. ',
+                          hintText: '0.00',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.orange.shade700, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Note (optional)',
+                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: noteCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'e.g. "Left Rs.1500, all good"',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ]),
                   ),
                 ]),
               ),
-              Divider(height: 1, color: Colors.grey.shade200),
-              Padding(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _infoRow(Icons.person, 'Staff', shift.staffName),
-                    SizedBox(height: 8),
-                    _infoRow(Icons.timer, 'Duration', '${hours}h ${minutes}m'),
-                    SizedBox(height: 8),
-                    _infoRow(Icons.play_arrow, 'Started',
-                        '${shift.startTime.hour.toString().padLeft(2, '0')}:${shift.startTime.minute.toString().padLeft(2, '0')}'),
-                    SizedBox(height: 12),
-                    Container(
-                      padding: EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.07),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        'Orders during this shift will be tallied and saved to the Shift Report.',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange.shade800),
-                      ),
-                    ),
-                  ],
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () async {
+                    Navigator.pop(ctx);
+                    // Auto-logout after ending shift
+                    await _clearLoginState();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(
+                          context, RouteNames.restaurantLogin, (r) => false);
+                    }
+                  },
+                  child: Text('Skip', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
                 ),
+                ElevatedButton(
+                  onPressed: isSaving ? null : () async {
+                    final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                    if (amount <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Enter the cash amount')));
+                      return;
+                    }
+                    setS(() => isSaving = true);
+                    await cashHandoverStore.createHandover(
+                      closedBy: shift.staffName,
+                      closedAmount: amount,
+                      closedNote: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    // Auto-logout after ending shift
+                    await _clearLoginState();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(
+                          context, RouteNames.restaurantLogin, (r) => false);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade700,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: isSaving
+                      ? const SizedBox(width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text('Confirm Handover',
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          }
+
+          // ── Phase 1: End Shift confirm ──────────────────────────────
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            contentPadding: EdgeInsets.zero,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(20),
+                  child: Row(children: [
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.lock_clock_rounded, size: 28, color: Colors.orange),
+                    ),
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: Text('End Shift',
+                          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700)),
+                    ),
+                  ]),
+                ),
+                Divider(height: 1, color: Colors.grey.shade200),
+                Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _infoRow(Icons.person, 'Staff', shift.staffName),
+                      SizedBox(height: 8),
+                      _infoRow(Icons.timer, 'Duration', '${hours}h ${minutes}m'),
+                      SizedBox(height: 8),
+                      _infoRow(Icons.play_arrow, 'Started',
+                          '${shift.startTime.hour.toString().padLeft(2, '0')}:${shift.startTime.minute.toString().padLeft(2, '0')}'),
+                      SizedBox(height: 12),
+                      Container(
+                        padding: EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.07),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'Orders during this shift will be tallied and saved to the Shift Report.',
+                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange.shade800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+              ),
+              ElevatedButton(
+                onPressed: isClosing
+                    ? null
+                    : () async {
+                        setS(() => isClosing = true);
+                        final closed = await shiftStore.closeShift(shift.id);
+                        if (closed != null) {
+                          await RestaurantSession.clearShiftSession();
+                          // Switch dialog to handover phase in-place
+                          if (ctx.mounted) setS(() => showHandover = true);
+                        } else {
+                          if (ctx.mounted) {
+                            setS(() => isClosing = false);
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Failed to end shift. Please try again.')),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: isClosing
+                    ? const SizedBox(width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Text('End Shift', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel',
-                  style: GoogleFonts.poppins(color: Colors.grey.shade600)),
-            ),
-            ElevatedButton(
-              onPressed: isClosing
-                  ? null
-                  : () async {
-                      setState(() => isClosing = true);
-                      final closed = await shiftStore.closeShift(shift.id);
-                      if (closed != null) {
-                        await RestaurantSession.clearShiftSession();
-                      }
-                      if (ctx.mounted) Navigator.pop(ctx);
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              child: isClosing
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : Text('End Shift',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

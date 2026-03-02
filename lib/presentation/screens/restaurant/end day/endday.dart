@@ -41,6 +41,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   double expectedCash = 0.0;
   double totalExpenses = 0.0;
   double cashExpenses = 0.0;
+  double _cashIn = 0.0;
+  double _cashOut = 0.0;
 
   @override
   void initState() {
@@ -146,7 +148,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
       // 3) Expected CASH only
       final expectedCashAmount = report.paymentSummaries
-          .where((p) => (p.paymentType ?? '').toLowerCase().trim() == 'cash')
+          .where((p) => p.paymentType.toLowerCase().trim() == 'cash')
           .fold<double>(0.0, (sum, p) => sum + p.totalAmount);
 
       // 4) Decide whether there's anything to show
@@ -157,12 +159,19 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           (report.totalExpenses > 0) ||
           (currentOpeningBalance > 0);
 
+      // Load today's manual Cash In / Cash Out movements
+      final dayStart = await DayManagementService.getDayStartTimestamp()
+          ?? DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      await cashMovementStore.loadTodayMovements(dayStart);
+
       setState(() {
         _currentReport = hasAnyData ? report : null;
         openingBalance = currentOpeningBalance;
         expectedCash = expectedCashAmount;
         totalExpenses = report.totalExpenses;
         cashExpenses = report.cashExpenses;
+        _cashIn  = cashMovementStore.totalCashIn;
+        _cashOut = cashMovementStore.totalCashOut;
         _isLoading = false;
       });
     } catch (e) {
@@ -177,7 +186,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       final actual = double.tryParse(_actualCashController.text) ?? 0.0;
       // Expected total cash should include opening balance + cash sales - ONLY cash expenses
       // Non-cash expenses (Card/Online/Other) don't affect physical cash drawer
-      final expectedTotalCash = openingBalance + expectedCash - cashExpenses;
+      final expectedTotalCash = openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
       final difference = actual - expectedTotalCash;
       _differenceController.text = difference.toStringAsFixed(2);
     }
@@ -254,28 +263,25 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       // Past orders should remain for historical reporting
       // await DataClearService.clearCompletedOrders(); // REMOVED - Keep past orders for reports
 
-      // 4b. Close the active shift for the current staff member (if any)
-      final activeShiftId = RestaurantSession.currentShiftId;
-      if (activeShiftId != null) {
-        await shiftStore.closeShift(activeShiftId);
-        await RestaurantSession.clearShiftSession();
+      // 4b. Close ALL open shifts (cashiers may not have ended their shift before EOD)
+      await shiftStore.loadShifts();
+      final openShifts = shiftStore.shifts.where((s) => s.isOpen).toList();
+      for (final s in openShifts) {
+        await shiftStore.closeShift(s.id);
       }
+      await RestaurantSession.clearShiftSession();
 
       // 5. Mark day as completed
       await _markDayCompleted();
 
-      // 6. Reset opening balance for next day
-      await DayManagementService.resetDay();
-
-      // Show success message
-      NotificationService.instance.showSuccess('End of Day completed successfully!');
-
-      // Navigate immediately to Welcome Admin screen without delay
+      // 6. Show safe drop dialog — admin records cash withdrawal before logout.
+      //    markDayEnded + logout happen inside the dialog after confirmation.
+      //    Pass the discrepancy so it gets recorded as an ADJUSTMENT transaction.
+      final expectedTotalCash =
+          openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
+      final discrepancy = actualCashAmount - expectedTotalCash;
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => AdminWelcome()),
-              (route) => false, // Remove all previous routes
-        );
+        await _showSafeDropDialog(actualCashAmount, discrepancy: discrepancy);
       }
     } catch (e) {
       setState(() {
@@ -293,6 +299,351 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
       _showError(errorMessage);
     }
+  }
+
+  /// Non-dismissible dialog after EOD: admin records how much cash they're
+  /// taking to the safe. The remainder becomes next day's opening balance.
+  /// [discrepancy] = actualCash − expectedCash (positive = overage, negative = shortage).
+  Future<void> _showSafeDropDialog(double actualCash,
+      {double discrepancy = 0.0}) async {
+    final withdrawalController = TextEditingController(
+      text: actualCash.toStringAsFixed(2),
+    );
+    // Snapshot the closer's name BEFORE clearSession() wipes it
+    final closerName = RestaurantSession.staffName ??
+        (RestaurantSession.loginType == 'admin' ? 'Admin' : 'Staff');
+
+    String? fieldError;
+    bool isConfirming = false;
+
+    Future<void> runConfirm(
+        double w, StateSetter setDialogState, BuildContext ctx) async {
+      setDialogState(() => isConfirming = true);
+
+      final closingBalance = actualCash - w;
+      final note = '$closerName ended day. '
+          'Counted: Rs.${actualCash.toStringAsFixed(2)}, '
+          'Took to safe: Rs.${w.toStringAsFixed(2)}, '
+          'Left in drawer: Rs.${closingBalance.toStringAsFixed(2)}';
+
+      try {
+        // 1. Record EOD discrepancy as an ADJUSTMENT transaction (audit only,
+        //    does not affect the cash-in/out balance formula).
+        if (discrepancy.abs() > 0.01) {
+          final expectedAmt = actualCash - discrepancy;
+          await cashMovementStore.addAdjustment(
+            signedAmount: discrepancy, // negative = shortage, positive = overage
+            reason: discrepancy < 0 ? 'EOD Shortage' : 'EOD Overage',
+            note: 'Expected: Rs.${expectedAmt.toStringAsFixed(2)}, '
+                'Counted: Rs.${actualCash.toStringAsFixed(2)}',
+            staffName: closerName,
+          );
+        }
+
+        // 2. Record safe drop ONLY if amount > 0
+        if (w > 0) {
+          await cashMovementStore.addMovement(
+            type: 'out',
+            amount: w,
+            reason: 'Safe drop - End of Day',
+            note: note,
+          );
+        }
+      } catch (e) {
+        // Movement recording failed — log it but do NOT block the day close.
+        // The discrepancy/safe-drop amount is still visible in the EOD report.
+        debugPrint('⚠️ Cash movement recording failed during EOD: $e');
+      }
+
+      // Always persist closing balance regardless of movement save result
+      await DayManagementService.markDayEnded(closingBalance: closingBalance);
+
+      NotificationService.instance
+          .showSuccess('Day closed. Rs.${closingBalance.toStringAsFixed(2)} left in drawer.');
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('restaurant_is_logged_in', false);
+      await RestaurantSession.clearSession();
+
+      if (ctx.mounted) Navigator.of(ctx).pop();
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          RouteNames.restaurantLogin,
+          (route) => false,
+        );
+      }
+    }
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final withdrawal =
+                double.tryParse(withdrawalController.text) ?? 0.0;
+            final remaining =
+                (actualCash - withdrawal).clamp(0.0, double.infinity);
+
+            Future<void> confirm() async {
+              if (isConfirming) return;
+              final w = double.tryParse(withdrawalController.text);
+              if (w == null || w < 0) {
+                setDialogState(() => fieldError = 'Enter a valid amount');
+                return;
+              }
+              if (w > actualCash) {
+                setDialogState(() =>
+                    fieldError = 'Cannot withdraw more than counted cash');
+                return;
+              }
+              try {
+                await runConfirm(w, setDialogState, ctx);
+              } catch (e) {
+                setDialogState(() {
+                  isConfirming = false;
+                  fieldError = 'Error: $e';
+                });
+              }
+            }
+
+            return PopScope(
+              canPop: false,
+              child: AlertDialog(
+                title: Column(
+                  children: [
+                    Icon(Icons.savings_outlined, size: 48, color: Colors.teal),
+                    const SizedBox(height: 6),
+                    Text(
+                      'End of Day — Safe Drop',
+                      style: GoogleFonts.poppins(
+                          fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Closed by: $closerName',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Day summary row
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.teal.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            _safeDropRow('Opening Balance',
+                                openingBalance, Colors.grey[700]!),
+                            _safeDropRow('Cash Sales',
+                                expectedCash, Colors.grey[700]!),
+                            if (_cashIn > 0)
+                              _safeDropRow(
+                                  'Cash In', _cashIn, Colors.green[700]!),
+                            if (cashExpenses > 0)
+                              _safeDropRow('Cash Expenses',
+                                  -cashExpenses, Colors.red[700]!),
+                            if (_cashOut > 0)
+                              _safeDropRow(
+                                  'Cash Out', -_cashOut, Colors.red[700]!),
+                            const Divider(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('You counted',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.teal.shade800)),
+                                Text(
+                                    'Rs. ${actualCash.toStringAsFixed(2)}',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.teal.shade800)),
+                              ],
+                            ),
+                            // Show discrepancy if present
+                            if (discrepancy.abs() > 0.01) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: discrepancy < 0
+                                      ? Colors.red.shade50
+                                      : Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: discrepancy < 0
+                                        ? Colors.red.shade200
+                                        : Colors.green.shade200,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded,
+                                        size: 14,
+                                        color: discrepancy < 0
+                                            ? Colors.red.shade700
+                                            : Colors.green.shade700),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        discrepancy < 0
+                                            ? 'Shortage of Rs.${discrepancy.abs().toStringAsFixed(2)} — will be logged as ADJUSTMENT'
+                                            : 'Overage of Rs.${discrepancy.toStringAsFixed(2)} — will be logged as ADJUSTMENT',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 11,
+                                          color: discrepancy < 0
+                                              ? Colors.red.shade700
+                                              : Colors.green.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'How much are you taking to the safe?',
+                        style: GoogleFonts.poppins(
+                            fontSize: 13, color: Colors.grey[700]),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: withdrawalController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d+\.?\d{0,2}')),
+                        ],
+                        onChanged: (_) =>
+                            setDialogState(() => fieldError = null),
+                        decoration: InputDecoration(
+                          prefixText: 'Rs. ',
+                          hintText: '0.00',
+                          errorText: fieldError,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                                color: Colors.teal.shade600, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Live "stays in drawer" display
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: remaining > 0
+                              ? Colors.green.shade50
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: remaining > 0
+                                ? Colors.green.shade200
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Stays in drawer (next opening)',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12, color: Colors.grey[600]),
+                            ),
+                            Text(
+                              'Rs. ${remaining.toStringAsFixed(2)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: remaining > 0
+                                    ? Colors.green.shade700
+                                    : Colors.grey[600]!,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  if (!isConfirming)
+                    TextButton(
+                      onPressed: () async {
+                        if (isConfirming) return;
+                        withdrawalController.text = '0.00';
+                        await confirm();
+                      },
+                      child: Text('Leave all in drawer',
+                          style: GoogleFonts.poppins(color: Colors.grey)),
+                    ),
+                  ElevatedButton(
+                    onPressed: isConfirming ? null : confirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                    ),
+                    child: isConfirming
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : Text('Confirm & Logout',
+                            style: GoogleFonts.poppins(color: Colors.white)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    withdrawalController.dispose();
+  }
+
+  /// Helper for the safe drop day-summary rows.
+  Widget _safeDropRow(String label, double amount, Color color) {
+    final isNeg = amount < 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+          Text(
+            '${isNeg ? '-' : '+'} Rs. ${amount.abs().toStringAsFixed(2)}',
+            style: GoogleFonts.poppins(
+                fontSize: 12, fontWeight: FontWeight.w500, color: color),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showActiveOrdersError(int count) async {
@@ -350,25 +701,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     ) ?? false;
   }
 
-  Future<void> _clearAllData() async {
-    // Load and delete all past orders
-    await pastOrderStore.loadPastOrders();
-    final pastOrders = pastOrderStore.pastOrders.toList();
-    for (final order in pastOrders) {
-      await pastOrderStore.deleteOrder(order.id);
-    }
-
-    // Load and delete all active orders
-    await orderStore.loadOrders();
-    final activeOrders = orderStore.orders.toList();
-    for (final order in activeOrders) {
-      await orderStore.deleteOrder(order.id);
-    }
-
-    // Clear cart using store
-    await restaurantCartStore.clearCart();
-  }
-
   Future<void> _markDayCompleted() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_eod_date', DateTime.now().toIso8601String());
@@ -389,10 +721,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
   void _showError(String message) {
     NotificationService.instance.showError(message);
-  }
-
-  void _showSuccess(String message) {
-    NotificationService.instance.showSuccess(message);
   }
 
   Future<void> _printSummary() async {
@@ -1043,6 +1371,22 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                             ),
                           ],
                         ),
+                        if (_cashIn > 0) Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Cash In:', style: GoogleFonts.poppins(fontSize: 12, color: Colors.green[700])),
+                            Text('+ $currency ${_cashIn.toStringAsFixed(2)}',
+                                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.green[700])),
+                          ],
+                        ),
+                        if (_cashOut > 0) Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Cash Out:', style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange[700])),
+                            Text('- $currency ${_cashOut.toStringAsFixed(2)}',
+                                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.orange[700])),
+                          ],
+                        ),
                         if (totalExpenses > cashExpenses) Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1071,7 +1415,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                               style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
                             ),
                             Text(
-                              '$currency ${(openingBalance + expectedCash - cashExpenses).toStringAsFixed(2)}',
+                              '$currency ${(openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses).toStringAsFixed(2)}',
                               style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blue[800]),
                             ),
                           ],

@@ -130,9 +130,9 @@ class RestaurantSession {
   static bool canAccess(String feature) {
     if (isAdmin || staffRole == 'Manager') return true;
     if (staffRole == 'Cashier') {
-      // Cashier cannot access reports or staff management
-      if (feature == 'reports' || feature == 'manageStaff') return false;
-      return true; // endDay and everything else allowed
+      // Cashier cannot access reports, staff management, or cash drawer
+      if (feature == 'reports' || feature == 'manageStaff' || feature == 'cashDrawer') return false;
+      return true;
     }
     // Other staff roles: orders only
     return feature == 'startOrder';

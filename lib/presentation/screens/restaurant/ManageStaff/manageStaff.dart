@@ -555,7 +555,7 @@ class _manageStaffState extends State<manageStaff> {
                               hintText: 'Select Role',
                             ),
                             style: GoogleFonts.poppins(fontSize: isTablet ? 15 : 14, color: Colors.black87),
-                            items: ['Select Role', 'Cashier', 'Waiter', 'Manager', 'Kitchen Staff']
+                            items: ['Select Role',  'Manager','Cashier', 'Waiter',]
                                 .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                                 .toList(),
                             onChanged: (v) => setState(() => selectedrole = v ?? 'Select Role'),

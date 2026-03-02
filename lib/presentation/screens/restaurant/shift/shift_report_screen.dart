@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
@@ -28,6 +29,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   void initState() {
     super.initState();
     shiftStore.loadShifts();
+    expenseStore.loadExpenses();
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -142,6 +144,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                 final filtered = shiftStore.filteredShifts;
                 final closed = filtered.where((s) => !s.isOpen).toList();
                 final open = filtered.where((s) => s.isOpen).toList();
+                final expenses = expenseStore.expenses.toList();
 
                 return Column(
                   children: [
@@ -149,7 +152,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                     Expanded(
                       child: filtered.isEmpty
                           ? _buildEmptyState(context)
-                          : _buildGroupedList(context, currency, open, closed),
+                          : _buildGroupedList(context, currency, open, closed, expenses),
                     ),
                   ],
                 );
@@ -499,6 +502,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     String currency,
     List<ShiftModel> open,
     List<ShiftModel> closed,
+    List<Expense> expenses,
   ) {
     final grouped = _groupByDay([...open, ...closed]);
 
@@ -507,7 +511,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
       children: [
         for (final entry in grouped.entries) ...[
           _dayHeader(context, entry.key, entry.value),
-          ...entry.value.map((s) => _ShiftCard(s, currency)),
+          ...entry.value.map((s) => _ShiftCard(s, currency, expenses)),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
         ],
       ],
@@ -603,7 +607,8 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
 class _ShiftCard extends StatefulWidget {
   final ShiftModel shift;
   final String currency;
-  const _ShiftCard(this.shift, this.currency);
+  final List<Expense> expenses;
+  const _ShiftCard(this.shift, this.currency, this.expenses);
 
   @override
   State<_ShiftCard> createState() => _ShiftCardState();
@@ -743,8 +748,26 @@ class _ShiftCardState extends State<_ShiftCard> {
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 Divider(color: AppColors.divider, height: 1),
                 SizedBox(height: AppResponsive.smallSpacing(context)),
-                _detailRow(context, 'Total Sales',
+                _detailRow(context, 'Sales',
                     '${widget.currency}${s.totalSales.toStringAsFixed(2)}'),
+                Builder(builder: (_) {
+                  final shiftEnd = s.endTime ?? DateTime.now();
+                  final shiftExp = widget.expenses
+                      .where((e) =>
+                          e.dateandTime.isAfter(
+                              s.startTime.subtract(const Duration(seconds: 1))) &&
+                          e.dateandTime
+                              .isBefore(shiftEnd.add(const Duration(seconds: 1))))
+                      .fold<double>(0.0, (sum, e) => sum + e.amount);
+                  return Column(
+                    children: [
+                      _detailRow(context, 'Expenses',
+                          '- ${widget.currency}${shiftExp.toStringAsFixed(2)}'),
+                      _detailRow(context, 'Net Revenue',
+                          '${widget.currency}${(s.totalSales - shiftExp).toStringAsFixed(2)}'),
+                    ],
+                  );
+                }),
                 _detailRow(context, 'Orders', '${s.orderCount}'),
                 _detailRow(context, 'Duration',
                     '${dur.inHours}h ${dur.inMinutes.remainder(60)}m'),

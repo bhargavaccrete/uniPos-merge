@@ -12,6 +12,7 @@ import '../start order/cart/cart.dart';
 import '../start order/startorder.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class TableScreen extends StatefulWidget {
   final bool? isfromcart;
@@ -47,7 +48,7 @@ class _TableScreenState extends State<TableScreen> {
             autofocus: true,
             style: GoogleFonts.poppins(),
             decoration: InputDecoration(
-              hintText: 'Enter Table Name (e.g., T-4)',
+              hintText: 'Enter Table Name',
               hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -337,8 +338,7 @@ class _TableScreenState extends State<TableScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -346,7 +346,7 @@ class _TableScreenState extends State<TableScreen> {
         children: [
           // Header: Add Table + Legend
           Container(
-            padding: EdgeInsets.all(isTablet ? 24 : 20),
+            padding: AppResponsive.padding(context),
             color: AppColors.white,
             child: Column(
               children: [
@@ -354,7 +354,9 @@ class _TableScreenState extends State<TableScreen> {
                   onTap: _addTable,
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 16),
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.getValue(context, mobile: 16, tablet: 18),
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.tablesTab,
                       borderRadius: BorderRadius.circular(12),
@@ -369,13 +371,17 @@ class _TableScreenState extends State<TableScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add, color: AppColors.white, size: isTablet ? 22 : 20),
-                        SizedBox(width: isTablet ? 10 : 8),
+                        Icon(
+                          Icons.add,
+                          color: AppColors.white,
+                          size: AppResponsive.getValue(context, mobile: 20, tablet: 22),
+                        ),
+                        AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                         Text(
                           'Add Table',
                           style: GoogleFonts.poppins(
                             color: AppColors.white,
-                            fontSize: isTablet ? 17 : 16,
+                            fontSize: AppResponsive.getValue(context, mobile: 16, tablet: 17),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -383,7 +389,7 @@ class _TableScreenState extends State<TableScreen> {
                     ),
                   ),
                 ),
-                SizedBox(height: isTablet ? 20 : 16),
+                AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -434,15 +440,15 @@ class _TableScreenState extends State<TableScreen> {
                 }
 
                 final allTables = tableStore.tables;
-                final crossAxisCount = isTablet ? 4 : 2;
+                final crossAxisCount = AppResponsive.gridColumns(context, mobile: 2, tablet: 4, desktop: 4);
 
                 return GridView.builder(
-                  padding: EdgeInsets.all(20),
+                  padding: AppResponsive.padding(context),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.1,
+                    crossAxisSpacing: AppResponsive.gridSpacing(context),
+                    mainAxisSpacing: AppResponsive.gridSpacing(context),
+                    childAspectRatio: AppResponsive.gridAspectRatio(context),
                   ),
                   itemCount: allTables.length,
                   itemBuilder: (context, index) {
@@ -563,17 +569,17 @@ class _TableScreenState extends State<TableScreen> {
     return Row(
       children: [
         Container(
-          width: isTablet ? 14 : 12,
-          height: isTablet ? 14 : 12,
+          width: AppResponsive.getValue(context, mobile: 12, tablet: 14),
+          height: AppResponsive.getValue(context, mobile: 12, tablet: 14),
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        SizedBox(width: isTablet ? 10 : 8),
+        AppResponsive.horizontalSpace(context, size: SpacingSize.small),
         Text(
           text,
           style: GoogleFonts.poppins(
             color: color,
             fontWeight: FontWeight.w600,
-            fontSize: isTablet ? 15 : 13,
+            fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 15),
           ),
         ),
       ],
@@ -658,50 +664,58 @@ class TableCard extends StatelessWidget {
                   Text(
                     table.id,
                     style: GoogleFonts.poppins(
-                      fontSize: 32,
+                      fontSize: AppResponsive.getValue(context, mobile: 28, tablet: 32),
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
                   if (table.status != 'Available') ...[
-                    SizedBox(height: 12),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                     Text(
                       '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(table.currentOrderTotal ?? 0.0)}',
                       style: GoogleFonts.poppins(
-                        fontSize: 18,
+                        fontSize: AppResponsive.getValue(context, mobile: 16, tablet: 18),
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person, size: 14, color: AppColors.textSecondary),
-                        SizedBox(width: 4),
+                        Icon(
+                          Icons.person,
+                          size: AppResponsive.smallIconSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                        AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                         Text(
                           customerName ?? 'Guest',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
                             color: AppColors.textSecondary,
-                            fontSize: 12,
+                            fontSize: AppResponsive.smallFontSize(context),
                           ),
                         ),
                       ],
                     ),
                     if (table.timeStamp != null && table.timeStamp!.isNotEmpty) ...[
-                      SizedBox(height: 6),
+                      AppResponsive.verticalSpace(context, size: SpacingSize.small),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.access_time, size: 14, color: AppColors.textSecondary),
-                          SizedBox(width: 4),
+                          Icon(
+                            Icons.access_time,
+                            size: AppResponsive.smallIconSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                          AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                           Text(
                             _formatOrderTime(table.timeStamp),
                             style: GoogleFonts.poppins(
                               color: AppColors.textSecondary,
-                              fontSize: 12,
+                              fontSize: AppResponsive.smallFontSize(context),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -718,7 +732,10 @@ class TableCard extends StatelessWidget {
               top: -12,
               left: 20,
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.getValue(context, mobile: 10, tablet: 12),
+                  vertical: AppResponsive.getValue(context, mobile: 4, tablet: 6),
+                ),
                 decoration: BoxDecoration(
                   color: statusColor,
                   borderRadius: BorderRadius.circular(8),
@@ -735,7 +752,7 @@ class TableCard extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                   ),
                 ),
               ),

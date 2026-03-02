@@ -47,6 +47,8 @@ import 'package:unipos/data/repositories/restaurant/table_repository.dart';
 import 'package:unipos/data/repositories/restaurant/customer_repository.dart' as restaurant;
 import 'package:unipos/data/repositories/restaurant/staff_repository.dart';
 import 'package:unipos/data/repositories/restaurant/shift_repository.dart';
+import 'package:unipos/data/repositories/restaurant/cash_movement_repository.dart';
+import 'package:unipos/data/repositories/restaurant/cash_handover_repository.dart';
 import 'package:unipos/data/repositories/restaurant/expense_repository.dart';
 import 'package:unipos/data/repositories/restaurant/expense_category_repository.dart';
 import 'package:unipos/data/repositories/restaurant/tax_repository.dart';
@@ -65,6 +67,8 @@ import 'package:unipos/domain/store/restaurant/table_store.dart';
 import 'package:unipos/domain/store/restaurant/customer_store.dart' as restaurant;
 import 'package:unipos/domain/store/restaurant/staff_store.dart';
 import 'package:unipos/domain/store/restaurant/shift_store.dart';
+import 'package:unipos/domain/store/restaurant/cash_movement_store.dart';
+import 'package:unipos/domain/store/restaurant/cash_handover_store.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:unipos/domain/store/restaurant/expense_store.dart';
 import 'package:unipos/domain/store/restaurant/expense_category_store.dart';
@@ -208,6 +212,8 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<CustomerRepositoryRes>(() => CustomerRepositoryRes());
   locator.registerLazySingleton<StaffRepository>(() => StaffRepository());
   locator.registerLazySingleton<ShiftRepository>(() => ShiftRepository());
+  locator.registerLazySingleton<CashMovementRepository>(() => CashMovementRepository());
+  locator.registerLazySingleton<CashHandoverRepository>(() => CashHandoverRepository());
   locator.registerLazySingleton<ExpenseRepository>(() => ExpenseRepository());
   locator.registerLazySingleton<ExpenseCategoryRepository>(() => ExpenseCategoryRepository());
   locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
@@ -253,6 +259,14 @@ Future<void> _registerRestaurantDependencies() async {
   );
   // Auto-close the open shift when any logout path calls RestaurantSession.clearSession()
   RestaurantSession.onShiftAutoClose = (id) => shiftStore.closeShift(id);
+
+  // Cash Management stores
+  locator.registerLazySingleton<CashMovementStore>(
+    () => CashMovementStore(locator<CashMovementRepository>()),
+  );
+  locator.registerLazySingleton<CashHandoverStore>(
+    () => CashHandoverStore(locator<CashHandoverRepository>()),
+  );
   locator.registerLazySingleton<ExpenseStore>(
     () => ExpenseStore(locator<ExpenseRepository>()),
   );
@@ -367,6 +381,8 @@ TableStore get tableStore => locator<TableStore>();
 CustomerStoreRes get restaurantCustomerStore => locator<CustomerStoreRes>();
 StaffStore get staffStore => locator<StaffStore>();
 ShiftStore get shiftStore => locator<ShiftStore>();
+CashMovementStore get cashMovementStore => locator<CashMovementStore>();
+CashHandoverStore  get cashHandoverStore  => locator<CashHandoverStore>();
 ExpenseStore get expenseStore => locator<ExpenseStore>();
 ExpenseCategoryStore get expenseCategoryStore => locator<ExpenseCategoryStore>();
 TaxStore get taxStore => locator<TaxStore>();

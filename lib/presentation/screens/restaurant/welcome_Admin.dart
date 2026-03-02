@@ -4,12 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import '../../../core/routes/routes_name.dart';
 import '../../../domain/services/common/notification_service.dart';
+import '../../screens/restaurant/cash_drawer/cash_drawer_screen.dart';
 import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
 import '../../../domain/services/retail/store_settings_service.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../../core/di/service_locator.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
+import '../../widget/restaurant/opening_balance_dialog.dart';
 
 class AdminWelcome extends StatefulWidget {
   const AdminWelcome({super.key});
@@ -28,6 +30,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkDayStarted();
       await _startShiftIfNeeded();
+      await _checkPendingHandover();
     });
   }
 
@@ -44,10 +47,25 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       final balance = await showDialog<double>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => _buildOpeningBalanceDialog(),
+        builder: (context) => const OpeningBalanceDialog(),
       );
 
       if (balance != null) {
+        // Check if admin changed the pre-filled closing balance — record ADJUSTMENT
+        final lastClosing = await DayManagementService.getLastClosingBalance();
+        final diff = balance - lastClosing;
+        if (lastClosing > 0 && diff.abs() > 0.01) {
+          final byName = RestaurantSession.staffName ??
+              (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+          await cashMovementStore.addAdjustment(
+            signedAmount: diff, // negative if admin entered less than closing
+            reason: 'Opening balance modified',
+            note: 'Previous closing: Rs.${lastClosing.toStringAsFixed(2)}, '
+                'Opened at: Rs.${balance.toStringAsFixed(2)}',
+            staffName: byName,
+          );
+        }
+
         // Save the opening balance to mark the day as started
         await DayManagementService.setOpeningBalance(balance);
 
@@ -105,134 +123,6 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       await RestaurantSession.saveShiftSession(shiftStore.activeShift!.id);
       NotificationService.instance.showSuccess('Shift started');
     }
-  }
-
-  Widget _buildOpeningBalanceDialog() {
-    final controller = TextEditingController();
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      contentPadding: EdgeInsets.zero,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Container(
-            padding: EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.play_circle_rounded,
-                    size: 28,
-                    color: Colors.green,
-                  ),
-                ),
-                SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    'Start Day',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: AppColors.divider),
-
-          // Content
-          Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Enter opening balance to start the day',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  style: GoogleFonts.poppins(fontSize: 15),
-                  decoration: InputDecoration(
-                    labelText: 'Opening Balance',
-                    labelStyle: GoogleFonts.poppins(fontSize: 14),
-                    prefixText: 'Rs. ',
-                    prefixStyle: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                    filled: true,
-                    fillColor: AppColors.surfaceLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.divider),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.divider),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
-                    ),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, 0.0),
-          child: Text(
-            'Skip',
-            style: GoogleFonts.poppins(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final balance = double.tryParse(controller.text) ?? 0;
-            Navigator.pop(context, balance);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          child: Text(
-            'Start Day',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   @override
@@ -469,6 +359,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       _MenuCardData('Expenses',      Icons.account_balance_wallet_rounded, Colors.red,         'expenses',     () => Navigator.pushNamed(context, RouteNames.restaurantExpenses)),
       _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory)),
       _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings)),
+      _MenuCardData('Cash Drawer',   Icons.point_of_sale_rounded,       const Color(0xFF00897B), 'cashDrawer', () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer)),
       _MenuCardData('Logout',        Icons.logout_rounded,              Colors.red.shade700,   'logout',       () => _showLogoutDialog(context)),
     ];
     return all.where((c) => c.permission == 'logout' || RestaurantSession.canAccess(c.permission)).toList();
@@ -647,6 +538,27 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         ],
       ),
     );
+  }
+
+  /// Checks if a staff member left a PENDING cash handover.
+  /// Called on every login — if a PENDING handover exists, the incoming
+  /// staff must confirm receipt before they can use the app.
+  Future<void> _checkPendingHandover() async {
+    await cashHandoverStore.loadPendingHandover();
+    final pending = cashHandoverStore.pendingHandover;
+    if (pending != null && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false, // Cannot skip — forces accountability
+        builder: (_) => HandoverReceiveDialog(
+          handoverId: pending.id,
+          closedBy: pending.closedBy,
+          closedAt: pending.closedAt,
+          closedAmount: pending.closedAmount,
+          closedNote: pending.closedNote,
+        ),
+      );
+    }
   }
 
   Future<void> _clearLoginState() async {

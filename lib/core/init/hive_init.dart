@@ -59,6 +59,8 @@ import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'package:unipos/data/models/restaurant/db/shift_model.dart';
+import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
+import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 
 /// Hive Initialization Class
 /// Handles all adapter registrations and box openings
@@ -539,6 +541,14 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantShift)) {
       Hive.registerAdapter(ShiftModelAdapter());
     }
+    // CashMovementModel - 128: records every Cash In / Cash Out during the day
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashMovement)) {
+      Hive.registerAdapter(CashMovementModelAdapter());
+    }
+    // CashHandoverModel - 129: 2-step shift handover between staff members
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashHandover)) {
+      Hive.registerAdapter(CashHandoverModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -589,6 +599,10 @@ class HiveInit {
 
     // Restaurant Shifts
     await Hive.openBox<ShiftModel>(HiveBoxNames.restaurantShift);
+
+    // Cash Management — movements (Cash In/Out) and handovers (shift transfers)
+    await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+    await Hive.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
 
     _areRestaurantBoxesOpen = true;
     print('✅ All restaurant boxes opened successfully with correct names and guard flag set');

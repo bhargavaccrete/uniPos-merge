@@ -308,6 +308,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         iconColor: Colors.deepPurple,
                         isTablet: isTablet,
                       ),
+                      _buildReportCard(
+                        icon: Icons.account_balance_wallet_outlined,
+                        title: 'Cash Drawer History',
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawerHistory),
+                        iconColor: Colors.teal,
+                        isTablet: isTablet,
+                      ),
                     ],
                   );
                 },

@@ -184,6 +184,12 @@ class HiveBoxNames {
   /// Restaurant shift management box
   static const String restaurantShift = 'shiftBox';
 
+  /// Cash movement events (Cash In / Cash Out during the day)
+  static const String restaurantCashMovements = 'cashMovementsBox';
+
+  /// Cash handover records (2-step shift handover between staff)
+  static const String restaurantCashHandovers = 'cashHandoversBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode

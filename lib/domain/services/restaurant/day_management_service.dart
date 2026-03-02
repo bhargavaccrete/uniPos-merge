@@ -1,7 +1,10 @@
 import 'package:hive/hive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
 
 class DayManagementService {
   static const String _boxName = 'dayManagementBox';
@@ -9,6 +12,7 @@ class DayManagementService {
   static const String _dayStartedKey = 'dayStarted';
   static const String _lastDayDateKey = 'lastDayDate';
   static const String _dayStartTimestampKey = 'dayStartTimestamp'; // NEW: Track exact start time
+  static const String _closingBalanceKey = 'closingBalance'; // Persists last day's closing cash
   static Box? _box;
 
   static Box _getBox() {
@@ -33,6 +37,9 @@ class DayManagementService {
     await box.put(_lastDayDateKey, now.toIso8601String());
     await box.put(_dayStartTimestampKey, now.toIso8601String()); // Store exact start timestamp
 
+    // Reset daily bill number counter for the new day
+    await orderStore.resetDailyBillNumber();
+
     // Clear the last EOD completion date when starting a new day
     // This ensures End Day screen shows data for the new day
     final prefs = await SharedPreferences.getInstance();
@@ -48,6 +55,23 @@ class DayManagementService {
     final afterRemoval = prefs.getString('last_eod_date');
     debugPrint('   last_eod_date after removal: $afterRemoval (should be null)');
 
+    // Persist opening balance as an immutable ledger entry so the cash drawer
+    // history is self-contained and does not depend on the dayManagementBox scalar.
+    if (Hive.isBoxOpen(HiveBoxNames.restaurantCashMovements)) {
+      final cashBox = Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+      final entry = CashMovementModel(
+        id: const Uuid().v4(),
+        timestamp: now,
+        type: 'opening',
+        amount: balance,
+        reason: 'Day Start — Carry Forward',
+        note: null,
+        staffName: 'System',
+      );
+      await cashBox.put(entry.id, entry);
+      debugPrint('   Opening balance transaction recorded: Rs.$balance');
+    }
+
     debugPrint('✅ New day started successfully!');
   }
 
@@ -55,7 +79,7 @@ class DayManagementService {
   static Future<double> getOpeningBalance() async {
     final box = _getBox();
     final balance = box.get(_openingBalanceKey, defaultValue: 0.0);
-    return balance is double ? balance : 0.0;
+    return (balance as num?)?.toDouble() ?? 0.0;
   }
 
   /// Check if the day has been started (opening balance set)
@@ -69,11 +93,12 @@ class DayManagementService {
       final lastDayDate = DateTime.parse(lastDayDateStr);
       final today = DateTime.now();
 
-      // If it's a new day, reset the flag
+      // If it's a new day, return false so the user is prompted to start it.
+      // We don't call resetDay() here anymore to preserve the old timestamp
+      // until a new day is explicitly started via setOpeningBalance().
       if (lastDayDate.day != today.day ||
           lastDayDate.month != today.month ||
           lastDayDate.year != today.year) {
-        await resetDay();
         return false;
       }
     }
@@ -81,17 +106,39 @@ class DayManagementService {
     return started == true;
   }
 
-  /// Reset the day (called after End of Day)
+  /// Reset the day (called automatically when a NEW calendar day is detected).
+  /// Clears all balance/timestamp data so the next day starts fresh.
   static Future<void> resetDay() async {
     final box = _getBox();
     await box.put(_openingBalanceKey, 0.0);
     await box.put(_dayStartedKey, false);
-    await box.delete(_dayStartTimestampKey); // Clear the day start timestamp
+    await box.delete(_dayStartTimestampKey);
 
     // Reset daily bill number counter
     await orderStore.resetDailyBillNumber();
 
     debugPrint('Day reset - opening balance cleared, bill counter reset');
+  }
+
+  /// Mark the current day as ended (called from End Day screen).
+  /// Preserves opening balance and timestamp so Cash Drawer can still display
+  /// today's totals in read-only mode until the next day's Start Day.
+  /// [closingBalance] is the actual cash counted — persisted as opening suggestion for next day.
+  static Future<void> markDayEnded({double closingBalance = 0.0}) async {
+    final box = _getBox();
+    await box.put(_dayStartedKey, false);
+    await box.put(_closingBalanceKey, closingBalance);
+    // Reset daily bill number counter
+    await orderStore.resetDailyBillNumber();
+    debugPrint('Day ended - closing balance: $closingBalance, balance/timestamp preserved');
+  }
+
+  /// Get the closing balance from the last ended day (used to pre-fill next day's opening).
+  static Future<double> getLastClosingBalance() async {
+    final box = _getBox();
+    final balance = box.get(_closingBalanceKey, defaultValue: 0.0);
+    // Use num cast — Hive can return whole-number doubles as int on some platforms
+    return (balance as num?)?.toDouble() ?? 0.0;
   }
 
   /// Get the last day's date

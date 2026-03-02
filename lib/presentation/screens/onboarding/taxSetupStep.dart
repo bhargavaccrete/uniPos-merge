@@ -205,7 +205,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
           const SizedBox(height: 30),
 
           // Tax Settings Card
-          Container(
+    /*      Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -240,7 +240,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 // ✅ Tax Inclusive Toggle
                 // This toggle is CONNECTED to Restaurant → Settings & Customization → "Tax Is Inclusive"
                 // Both toggles control the SAME setting via AppSettings
-                Observer(
+*//*                Observer(
                   builder: (_) => Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -280,7 +280,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                       ),
                     ],
                   ),
-                ),
+                ),*//*
 
                 // Tax Type Selection - Only show for RETAIL mode
                 // Restaurant manages this in Settings screen, not setup wizard
@@ -318,7 +318,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 ],
               ],
             ),
-          ),
+          ),*/
 
           const SizedBox(height: 20),
 

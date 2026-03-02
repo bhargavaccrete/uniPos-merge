@@ -10,7 +10,7 @@ import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import '../welcome_Admin.dart';
-
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 class RestaurantLogin extends StatefulWidget {
   const RestaurantLogin({super.key});
 
@@ -270,10 +270,11 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                       obsecureText: _obscurePassword,
                       controller: _passwordController,
                       hintText: 'Enter password',
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter password';
-                        }
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'PIN is required';
+                        if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
                         return null;
                       },
                       gesture: GestureDetector(

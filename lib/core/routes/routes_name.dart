@@ -82,6 +82,8 @@ class RouteNames {
   static const restaurantReportsExpense  = '/restaurant-report-expensereport';
   static const restaurantShiftReport = '/restaurant-shift-report';
   static const restaurantStaffPerformance = '/restaurant-staff-performance';
+  static const restaurantCashDrawer = '/restaurant-cash-drawer';
+  static const restaurantCashDrawerHistory = '/restaurant-cash-drawer-history';
   // static const restaurantReportsPerformanceStatistics  = '/restaurant-report-performanxestatisticsreport';
 
 

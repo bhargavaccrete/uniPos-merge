@@ -111,6 +111,8 @@ import '../../presentation/screens/restaurant/Reports/void Order Report/voidOrde
 import '../../presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
 import '../../presentation/screens/restaurant/shift/shift_report_screen.dart';
 import '../../presentation/screens/restaurant/shift/staff_performance_screen.dart';
+import '../../presentation/screens/restaurant/cash_drawer/cash_drawer_screen.dart';
+import '../../presentation/screens/restaurant/cash_drawer/cash_drawer_history_screen.dart';
 
 class RestaurantRoutes {
   /// Wraps a widget builder with [RestaurantGuard] to enforce login + optional role check.
@@ -200,6 +202,8 @@ class RestaurantRoutes {
     RouteNames.restaurantReportsVoidOrderReport: _guard(VoidOrderReport(), 'reports'),
     RouteNames.restaurantShiftReport: _guard(const ShiftReportScreen(), 'reports'),
     RouteNames.restaurantStaffPerformance: _guard(const StaffPerformanceScreen(), 'reports'),
+    RouteNames.restaurantCashDrawer: _guard(const CashDrawerScreen(), 'cashDrawer'),
+    RouteNames.restaurantCashDrawerHistory: _guard(const CashDrawerHistoryScreen(), 'reports'),
 
     // Restaurant - Settings
     RouteNames.restaurantSettings: _guard(const Settingsscreen(), 'settings'),

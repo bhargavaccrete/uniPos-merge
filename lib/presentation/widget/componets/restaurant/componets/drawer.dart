@@ -12,8 +12,10 @@ import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
 import 'package:unipos/domain/services/common/unified_backup_service.dart';
 import 'package:unipos/domain/services/common/backup_encryption_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/util/images.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/main.dart' as main_app;
+
+import '../../../../../util/images.dart';
 
 class Drawerr extends StatefulWidget {
   const Drawerr({super.key});
@@ -42,8 +44,7 @@ class _DrawerrState extends State<Drawerr> {
   @override
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -53,7 +54,7 @@ class _DrawerrState extends State<Drawerr> {
             // Header
             Container(
               width: double.infinity,
-              padding: EdgeInsets.all(isTablet ? 24 : 20),
+              padding: AppResponsive.padding(context),
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 boxShadow: [
@@ -76,14 +77,14 @@ class _DrawerrState extends State<Drawerr> {
                     child: Icon(
                       Icons.restaurant_menu,
                       color: Colors.white,
-                      size: isTablet ? 32 : 28,
+                      size: AppResponsive.getValue(context, mobile: 28, tablet: 32),
                     ),
                   ),
-                  SizedBox(height: 16),
+                  AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                   Text(
                     'UniPOS',
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 24 : 22,
+                      fontSize: AppResponsive.getValue(context, mobile: 22, tablet: 24),
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -92,7 +93,7 @@ class _DrawerrState extends State<Drawerr> {
                   Text(
                     'POS System',
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 14 : 13,
+                      fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 14),
                       fontWeight: FontWeight.w400,
                       color: Colors.white.withValues(alpha: 0.9),
                     ),
@@ -105,8 +106,8 @@ class _DrawerrState extends State<Drawerr> {
             Expanded(
               child: ListView(
                 padding: EdgeInsets.symmetric(
-                  vertical: isTablet ? 16 : 12,
-                  horizontal: isTablet ? 12 : 8,
+                  vertical: AppResponsive.getValue(context, mobile: 12, tablet: 16),
+                  horizontal: AppResponsive.getValue(context, mobile: 8, tablet: 12),
                 ),
                 children: [
                   _buildDrawerItem(
@@ -207,25 +208,6 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
-               /*   _buildDrawerItem(
-                    context: context,
-                    icon: Icons.sync_rounded,
-                    title: 'Sync Data',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showSyncDialog(context);
-                    },
-                    isTablet: isTablet,
-                  ),*/
-
-              /*    _buildDrawerItem(
-                    context: context,
-                    icon: Icons.sync_alt_rounded,
-                    title: 'Sync Order',
-                    onTap: () {},
-                    isTablet: isTablet,
-                  ),*/
-
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.sunny_snowing,
@@ -284,7 +266,7 @@ class _DrawerrState extends State<Drawerr> {
 
             // Footer
             Container(
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              padding: AppResponsive.padding(context),
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
@@ -297,15 +279,15 @@ class _DrawerrState extends State<Drawerr> {
                 children: [
                   Icon(
                     Icons.info_outline,
-                    size: 16,
+                    size: AppResponsive.smallIconSize(context),
                     color: Colors.grey.shade600,
                   ),
-                  SizedBox(width: 8),
+                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                   Expanded(
                     child: Text(
                       'Version 1.0.0',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: Colors.grey.shade600,
                       ),
                     ),
@@ -339,8 +321,8 @@ class _DrawerrState extends State<Drawerr> {
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
-              vertical: isTablet ? 14 : 12,
+              horizontal: AppResponsive.getValue(context, mobile: 12, tablet: 16),
+              vertical: AppResponsive.getValue(context, mobile: 12, tablet: 14),
             ),
             child: Row(
               children: [
@@ -352,16 +334,16 @@ class _DrawerrState extends State<Drawerr> {
                   ),
                   child: Icon(
                     icon,
-                    size: isTablet ? 22 : 20,
+                    size: AppResponsive.getValue(context, mobile: 20, tablet: 22),
                     color: itemColor,
                   ),
                 ),
-                SizedBox(width: isTablet ? 16 : 12),
+                AppResponsive.horizontalSpace(context, size: SpacingSize.medium),
                 Expanded(
                   child: Text(
                     title,
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 15 : 14,
+                      fontSize: AppResponsive.getValue(context, mobile: 14, tablet: 15),
                       fontWeight: FontWeight.w500,
                       color: Colors.black87,
                     ),
@@ -402,10 +384,12 @@ class _DrawerrState extends State<Drawerr> {
             initiallyExpanded: isExpanded,
             onExpansionChanged: onExpansionChanged,
             tilePadding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
-              vertical: isTablet ? 6 : 4,
+              horizontal: AppResponsive.getValue(context, mobile: 12, tablet: 16),
+              vertical: AppResponsive.getValue(context, mobile: 4, tablet: 6),
             ),
-            childrenPadding: EdgeInsets.only(left: isTablet ? 24 : 20),
+            childrenPadding: EdgeInsets.only(
+              left: AppResponsive.getValue(context, mobile: 20, tablet: 24),
+            ),
             leading: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -414,14 +398,14 @@ class _DrawerrState extends State<Drawerr> {
               ),
               child: Icon(
                 icon,
-                size: isTablet ? 22 : 20,
+                size: AppResponsive.getValue(context, mobile: 20, tablet: 22),
                 color: AppColors.primary,
               ),
             ),
             title: Text(
               title,
               style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 14,
+                fontSize: AppResponsive.getValue(context, mobile: 14, tablet: 15),
                 fontWeight: FontWeight.w500,
                 color: Colors.black87,
               ),
@@ -449,22 +433,22 @@ class _DrawerrState extends State<Drawerr> {
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 12 : 10,
-              vertical: isTablet ? 10 : 8,
+              horizontal: AppResponsive.getValue(context, mobile: 10, tablet: 12),
+              vertical: AppResponsive.getValue(context, mobile: 8, tablet: 10),
             ),
             child: Row(
               children: [
                 Icon(
                   icon,
-                  size: isTablet ? 18 : 16,
+                  size: AppResponsive.getValue(context, mobile: 16, tablet: 18),
                   color: AppColors.primary,
                 ),
-                SizedBox(width: isTablet ? 12 : 10),
+                AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                 Expanded(
                   child: Text(
                     title,
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 14 : 13,
+                      fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 14),
                       fontWeight: FontWeight.w400,
                       color: Colors.black87,
                     ),
@@ -491,14 +475,18 @@ class _DrawerrState extends State<Drawerr> {
                 color: Colors.orange.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.warning_rounded, color: Colors.orange, size: 24),
+              child: Icon(
+                Icons.warning_rounded,
+                color: Colors.orange,
+                size: AppResponsive.getValue(context, mobile: 24, tablet: 28),
+              ),
             ),
-            SizedBox(width: 12),
+            AppResponsive.horizontalSpace(context, size: SpacingSize.small),
             Expanded(
               child: Text(
                 'Clear Cart?',
                 style: GoogleFonts.poppins(
-                  fontSize: 20,
+                  fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -507,7 +495,7 @@ class _DrawerrState extends State<Drawerr> {
         ),
         content: Text(
           'Are you sure you want to clear the cart?',
-          style: GoogleFonts.poppins(fontSize: 14),
+          style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
         ),
         actions: [
           Row(
@@ -516,18 +504,18 @@ class _DrawerrState extends State<Drawerr> {
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
                 style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: AppResponsive.horizontalPadding(context),
                 ),
                 child: Text(
                   "No",
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.buttonFontSize(context),
                     color: Colors.grey[700],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              SizedBox(width: 8),
+              AppResponsive.horizontalSpace(context, size: SpacingSize.small),
               ElevatedButton(
                 onPressed: () async {
                   Navigator.pop(dialogContext);
@@ -537,7 +525,7 @@ class _DrawerrState extends State<Drawerr> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: AppResponsive.horizontalPadding(context),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -546,7 +534,7 @@ class _DrawerrState extends State<Drawerr> {
                 child: Text(
                   "Yes",
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.buttonFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -579,23 +567,23 @@ class _DrawerrState extends State<Drawerr> {
               children: [
                 Lottie.asset(
                   AppImages.syncanimation,
-                  width: 200,
-                  height: 150,
+                  width: AppResponsive.getValue(context, mobile: 180, tablet: 220),
+                  height: AppResponsive.getValue(context, mobile: 130, tablet: 160),
                 ),
-                SizedBox(height: 25),
+                AppResponsive.verticalSpace(context, size: SpacingSize.large),
                 Text(
                   'Sync in Progress...',
                   style: GoogleFonts.poppins(
                     color: AppColors.primary,
-                    fontSize: 18,
+                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: 10),
+                AppResponsive.verticalSpace(context, size: SpacingSize.small),
                 Text(
                   'Please wait while we update your data...',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: 14),
+                  style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
                 ),
               ],
             ),
@@ -620,7 +608,7 @@ class _DrawerrState extends State<Drawerr> {
                 child: Text(
                   'Backup & Restore',
                   style: GoogleFonts.poppins(
-                    fontSize: 18,
+                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -631,7 +619,7 @@ class _DrawerrState extends State<Drawerr> {
                   children: [
                     // Auto Backup Toggle
                     Container(
-                      padding: EdgeInsets.all(12),
+                      padding: AppResponsive.getValue(context, mobile: EdgeInsets.all(12), tablet: EdgeInsets.all(14)),
                       decoration: BoxDecoration(
                         color: initialEnabled
                             ? Colors.green.shade50
@@ -655,12 +643,13 @@ class _DrawerrState extends State<Drawerr> {
                                     ? Colors.green
                                     : Colors.grey,
                               ),
-                              SizedBox(width: 10),
+                              AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                               Expanded(
                                 child: Text(
                                   'Daily Auto Backup',
                                   style: GoogleFonts.poppins(
                                     fontWeight: FontWeight.w600,
+                                    fontSize: AppResponsive.bodyFontSize(context),
                                   ),
                                 ),
                               ),
@@ -688,7 +677,7 @@ class _DrawerrState extends State<Drawerr> {
                               child: Text(
                                 'Last backup: $initialBackup',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 11,
+                                  fontSize: AppResponsive.captionFontSize(context),
                                   color: Colors.grey.shade700,
                                 ),
                               ),
@@ -697,9 +686,9 @@ class _DrawerrState extends State<Drawerr> {
                       ),
                     ),
 
-                    SizedBox(height: 16),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                     Divider(),
-                    SizedBox(height: 8),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
 
                     // Backup Encryption Password Setup
                     StatefulBuilder(
@@ -759,11 +748,14 @@ class _DrawerrState extends State<Drawerr> {
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.lock_outline, size: 18, color: Colors.grey.shade700),
-                                    SizedBox(width: 8),
+                                    Icon(Icons.lock_outline,
+                                        size: AppResponsive.smallIconSize(context), color: Colors.grey.shade700),
+                                    AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                                     Text(
                                       'Backup Encryption',
-                                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                                      style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.smallFontSize(context),
+                                          fontWeight: FontWeight.w500),
                                     ),
                                     Spacer(),
                                     if (!hasPassword)
@@ -776,7 +768,9 @@ class _DrawerrState extends State<Drawerr> {
                                         ),
                                         child: Text(
                                           'Set Password',
-                                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.success),
+                                          style: GoogleFonts.poppins(
+                                              fontSize: AppResponsive.captionFontSize(context),
+                                              color: AppColors.success),
                                         ),
                                       )
                                     else ...[
@@ -788,7 +782,8 @@ class _DrawerrState extends State<Drawerr> {
                                         ),
                                         child: Text(
                                           'Change',
-                                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange),
+                                          style: GoogleFonts.poppins(
+                                              fontSize: AppResponsive.captionFontSize(context), color: Colors.orange),
                                         ),
                                       ),
                                       IconButton(
@@ -809,10 +804,11 @@ class _DrawerrState extends State<Drawerr> {
                                     padding: const EdgeInsets.only(left: 26, top: 2),
                                     child: Text(
                                       'Backups will be encrypted',
-                                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.success),
+                                      style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.captionFontSize(context), color: AppColors.success),
                                     ),
                                   ),
-                                SizedBox(height: 12),
+                                AppResponsive.verticalSpace(context, size: SpacingSize.small),
                               ],
                             );
                           },
@@ -822,12 +818,10 @@ class _DrawerrState extends State<Drawerr> {
 
                     // Download to Downloads Button
 
-
-
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
-                        minimumSize: Size(double.infinity, 50),
+                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -837,7 +831,7 @@ class _DrawerrState extends State<Drawerr> {
                         'Download Backup',
                         style: GoogleFonts.poppins(
                           color: Colors.white,
-                          fontSize: 15,
+                          fontSize: AppResponsive.buttonFontSize(context),
                         ),
                       ),
                       onPressed: () async {
@@ -857,11 +851,11 @@ class _DrawerrState extends State<Drawerr> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     CircularProgressIndicator(),
-                                    SizedBox(height: 20),
+                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                                     Text(
                                       'Creating backup...\nPlease wait',
                                       textAlign: TextAlign.center,
-                                      style: TextStyle(fontSize: 16),
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
                                     ),
                                   ],
                                 ),
@@ -899,13 +893,13 @@ class _DrawerrState extends State<Drawerr> {
                       },
                     ),
 
-                    SizedBox(height: 12),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
 
                     // Choose Folder Button
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
-                        minimumSize: Size(double.infinity, 50),
+                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -915,7 +909,7 @@ class _DrawerrState extends State<Drawerr> {
                         'Choose Folder',
                         style: GoogleFonts.poppins(
                           color: Colors.white,
-                          fontSize: 15,
+                          fontSize: AppResponsive.buttonFontSize(context),
                         ),
                       ),
                       onPressed: () async {
@@ -960,11 +954,11 @@ class _DrawerrState extends State<Drawerr> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     CircularProgressIndicator(),
-                                    SizedBox(height: 20),
+                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                                     Text(
                                       'Creating backup...\nPlease wait',
                                       textAlign: TextAlign.center,
-                                      style: TextStyle(fontSize: 16),
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
                                     ),
                                   ],
                                 ),
@@ -1001,15 +995,15 @@ class _DrawerrState extends State<Drawerr> {
                       },
                     ),
 
-                    SizedBox(height: 16),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                     Divider(),
-                    SizedBox(height: 8),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
 
                     // Import Button
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
-                        minimumSize: Size(double.infinity, 50),
+                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -1019,7 +1013,7 @@ class _DrawerrState extends State<Drawerr> {
                         'Import Backup',
                         style: GoogleFonts.poppins(
                           color: Colors.white,
-                          fontSize: 15,
+                          fontSize: AppResponsive.buttonFontSize(context),
                         ),
                       ),
                       onPressed: () async {
@@ -1039,11 +1033,11 @@ class _DrawerrState extends State<Drawerr> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const CircularProgressIndicator(),
-                                    const SizedBox(height: 20),
+                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                                     Text(
                                       'Importing backup...\nPlease wait',
                                       textAlign: TextAlign.center,
-                                      style: GoogleFonts.poppins(),
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
                                     ),
                                   ],
                                 ),

@@ -16,6 +16,8 @@ class OpeningBalanceDialog extends StatefulWidget {
 class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
   final TextEditingController _openingBalanceController = TextEditingController();
   bool _isLoading = false;
+  bool _isLoadingBalance = true;
+  double _lastClosingBalance = 0.0;
   String? _errorText;
 
   @override
@@ -25,9 +27,17 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
   }
 
   Future<void> _loadLastClosingBalance() async {
-    // You can optionally load the last closing balance here as a suggestion
-    // For now, we'll start with 0
-    _openingBalanceController.text = '0.00';
+    final closing = await DayManagementService.getLastClosingBalance();
+    if (mounted) {
+      setState(() {
+        _lastClosingBalance = closing;
+        _isLoadingBalance = false;
+        // Pre-fill with last closing balance so admin just taps Start Day if same float
+        _openingBalanceController.text = closing > 0
+            ? closing.toStringAsFixed(2)
+            : '0.00';
+      });
+    }
   }
 
   Future<void> _saveOpeningBalance() async {
@@ -105,10 +115,34 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Please enter the opening balance to start your day.',
+                'Enter the cash amount currently in the drawer to start your day.',
                 style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
+              if (!_isLoadingBalance && _lastClosingBalance > 0) ...[
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    border: Border.all(color: Colors.teal.shade200),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.teal.shade700),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Yesterday closed with Rs. ${_lastClosingBalance.toStringAsFixed(2)} in drawer',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.teal.shade800,
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
               SizedBox(height: 20),
               Text(
                 'Opening Balance (Rs.)',

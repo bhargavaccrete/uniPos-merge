@@ -5,6 +5,9 @@ import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/eodmodel_317.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
+import '../../../core/constants/hive_box_names.dart';
+import '../../../data/models/restaurant/db/cash_movement_model.dart';
+import 'package:hive/hive.dart';
 
 class EODService {
   static const _uuid = Uuid();
@@ -126,14 +129,26 @@ class EODService {
     print('💰 Cash expenses only: Rs.$cashExpenses');
     print('💰 ====================================');
 
+    // Load manual Cash In / Cash Out movements recorded during the day
+    double totalCashIn = 0.0;
+    double totalCashOut = 0.0;
+    if (Hive.isBoxOpen(HiveBoxNames.restaurantCashMovements)) {
+      final cashMovBox = Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+      final todayMoves = cashMovBox.values.where(
+        (m) => m.timestamp.isAfter(startTime) && m.timestamp.isBefore(endTime),
+      ).toList();
+      totalCashIn  = todayMoves.where((m) => m.type == 'in' ).fold(0.0, (s, m) => s + m.amount);
+      totalCashOut = todayMoves.where((m) => m.type == 'out').fold(0.0, (s, m) => s + m.amount);
+      print('💵 Cash In today: Rs.$totalCashIn | Cash Out today: Rs.$totalCashOut');
+    }
+
     final expectedCash = paymentSummaries
         .where((payment) => payment.paymentType.toLowerCase() == 'cash')
         .fold<double>(0.0, (sum, payment) => sum + payment.totalAmount);
 
-    // Adjust closing balance and cash difference by subtracting ONLY cash expenses
-    // Non-cash expenses don't affect the physical cash drawer
-    final closingBalance = openingBalance + expectedCash - cashExpenses;
-    final cashDifference = actualCash - (openingBalance + expectedCash - cashExpenses);
+    // Full formula: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
+    final closingBalance = openingBalance + expectedCash + totalCashIn - totalCashOut - cashExpenses;
+    final cashDifference = actualCash - closingBalance;
 
     String reconciliationStatus;
     if (cashDifference == 0) {
@@ -253,12 +268,26 @@ class EODService {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (status == 'VOIDED') continue;
 
-      final paymentType = order.paymentmode ?? 'Unknown';
-      final amount = order.totalPrice - (order.refundAmount ?? 0.0); // Net amount after refunds
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
 
-      paymentTotals[paymentType] = (paymentTotals[paymentType] ?? 0.0) + amount;
-      paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
-      grandTotal += amount;
+      // Expand split payments into individual methods (matches retail logic)
+      if (order.isSplitPayment == true &&
+          order.paymentListJson != null &&
+          order.paymentListJson!.isNotEmpty) {
+        for (final entry in order.paymentList) {
+          final method = (entry['method'] as String? ?? 'Unknown');
+          final amt = (entry['amount'] as num?)?.toDouble() ?? 0.0;
+          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
+          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
+          grandTotal += amt;
+        }
+      } else {
+        final paymentType = order.paymentmode ?? 'Unknown';
+        paymentTotals[paymentType] =
+            (paymentTotals[paymentType] ?? 0.0) + netAmount;
+        paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
+        grandTotal += netAmount;
+      }
     }
 
     return paymentTotals.entries.map((entry) {
@@ -419,9 +448,22 @@ class EODService {
         .where((payment) => payment.paymentType.toLowerCase() == 'cash')
         .fold<double>(0.0, (sum, payment) => sum + payment.totalAmount);
 
-    // Calculate closing balance and difference
-    final closingBalance = openingBalance + expectedCash - cashExpenses;
-    final cashDifference = actualCash - (openingBalance + expectedCash - cashExpenses);
+    // Load manual Cash In / Cash Out movements recorded during the retail day
+    double totalCashIn = 0.0;
+    double totalCashOut = 0.0;
+    if (Hive.isBoxOpen(HiveBoxNames.restaurantCashMovements)) {
+      final cashMovBox = Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+      final todayMoves = cashMovBox.values.where(
+        (m) => m.timestamp.isAfter(startTime) && m.timestamp.isBefore(endTime),
+      ).toList();
+      totalCashIn  = todayMoves.where((m) => m.type == 'in' ).fold(0.0, (s, m) => s + m.amount);
+      totalCashOut = todayMoves.where((m) => m.type == 'out').fold(0.0, (s, m) => s + m.amount);
+      print('💵 Retail Cash In today: Rs.$totalCashIn | Cash Out today: Rs.$totalCashOut');
+    }
+
+    // Full formula: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
+    final closingBalance = openingBalance + expectedCash + totalCashIn - totalCashOut - cashExpenses;
+    final cashDifference = actualCash - closingBalance;
 
     String reconciliationStatus;
     if (cashDifference == 0) {

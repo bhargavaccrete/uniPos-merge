@@ -718,10 +718,10 @@ class _ItemsDataViewState extends State<ItemsDataView> {
                   title,
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w400,
                     color: AppColors.textSecondary,
                   ),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.clip,
                 ),
               ),
               Container(
@@ -742,7 +742,7 @@ class _ItemsDataViewState extends State<ItemsDataView> {
           Text(
             value,
             style: GoogleFonts.poppins(
-              fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 24.0),
+              fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0),
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),

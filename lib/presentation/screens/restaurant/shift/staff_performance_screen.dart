@@ -19,6 +19,7 @@ class _StaffPerformance {
   final int totalMinutes;
   final double totalDiscounts;
   final double totalRefunds;
+  final double totalExpenses;
   final Map<String, int> orderTypes; // e.g. {'Dine In': 40, 'Takeaway': 12}
   final int rank;
 
@@ -31,6 +32,7 @@ class _StaffPerformance {
     required this.totalMinutes,
     required this.totalDiscounts,
     required this.totalRefunds,
+    required this.totalExpenses,
     required this.orderTypes,
     required this.rank,
   });
@@ -76,6 +78,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     await shiftStore.loadShifts();
     await pastOrderStore.loadPastOrders();
     await staffStore.loadStaff(); // needed for role lookup in _compute
+    await expenseStore.loadExpenses();
     _compute();
   }
 
@@ -137,6 +140,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     }
 
     // 5. Compute metrics per staff
+    final allExpenses = expenseStore.expenses.toList();
     final raw = byStaff.entries.map((entry) {
       final name = entry.key;
       final shifts = entry.value;
@@ -150,6 +154,23 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
           shifts.fold<double>(0.0, (s, sh) => s + sh.totalSales);
       final totalMinutes =
           shifts.fold<int>(0, (s, sh) => s + sh.duration.inMinutes);
+
+      // Expense aggregates: sum expenses during each shift's time window
+      double totalExpenses = 0;
+      final Set<String> countedExpenseIds = {};
+      for (final shift in shifts) {
+        final shiftEnd = shift.endTime ?? DateTime.now();
+        for (final e in allExpenses) {
+          if (!countedExpenseIds.contains(e.id) &&
+              e.dateandTime.isAfter(
+                  shift.startTime.subtract(const Duration(seconds: 1))) &&
+              e.dateandTime
+                  .isBefore(shiftEnd.add(const Duration(seconds: 1)))) {
+            totalExpenses += e.amount;
+            countedExpenseIds.add(e.id);
+          }
+        }
+      }
 
       // Order-level aggregates
       double totalDiscounts = 0;
@@ -188,6 +209,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
         totalMinutes: totalMinutes,
         totalDiscounts: totalDiscounts,
         totalRefunds: totalRefunds,
+        totalExpenses: totalExpenses,
         orderTypes: orderTypes,
         rank: 0, // assigned after sort
       );
@@ -217,6 +239,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
         totalMinutes: raw[i].totalMinutes,
         totalDiscounts: raw[i].totalDiscounts,
         totalRefunds: raw[i].totalRefunds,
+        totalExpenses: raw[i].totalExpenses,
         orderTypes: raw[i].orderTypes,
         rank: i + 1,
       ),
@@ -903,6 +926,12 @@ class _StaffCardState extends State<_StaffCard>
                     _detailRow(context, 'Total Sales',
                         '${widget.currency}${p.totalSales.toStringAsFixed(2)}',
                         Colors.green),
+                    _detailRow(context, 'Expenses',
+                        '- ${widget.currency}${p.totalExpenses.toStringAsFixed(2)}',
+                        Colors.red),
+                    _detailRow(context, 'Net Revenue',
+                        '${widget.currency}${(p.totalSales - p.totalExpenses).toStringAsFixed(2)}',
+                        Colors.teal),
                     _detailRow(context, 'Avg Order Value',
                         '${widget.currency}${p.avgOrderValue.toStringAsFixed(2)}',
                         Colors.teal),

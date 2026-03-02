@@ -7,6 +7,7 @@ import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/color.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 class Changepassword extends StatefulWidget {
   @override
   State<Changepassword> createState() => _ChangepasswordState();
@@ -375,13 +376,11 @@ class _ChangepasswordState extends State<Changepassword> {
                   controller: _currentPasswordController,
                   obsecureText: _obscureCurrentPass,
                   hintText: 'Enter current password',
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter current password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'PIN is required';
+                    if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
                     return null;
                   },
                   gesture: GestureDetector(
@@ -413,13 +412,11 @@ class _ChangepasswordState extends State<Changepassword> {
                   controller: _newPasswordController,
                   obsecureText: _obscureNewPass,
                   hintText: 'Enter new password',
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter new password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'PIN is required';
+                    if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
                     return null;
                   },
                   gesture: GestureDetector(
@@ -451,13 +448,11 @@ class _ChangepasswordState extends State<Changepassword> {
                   controller: _confirmPasswordController,
                   obsecureText: _obscureConfirmPass,
                   hintText: 'Confirm new password',
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please confirm new password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'PIN is required';
+                    if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
                     return null;
                   },
                   gesture: GestureDetector(
