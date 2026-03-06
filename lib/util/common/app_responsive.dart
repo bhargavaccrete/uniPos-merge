@@ -75,7 +75,8 @@ class AppResponsive {
 
   /// Responsive font size for captions
   static double captionFontSize(BuildContext context) =>
-      getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0);
+      getValue
+        (context, mobile: 11.0, tablet: 12.0, desktop: 13.0);
 
   /// Responsive font size for buttons
   static double buttonFontSize(BuildContext context) =>

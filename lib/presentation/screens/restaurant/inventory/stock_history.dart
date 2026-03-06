@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 
 class StockHistory extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final width = size.width;
-    final height = size.height;
+    final isTablet = AppResponsive.isTablet(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -27,7 +25,7 @@ class StockHistory extends StatelessWidget {
               color: AppColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha:0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -75,7 +73,7 @@ class StockHistory extends StatelessWidget {
                   Container(
                     padding: EdgeInsets.all(isTablet ? 10 : 8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -163,9 +161,9 @@ class StockHistory extends StatelessWidget {
                       vertical: isTablet ? 12 : 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      border: Border.all(color: Colors.blue.withValues(alpha:0.3)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

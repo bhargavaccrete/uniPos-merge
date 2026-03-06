@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
@@ -133,10 +136,7 @@ class _AddexpenceState extends State<Addexpence> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final height = size.height;
-    final width = size.width;
+    final isTablet = AppResponsive.isTablet(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -179,7 +179,7 @@ class _AddexpenceState extends State<Addexpence> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha:0.05),
                     blurRadius: 10,
                     offset: Offset(0, 2),
                   ),
@@ -228,7 +228,7 @@ class _AddexpenceState extends State<Addexpence> {
                                       child: Text(
                                         _dateselect == null
                                             ? "Select Date"
-                                            : "${_dateselect!.day}/${_dateselect!.month}/${_dateselect!.year}",
+                                            : DateFormat('dd/MM/yyyy').format(_dateselect!),
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
@@ -260,6 +260,9 @@ class _AddexpenceState extends State<Addexpence> {
                             TextField(
                               controller: _amountController,
                               keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                              ],
                               style: GoogleFonts.poppins(fontSize: 15),
                               decoration: InputDecoration(
                                 hintText: 'Enter amount',

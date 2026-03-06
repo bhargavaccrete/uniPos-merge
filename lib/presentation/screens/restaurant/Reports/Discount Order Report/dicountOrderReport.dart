@@ -212,9 +212,9 @@ class _DiscountDataViewState extends State<DiscountDataView> {
           // Filter orders with discount > 0
           if ((order.Discount ?? 0) <= 0) return false;
 
-          // Exclude refunded and voided orders
+          // FIX 1: Exclude all voided/refunded orders ('VOIDED' variant was missing).
           final status = order.orderStatus?.toUpperCase() ?? '';
-          if (status == 'FULLY_REFUNDED' || status == 'VOID') return false;
+          if (status == 'FULLY_REFUNDED' || status == 'VOID' || status == 'VOIDED') return false;
 
           return true;
         })
@@ -284,6 +284,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       _filteredOrders = resultingList;
       _totalOrdersCount = _filteredOrders.length;
       _totalDiscountAmount = _filteredOrders.fold(0.0, (sum, order) => sum + (order.Discount ?? 0.0));
+      // FIX 2: Use net amount (totalPrice - refundAmount) so PARTIALLY_REFUNDED orders don't inflate totals.
       _averageDiscount = _totalOrdersCount > 0 ? _totalDiscountAmount / _totalOrdersCount : 0.0;
       _isLoading = false;
     });
@@ -314,11 +315,13 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       order.orderType ?? 'N/A',
       ReportExportService.formatCurrency(order.subTotal ?? 0.0),
       ReportExportService.formatCurrency(order.Discount ?? 0.0),
-      ReportExportService.formatCurrency(order.totalPrice),
+      // FIX 2: Use net amount in export to match the table display.
+      ReportExportService.formatCurrency(order.totalPrice - (order.refundAmount ?? 0.0)),
     ]).toList();
 
     final totalSubtotal = _filteredOrders.fold<double>(0, (sum, o) => sum + (o.subTotal ?? 0.0));
-    final totalAmount = _filteredOrders.fold<double>(0, (sum, o) => sum + o.totalPrice);
+    // FIX 2: totalAmount uses net amounts to exclude partial refunds.
+    final totalAmount = _filteredOrders.fold<double>(0, (sum, o) => sum + o.totalPrice - (o.refundAmount ?? 0.0));
 
     final periodDisplay = _getPeriodDisplayName();
 
@@ -750,6 +753,8 @@ class _DiscountDataViewState extends State<DiscountDataView> {
               ],
               rows: _filteredOrders.map((order) {
                 final discount = order.Discount ?? 0.0;
+                // FIX 2: Net amount deducts any partial refund from totalPrice.
+                final netTotal = order.totalPrice - (order.refundAmount ?? 0.0);
                 return DataRow(
                   cells: [
                     DataCell(Text(order.orderAt != null ? DateFormat('dd-MM-yy\nHH:mm').format(order.orderAt!) : 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
@@ -782,7 +787,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                         child: Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(discount)}', style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context), color: Colors.orange, fontWeight: FontWeight.w600)),
                       ),
                     ),
-                    DataCell(Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(order.totalPrice)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600))),
+                    DataCell(Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(netTotal)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600))),
                   ],
                 );
               }).toList(),

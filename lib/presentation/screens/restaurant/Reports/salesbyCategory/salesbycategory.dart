@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -350,19 +349,37 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     }
 
     for (final order in filteredOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      // Skip voided and fully refunded orders — no revenue to count.
+      final status = order.orderStatus ?? '';
+      if (status == 'FULLY_REFUNDED' || status == 'VOIDED' || status == 'VOID') continue;
+
+      final isTaxInclusive = order.isTaxInclusive ?? false;
+
+      // For PARTIALLY_REFUNDED: only apply order-level ratio when no item-level refunds exist.
+      final hasItemLevelRefunds = order.items.any((i) => (i.refundedQuantity ?? 0) > 0);
+      final orderRefundRatio = (!hasItemLevelRefunds && order.totalPrice > 0 && (order.refundAmount ?? 0) > 0)
+          ? (order.totalPrice - order.refundAmount!) / order.totalPrice
+          : 1.0;
+
+      // Pre-discount gross total — weights for bill-level discount distribution.
+      final orderGrossTotal = order.items.fold(0.0, (s, i) => s + i.price * i.quantity);
+      final orderDiscount = order.Discount ?? 0.0;
 
       for (final cartItem in order.items) {
-        final originalQuantity = cartItem.quantity;
-        final refundedQuantity = cartItem.refundedQuantity ?? 0;
-        final effectiveQuantity = originalQuantity - refundedQuantity;
+        final effectiveQuantity = cartItem.quantity - (cartItem.refundedQuantity ?? 0);
 
         if (effectiveQuantity <= 0) continue;
 
-        final orderRefundRatio = order.totalPrice > 0
-            ? ((order.totalPrice - (order.refundAmount ?? 0.0)) / order.totalPrice)
-            : 1.0;
-        final effectiveRevenue = cartItem.totalPrice * orderRefundRatio;
+        // Base revenue = finalItemPrice × effectiveQuantity (item discount already applied).
+        final unitPrice = cartItem.finalItemPrice;
+        // Proportional share of the bill-level discount for this item's effective quantity.
+        final itemBillDiscount = orderGrossTotal > 0 && orderDiscount > 0
+            ? orderDiscount * (cartItem.price * effectiveQuantity) / orderGrossTotal
+            : 0.0;
+        final discountedRevenue = (unitPrice * effectiveQuantity) - itemBillDiscount;
+        // Add tax on discounted base (exclusive) or already included (inclusive).
+        final taxRevenue = isTaxInclusive ? 0.0 : discountedRevenue * (cartItem.taxRate ?? 0.0);
+        final effectiveRevenue = (discountedRevenue + taxRevenue) * orderRefundRatio;
 
         final cat = resolveCategoryName(cartItem);
 

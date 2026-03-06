@@ -204,13 +204,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         isTablet: isTablet,
                       ),
                       _buildReportCard(
-                        icon: Icons.graphic_eq_outlined,
-                        title: 'Sales By Top Selling',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsSalesByTop),
-                        iconColor: Colors.deepOrangeAccent,
-                        isTablet: isTablet,
-                      ),
-                      _buildReportCard(
                         icon: Icons.list_alt,
                         title: 'Customer List',
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsCustomerList),

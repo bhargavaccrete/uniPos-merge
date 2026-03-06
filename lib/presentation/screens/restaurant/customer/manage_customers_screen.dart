@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
@@ -203,7 +206,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
               // Avatar
               CircleAvatar(
                 radius: 30,
-                backgroundColor: AppColors.primary.withOpacity(0.2),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                 child: Text(
                   customer.name?.isNotEmpty == true
                       ? customer.name![0].toUpperCase()
@@ -350,6 +353,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Phone Number',
                   obsecureText: false,
                   keyboardType: TextInputType.phone,
+                  // FIX 7: Restrict input to digits only.
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   BorderColor: AppColors.primary,
                   icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
@@ -369,6 +374,15 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   keyboardType: TextInputType.emailAddress,
                   BorderColor: AppColors.primary,
                   icon: Icon(Icons.email, color: AppColors.primary),
+                  // FIX 6: Validate email format when provided.
+                  validator: (v) {
+                    if (v != null && v.trim().isNotEmpty) {
+                      if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
+                        return 'Enter a valid email';
+                      }
+                    }
+                    return null;
+                  },
                 ),
                 SizedBox(height: 15),
                 CommonTextForm(
@@ -403,6 +417,17 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           CommonButton(
             onTap: () async {
               if (formKey.currentState!.validate()) {
+                // FIX 8: Duplicate phone check before adding.
+                final phone = phoneController.text.trim();
+                if (phone.isNotEmpty) {
+                  final exists = customerStoreRestail.customers.any(
+                    (c) => (c.phone ?? '') == phone,
+                  );
+                  if (exists) {
+                    NotificationService.instance.showError('A customer with this phone number already exists.');
+                    return;
+                  }
+                }
                 await _addCustomer(
                   nameController.text.trim(),
                   phoneController.text.trim(),
@@ -471,6 +496,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   hintText: 'Phone Number',
                   obsecureText: false,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   BorderColor: AppColors.primary,
                   icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
@@ -490,6 +516,14 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   keyboardType: TextInputType.emailAddress,
                   BorderColor: AppColors.primary,
                   icon: Icon(Icons.email, color: AppColors.primary),
+                  validator: (v) {
+                    if (v != null && v.trim().isNotEmpty) {
+                      if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
+                        return 'Enter a valid email';
+                      }
+                    }
+                    return null;
+                  },
                 ),
                 SizedBox(height: 15),
                 CommonTextForm(
@@ -554,8 +588,6 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   }
 
   void _showCustomerDetailsDialog(BuildContext context, CustomerModel customer) {
-    final width = MediaQuery.of(context).size.width;
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -563,7 +595,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           children: [
             CircleAvatar(
               radius: 25,
-              backgroundColor: AppColors.primary.withOpacity(0.2),
+              backgroundColor: AppColors.primary.withValues(alpha: 0.2),
               child: Text(
                 customer.name?.isNotEmpty == true
                     ? customer.name![0].toUpperCase()
@@ -600,7 +632,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
               if (customer.visitCount != null && customer.visitCount! > 0)
                 _buildDetailRow(Icons.shopping_bag, 'Visits', '${customer.visitCount}'),
               if (customer.totalPurchaseAmount != null && customer.totalPurchaseAmount! > 0)
-                _buildDetailRow(Icons.attach_money, 'Total Purchases', '₹${customer.totalPurchaseAmount!.toStringAsFixed(2)}'),
+                _buildDetailRow(Icons.attach_money, 'Total Purchases',
+                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(customer.totalPurchaseAmount!)}'),
             ],
           ),
         ),

@@ -9,6 +9,7 @@ import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 class ShiftReportScreen extends StatefulWidget {
   const ShiftReportScreen({super.key});
@@ -444,9 +445,10 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     List<ShiftModel> open,
   ) {
     final allForSummary = [...closed, ...open];
-    final totalSales = closed.fold<double>(0.0, (s, sh) => s + sh.totalSales);
-    final totalOrders = closed.fold<int>(0, (s, sh) => s + sh.orderCount);
-    final totalMins = closed.fold<int>(0, (s, sh) => s + sh.duration.inMinutes);
+    // FIX 1: Include open shifts in all totals — they have live data from loadShifts().
+    final totalSales = allForSummary.fold<double>(0.0, (s, sh) => s + sh.totalSales);
+    final totalOrders = allForSummary.fold<int>(0, (s, sh) => s + sh.orderCount);
+    final totalMins = allForSummary.fold<int>(0, (s, sh) => s + sh.duration.inMinutes);
 
     return Container(
       margin: EdgeInsets.fromLTRB(
@@ -465,7 +467,8 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
         children: [
           _summaryTile(context, '${allForSummary.length}', 'Shifts', Icons.badge_outlined),
           _summaryTile(context, '$totalOrders', 'Orders', Icons.receipt_long),
-          _summaryTile(context, '$currency${totalSales.toStringAsFixed(0)}', 'Sales',
+          // FIX 3: Use DecimalSettings for consistent currency formatting.
+          _summaryTile(context, '$currency${DecimalSettings.formatAmount(totalSales)}', 'Sales',
               Icons.attach_money),
           _summaryTile(
               context,
@@ -551,7 +554,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${shifts.length} shift${shifts.length > 1 ? 's' : ''}  •  $currency${totalSales.toStringAsFixed(0)}',
+                    '${shifts.length} shift${shifts.length > 1 ? 's' : ''}  •  $currency${DecimalSettings.formatAmount(totalSales)}',
                     style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.primary,
@@ -737,8 +740,9 @@ class _ShiftCardState extends State<_ShiftCard> {
                       '${dur.inHours}h ${dur.inMinutes.remainder(60)}m', Colors.blue),
                   _chip(context, Icons.receipt_rounded,
                       '${s.orderCount} orders', Colors.indigo),
+                  // FIX 3: Consistent DecimalSettings formatting.
                   _chip(context, Icons.attach_money,
-                      '${widget.currency}${s.totalSales.toStringAsFixed(0)}',
+                      '${widget.currency}${DecimalSettings.formatAmount(s.totalSales)}',
                       Colors.green),
                 ],
               ),
@@ -752,12 +756,12 @@ class _ShiftCardState extends State<_ShiftCard> {
                     '${widget.currency}${s.totalSales.toStringAsFixed(2)}'),
                 Builder(builder: (_) {
                   final shiftEnd = s.endTime ?? DateTime.now();
+                  // FIX 2: !isAfter(shiftEnd) is exact — avoids attributing expenses
+                  // from up to 999ms after close to this shift.
                   final shiftExp = widget.expenses
                       .where((e) =>
-                          e.dateandTime.isAfter(
-                              s.startTime.subtract(const Duration(seconds: 1))) &&
-                          e.dateandTime
-                              .isBefore(shiftEnd.add(const Duration(seconds: 1))))
+                          !e.dateandTime.isBefore(s.startTime) &&
+                          !e.dateandTime.isAfter(shiftEnd))
                       .fold<double>(0.0, (sum, e) => sum + e.amount);
                   return Column(
                     children: [

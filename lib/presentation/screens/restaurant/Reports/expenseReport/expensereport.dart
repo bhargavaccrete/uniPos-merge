@@ -230,8 +230,14 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
 
     if (widget.period == TimePeriod.Custom) {
       if (_startDate != null && _endDate != null) {
+        // FIX 2: Validate date range before filtering.
+        if (_startDate!.isAfter(_endDate!)) {
+          NotificationService.instance.showError('Start date must be before end date');
+          setState(() => _isLoading = false);
+          return;
+        }
         resultingList = _allExpenses.where((expense) {
-          return expense.dateandTime.isAfter(_startDate!.subtract(const Duration(seconds: 1))) &&
+          return !expense.dateandTime.isBefore(_startDate!) &&
               expense.dateandTime.isBefore(_endDate!.add(const Duration(days: 1)));
         }).toList();
       }
@@ -267,6 +273,9 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
           break;
       }
     }
+
+    // FIX 1: Sort newest-first so the most recent expense appears at the top.
+    resultingList.sort((a, b) => b.dateandTime.compareTo(a.dateandTime));
 
     setState(() {
       _filteredExpenses = resultingList;
@@ -574,7 +583,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
     return Row(
       children: [
         Expanded(
-          flex: isDesktop ? 1 : 1,
+          flex: 1,
           child: Container(
             padding: EdgeInsets.all(isTablet ? 24 : 16),
             decoration: BoxDecoration(
@@ -627,7 +636,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
         ),
         SizedBox(width: isDesktop ? 24 : 16),
         Expanded(
-          flex: isDesktop ? 1 : 1,
+          flex: 1,
           child: Container(
             padding: EdgeInsets.all(isTablet ? 24 : 16),
             decoration: BoxDecoration(
@@ -680,7 +689,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
         ),
         SizedBox(width: isDesktop ? 24 : 16),
         Expanded(
-          flex: isDesktop ? 1 : 1,
+          flex: 1,
           child: Container(
             padding: EdgeInsets.all(isTablet ? 24 : 16),
             decoration: BoxDecoration(

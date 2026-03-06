@@ -3,7 +3,6 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -48,20 +47,29 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
     double previousAmount = 0.0;
 
     for (final order in allOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      // FIX 1: Skip voided and fully refunded orders.
+      final status = order.orderStatus ?? '';
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
-      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      // Compute net amount from items (consistent with salesbycategory report):
+      // itemsTotal = sum of per-item prices after item-level discounts
+      // subtract bill-level discount and add exclusive GST
+      // This correctly handles both old orders (where totalPrice may be pre-discount)
+      // and new orders (where totalPrice is already post-discount).
+      final itemsTotal = order.items.fold(0.0, (s, i) => s + i.finalItemPrice * i.quantity);
+      final billDiscount = order.Discount ?? 0.0;
+      final gst = order.isTaxInclusive == true ? 0.0 : (order.gstAmount ?? 0.0);
+      final netAmount = (itemsTotal - billDiscount + gst) - (order.refundAmount ?? 0.0);
 
       // Current month
-      if (order.orderAt!.isAfter(currentMonthStart) ||
-          order.orderAt!.isAtSameMomentAs(currentMonthStart)) {
+      if (!order.orderAt!.isBefore(currentMonthStart)) {
         currentOrders++;
         currentAmount += netAmount;
       }
-      // Previous month
-      else if (order.orderAt!.isAfter(previousMonthStart) &&
-          order.orderAt!.isBefore(previousMonthEnd)) {
+      // FIX 2: Previous month start uses !isBefore (inclusive) to catch midnight orders.
+      else if (!order.orderAt!.isBefore(previousMonthStart) &&
+          !order.orderAt!.isAfter(previousMonthEnd)) {
         previousOrders++;
         previousAmount += netAmount;
       }
@@ -159,7 +167,7 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
                   Container(
                     padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -463,8 +471,9 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
   }
 
   String _calculateGrowth(double previous, double current) {
+    // FIX 3: previous=0 with current>0 is "New" — can't compute % from zero base.
     if (previous == 0) {
-      return current > 0 ? '+100%' : '0%';
+      return current > 0 ? 'New' : '0%';
     }
     final growth = ((current - previous) / previous) * 100;
     return '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%';
@@ -480,13 +489,17 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
     // Prepare headers
     final headers = ['Details', data.previousPeriod, data.currentPeriod];
 
-    // Calculate growth percentages
-    final orderGrowth = data.previousOrders == 0
-        ? (data.currentOrders > 0 ? 100.0 : 0.0)
-        : ((data.currentOrders - data.previousOrders) / data.previousOrders) * 100;
-    final amountGrowth = data.previousAmount == 0
-        ? (data.currentAmount > 0 ? 100.0 : 0.0)
-        : ((data.currentAmount - data.previousAmount) / data.previousAmount) * 100;
+    // FIX 4: Use string helpers consistent with _calculateGrowth (returns 'New' not '+100%').
+    String growthStr(double prev, double cur) {
+      if (prev == 0) return cur > 0 ? 'New' : '0%';
+      final g = ((cur - prev) / prev) * 100;
+      return '${g >= 0 ? '+' : ''}${g.toStringAsFixed(1)}%';
+    }
+
+    final orderGrowthStr = data.previousOrders == 0
+        ? (data.currentOrders > 0 ? 'New' : '0%')
+        : growthStr(data.previousOrders.toDouble(), data.currentOrders.toDouble());
+    final amountGrowthStr = growthStr(data.previousAmount, data.currentAmount);
 
     // Prepare data rows
     final dataRows = [
@@ -496,11 +509,7 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
         ReportExportService.formatCurrency(data.previousAmount),
         ReportExportService.formatCurrency(data.currentAmount)
       ],
-      [
-        'Growth %',
-        '-',
-        '${amountGrowth >= 0 ? '+' : ''}${amountGrowth.toStringAsFixed(1)}%'
-      ],
+      ['Growth %', '-', amountGrowthStr],
     ];
 
     // Prepare summary
@@ -508,8 +517,8 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
       'Report Type': 'Month Comparison',
       'Previous Period': data.previousPeriod,
       'Current Period': data.currentPeriod,
-      'Order Growth': '${orderGrowth >= 0 ? '+' : ''}${orderGrowth.toStringAsFixed(1)}%',
-      'Amount Growth': '${amountGrowth >= 0 ? '+' : ''}${amountGrowth.toStringAsFixed(1)}%',
+      'Order Growth': orderGrowthStr,
+      'Amount Growth': amountGrowthStr,
     };
 
     // Show export dialog

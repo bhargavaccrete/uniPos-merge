@@ -316,7 +316,8 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     double previousAmount = 0.0;
 
     for (final order in allOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      final status = (order.orderStatus ?? '').toUpperCase();
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
       final netAmount = (order.totalPrice ?? 0.0) - (order.refundAmount ?? 0.0);

@@ -1,23 +1,17 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'dart:typed_data';
+import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/filterButton.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
-import 'package:uuid/uuid.dart';
-import 'package:path/path.dart' as p;
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -58,9 +52,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
   late String selectedCategoryId;
   late String selectedIMGCategory;
 
-  // ✅ ADDED: State for the new image picker
-  File? _selectedImage;
-  Uint8List? _selectedImageBytes; // Store image bytes for web compatibility
+  Uint8List? _selectedImageBytes;
 
   // ✅ ADDED: New selling method state
   SellingMethod _sellingMethod = SellingMethod.byUnit;
@@ -68,6 +60,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   String selectedFilter = 'YES';
   String allowOutOfStockFilter = 'YES';
+  bool _isSaving = false;
 
   // For managing variant selections
   late List<bool> _variantCheckedList;
@@ -98,17 +91,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _sellingMethod = widget.items.isSoldByWeight == true ? SellingMethod.byWeight : SellingMethod.byUnit;
     _selectedUnit = widget.items.unit ?? 'kg';
 
-    // Auto-select "YES" for manage inventory if track inventory is true
-    print('🔍 LOADING ITEM - Name: ${widget.items.name}');
-    print('   trackInventory value: ${widget.items.trackInventory}');
-    print('   allowOrderWhenOutOfStock value: ${widget.items.allowOrderWhenOutOfStock}');
-
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
-    print('   selectedFilter set to: $selectedFilter');
-
-    // Auto-select "YES" for allow out of stock if allowOrderWhenOutOfStock is true
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true ? 'YES' : 'NO';
-    print('   allowOutOfStockFilter set to: $allowOutOfStockFilter');
 
     _loadDataFuture = _loadInitialData();
   }
@@ -132,7 +116,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _variantPriceControllers = List.generate(allVariants.length, (index) {
       final existingVariant = widget.items.variant?.firstWhere((v) => v.variantId == allVariants[index].id,
           orElse: () => ItemVariante(variantId: '', price: 0.0));
-      return TextEditingController(text: existingVariant?.price?.toString() ?? '');
+      return TextEditingController(text: existingVariant?.price.toString() ?? '');
     });
 
     _choiceCheckedList = List.generate(allChoices.length, (index) {
@@ -185,16 +169,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
     super.dispose();
   }
 
-  // ... (saveImage and saveChanges methods remain the same) ...
-  Future<String?> _saveImageAndGetPath(File imageFile) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final fileName = '${const Uuid().v4()}${p.extension(imageFile.path)}';
-    final savedImagePath = p.join(directory.path, fileName);
-    await imageFile.copy(savedImagePath);
-    return savedImagePath;
-  }
-
   void _saveChanges(EditScreenData data) async {
+    final trimmedName = _nameController.text.trim();
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Item name cannot be empty');
+      return;
+    }
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
     // Handle image: keep existing imageBytes or use newly selected imageBytes
     Uint8List? finalImageBytes = widget.items.imageBytes;
 
@@ -263,9 +247,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
     }
 
     final updateItem = widget.items.copyWith(
-      name: _nameController.text,
-      price: double.tryParse(_itemPriceController.text),
-      description: _descController.text,
+      name: trimmedName,
+      price: double.tryParse(_itemPriceController.text.trim()),
+      description: _descController.text.trim(),
       isVeg: selectedIMGCategory,
       categoryOfItem: selectedCategoryId,
       imageBytes: finalImageBytes,
@@ -275,17 +259,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
       extraConstraints: extraConstraints.isNotEmpty ? extraConstraints : null,
       trackInventory: selectedFilter.toLowerCase() == 'yes',
       allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
-      // ✅ ADDED: Weight selling support
       isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
       unit: _sellingMethod == SellingMethod.byWeight ? _selectedUnit : null,
     );
 
-    // 🔍 AUDIT TRAIL: Track this edit
     AuditTrailHelper.trackEdit(updateItem, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
 
     await itemStore.updateItem(updateItem);
 
-    Navigator.pop(context, true);
+    if (mounted) Navigator.pop(context, true);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -359,12 +344,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
           // Basic Information Section
           _buildSectionHeader('Basic Information', Icons.info_outline),
           const SizedBox(height: 15),
-          CommonTextForm(
-              borderc: 5,
-              LabelColor: Colors.grey,
-              controller: _nameController,
+          TextField(
+            controller: _nameController,
+            style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+            decoration: InputDecoration(
               labelText: 'Item Name',
-              obsecureText: false),
+              labelStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+              prefixIcon: const Icon(Icons.label_outline, color: AppColors.primary),
+              filled: true,
+              fillColor: AppColors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+            ),
+          ),
           const SizedBox(height: 25),
 
           // Selling Method Section
@@ -430,12 +423,21 @@ class _EdititemScreenState extends State<EdititemScreen> {
           Row(
             children: [
               Expanded(
-                  child: CommonTextForm(
-                      borderc: 5,
-                      LabelColor: Colors.grey,
-                      controller: _itemPriceController, labelText: 'Item Price',
-                      obsecureText: false,
-                      keyboardType: TextInputType.number)
+                child: TextField(
+                  controller: _itemPriceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Item Price',
+                    labelStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Icons.currency_rupee, color: AppColors.primary),
+                    filled: true,
+                    fillColor: AppColors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
               // ✅ ADDED: Your Veg/Non-Veg selector UI
@@ -451,7 +453,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(5)),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -475,50 +481,45 @@ class _EdititemScreenState extends State<EdititemScreen> {
           // Category Section
           _buildSectionHeader('Category', Icons.category_outlined),
           const SizedBox(height: 15),
-          Container(
-            height: 60,
-            decoration: BoxDecoration(border: Border.all(width: 0.5, color: Colors.black38)),
-            child: CommonButton(
-              height: 60,
-              bgcolor: Colors.transparent,
-              bordercolor: Colors.transparent,
-              onTap: () async {
-                final String? newId = await showModalBottomSheet(
-                  context: context,
-                  builder: (_) => _CategorySelectionSheet(
-                    categories: data.allCategories,
-                    allItems: data.allItems,
-                    selectedId: selectedCategoryId,
-                    // ✅ FIX: Pass a callback to handle deletion
-                    onCategoryDeleted: (deletedCategoryId) {
-                      // If the deleted category was the selected one, clear the selection
-                      if (selectedCategoryId == deletedCategoryId) {
-                        setState(() {
-                          selectedCategoryId = '';
-                        });
-                      }
-                      // Refresh the FutureBuilder to get the updated category list
-                      setState(() {
-                        _loadDataFuture = _loadInitialData();
-                      });
-                    },
-                  ),
-                );
-                if (newId != null) {
-                  setState(() {
-                    selectedCategoryId = newId;
-                  });
-                }
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(currentCategoryName, style: GoogleFonts.poppins(fontSize: 16)),
-                    const Icon(Icons.arrow_forward_ios)
-                  ],
+          InkWell(
+            onTap: () async {
+              final String? newId = await showModalBottomSheet(
+                context: context,
+                builder: (_) => _CategorySelectionSheet(
+                  categories: data.allCategories,
+                  allItems: data.allItems,
+                  selectedId: selectedCategoryId,
+                  onCategoryDeleted: (deletedCategoryId) {
+                    if (selectedCategoryId == deletedCategoryId) {
+                      setState(() => selectedCategoryId = '');
+                    }
+                    setState(() => _loadDataFuture = _loadInitialData());
+                  },
                 ),
+              );
+              if (newId != null) setState(() => selectedCategoryId = newId);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                border: Border.all(color: AppColors.divider),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.category_outlined, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 10),
+                      Text(currentCategoryName, style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary)),
+                    ],
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
+                ],
               ),
             ),
           ),
@@ -639,31 +640,49 @@ class _EdititemScreenState extends State<EdititemScreen> {
               final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
               if (pickedFile != null) {
                 final bytes = await pickedFile.readAsBytes();
-                setState(() {
-                  _selectedImage = File(pickedFile.path);
-                  _selectedImageBytes = bytes;
-                });
+                setState(() => _selectedImageBytes = bytes);
               }
             },
             child: Column(
               children: [
                 Container(
-                  height: AppResponsive.height(context, 0.16),
+                  height: 160,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.surfaceLight,
+                    border: Border.all(color: AppColors.divider, width: 1.5),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: _buildImage(), // Using a helper method for clarity
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _buildImage(),
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text('Upload Image (png, .jpg, .jpeg) upto 3mb', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+                Text('Upload Image (png, .jpg, .jpeg) up to 3MB', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
           ),
           const SizedBox(height: 10),
 
-          CommonTextForm(maxline: 3, controller: _descController, hintText: 'Description (Optional)', obsecureText: false),
+          TextField(
+            controller: _descController,
+            maxLines: 3,
+            style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Description (Optional)',
+              hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+              prefixIcon: const Padding(
+                padding: EdgeInsets.only(bottom: 42),
+                child: Icon(Icons.notes_outlined, color: AppColors.primary),
+              ),
+              filled: true,
+              fillColor: AppColors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+            ),
+          ),
           const SizedBox(height: 25),
 
           // Variants, Choices & Extras Section
@@ -679,29 +698,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
           SizedBox(
             width: double.infinity,
             height: 56,
-            child: ElevatedButton(
-              onPressed: () => _saveChanges(data),
+            child: ElevatedButton.icon(
+              onPressed: _isSaving ? null : () => _saveChanges(data),
+              icon: _isSaving
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.save, color: Colors.white),
+              label: Text(
+                _isSaving ? 'Saving…' : 'Save Changes',
+                style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.save, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Save Changes',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
               ),
             ),
           ),
@@ -778,10 +788,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     Expanded(child: Text(variants[index].name)),
                     SizedBox(
                       width: 120,
-                      child: CommonTextForm(
+                      child: TextField(
                         controller: _variantPriceControllers[index],
-                        hintText: 'Price',
-                        keyboardType: TextInputType.number, obsecureText: false,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: GoogleFonts.poppins(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'Price',
+                          hintStyle: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                        ),
                       ),
                     ),
                   ],
@@ -1008,26 +1026,23 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
     );
 
     if (confirmed == true) {
+      // Unlink items belonging to this category
+      final affected = widget.allItems.where((item) => item.categoryOfItem == categoryId).toList();
+      for (final item in affected) {
+        await itemStore.updateItem(item.copyWith(categoryOfItem: ''));
+      }
       await categoryStore.deleteCategory(categoryId);
-      // Refresh the list inside the sheet
+      widget.onCategoryDeleted(categoryId);
       setState(() {
         _currentCategories.removeWhere((cat) => cat.id == categoryId);
       });
     }
   }
-  // ✅ ADDED: Functionality to add a new category
   Future<void> _onAddNewCategory() async {
-    final newCategoryName = await showDialog<String>(
-      context: context,
-      builder: (ctx) => _AddCategoryDialog(),
-    );
-
-    if (newCategoryName != null && newCategoryName.isNotEmpty) {
-      final newCategory = Category(id: const Uuid().v4(), name: newCategoryName);
-      await categoryStore.addCategory(newCategory);
-      // Refresh the list inside this sheet to show the new category
+    final added = await AddCategoryDialog.show(context);
+    if (added) {
       setState(() {
-        _currentCategories.add(newCategory);
+        _currentCategories = categoryStore.categories.toList();
       });
     }
   }
@@ -1053,10 +1068,6 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
               itemCount: _currentCategories.length,
               itemBuilder: (context, index) {
                 final category = _currentCategories[index];
-                // Calculate product count for this category
-                final productCount = widget.allItems.where((item) => item.categoryOfItem == category.id).length ?? 0;
-                // final itemCount =
-                //     itemsList?.where((item) => item.categoryOfItem == category.id).length ?? 0;
                 return ListTile(
                   onTap: () => Navigator.pop(context, category.id),
                   leading: Radio<String>(
@@ -1068,20 +1079,7 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
                       }
                     },
                   ),
-                  title: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(category.name),
-                      // Text(
-                      //   // Text(
-                      //   //   '$itemCount item${itemCount == 1 ? '' : 's'} Added',
-                      //   //   style: GoogleFonts.poppins(color: Colors.grey),
-                      //   // )
-                      //   '$productCount Product${productCount == 1 ? '' : 's'} Listed',
-                      //   style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      // ),
-                    ],
-                  ),
+                  title: Text(category.name),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1107,15 +1105,17 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
             ),
           ),
           const Divider(),
-          CommonButton(
-            onTap:_onAddNewCategory,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add),
-                SizedBox(width: 8),
-                Text("Add New Category"),
-              ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _onAddNewCategory,
+              icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+              label: Text('Add New Category', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
             ),
           ),
         ],
@@ -1125,30 +1125,6 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
 }
 
 
-
-/// ✅ ADDED: A simple dialog for adding a new category
-class _AddCategoryDialog extends StatelessWidget {
-  final TextEditingController controller = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add New Category'),
-      content: TextField(
-        controller: controller,
-        decoration: const InputDecoration(hintText: 'Category Name'),
-        autofocus: true,
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-          child: const Text('Add'),
-        ),
-      ],
-    );
-  }
-}
 
 
 class _VegNonVegSheet extends StatelessWidget {
@@ -1177,1601 +1153,3 @@ class _VegNonVegSheet extends StatelessWidget {
 
 
 
-// old items edit code
-
-// import 'dart:io';
-//
-// import 'package:flutter/cupertino.dart';
-// import 'package:flutter/material.dart';
-// import 'package:BillBerry/componets/Textform.dart';
-// import 'package:BillBerry/constant/color.dart';
-// import 'package:BillBerry/database/hive_choice.dart';
-// import 'package:BillBerry/database/hive_variante.dart';
-// import 'package:BillBerry/model/db/itemvariantemodel_12.dart';
-// import 'package:BillBerry/model/db/variantmodel_5.dart';
-// import 'package:google_fonts/google_fonts.dart';
-// import 'package:hive/hive.dart';
-// import 'package:image_picker/image_picker.dart';
-// import 'package:uuid/uuid.dart';
-//
-// import '../../../componets/Button.dart';
-// import '../../../componets/filterButton.dart';
-// import '../../../database/hive_db.dart';
-// import '../../../model/db/categorymodel_0.dart';
-// import '../../../model/db/choicemodel_6.dart';
-// import '../../../model/db/choiceoptionmodel_7.dart';
-// import '../../../model/db/itemmodel_2.dart';
-// import '../../../utils/responsive_helper.dart';
-//
-// class EdititemScreen extends StatefulWidget {
-//   final Items items;
-//
-//   const EdititemScreen({super.key, required this.items});
-//
-//   @override
-//   State<EdititemScreen> createState() => _EdititemScreenState();
-// }
-//
-// class _EdititemScreenState extends State<EdititemScreen> {
-//   late TextEditingController _nameController = TextEditingController();
-//   late TextEditingController _itemPriceController = TextEditingController();
-//   final TextEditingController _barcodeController = TextEditingController();
-//   final TextEditingController _searchController = TextEditingController();
-//   final TextEditingController _descController = TextEditingController();
-//   final TextEditingController _priceController = TextEditingController();
-//   final TextEditingController CategoryController = TextEditingController();
-//   String? selectedCategory;
-//   String? selectedCategoryId;
-//   String? option = 'Each';
-//   String selectedIMGCategory = '';
-//   String selectedFilter = 'yes';
-//   String selectedFilter2 = 'yes';
-//   File? _selectedImage;
-//   bool isChecked = false;
-//   bool isCheckedone = false;
-//   bool isCheckedtwo = false;
-//   final ImagePicker _picker = ImagePicker();
-//   bool IsYes = false;
-//   Box<Category>? categorybox;
-//
-//   // variant
-//   List<VariantModel> variantList = [];
-//   List<bool> isCheckedList = [];
-//   List<TextEditingController> priceController = [];
-//
-//
-//   // Choice
-//   List<ChoicesModel> choiceList = [];
-//   List<ChoiceOption> tempOptions = [];
-//   List<bool> isCheckedListChoice = [];
-//
-//
-//   // function For Image Pick
-//   Future<void> _pickIMage(ImageSource source) async {
-//     final pickedFile = await _picker.pickImage(source: source);
-//     if (pickedFile != null) {
-//       setState(() {
-//         _selectedImage = File(pickedFile.path);
-//       });
-//     }
-//     Navigator.pop(context);
-//   }
-//
-//   void _showImagePicker() {
-//     showModalBottomSheet(
-//         context: context,
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-//         ),
-//         builder: (context) {
-//           return Padding(
-//               padding: EdgeInsets.all(20),
-//               child: Container(
-//                 // color: Colors.red,
-//                 width: double.infinity,
-//                 height: ResponsiveHelper.responsiveHeight(context, 0.25),
-//
-//                 child: Row(
-//                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                   children: [
-//                     InkWell(
-//                       onTap: () => _pickIMage(ImageSource.gallery),
-//                       child: Container(
-//                         alignment: Alignment.center,
-//                         width: ResponsiveHelper.responsiveWidth(context, 0.35),
-//                         height: ResponsiveHelper.responsiveHeight(context, 0.2),
-//                         decoration: BoxDecoration(
-//                             color: Colors.white,
-//                             borderRadius: BorderRadius.circular(4)),
-//                         child: Column(
-//                           mainAxisAlignment: MainAxisAlignment.center,
-//                           children: [
-//                             Icon(
-//                               Icons.photo_library,
-//                               size: 50,
-//                               color: AppColors.primary,
-//                             ),
-//                             Text('From Gallery'),
-//                           ],
-//                         ),
-//                       ),
-//                     ),
-//                     Container(
-//                       width: ResponsiveHelper.responsiveWidth(context, 0.35),
-//                       height: ResponsiveHelper.responsiveHeight(context, 0.2),
-//                       decoration: BoxDecoration(
-//                           color: Colors.white,
-//                           borderRadius: BorderRadius.circular(4)),
-//                       child: Column(
-//                         mainAxisAlignment: MainAxisAlignment.center,
-//                         children: [
-//                           Icon(
-//                             Icons.search,
-//                             size: 50,
-//                             color: AppColors.primary,
-//                           ),
-//                           Text('From Search'),
-//                         ],
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//               ));
-//         });
-//   }
-//
-//
-//
-//   List<Category> categorieshive = [];
-//
-//   // Future<void> loadHiveCategory() async {
-//   //   final box = await HiveBoxes.getCategory();
-//   //   categorybox = await Hive.openBox<Category>('categories');
-//   //
-//   //   setState(() {
-//   //     categorieshive = box.values.toList();
-//   //     // selectedCategory =
-//   //   });
-//   // }
-//
-//
-//
-//
-//   Future<void> loadVariant() async {
-//     final box = await HiveVariante.getvariante();
-//     final loadedVariants = box.values.toList();
-//
-//     setState(() {
-//       variantList = loadedVariants;
-//       isCheckedList = List.generate(variantList.length, (_) => false);
-//       priceController = List.generate(
-//         variantList.length,
-//             (index) => TextEditingController(),
-//       );
-//     });
-//   }
-//   Future<void> loadChoice() async {
-//     final box = await HiveChoice.getchoice();
-//     final loadedChoice = box.values.toList();
-//
-//     setState(() {
-//       choiceList = loadedChoice;
-//       isCheckedListChoice = List.generate(choiceList.length, (_) => false);
-//
-//     });
-//   }
-//
-//
-//   Future<void> loadHiveCategory() async {
-//     categorybox = await Hive.openBox<Category>('categories');
-//     categorieshive = categorybox!.values.toList();
-//
-//     final matchedCategory = categorybox!.values.firstWhere(
-//           (cat) => cat.id == selectedCategoryId,
-//       orElse: () => Category(id: '', name: 'Unknown'),
-//     );
-//
-//     setState(() {
-//       selectedCategory = matchedCategory.name;
-//     });
-//   }
-//
-//   // Future<void> loadHiveCategory() async {
-//   //   categorybox = await Hive.openBox<Category>('category');
-//   //
-//   //   final matchedCategory = categorybox!.values.firstWhere(
-//   //         (cat) => cat.id == selectedCategoryId,
-//   //     orElse: () => Category(id: '', name: 'Unknown'),
-//   //   );
-//   //
-//   //   setState(() {
-//   //     selectedCategory = matchedCategory.name;
-//   //   });
-//   // }
-//
-//   Future<void> _addcategoryHive() async {
-//     if (CategoryController.text.trim().isEmpty) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Category name cannot be Empty')));
-//       return;
-//     }
-//     final newcategory = Category(
-//         imagePath: _selectedImage != null ? _selectedImage!.path : null,
-//         id: const Uuid().v4(),
-//         name: CategoryController.text.trim());
-//
-//     await HiveBoxes.addCategory(newcategory);
-//     _clearImage();
-//     Navigator.pop(context);
-//
-// // _clearImage();
-//   }
-//
-//   void _clearImage() {
-//     setState(() {
-//       _selectedImage = null;
-//
-//       // Navigator.pop(context);
-//     });
-//   }
-//
-//   final outborder = OutlineInputBorder(borderRadius: BorderRadius.circular(5));
-//
-//   // In EdititemScreen.dart
-//
-//   void saveChnages() async {
-//     // This part for Variants is correct
-//     List<ItemVariante> selectedVariants = [];
-//     for (int i = 0; i < variantList.length; i++) {
-//       if (isCheckedList[i]) {
-//         final priceText = priceController[i].text.trim();
-//         if (priceText.isNotEmpty) {
-//           selectedVariants.add(ItemVariante(
-//               variantId: variantList[i].id,
-//               price: double.tryParse(priceText) ?? 0.0));
-//         }
-//       }
-//     }
-//
-//     // This is the corrected part for Choices
-//     List<String> selectedChoiceIds = [];
-//     for (int i = 0; i < choiceList.length; i++) {
-//       // THE FIX IS ON THIS LINE: It should be isCheckedListChoice
-//       if (isCheckedListChoice[i]) {
-//         selectedChoiceIds.add(choiceList[i].id);
-//       }
-//     }
-//
-//     final updateItem = widget.items.copyWith(
-//       name: _nameController.text,
-//       price: double.tryParse(_itemPriceController.text),
-//       isVeg: selectedIMGCategory,
-//       categoryOfItem: selectedCategoryId,
-//       variant: selectedVariants,
-//       choiceIds: selectedChoiceIds,
-//     );
-//
-//     await itemsBoxes.updateItem(updateItem);
-//     Navigator.pop(context, true);
-//   }
-//
-//   @override
-//   void initState() {
-//     // TODO: implement initState
-//     super.initState();
-//     loadChoice();
-//     loadVariant();
-//     _nameController = TextEditingController(text: widget.items.name);
-//     _itemPriceController = TextEditingController(text:  widget.items.price.toString());
-//     selectedIMGCategory = widget.items.isVeg == 'Veg' ? 'Veg' : 'Non-Veg';
-//     selectedCategoryId = widget.items.categoryOfItem;
-//     selectedCategory = categorybox?.values.firstWhere(
-//             (cat) => cat.id == selectedCategoryId,
-//         orElse: ()=> Category(id: '', name: 'Unknow')).name;
-//     setState(() {});
-//     loadHiveCategory();
-//
-//
-//   //   initialize state list based on variantList
-//     isCheckedList = List.generate(variantList.length,(_)=>false);
-//     priceController = List.generate(
-//         variantList.length,
-//         (index)=> TextEditingController());
-//
-//
-//   }
-//
-//   Future<void> loadCategoryAndSetSelected() async {
-//     categorybox = await Hive.openBox<Category>('category');
-//     selectedCategoryId = widget.items.categoryOfItem;
-//
-//     final matchedCategory = categorybox!.values.firstWhere(
-//           (cat) => cat.id == selectedCategoryId,
-//       orElse: () => Category(id: '', name: 'Unknown'),
-//     );
-//
-//     setState(() {
-//       selectedCategory = matchedCategory.name;
-//     });
-//   }
-//   @override
-//   Widget build(BuildContext context) {
-//     final width = MediaQuery.of(context).size.width;
-//     final height = MediaQuery.of(context).size.height;
-//     return Scaffold(
-//       appBar: AppBar(
-//         automaticallyImplyLeading: false,
-//         backgroundColor: AppColors.primary,
-//         leading: IconButton(
-//             onPressed: () {
-//               Navigator.pop(context);
-//             },
-//             icon: Icon(
-//               Icons.arrow_back_ios,
-//               color: Colors.white,
-//             )),
-//         title: Text(
-//           "Edit Items ",
-//           style: TextStyle(color: Colors.white),
-//         ),
-//       ),
-//       body: SingleChildScrollView(
-//         child: Container(
-//           child: Padding(
-//             padding: const EdgeInsets.all(10),
-//             child: Column(
-//               children: [
-//                 CommonTextForm(
-//                   controller: _nameController,
-//                   borderc: 5,
-//                   obsecureText: false,
-//                   hintText: 'Item Name',
-//                   HintColor: Colors.grey,
-//                 ),
-//
-//                 SizedBox(
-//                   height: 10,
-//                 ),
-//                 Row(
-//                   children: [
-//                     Text("Sold by: "),
-//                     Radio<String>(
-//                       value: 'Each',
-//                       groupValue: option,
-//                       onChanged: (value) {
-//                         setState(() {
-//                           option = value;
-//                         });
-//                       },
-//                     ),
-//                     Text('Each'),
-//                     SizedBox(
-//                       width: width * 0.1,
-//                     ),
-//                     Radio<String>(
-//                       value: 'Weight',
-//                       groupValue: option,
-//                       onChanged: (value) {
-//                         setState(() {
-//                           option = value;
-//                         });
-//                       },
-//                     ),
-//                     Text('Weight'),
-//                   ],
-//                 ),
-//
-//                 SizedBox(
-//                   height: 10,
-//                 ),
-//                 // price
-//                 Row(
-//                   children: [
-//                     Expanded(
-//                       child: Container(
-//                           // color: Colors.red,
-//                           child: TextFormField(
-//                         controller: _itemPriceController,
-//                         decoration: InputDecoration(
-//                             contentPadding: EdgeInsets.all(5),
-//                             hintText: 'Item Price',
-//                             border: UnderlineInputBorder(
-//                                 borderRadius: BorderRadius.circular(5)),
-//                             focusedBorder: outborder,
-//                             focusedErrorBorder: outborder,
-//                             errorBorder: outborder,
-//                             disabledBorder: outborder,
-//                             enabledBorder: outborder),
-//                       )),
-//                     ),
-//                     SizedBox(width: 10),
-//                     // veg - nonveg
-//                     Expanded(
-//                       child: InkWell(
-//                         onTap: () {
-//                           showModalBottomSheet(
-//                             context: context,
-//                             builder: (context) {
-//                               return StatefulBuilder(
-//                                 builder: (context, setModalState) {
-//                                   return Column(
-//                                     mainAxisSize: MainAxisSize.min,
-//                                     children: [
-//                                       Padding(
-//                                         padding: const EdgeInsets.symmetric(
-//                                             horizontal: 16, vertical: 12),
-//                                         child: Row(
-//                                           mainAxisAlignment:
-//                                               MainAxisAlignment.spaceBetween,
-//                                           children: [
-//                                             Text(
-//                                               'Select Type ',
-//                                               style: TextStyle(
-//                                                 fontSize: 18,
-//                                                 fontWeight: FontWeight.bold,
-//                                               ),
-//                                             ),
-//                                             GestureDetector(
-//                                               onTap: () =>
-//                                                   Navigator.pop(context),
-//                                               child: Icon(Icons.close),
-//                                             ),
-//                                           ],
-//                                         ),
-//                                       ),
-//                                       Divider(thickness: 1),
-//                                       Container(
-//                                         margin: EdgeInsets.symmetric(
-//                                             horizontal: 12, vertical: 6),
-//                                         decoration: BoxDecoration(
-//                                           border: Border.all(
-//                                               color: Colors.black, width: 1),
-//                                           borderRadius:
-//                                               BorderRadius.circular(8),
-//                                         ),
-//                                         child: ListTile(
-//                                           leading: Icon(Icons.circle,
-//                                               color: Colors.green),
-//                                           title: Text('Veg'),
-//                                           onTap: () {
-//                                             setState(() {
-//                                               selectedIMGCategory = 'Veg';
-//                                             });
-//                                             Navigator.pop(context);
-//                                           },
-//                                         ),
-//                                       ),
-//                                       Container(
-//                                         margin: EdgeInsets.symmetric(
-//                                             horizontal: 12, vertical: 6),
-//                                         decoration: BoxDecoration(
-//                                           border: Border.all(
-//                                               color: Colors.black, width: 1),
-//                                           borderRadius:
-//                                               BorderRadius.circular(8),
-//                                         ),
-//                                         child: ListTile(
-//                                           leading: Icon(Icons.circle,
-//                                               color: Colors.red),
-//                                           title: Text('Non-Veg'),
-//                                           onTap: () {
-//                                             setState(() {
-//                                               selectedIMGCategory = 'Non-Veg';
-//                                             });
-//                                             Navigator.pop(context);
-//                                           },
-//                                         ),
-//                                       ),
-//                                     ],
-//                                   );
-//                                 },
-//                               );
-//                             },
-//                           );
-//                         },
-//                         child: Container(
-//                           padding: EdgeInsets.symmetric(
-//                               horizontal: 12, vertical: 10),
-//                           decoration: BoxDecoration(
-//                             border: Border.all(color: Colors.grey),
-//                             borderRadius: BorderRadius.circular(3),
-//                           ),
-//                           child: Row(
-//                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                             children: [
-//                               Row(
-//                                 children: [
-//                                   // widget.items.isVeg=='Veg'?
-//                                   //     selectedIMGCategory = 'Veg':
-//                                   //     selectedIMGCategory = 'Non-Veg',
-//
-//                                   if (selectedIMGCategory == 'Veg') ...[
-//                                     Icon(Icons.circle,
-//                                         color: Colors.green, size: 16),
-//                                     SizedBox(width: 6),
-//                                     Text('Veg',
-//                                         style: TextStyle(color: Colors.black)),
-//                                   ] else if (selectedIMGCategory ==
-//                                       'Non-Veg') ...[
-//                                     Icon(Icons.circle,
-//                                         color: Colors.red, size: 16),
-//                                     SizedBox(width: 6),
-//                                     Text('Non-Veg',
-//                                         style: TextStyle(color: Colors.black)),
-//                                   ],
-//                                 ],
-//                               ),
-//                               Icon(Icons.keyboard_arrow_down_rounded),
-//                             ],
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-//                     // Expanded(child:)
-//                   ],
-//                 ),
-//                 SizedBox(
-//                   height: 20,
-//                 ),
-//
-//                 SizedBox(height: 10,),
-//                 Container(
-//                     height: height * 0.1,
-//                     // padding: EdgeInsets.all(10),
-//                     decoration: BoxDecoration(
-//                         // color: Colors.red,
-//
-//                         border: Border.all(width: 0.5, color: Colors.black38)),
-//                     child:
-//                     CommonButton(
-//
-//                         height: height * 0.1,
-//                         bgcolor: Colors.transparent,
-//                         bordercolor: Colors.black12,
-//                         bordercircular: 0,
-//                         onTap: () async {
-//                           // Reload the latest category list before showing the bottom sheet
-//                           await loadHiveCategory();
-//                           showModalBottomSheet(
-//                               context: context,
-//                               builder: (BuildContext context) {
-//                                 return FutureBuilder(
-//                                     future: loadHiveCategory(),
-//                                     builder: (context, snapshot) {
-//                                       return Container(
-//                                         // color: Colors.red,
-//                                         padding: EdgeInsets.all(20),
-//                                         height:
-//                                             categorieshive.isEmpty ? 300 : 500,
-//                                         child: Column(
-//                                           children: [
-//                                             Row(
-//                                               mainAxisAlignment:
-//                                                   MainAxisAlignment
-//                                                       .spaceBetween,
-//                                               children: [
-//                                                 Text(selectedCategory.toString(),
-//                                                   style: GoogleFonts.poppins(
-//                                                       fontSize: ResponsiveHelper
-//                                                           .responsiveTextSize(
-//                                                               context, 16),
-//                                                       fontWeight:
-//                                                           FontWeight.w600),
-//                                                 ),
-//                                                 IconButton(
-//                                                     color: Colors.blue,
-//                                                     onPressed: () {
-//                                                       Navigator.pop(context);
-//                                                     },
-//                                                     icon: Icon(
-//                                                       Icons.cancel,
-//                                                       color: Colors.grey,
-//                                                     ))
-//                                               ],
-//                                             ),
-//                                             Divider(),
-//                                             Expanded(
-//                                                 child: categorieshive.isEmpty
-//                                                     ? Container(
-//                                                         padding:
-//                                                             EdgeInsets.all(30),
-//                                                         width: double.infinity,
-//                                                         height: ResponsiveHelper
-//                                                             .responsiveHeight(
-//                                                                 context, 0.2),
-//                                                         // color: Colors.green,
-//                                                         child: Column(
-//                                                           mainAxisAlignment:
-//                                                               MainAxisAlignment
-//                                                                   .spaceBetween,
-//                                                           children: [
-//                                                             Text(
-//                                                               'No Category added yet!! Please \n add  category for your items',
-//                                                               textScaler:
-//                                                                   TextScaler
-//                                                                       .linear(
-//                                                                           1),
-//                                                               style: GoogleFonts
-//                                                                   .poppins(
-//                                                                 fontSize: ResponsiveHelper
-//                                                                     .responsiveTextSize(
-//                                                                         context,
-//                                                                         12),
-//                                                               ),
-//                                                               textAlign:
-//                                                                   TextAlign
-//                                                                       .center,
-//                                                             ),
-//                                                             CommonButton(
-//                                                                 width: double
-//                                                                     .infinity,
-//                                                                 height: ResponsiveHelper
-//                                                                     .responsiveHeight(
-//                                                                         context,
-//                                                                         0.08),
-//                                                                 onTap: () {
-//                                                                   showModalBottomSheet(
-//                                                                       isScrollControlled:
-//                                                                           true,
-//                                                                       context:
-//                                                                           context,
-//                                                                       builder:
-//                                                                           (BuildContext
-//                                                                               context) {
-//                                                                         return Padding(
-//                                                                             padding:
-//                                                                                 EdgeInsets.only(
-//                                                                               bottom: MediaQuery.of(context).viewInsets.bottom,
-//                                                                             ),
-//                                                                             child: Container(
-//                                                                               width: double.infinity,
-//                                                                               height: ResponsiveHelper.responsiveHeight(context, 0.6),
-//                                                                               padding: ResponsiveHelper.responsivePadding(
-//                                                                                 context,
-//                                                                               ),
-//                                                                               child: Column(
-//                                                                                 children: [
-//                                                                                   Text(
-//                                                                                     'Add Category',
-//                                                                                     style: GoogleFonts.poppins(fontSize: ResponsiveHelper.responsiveTextSize(context, 20), fontWeight: FontWeight.w400),
-//                                                                                   ),
-//                                                                                   Divider(),
-//                                                                                   Container(
-//                                                                                     height: ResponsiveHelper.responsiveHeight(context, 0.08),
-//                                                                                     child: TextField(
-//                                                                                       controller: CategoryController,
-//                                                                                       decoration: InputDecoration(
-//                                                                                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(2)),
-//                                                                                         labelStyle: GoogleFonts.poppins(
-//                                                                                           color: Colors.grey,
-//                                                                                         ),
-//                                                                                         border: OutlineInputBorder(),
-//                                                                                         labelText: "Category Name (English)",
-//                                                                                       ),
-//                                                                                     ),
-//                                                                                   ),
-//                                                                                   SizedBox(height: 10),
-//                                                                                   InkWell(
-//                                                                                       onTap: _showImagePicker,
-//                                                                                       child: Column(
-//                                                                                         children: [
-//                                                                                           Container(
-//                                                                                               // color:Colors.red,
-//                                                                                               height: ResponsiveHelper.responsiveHeight(context, 0.16),
-//                                                                                               decoration: BoxDecoration(
-//                                                                                                 border: Border.all(color: Colors.grey),
-//                                                                                                 borderRadius: BorderRadius.circular(10),
-//                                                                                               ),
-//                                                                                               child: _selectedImage != null
-//                                                                                                   ? Image.file(
-//                                                                                                       _selectedImage!,
-//                                                                                                       fit: BoxFit.cover,
-//                                                                                                       height: 50,
-//                                                                                                       width: 150,
-//                                                                                                     )
-//                                                                                                   : Column(
-//                                                                                                       mainAxisAlignment: MainAxisAlignment.center,
-//                                                                                                       children: [
-//                                                                                                         Center(child: Icon(Icons.image, color: Colors.grey, size: 50)),
-//                                                                                                         SizedBox(
-//                                                                                                           height: 5,
-//                                                                                                         ),
-//                                                                                                         Text(
-//                                                                                                           'Upload Image',
-//                                                                                                           textScaler: TextScaler.linear(1),
-//                                                                                                           style: GoogleFonts.poppins(fontSize: ResponsiveHelper.responsiveTextSize(context, 16), fontWeight: FontWeight.w500),
-//                                                                                                         ),
-//                                                                                                         Text(
-//                                                                                                           '600X400',
-//                                                                                                           textScaler: TextScaler.linear(1),
-//                                                                                                           style: GoogleFonts.poppins(
-//                                                                                                             fontSize: ResponsiveHelper.responsiveTextSize(context, 12),
-//                                                                                                           ),
-//                                                                                                         )
-//                                                                                                       ],
-//                                                                                                     )),
-//                                                                                           Text(
-//                                                                                             'Upload Image (png , .jpg, .jpeg) upto 3mb',
-//                                                                                             textScaler: TextScaler.linear(1),
-//                                                                                             style: GoogleFonts.poppins(
-//                                                                                               fontSize: ResponsiveHelper.responsiveTextSize(context, 14),
-//                                                                                             ),
-//                                                                                           )
-//                                                                                         ],
-//                                                                                       )),
-//                                                                                   SizedBox(
-//                                                                                     height: ResponsiveHelper.responsiveHeight(context, 0.02),
-//                                                                                   ),
-//                                                                                   CommonButton(
-//                                                                                       onTap: () {
-//                                                                                         _addcategoryHive();
-//                                                                                       },
-//                                                                                       // bgcolor: Colors.white,
-//                                                                                       // bordercolor: Colors.deepOrange,
-//                                                                                       width: ResponsiveHelper.responsiveWidth(context, 0.9),
-//                                                                                       height: ResponsiveHelper.responsiveHeight(context, 0.07),
-//                                                                                       child: Row(
-//                                                                                         mainAxisAlignment: MainAxisAlignment.center,
-//                                                                                         children: [
-//                                                                                           Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)), child: Icon(Icons.add)),
-//                                                                                           SizedBox(
-//                                                                                             width: 5,
-//                                                                                           ),
-//                                                                                           Text(
-//                                                                                             'Add Category',
-//                                                                                             style: GoogleFonts.poppins(fontSize: ResponsiveHelper.responsiveTextSize(context, 16), color: Colors.white),
-//                                                                                           )
-//                                                                                         ],
-//                                                                                       )),
-//                                                                                 ],
-//                                                                               ),
-//                                                                             ));
-//                                                                       });
-//                                                                 },
-//                                                                 child: Padding(
-//                                                                   padding:
-//                                                                       const EdgeInsets
-//                                                                           .all(
-//                                                                           8.0),
-//                                                                   child: Row(
-//                                                                     mainAxisAlignment:
-//                                                                         MainAxisAlignment
-//                                                                             .center,
-//                                                                     children: [
-//                                                                       Container(
-//                                                                         decoration: BoxDecoration(
-//                                                                             borderRadius:
-//                                                                                 BorderRadius.circular(15),
-//                                                                             color: Colors.white),
-//                                                                         child:
-//                                                                             Icon(
-//                                                                           Icons
-//                                                                               .add,
-//                                                                         ),
-//                                                                       ),
-//                                                                       SizedBox(
-//                                                                         width: ResponsiveHelper.responsiveWidth(
-//                                                                             context,
-//                                                                             0.03),
-//                                                                       ),
-//                                                                       Text(
-//                                                                         'Add New Category',
-//                                                                         style: GoogleFonts.poppins(
-//                                                                             color:
-//                                                                                 Colors.white),
-//                                                                       )
-//                                                                     ],
-//                                                                   ),
-//                                                                 ))
-//                                                           ],
-//                                                         ),
-//                                                       )
-//
-//                                                     : ListView.builder(
-//                                                         itemCount:
-//                                                             categorieshive
-//                                                                 .length,
-//                                                         itemBuilder:
-//                                                             (context, index) {
-//                                                           var category =
-//                                                               categorieshive[
-//                                                                   index];
-//
-//                                                           return InkWell(
-//                                                             onTap: () {
-//                                                               setState(() {
-//                                                                 selectedCategory =
-//                                                                     category
-//                                                                         .name;
-//                                                                 selectedCategoryId = category.id;
-//                                                               });
-//                                                               Navigator.pop(
-//                                                                   context);
-//                                                             },
-//                                                             child: Container(
-//                                                               child: Column(
-//                                                                 children: [
-//                                                                   Row(
-//                                                                     mainAxisAlignment:
-//                                                                         MainAxisAlignment
-//                                                                             .spaceBetween,
-//                                                                     children: [
-//                                                                       Row(
-//                                                                         children: [
-//                                                                           Checkbox(
-//                                                                               value: true,
-//                                                                               onChanged: (value) {}),
-//                                                                           Column(
-//                                                                             crossAxisAlignment:
-//                                                                                 CrossAxisAlignment.start,
-//                                                                             children: [
-//                                                                               Text(
-//                                                                                 category.name,
-//                                                                                 style: GoogleFonts.poppins(
-//                                                                                   fontWeight: FontWeight.w600,
-//                                                                                   fontSize: ResponsiveHelper.responsiveTextSize(context, 18),
-//                                                                                 ),
-//                                                                               ),
-//                                                                               Text(
-//                                                                                 '0 Product Listed',
-//                                                                                 style: GoogleFonts.poppins(fontSize: ResponsiveHelper.responsiveTextSize(context, 14), color: Colors.grey),
-//                                                                               )
-//                                                                             ],
-//                                                                           ),
-//                                                                         ],
-//                                                                       ),
-//                                                                       Row(
-//                                                                         children: [
-//                                                                           Container(
-//                                                                             width:
-//                                                                                 ResponsiveHelper.responsiveWidth(context, 0.1),
-//                                                                             height:
-//                                                                                 ResponsiveHelper.responsiveHeight(context, 0.04),
-//                                                                             decoration:
-//                                                                                 BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(5)),
-//                                                                             child:
-//                                                                                 Icon(
-//                                                                               Icons.edit,
-//                                                                               color: Colors.white,
-//                                                                             ),
-//                                                                           ),
-//                                                                           SizedBox(
-//                                                                             width:
-//                                                                                 5,
-//                                                                           ),
-//                                                                           Container(
-//                                                                             width:
-//                                                                                 ResponsiveHelper.responsiveWidth(context, 0.1),
-//                                                                             height:
-//                                                                                 ResponsiveHelper.responsiveHeight(context, 0.04),
-//                                                                             decoration:
-//                                                                                 BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(5)),
-//                                                                             child:
-//                                                                                 Icon(
-//                                                                               Icons.delete,
-//                                                                               color: Colors.white,
-//                                                                             ),
-//                                                                           ),
-//                                                                         ],
-//                                                                       )
-//                                                                     ],
-//                                                                   ),
-//                                                                   Divider()
-//                                                                 ],
-//                                                               ),
-//                                                             ),
-//                                                           );
-//                                                         }))
-//                                           ],
-//                                         ),
-//                                       );
-//                                     });
-//                               });
-//                         },
-//                         child: Padding(
-//                           padding: const EdgeInsets.symmetric(horizontal: 5),
-//                           child: Row(
-//                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                             children: [
-//                               Text(
-//                                 selectedCategory?? 'Select',
-//                                 style: GoogleFonts.poppins(
-//                                   fontSize: ResponsiveHelper.responsiveTextSize(
-//                                       context, 16),
-//                                 ),
-//                               ),
-//                               Icon(Icons.arrow_forward_ios)
-//                             ],
-//                           ),
-//                         ))),
-//
-//                 SizedBox(
-//                   height: 10,
-//                 ),
-//
-//                 /// manage inventory
-//
-//                 Container(
-//                   padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-//                   decoration:
-//                       BoxDecoration(border: Border.all(color: Colors.grey)),
-//                   child: Row(
-//                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                     children: [
-//                       Text(
-//                         "Manage Inventory",
-//                         style: GoogleFonts.poppins(
-//                           fontWeight: FontWeight.w600,
-//                         ),
-//                       ),
-//                       Row(
-//                         children: [
-//                           Filterbutton(
-//                             borderc: 0,
-//                             title: 'YES',
-//                             selectedFilter: selectedFilter,
-//                             onpressed: () {
-//                               setState(() {
-//                                 IsYes = true;
-//                                 selectedFilter = "YES";
-//                               });
-//                             },
-//                           ),
-//                           SizedBox(
-//                             width: 10,
-//                           ),
-//                           Filterbutton(
-//                             borderc: 0,
-//                             title: 'NO',
-//                             selectedFilter: selectedFilter,
-//                             onpressed: () {
-//                               setState(() {
-//                                 IsYes = false;
-//                                 selectedFilter = "NO";
-//                               });
-//                             },
-//                           ),
-//                         ],
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//                 IsYes == true
-//                     ? Container(
-//                         padding:
-//                             EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-//                         decoration: BoxDecoration(
-//                             border: Border.all(color: Colors.grey)),
-//                         child: Column(
-//                           crossAxisAlignment: CrossAxisAlignment.center,
-//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                           children: [
-//                             Text(
-//                               "select order when stock is not available ?",
-//                               textScaler: TextScaler.linear(1.2),
-//                               style: GoogleFonts.poppins(
-//                                 fontSize: 10,
-//                                 fontWeight: FontWeight.w600,
-//                               ),
-//                             ),
-//                             Row(
-//                               mainAxisAlignment: MainAxisAlignment.center,
-//                               children: [
-//                                 Filterbutton(
-//                                   borderc: 0,
-//                                   title: 'YES',
-//                                   selectedFilter: selectedFilter2,
-//                                   onpressed: () {
-//                                     setState(() {
-//                                       IsYes = true;
-//                                       selectedFilter2 = "YES";
-//                                     });
-//                                   },
-//                                 ),
-//                                 SizedBox(
-//                                   width: 10,
-//                                 ),
-//                                 Filterbutton(
-//                                   borderc: 0,
-//                                   title: 'NO',
-//                                   selectedFilter: selectedFilter2,
-//                                   onpressed: () {
-//                                     setState(() {
-//                                       selectedFilter2 = "NO";
-//                                     });
-//                                   },
-//                                 ),
-//                               ],
-//                             ),
-//                           ],
-//                         ),
-//                       )
-//                     : SizedBox(),
-//
-//                 /// picture uplode
-//                 SizedBox(height: 10),
-//                 InkWell(
-//                     onTap: _showImagePicker,
-//                     child: Column(
-//                       children: [
-//                         Container(
-//                             // color:Colors.red,
-//                             height: ResponsiveHelper.responsiveHeight(
-//                                 context, 0.16),
-//                             decoration: BoxDecoration(
-//                               border: Border.all(color: Colors.grey),
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                             child: _selectedImage != null
-//                                 ? Image.file(
-//                                     _selectedImage!,
-//                                     fit: BoxFit.cover,
-//                                     height: 50,
-//                                     width: 150,
-//                                   )
-//                                 : Column(
-//                                     mainAxisAlignment: MainAxisAlignment.center,
-//                                     children: [
-//                                       Center(
-//                                           child: Icon(Icons.image,
-//                                               color: Colors.grey, size: 50)),
-//                                       SizedBox(
-//                                         height: 5,
-//                                       ),
-//                                       Text(
-//                                         'Upload Image',
-//                                         textScaler: TextScaler.linear(1),
-//                                         style: GoogleFonts.poppins(
-//                                             fontSize: ResponsiveHelper
-//                                                 .responsiveTextSize(
-//                                                     context, 16),
-//                                             fontWeight: FontWeight.w500),
-//                                       ),
-//                                       Text(
-//                                         '600X400',
-//                                         textScaler: TextScaler.linear(1),
-//                                         style: GoogleFonts.poppins(
-//                                           fontSize: ResponsiveHelper
-//                                               .responsiveTextSize(context, 12),
-//                                         ),
-//                                       )
-//                                     ],
-//                                   )),
-//                       ],
-//                     )),
-//                 Text(
-//                   'Upload Image (png , .jpg, .jpeg) upto 3mb',
-//                   textScaler: TextScaler.linear(1),
-//                   style: GoogleFonts.poppins(
-//                     fontSize: ResponsiveHelper.responsiveTextSize(context, 12),
-//                     color: Colors.grey,
-//                   ),
-//                 ),
-//                 SizedBox(
-//                   height: 10,
-//                 ),
-//
-//                 /// for discription
-//                 ///
-//                 CommonTextForm(
-//                   maxline: 2,
-//                   controller: _descController,
-//                   borderc: 5,
-//                   obsecureText: false,
-//                   hintText: 'Description (Optional)',
-//                   HintColor: Colors.grey,
-//                 ),
-//                 SizedBox(
-//                   height: 10,
-//                 ),
-//
-//                 ///for varient
-//                 variantList.isNotEmpty
-//                 ?Card(
-//                   child: Container(
-//                     // color: Colors.red,
-//                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-//                     height: height * 0.3,
-//                     width: width * 0.9,
-//                     // color: Colors.grey,
-//                     child: Container(
-//                       // color: Colors.red,
-//                       padding: EdgeInsets.symmetric(horizontal: 20),
-//                       child: Column(
-//                         crossAxisAlignment: CrossAxisAlignment.start,
-//                         children: [
-//                           Text(
-//                             "Varients",
-//                             style: GoogleFonts.poppins(
-//                               fontSize: 12,
-//                               fontWeight: FontWeight.bold,
-//                             ),
-//                           ),
-//                           Divider(),
-//
-//                          Container(height: height  * 0.2,
-//                            // color: Colors.grey,
-//                            child: ListView.builder(
-//                                itemCount: variantList.length,
-//                                itemBuilder: (context, index){
-//
-//
-//                                  return Container(
-//                                    // color: Colors.red,
-//                                    child:Row(
-//                                      // crossAxisAlignment: CrossAxisAlignment.start,
-//                                      mainAxisAlignment: MainAxisAlignment.start,
-//                                      children: [
-//                                        if(variantList.isNotEmpty)
-//                                        Checkbox(
-//
-//                                          value: isCheckedList[index],
-//                                          onChanged: (bool? value) {
-//                                            setState(() {
-//                                              isCheckedList[index] = value!;
-//                                            });
-//                                          },
-//                                          activeColor: AppColors.primary,
-//                                          checkColor: Colors.white,
-//                                        ),
-//                                        SizedBox(
-//                                          width: 15,
-//                                        ),
-//                                        Container(
-//                                          // color: Colors.red,
-//                                            width: width * 0.2,
-//                                            child: Text(variantList[index].name,textAlign: TextAlign.center,)),
-//                                        SizedBox(
-//                                          width: 20,
-//                                        ),
-//                                        SizedBox(
-//                                          height: height * 0.06,
-//                                          width: width * 0.3,
-//                                          child: TextField(
-//                                            controller: priceController[index],
-//                                            decoration: InputDecoration(
-//                                                labelText: "Price",
-//                                                border: OutlineInputBorder(),
-//                                                focusedBorder: OutlineInputBorder(
-//                                                  borderSide: BorderSide(
-//                                                      color: Colors.blue),
-//                                                )),
-//                                          ),
-//                                        )
-//                                      ],
-//                                    ),
-//                                  );
-//
-//                            }),
-//                          )
-//
-//                          /* Container(
-//                             // color: Colors.red,
-//                             padding: EdgeInsets.all(10),
-//                             child: Column(
-//                               children: [
-//                                 Row(
-//                                   // crossAxisAlignment: CrossAxisAlignment.start,
-//                                   mainAxisAlignment: MainAxisAlignment.start,
-//                                   children: [
-//                                     Checkbox(
-//                                       value: isChecked,
-//                                       onChanged: (bool? value) {
-//                                         setState(() {
-//                                           isChecked = value!;
-//                                         });
-//                                       },
-//                                       activeColor: AppColors.primary,
-//                                       checkColor: Colors.white,
-//                                     ),
-//                                     SizedBox(
-//                                       width: 15,
-//                                     ),
-//                                     Text("small"),
-//                                     SizedBox(
-//                                       width: 20,
-//                                     ),
-//                                     SizedBox(
-//                                       height: height * 0.06,
-//                                       width: width * 0.3,
-//                                       child: TextField(
-//                                         controller: _priceController,
-//                                         decoration: InputDecoration(
-//                                             labelText: "Price",
-//                                             border: OutlineInputBorder(),
-//                                             focusedBorder: OutlineInputBorder(
-//                                               borderSide: BorderSide(
-//                                                   color: Colors.blue),
-//                                             )),
-//                                       ),
-//                                     )
-//                                   ],
-//                                 ),
-//                                 SizedBox(
-//                                   height: 25,
-//                                 ),
-//                                 Row(
-//                                   mainAxisAlignment: MainAxisAlignment.start,
-//                                   children: [
-//                                     Checkbox(
-//                                       value: isCheckedone,
-//                                       onChanged: (bool? value) {
-//                                         setState(() {
-//                                           isCheckedone = value!;
-//                                         });
-//                                       },
-//                                       activeColor: AppColors.primary,
-//                                       checkColor: Colors.white,
-//                                     ),
-//                                     SizedBox(
-//                                       width: 20,
-//                                     ),
-//                                     Text("mid"),
-//                                     SizedBox(
-//                                       width: 25,
-//                                     ),
-//                                     SizedBox(
-//                                       height: height * 0.06,
-//                                       width: width * 0.3,
-//                                       child: TextField(
-//                                         controller: _priceController,
-//                                         decoration: InputDecoration(
-//                                             labelText: "Price",
-//                                             border: OutlineInputBorder(),
-//                                             focusedBorder: OutlineInputBorder(
-//                                               borderSide: BorderSide(
-//                                                   color: Colors.blue),
-//                                             )),
-//                                       ),
-//                                     )
-//                                   ],
-//                                 ),
-//                                 SizedBox(
-//                                   height: 25,
-//                                 ),
-//                                 Row(
-//                                   mainAxisAlignment: MainAxisAlignment.start,
-//                                   children: [
-//                                     Checkbox(
-//                                       value: isCheckedtwo,
-//                                       onChanged: (bool? value) {
-//                                         setState(() {
-//                                           isCheckedtwo = value!;
-//                                         });
-//                                       },
-//                                       activeColor: AppColors.primary,
-//                                       checkColor: Colors.white,
-//                                     ),
-//                                     SizedBox(
-//                                       width: 20,
-//                                     ),
-//                                     Text("big"),
-//                                     SizedBox(
-//                                       width: 25,
-//                                     ),
-//                                     SizedBox(
-//                                       height: height * 0.06,
-//                                       width: width * 0.3,
-//                                       child: TextField(
-//                                         controller: _priceController,
-//                                         decoration: InputDecoration(
-//                                             labelText: "Price",
-//                                             border: OutlineInputBorder(),
-//                                             focusedBorder: OutlineInputBorder(
-//                                               borderSide: BorderSide(
-//                                                   color: Colors.blue),
-//                                             )),
-//                                       ),
-//                                     )
-//                                   ],
-//                                 ),
-//                                 SizedBox(
-//                                   height: 25,
-//                                 ),
-//                               ],
-//                             ),
-//                           ),*/
-//                         ],
-//                       ),
-//                     ),
-//                   ),
-//                 )
-//                 :SizedBox(),
-//
-//                 ///for choice
-//                 choiceList.isNotEmpty
-//                 ?Card(
-//                   child: Container(
-//                     // color: Colors.red,
-//                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-//                     height: height * 0.3,
-//                     width: width * 0.9,
-//                     // color: Colors.grey,
-//                     child: Container(
-//                       // color: Colors.red,
-//                       padding: EdgeInsets.symmetric(horizontal: 20),
-//                       child: Column(
-//                         crossAxisAlignment: CrossAxisAlignment.start,
-//                         children: [
-//                           Text(
-//                             "Choices",
-//                             style: GoogleFonts.poppins(
-//                               fontSize: 12,
-//                               fontWeight: FontWeight.bold,
-//                             ),
-//                           ),
-//                           Divider(),
-//
-//                          Container(height: height  * 0.2,
-//                            // color: Colors.grey,
-//                            child: ListView.builder(
-//                                itemCount: choiceList.length,
-//                                itemBuilder: (context, index){
-//                                  return Container(
-//                                 child:
-//                                 ListTile(
-//                                   leading:  Checkbox(
-//                                       value: isCheckedListChoice[index],
-//                                       onChanged: (bool? value) {
-//                                         setState(() {
-//                                           isCheckedListChoice[index] = value!;
-//                                         });
-//                                       },
-//                                       activeColor: AppColors.primary,
-//                                       checkColor: Colors.white,
-//                                     ),
-//                                   title: Text(
-//                                     choiceList[index].name,
-//                                     style: GoogleFonts.poppins(fontSize: 16),
-//                                   ),
-//
-//                                   subtitle: tempOptions.isNotEmpty
-//                                       ? Padding(
-//                                     padding: const EdgeInsets.only(top: 8),
-//                                     child: Align(
-//                                       alignment: Alignment.centerLeft,
-//                                       child: Wrap(
-//                                         spacing: 8,
-//                                         runSpacing: 8,
-//                                         children: tempOptions.asMap().entries.map((entry) {
-//                                           final idx = entry.key;
-//                                           final opt = entry.value;
-//                                           return Container(
-//                                             decoration: BoxDecoration(
-//                                               color: Colors.red.shade100,
-//                                               borderRadius: BorderRadius.circular(8),
-//                                             ),
-//                                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-//                                             child: Row(
-//                                               mainAxisSize: MainAxisSize.min,
-//                                               children: [
-//                                                 Text(opt.name,
-//                                                     style: GoogleFonts.poppins(fontSize: 14)),
-//                                                 SizedBox(width: 4),
-//                                                 GestureDetector(
-//                                                   onTap: () {
-//                                                     setState(() {
-//                                                       tempOptions.removeAt(idx);
-//                                                     });
-//                                                   },
-//                                                   child: Icon(Icons.delete,
-//                                                       size: 18, color: Colors.redAccent),
-//                                                 ),
-//                                               ],
-//                                             ),
-//                                           );
-//                                         }).toList(),
-//                                       ),
-//                                     ),
-//                                   )
-//                                       : SizedBox.shrink(),
-//
-//
-//                                   // trailing:
-//                                   trailing: Container(
-//                                     width: 60,
-//                                     child: Row(
-//                                       children: [
-//                                         SizedBox(
-//                                           width: 5,
-//                                         ),
-//                                       ],
-//                                     ),
-//                                   ),
-//                                 ),   // color: Colors.red,
-//                                    // child:Row(
-//                                    //   // crossAxisAlignment: CrossAxisAlignment.start,
-//                                    //   mainAxisAlignment: MainAxisAlignment.start,
-//                                    //   children: [
-//                                    //     if(variantList.isNotEmpty)
-//                                    //     Checkbox(
-//                                    //       value: isCheckedListChoice[index],
-//                                    //       onChanged: (bool? value) {
-//                                    //         setState(() {
-//                                    //           isCheckedListChoice[index] = value!;
-//                                    //         });
-//                                    //       },
-//                                    //       activeColor: AppColors.primary,
-//                                    //       checkColor: Colors.white,
-//                                    //     ),
-//                                    //     SizedBox(
-//                                    //       width: 15,
-//                                    //     ),
-//                                    //     Container(
-//                                    //       // color: Colors.red,
-//                                    //         width: width * 0.2,
-//                                    //         child: Text(choiceList[index].name,textAlign: TextAlign.center,)),
-//                                    //     SizedBox(
-//                                    //       width: 20,
-//                                    //     ),
-//                                    //     SizedBox(
-//                                    //       height: height * 0.06,
-//                                    //       width: width * 0.3,
-//                                    //       child: TextField(
-//                                    //         controller: priceController[index],
-//                                    //         decoration: InputDecoration(
-//                                    //             labelText: "Price",
-//                                    //             border: OutlineInputBorder(),
-//                                    //             focusedBorder: OutlineInputBorder(
-//                                    //               borderSide: BorderSide(
-//                                    //                   color: Colors.blue),
-//                                    //             )),
-//                                    //       ),
-//                                    //     )
-//                                    //   ],
-//                                    // ),
-//                                  );
-//
-//                            }),
-//                          )
-//
-//                          /* Container(
-//                             // color: Colors.red,
-//                             padding: EdgeInsets.all(10),
-//                             child: Column(
-//                               children: [
-//                                 Row(
-//                                   // crossAxisAlignment: CrossAxisAlignment.start,
-//                                   mainAxisAlignment: MainAxisAlignment.start,
-//                                   children: [
-//                                     Checkbox(
-//                                       value: isChecked,
-//                                       onChanged: (bool? value) {
-//                                         setState(() {
-//                                           isChecked = value!;
-//                                         });
-//                                       },
-//                                       activeColor: AppColors.primary,
-//                                       checkColor: Colors.white,
-//                                     ),
-//                                     SizedBox(
-//                                       width: 15,
-//                                     ),
-//                                     Text("small"),
-//                                     SizedBox(
-//                                       width: 20,
-//                                     ),
-//                                     SizedBox(
-//                                       height: height * 0.06,
-//                                       width: width * 0.3,
-//                                       child: TextField(
-//                                         controller: _priceController,
-//                                         decoration: InputDecoration(
-//                                             labelText: "Price",
-//                                             border: OutlineInputBorder(),
-//                                             focusedBorder: OutlineInputBorder(
-//                                               borderSide: BorderSide(
-//                                                   color: Colors.blue),
-//                                             )),
-//                                       ),
-//                                     )
-//                                   ],
-//                                 ),
-//                                 SizedBox(
-//                                   height: 25,
-//                                 ),
-//                                 Row(
-//                                   mainAxisAlignment: MainAxisAlignment.start,
-//                                   children: [
-//                                     Checkbox(
-//                                       value: isCheckedone,
-//                                       onChanged: (bool? value) {
-//                                         setState(() {
-//                                           isCheckedone = value!;
-//                                         });
-//                                       },
-//                                       activeColor: AppColors.primary,
-//                                       checkColor: Colors.white,
-//                                     ),
-//                                     SizedBox(
-//                                       width: 20,
-//                                     ),
-//                                     Text("mid"),
-//                                     SizedBox(
-//                                       width: 25,
-//                                     ),
-//                                     SizedBox(
-//                                       height: height * 0.06,
-//                                       width: width * 0.3,
-//                                       child: TextField(
-//                                         controller: _priceController,
-//                                         decoration: InputDecoration(
-//                                             labelText: "Price",
-//                                             border: OutlineInputBorder(),
-//                                             focusedBorder: OutlineInputBorder(
-//                                               borderSide: BorderSide(
-//                                                   color: Colors.blue),
-//                                             )),
-//                                       ),
-//                                     )
-//                                   ],
-//                                 ),
-//                                 SizedBox(
-//                                   height: 25,
-//                                 ),
-//                                 Row(
-//                                   mainAxisAlignment: MainAxisAlignment.start,
-//                                   children: [
-//                                     Checkbox(
-//                                       value: isCheckedtwo,
-//                                       onChanged: (bool? value) {
-//                                         setState(() {
-//                                           isCheckedtwo = value!;
-//                                         });
-//                                       },
-//                                       activeColor: AppColors.primary,
-//                                       checkColor: Colors.white,
-//                                     ),
-//                                     SizedBox(
-//                                       width: 20,
-//                                     ),
-//                                     Text("big"),
-//                                     SizedBox(
-//                                       width: 25,
-//                                     ),
-//                                     SizedBox(
-//                                       height: height * 0.06,
-//                                       width: width * 0.3,
-//                                       child: TextField(
-//                                         controller: _priceController,
-//                                         decoration: InputDecoration(
-//                                             labelText: "Price",
-//                                             border: OutlineInputBorder(),
-//                                             focusedBorder: OutlineInputBorder(
-//                                               borderSide: BorderSide(
-//                                                   color: Colors.blue),
-//                                             )),
-//                                       ),
-//                                     )
-//                                   ],
-//                                 ),
-//                                 SizedBox(
-//                                   height: 25,
-//                                 ),
-//                               ],
-//                             ),
-//                           ),*/
-//                         ],
-//                       ),
-//                     ),
-//                   ),
-//                 )
-//                 :SizedBox(),
-//
-//                 SizedBox(
-//                   height: 10,
-//                 ),
-//                 CommonButton(
-//                     height: height * 0.07,
-//                     onTap: () {
-//                       saveChnages();
-//                     },
-//                     child: Text('Save'))
-//               ],
-//             ),
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }

@@ -84,7 +84,7 @@ class _TotalsalesState extends State<Totalsales> {
                   Container(
                     padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -197,12 +197,11 @@ class _SalesDataViewState extends State<SalesDataView> {
   @override
   void didUpdateWidget(covariant SalesDataView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadDataAndFilter();
-
     if (widget.period != oldWidget.period) {
       _startDate = null;
       _endDate = null;
     }
+    _loadDataAndFilter();
   }
 
   Future<void> _loadDataAndFilter() async {
@@ -269,10 +268,22 @@ class _SalesDataViewState extends State<SalesDataView> {
       }
     }
 
+    // Exclude voided/cancelled orders entirely — they generated no revenue
+    resultingList = resultingList.where((order) {
+      final status = order.orderStatus ?? '';
+      return status != 'VOID' && status != 'VOIDED';
+    }).toList();
+
     setState(() {
       _filteredOrders = resultingList;
-      _totalOrdersCount = _filteredOrders.where((order) => order.orderStatus != 'FULLY_REFUNDED').length;
-      _totalSales = _filteredOrders.fold(0.0, (sum, order) => sum + (order.totalPrice - (order.refundAmount ?? 0.0)));
+      // Exclude fully-refunded from count (already no revenue)
+      _totalOrdersCount = _filteredOrders
+          .where((o) => o.orderStatus != 'FULLY_REFUNDED')
+          .length;
+      // Exclude fully-refunded from sales total
+      _totalSales = _filteredOrders
+          .where((o) => o.orderStatus != 'FULLY_REFUNDED')
+          .fold(0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0)));
       _isLoading = false;
     });
   }
@@ -290,18 +301,33 @@ class _SalesDataViewState extends State<SalesDataView> {
       'Customer',
       'Payment Method',
       'Order Type',
+      'Status',
       'Amount',
     ];
 
+    // Export only orders counted in totals (exclude FULLY_REFUNDED) for consistency
+    final exportOrders = _filteredOrders
+        .where((o) => o.orderStatus != 'FULLY_REFUNDED')
+        .toList();
+
     // Prepare data rows
-    final data = _filteredOrders.map((order) {
+    final data = exportOrders.map((order) {
       final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      final String statusLabel;
+      switch (order.orderStatus) {
+        case 'PARTIALLY_REFUNDED':
+          statusLabel = 'Partial Refund';
+          break;
+        default:
+          statusLabel = 'Completed';
+      }
       return [
         ReportExportService.formatDateTime(order.orderAt),
         order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
-        order.customerName ?? 'Guest',
+        order.customerName,
         order.paymentmode ?? 'N/A',
         order.orderType ?? 'N/A',
+        statusLabel,
         ReportExportService.formatCurrency(netAmount),
       ];
     }).toList();
@@ -367,7 +393,16 @@ class _SalesDataViewState extends State<SalesDataView> {
         setState(() {
           if (isStartDate) {
             _startDate = picked;
+            // Clear end date if it is now before the new start date
+            if (_endDate != null && _endDate!.isBefore(picked)) {
+              _endDate = null;
+            }
           } else {
+            // Prevent end date before start date
+            if (_startDate != null && picked.isBefore(_startDate!)) {
+              NotificationService.instance.showError('End date cannot be before start date');
+              return;
+            }
             _endDate = picked;
           }
         });
@@ -377,8 +412,7 @@ class _SalesDataViewState extends State<SalesDataView> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = AppResponsive.isTablet(context);
 
     if (_isLoading) {
       return Center(child: CircularProgressIndicator(color: AppColors.primary));
@@ -392,8 +426,7 @@ class _SalesDataViewState extends State<SalesDataView> {
   }
 
   Widget _buildCustomDateSelector(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
+    final isDesktop = AppResponsive.isDesktop(context);
 
     String formatDate(DateTime? date) {
       if (date == null) return 'Select Date';
@@ -573,13 +606,11 @@ class _SalesDataViewState extends State<SalesDataView> {
   }
 
   Widget _buildSummaryCards(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return Row(
       children: [
         Expanded(
-          flex: isDesktop ? 1 : 1,
           child: Container(
             padding: EdgeInsets.all(isTablet ? 24 : 16),
             decoration: BoxDecoration(
@@ -607,7 +638,7 @@ class _SalesDataViewState extends State<SalesDataView> {
                     Container(
                       padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 6)),
                       decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1 * Colors.green.a),
+                        color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(Icons.currency_rupee, color: Colors.green, size: isDesktop ? 28 : (isTablet ? 22 : 16)),
@@ -632,7 +663,6 @@ class _SalesDataViewState extends State<SalesDataView> {
         ),
         SizedBox(width: isDesktop ? 24 : 16),
         Expanded(
-          flex: isDesktop ? 1 : 1,
           child: Container(
             padding: EdgeInsets.all(isTablet ? 24 : 16),
             decoration: BoxDecoration(
@@ -660,7 +690,7 @@ class _SalesDataViewState extends State<SalesDataView> {
                     Container(
                       padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 6)),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1 * Colors.orange.a),
+                        color: Colors.orange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(Icons.receipt_long, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 16)),
@@ -688,8 +718,7 @@ class _SalesDataViewState extends State<SalesDataView> {
   }
 
   Widget _buildExportButton(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return SizedBox(
       width: double.infinity,
@@ -707,6 +736,33 @@ class _SalesDataViewState extends State<SalesDataView> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
+    );
+  }
+
+  Widget _buildStatusBadge(String? status, double fontSize) {
+    final Color bg;
+    final Color fg;
+    final String label;
+    switch (status) {
+      case 'PARTIALLY_REFUNDED':
+        bg = Colors.orange.withValues(alpha: 0.12);
+        fg = Colors.orange.shade800;
+        label = 'Partial Refund';
+        break;
+      case 'FULLY_REFUNDED':
+        bg = Colors.red.withValues(alpha: 0.1);
+        fg = Colors.red.shade700;
+        label = 'Refunded';
+        break;
+      default:
+        bg = Colors.green.withValues(alpha: 0.1);
+        fg = Colors.green.shade700;
+        label = 'Completed';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: GoogleFonts.poppins(fontSize: fontSize, color: fg, fontWeight: FontWeight.w500)),
     );
   }
 
@@ -745,6 +801,7 @@ class _SalesDataViewState extends State<SalesDataView> {
                 DataColumn(label: Text('Customer', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
                 DataColumn(label: Text('Payment', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
                 DataColumn(label: Text('Type', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                DataColumn(label: Text('Status', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
                 DataColumn(label: Text('Amount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
               ],
               rows: _filteredOrders.map((order) {
@@ -761,13 +818,14 @@ class _SalesDataViewState extends State<SalesDataView> {
                           vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(order.paymentmode ?? 'N/A', style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context), color: AppColors.primary, fontWeight: FontWeight.w500)),
                       ),
                     ),
                     DataCell(Text(order.orderType ?? 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textSecondary))),
+                    DataCell(_buildStatusBadge(order.orderStatus, cellFontSize)),
                     DataCell(Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(netAmount)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600))),
                   ],
                 );

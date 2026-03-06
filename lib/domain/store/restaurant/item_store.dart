@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:mobx/mobx.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../data/repositories/restaurant/item_repository.dart';
@@ -148,13 +149,24 @@ abstract class _ItemStore with Store {
       isLoading = true;
       errorMessage = null;
 
+      // Duplicate name guard — case-insensitive check within the same category
+      final duplicate = items.any((i) =>
+          i.name.trim().toLowerCase() == item.name.trim().toLowerCase() &&
+          i.categoryOfItem == item.categoryOfItem);
+      if (duplicate) {
+        errorMessage =
+            '"${item.name}" already exists in this category. Use a different name.';
+        return false;
+      }
+
       await _repository.addItem(item);
       items.add(item);
 
       return true;
     } catch (e) {
       errorMessage = 'Failed to add item: $e';
-      print('Error adding item: $e');
+      debugPrint('Error adding item: $e');
+
       return false;
     } finally {
       isLoading = false;

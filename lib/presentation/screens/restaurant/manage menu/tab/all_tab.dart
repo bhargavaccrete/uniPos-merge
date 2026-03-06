@@ -41,10 +41,16 @@ class _AllTabState extends State<AllTab> {
     super.dispose();
   }
 
+  Future<void> _bulkToggleCategory(String categoryId, List<Items> items) async {
+    final anyDisabled = items.any((i) => !i.isEnabled);
+    for (final item in items.where((i) => i.isEnabled != anyDisabled)) {
+      await itemStore.toggleItemStatus(item.id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height;
-    final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -57,7 +63,7 @@ class _AllTabState extends State<AllTab> {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: Offset(0, 2),
                     ),
@@ -184,7 +190,7 @@ class _AllTabState extends State<AllTab> {
                           key: _categoryKeys[cat.id],
                           margin: EdgeInsets.only(bottom: 16),
                           elevation: 2,
-                          shadowColor: Colors.black.withOpacity(0.1),
+                          shadowColor: Colors.black.withValues(alpha: 0.1),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -198,7 +204,7 @@ class _AllTabState extends State<AllTab> {
                               leading: Container(
                                 padding: EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
+                                  color: AppColors.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -207,13 +213,67 @@ class _AllTabState extends State<AllTab> {
                                   size: 24,
                                 ),
                               ),
-                              title: Text(
-                                cat.name,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      cat.name,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                  if (items.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    () {
+                                      final allEnabled = items.every((i) => i.isEnabled);
+                                      final fg = allEnabled
+                                          ? Colors.orange.shade700
+                                          : Colors.green.shade700;
+                                      return GestureDetector(
+                                        onTap: () => _bulkToggleCategory(cat.id, items),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: allEnabled
+                                                ? Colors.orange.shade50
+                                                : Colors.green.shade50,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: allEnabled
+                                                  ? Colors.orange.shade200
+                                                  : Colors.green.shade200,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                allEnabled
+                                                    ? Icons.visibility_off_outlined
+                                                    : Icons.visibility_outlined,
+                                                size: 13,
+                                                color: fg,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                allEnabled ? 'Disable All' : 'Enable All',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: fg,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }(),
+                                  ],
+                                ],
                               ),
                               subtitle: Text(
                                 '${items.length} items',
@@ -256,7 +316,7 @@ class _AllTabState extends State<AllTab> {
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.03),
+                                              color: Colors.black.withValues(alpha: 0.03),
                                               blurRadius: 8,
                                               offset: Offset(0, 2),
                                             ),
@@ -274,8 +334,8 @@ class _AllTabState extends State<AllTab> {
                                                     padding: EdgeInsets.all(10),
                                                     decoration: BoxDecoration(
                                                       color: item.isEnabled
-                                                          ? Colors.green.withOpacity(0.1)
-                                                          : Colors.red.withOpacity(0.1),
+                                                          ? Colors.green.withValues(alpha: 0.1)
+                                                          : Colors.red.withValues(alpha: 0.1),
                                                       borderRadius: BorderRadius.circular(10),
                                                     ),
                                                     child: Icon(
@@ -308,7 +368,7 @@ class _AllTabState extends State<AllTab> {
                                                                 vertical: 4,
                                                               ),
                                                               decoration: BoxDecoration(
-                                                                color: AppColors.primary.withOpacity(0.1),
+                                                                color: AppColors.primary.withValues(alpha: 0.1),
                                                                 borderRadius: BorderRadius.circular(6),
                                                               ),
                                                               child: Text(

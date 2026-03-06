@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/addexpence.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/viewexpense.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
-import '../../../widget/componets/restaurant/componets/filterButton.dart';
 
 class ExpenseScreen extends StatefulWidget {
   const ExpenseScreen({super.key});
@@ -44,8 +44,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   // }
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = AppResponsive.isTablet(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -59,7 +58,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
               color: AppColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha:0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -111,7 +110,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                   Container(
                     padding: EdgeInsets.all(isTablet ? 10 : 8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(

@@ -129,7 +129,7 @@ class _AllTabState extends State<ItemsTab> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -249,7 +249,7 @@ class _AllTabState extends State<ItemsTab> {
                     return Card(
                       margin: EdgeInsets.only(bottom: 12),
                       elevation: 2,
-                      shadowColor: Colors.black.withOpacity(0.1),
+                      shadowColor: Colors.black.withValues(alpha: 0.1),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                         side: BorderSide(
@@ -270,8 +270,8 @@ class _AllTabState extends State<ItemsTab> {
                                   padding: EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: item.isEnabled
-                                        ? Colors.green.withOpacity(0.1)
-                                        : Colors.red.withOpacity(0.1),
+                                        ? Colors.green.withValues(alpha: 0.1)
+                                        : Colors.red.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
@@ -305,8 +305,8 @@ class _AllTabState extends State<ItemsTab> {
                                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
                                               color: item.isVeg == 'Veg'
-                                                  ? Colors.green.withOpacity(0.1)
-                                                  : Colors.red.withOpacity(0.1),
+                                                  ? Colors.green.withValues(alpha: 0.1)
+                                                  : Colors.red.withValues(alpha: 0.1),
                                               borderRadius: BorderRadius.circular(6),
                                               border: Border.all(
                                                 color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
@@ -419,7 +419,7 @@ class _AllTabState extends State<ItemsTab> {
                                   Container(
                                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.1),
+                                      color: AppColors.primary.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Row(
@@ -570,7 +570,7 @@ class _AllTabState extends State<ItemsTab> {
 
             return Card(
               elevation: 2,
-              shadowColor: Colors.black.withOpacity(0.1),
+              shadowColor: Colors.black.withValues(alpha: 0.1),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(
@@ -586,8 +586,8 @@ class _AllTabState extends State<ItemsTab> {
                     padding: EdgeInsets.all(isTablet ? 8 : 10),
                     decoration: BoxDecoration(
                       color: item.isEnabled
-                          ? Colors.green.withOpacity(0.05)
-                          : Colors.red.withOpacity(0.05),
+                          ? Colors.green.withValues(alpha: 0.05)
+                          : Colors.red.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                     ),
                     child: Column(
@@ -599,8 +599,8 @@ class _AllTabState extends State<ItemsTab> {
                               padding: EdgeInsets.all(isTablet ? 6 : 8),
                               decoration: BoxDecoration(
                                 color: item.isEnabled
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.red.withOpacity(0.1),
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.red.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
@@ -653,8 +653,8 @@ class _AllTabState extends State<ItemsTab> {
                               padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
                                 color: item.isVeg == 'Veg'
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.red.withOpacity(0.1),
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.red.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
                                   color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
@@ -689,7 +689,7 @@ class _AllTabState extends State<ItemsTab> {
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(

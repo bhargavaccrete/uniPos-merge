@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
-import '../../../../constants/restaurant/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
-import '../../../widget/componets/restaurant/componets/Button.dart';
 
 class ManageCategory extends StatefulWidget {
   const ManageCategory({super.key});
@@ -77,10 +75,7 @@ class _ManageCategoryState extends State<ManageCategory> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final height = size.height;
-    final width = size.width;
+    final isTablet = AppResponsive.isTablet(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -111,7 +106,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                 Container(
                   padding: EdgeInsets.all(isTablet ? 10 : 8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -188,7 +183,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                                   Container(
                                     padding: EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.1),
+                                      color: AppColors.primary.withValues(alpha:0.1),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Icon(
@@ -364,7 +359,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
+                            color: Colors.black.withValues(alpha:0.03),
                             blurRadius: 8,
                             offset: Offset(0, 2),
                           ),
@@ -376,8 +371,8 @@ class _ManageCategoryState extends State<ManageCategory> {
                             padding: EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: category.isEnabled
-                                  ? AppColors.primary.withOpacity(0.1)
-                                  : Colors.grey.withOpacity(0.1),
+                                  ? AppColors.primary.withValues(alpha:0.1)
+                                  : Colors.grey.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
@@ -412,7 +407,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                           SizedBox(width: 8),
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              color: Colors.red.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: IconButton(
@@ -428,7 +423,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                                         Container(
                                           padding: EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: Colors.red.withOpacity(0.1),
+                                            color: Colors.red.withValues(alpha:0.1),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Icon(Icons.delete_rounded, color: Colors.red, size: 24),

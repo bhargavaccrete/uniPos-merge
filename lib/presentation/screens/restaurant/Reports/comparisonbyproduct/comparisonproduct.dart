@@ -296,12 +296,14 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       final previousQty = previousQuantities[productName] ?? 0;
       final difference = currentQty - previousQty;
 
-      // Calculate growth percentage
+      // Calculate growth percentage.
+      // FIX 1: Use double.infinity as a sentinel for "New" (no previous data).
+      // Displaying 100% growth when previous=0 is mathematically wrong.
       double growthPercentage = 0.0;
       if (previousQty > 0) {
         growthPercentage = ((currentQty - previousQty) / previousQty) * 100;
       } else if (currentQty > 0) {
-        growthPercentage = 100.0; // New product, 100% growth
+        growthPercentage = double.infinity; // sentinel: product is new this period
       }
 
       comparisonList.add(ProductComparisonData(
@@ -342,13 +344,21 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       product.previousPeriodQty.toString(),
       product.currentPeriodQty.toString(),
       '${product.difference > 0 ? '+' : ''}${product.difference}',
-      '${product.growthPercentage.toStringAsFixed(1)}%',
+      product.growthPercentage.isInfinite
+          ? 'New'
+          : '${product.growthPercentage >= 0 ? '+' : ''}${product.growthPercentage.toStringAsFixed(1)}%',
     ]).toList();
 
     final totalCurrent = comparisonData.fold<int>(0, (sum, p) => sum + p.currentPeriodQty);
     final totalPrevious = comparisonData.fold<int>(0, (sum, p) => sum + p.previousPeriodQty);
     final totalDifference = totalCurrent - totalPrevious;
-    final overallGrowth = totalPrevious > 0 ? ((totalCurrent - totalPrevious) / totalPrevious) * 100 : 0.0;
+    // FIX 2: Use 'New' when totalPrevious=0 — '+0.0%' is misleading when base is zero.
+    final overallGrowthStr = totalPrevious == 0
+        ? (totalCurrent > 0 ? 'New' : '0%')
+        : () {
+            final g = ((totalCurrent - totalPrevious) / totalPrevious) * 100;
+            return '${g >= 0 ? '+' : ''}${g.toStringAsFixed(1)}%';
+          }();
 
     final summary = {
       'Comparison Period': '${comparisonData.first.previousLabel} vs ${comparisonData.first.currentLabel}',
@@ -356,7 +366,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       'Total Previous Period': totalPrevious.toString(),
       'Total Current Period': totalCurrent.toString(),
       'Total Difference': '${totalDifference > 0 ? '+' : ''}$totalDifference',
-      'Overall Growth': '${overallGrowth >= 0 ? '+' : ''}${overallGrowth.toStringAsFixed(1)}%',
+      'Overall Growth': overallGrowthStr,
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
     };
 
@@ -704,7 +714,10 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                                           ),
                                           DataCell(
                                             Text(
-                                              '${data.growthPercentage.toStringAsFixed(1)}%',
+                                              // FIX 1 & 3: Show 'New' for sentinel; add + prefix for positive growth.
+                                              data.growthPercentage.isInfinite
+                                                  ? 'New'
+                                                  : '${data.growthPercentage >= 0 ? '+' : ''}${data.growthPercentage.toStringAsFixed(1)}%',
                                               style: GoogleFonts.poppins(
                                                 fontSize: AppResponsive.smallFontSize(context),
                                                 fontWeight: FontWeight.w600,

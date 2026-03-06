@@ -303,6 +303,14 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     _totalClosingBalance = 0.0;
     _reportCount = reports.length;
 
+    // For opening/closing balance: use the first day's opening and last day's closing.
+    // Summing across days would inflate these figures incorrectly.
+    if (reports.isNotEmpty) {
+      final sorted = reports.toList()..sort((a, b) => a.date.compareTo(b.date));
+      _totalOpeningBalance = sorted.first.openingBalance;
+      _totalClosingBalance = sorted.last.closingBalance;
+    }
+
     for (final report in reports) {
       // Aggregate order types
       for (final order in report.orderSummaries) {
@@ -320,8 +328,6 @@ class _ClosingReportViewState extends State<ClosingReportView> {
 
       _totalSales += report.totalSales;
       _totalExpenses += report.totalExpenses;
-      _totalOpeningBalance += report.openingBalance;
-      _totalClosingBalance += report.closingBalance;
     }
   }
 
@@ -335,15 +341,17 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     final dataRows = <List<dynamic>>[];
 
     // Add financial summary
+    dataRows.add(['Opening Balance', ReportExportService.formatCurrency(_totalOpeningBalance)]);
     dataRows.add(['Total Sales', ReportExportService.formatCurrency(_totalSales)]);
     dataRows.add(['Total Expenses', ReportExportService.formatCurrency(_totalExpenses)]);
     dataRows.add(['Net Amount', ReportExportService.formatCurrency(_totalSales - _totalExpenses)]);
+    dataRows.add(['Closing Balance', ReportExportService.formatCurrency(_totalClosingBalance)]);
     dataRows.add(['', '']); // Empty row separator
 
     // Add order breakdown
     for (var entry in _orderTypeTotals.entries) {
       dataRows.add([
-        '${entry.key} Orders (${_orderTypeCounts[entry.key]} count)',
+        '${entry.key} Orders (${_orderTypeCounts[entry.key] ?? 0} count)',
         ReportExportService.formatCurrency(entry.value)
       ]);
     }
@@ -352,7 +360,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     // Add payment breakdown
     for (var entry in _paymentTypeTotals.entries) {
       dataRows.add([
-        '$entry.key} Payments',
+        '${entry.key} Payments',
         ReportExportService.formatCurrency(entry.value)
       ]);
     }
@@ -1266,11 +1274,15 @@ class _ClosingReportViewState extends State<ClosingReportView> {
             ),
           ),
           AppResponsive.verticalSpace(context),
+          _buildFinancialRow('Opening Balance:', _totalOpeningBalance, Colors.indigo.shade600),
+          SizedBox(height: 8),
           _buildFinancialRow('Total Sales:', _totalSales, Colors.green.shade700),
           SizedBox(height: 8),
           _buildFinancialRow('Total Expenses:', _totalExpenses, Colors.red.shade700, isNegative: true),
           Divider(thickness: 1, height: 20),
           _buildFinancialRow('Net Amount:', _totalSales - _totalExpenses, Colors.blue.shade800, isBold: true),
+          SizedBox(height: 8),
+          _buildFinancialRow('Closing Balance:', _totalClosingBalance, Colors.indigo.shade800, isBold: true),
         ],
       ),
     );

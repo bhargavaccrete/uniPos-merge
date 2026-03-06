@@ -39,7 +39,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     for (final order in allOrders) {
       // Skip fully refunded and voided orders
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'FULLY_REFUNDED' || status == 'VOIDED' || status == 'VOID') continue;
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
 
       // Get customer name, use "Walk-in Customer" if empty
       String customerName = order.customerName.trim();
@@ -53,13 +53,15 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       // Skip if net revenue is 0 or negative
       if (netRevenue <= 0) continue;
 
-      if (customerMap.containsKey(customerName)) {
-        customerMap[customerName]!.revenue += netRevenue;
-        customerMap[customerName]!.orderCount += 1;
+      // FIX 1: Use lowercase key so "John" and "JOHN" map to the same customer.
+      final mapKey = customerName.toLowerCase();
+      if (customerMap.containsKey(mapKey)) {
+        customerMap[mapKey]!.revenue += netRevenue;
+        customerMap[mapKey]!.orderCount += 1;
       } else {
-        customerMap[customerName] = CustomerRevenueData(
+        customerMap[mapKey] = CustomerRevenueData(
           srNo: 0,
-          name: customerName,
+          name: customerName, // preserve display casing from first occurrence
           revenue: netRevenue,
           orderCount: 1,
         );

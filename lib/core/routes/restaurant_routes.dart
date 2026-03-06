@@ -10,7 +10,6 @@ import 'package:unipos/presentation/screens/restaurant/Reports/pos%20End%20Day%2
 import 'package:unipos/presentation/screens/restaurant/Reports/refundDetails/refunddetails.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyCategory/salesbycategory.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyTop/salesbytop.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/data_generator_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
@@ -188,9 +187,8 @@ class RestaurantRoutes {
     RouteNames.restaurantReportsSalesBYItem: _guard(Salesbyitem(), 'reports'),
     RouteNames.restaurantReportsSalesByCategory: _guard(SalesByCategory(), 'reports'),
     RouteNames.restaurantReportsDailyClosingReport: _guard(DailyClosingReport(), 'reports'),
-    RouteNames.restaurantReportsSalesByTop: _guard(SalesByTopSelling(), 'reports'),
     RouteNames.restaurantReportsCustomerList: _guard(CustomerListReport(), 'reports'),
-    RouteNames.restaurantReportsComparisionByWeek: _guard(SalesComparison(), 'reports'),
+    RouteNames.restaurantReportsComparisionByWeek: _guard(ComparisonByWeek(), 'reports'),
     RouteNames.restaurantReportsComparisionByMonth: _guard(ComparisonByMonth(), 'reports'),
     RouteNames.restaurantReportsComparisionByYear: _guard(ComparisonByYear(), 'reports'),
     RouteNames.restaurantReportsComparisionByProduct: _guard(ComparisonByProduct(), 'reports'),

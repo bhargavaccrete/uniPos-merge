@@ -55,23 +55,32 @@ class _CustomerListReportState extends State<CustomerListReport> {
                (customerPhone.isNotEmpty && order.customerName.contains(customerPhone));
       }).toList();
 
-      // Calculate order statistics
-      final totalOrders = customerOrders.length;
-      final totalSpent = customerOrders.fold<double>(
-        0.0,
-        (sum, order) => sum + ((order.totalPrice ?? 0.0) - (order.refundAmount ?? 0.0))
-      );
+      // FIX 1 & 2: Exclude VOID/VOIDED orders — they were never completed sales.
+      final validOrders = customerOrders.where((order) {
+        final status = order.orderStatus ?? '';
+        return status != 'VOID' && status != 'VOIDED';
+      }).toList();
 
-      // Find last order date
+      // Calculate order statistics
+      final totalOrders = validOrders.length;
+
+      // FIX 3: FULLY_REFUNDED orders contribute 0 to spent; others net off refund amount.
+      final totalSpent = validOrders.fold<double>(0.0, (sum, order) {
+        final status = order.orderStatus ?? '';
+        if (status == 'FULLY_REFUNDED') return sum;
+        return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
+      });
+
+      // FIX 5: Last order date only from valid (non-voided) orders.
       DateTime? lastOrderDate;
-      if (customerOrders.isNotEmpty) {
-        customerOrders.sort((a, b) {
+      if (validOrders.isNotEmpty) {
+        validOrders.sort((a, b) {
           if (a.orderAt == null && b.orderAt == null) return 0;
           if (a.orderAt == null) return 1;
           if (b.orderAt == null) return -1;
           return b.orderAt!.compareTo(a.orderAt!);
         });
-        lastOrderDate = customerOrders.first.orderAt;
+        lastOrderDate = validOrders.first.orderAt;
       }
 
       // Apply search filter
@@ -85,8 +94,9 @@ class _CustomerListReportState extends State<CustomerListReport> {
         }
       }
 
+      // FIX 4: srNo based on current list size — no gaps when search filters rows.
       customerDataList.add(CustomerReportData(
-        srNo: i + 1,
+        srNo: customerDataList.length + 1,
         name: customer.name ?? 'Unknown',
         phone: customer.phone ?? '-',
         totalOrders: totalOrders,

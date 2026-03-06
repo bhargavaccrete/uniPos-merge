@@ -43,7 +43,8 @@ class _MonthWisebyComparisonState extends State<MonthWisebyComparison> {
     Map<String, int> previousMonthQuantities = {};
 
     for (final order in allOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      final orderStatus = order.orderStatus?.toUpperCase() ?? '';
+      if (orderStatus == 'VOID' || orderStatus == 'VOIDED' || orderStatus == 'FULLY_REFUNDED' || orderStatus == 'PARTIALLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
       // Check if current month

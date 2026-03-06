@@ -82,8 +82,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
     }
 
     final headers = [
-      'Opening Date',
-      'Closing Date',
+      'Date',
+      'Total Sales',
       'Opening Balance',
       'Closing Balance',
       'Actual Cash',
@@ -97,20 +97,22 @@ class _PosenddayreportState extends State<Posenddayreport> {
       double cardAmount = 0.0;
       double onlineAmount = 0.0;
 
+      // FIX 2: Use += to accumulate; = would discard earlier entries of the same type.
       for (var payment in report.paymentSummaries) {
         if (payment.paymentType.toLowerCase() == 'cash') {
-          cashAmount = payment.totalAmount;
+          cashAmount += payment.totalAmount;
         } else if (payment.paymentType.toLowerCase() == 'card') {
-          cardAmount = payment.totalAmount;
+          cardAmount += payment.totalAmount;
         } else if (payment.paymentType.toLowerCase() == 'online' ||
             payment.paymentType.toLowerCase() == 'upi') {
-          onlineAmount = payment.totalAmount;
+          onlineAmount += payment.totalAmount;
         }
       }
 
       return [
+        // FIX 1: Model has no closingDate — replaced with report date and totalSales.
         ReportExportService.formatDateTime(report.date),
-        ReportExportService.formatDateTime(report.date.add(Duration(hours: 8))),
+        ReportExportService.formatCurrency(report.totalSales),
         ReportExportService.formatCurrency(report.openingBalance),
         ReportExportService.formatCurrency(report.closingBalance),
         ReportExportService.formatCurrency(report.cashReconciliation.actualCash),
@@ -628,8 +630,9 @@ class _PosenddayreportState extends State<Posenddayreport> {
               dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
               dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
               columns: [
-                DataColumn(label: Text('Opening Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
-                DataColumn(label: Text('Closing Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                // FIX 1: 'Closing Date' was fabricated (date + 8 hours); replaced with 'Total Sales'.
+                DataColumn(label: Text('Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
+                DataColumn(label: Text('Total Sales', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Opening', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Closing', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Actual Cash', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
@@ -645,19 +648,21 @@ class _PosenddayreportState extends State<Posenddayreport> {
                 double cardAmount = 0.0;
                 double onlineAmount = 0.0;
 
+                // FIX 2: Use += to accumulate all entries of the same payment type.
                 for (var payment in report.paymentSummaries) {
                   if (payment.paymentType.toLowerCase() == 'cash') {
-                    cashAmount = payment.totalAmount;
+                    cashAmount += payment.totalAmount;
                   } else if (payment.paymentType.toLowerCase() == 'card') {
-                    cardAmount = payment.totalAmount;
+                    cardAmount += payment.totalAmount;
                   } else if (payment.paymentType.toLowerCase() == 'online' ||
                       payment.paymentType.toLowerCase() == 'upi') {
-                    onlineAmount = payment.totalAmount;
+                    onlineAmount += payment.totalAmount;
                   }
                 }
 
                 return DataRow(
                   cells: [
+                    // FIX 1: Show report date; 'Closing Date' col replaced with 'Total Sales'.
                     DataCell(
                       Text(
                         '${dateFormatter.format(report.date)}\n${timeFormatter.format(report.date)}',
@@ -666,8 +671,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
                     ),
                     DataCell(
                       Text(
-                        '${dateFormatter.format(report.date)}\n${timeFormatter.format(report.date.add(Duration(hours: 8)))}',
-                        style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary),
+                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.totalSales)}',
+                        style: GoogleFonts.poppins(fontSize: cellFontSize, color: Colors.green.shade700, fontWeight: FontWeight.w600),
                       ),
                     ),
                     DataCell(

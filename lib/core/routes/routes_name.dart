@@ -68,7 +68,6 @@ class RouteNames {
   static const restaurantReportsSalesBYItem = '/restaurant-report-salebyitem';
   static const restaurantReportsSalesByCategory = '/restaurant-report-salebycatgeory';
   static const restaurantReportsDailyClosingReport = '/restaurant-report-dailyclosingreport';
-  static const restaurantReportsSalesByTop = '/restaurant-report-salesbytop';
   static const restaurantReportsCustomerList = '/restaurant-report-customerlist';
   static const restaurantReportsComparisionByWeek = '/restaurant-report-comparisionbyweek';
   static const restaurantReportsComparisionByMonth  = '/restaurant-report-comparisionbymonth';

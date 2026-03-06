@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/service_locator.dart';
@@ -285,7 +287,7 @@ class _AddtaxState extends State<Addtax> {
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
-                                          'Tax Rate: ${tax.taxperecentage}%',
+                                          'Tax Rate: ${DecimalSettings.formatAmount(tax.taxperecentage ?? 0)}%',
                                           style: GoogleFonts.poppins(
                                             fontSize: isTablet ? 14 : 13,
                                             color: AppColors.primary,
@@ -551,6 +553,9 @@ class _AddtaxState extends State<Addtax> {
                             borderc: 12,
                             keyboardType: TextInputType.numberWithOptions(decimal: true),
                             obsecureText: false,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                            ],
                           ),
                         ),
                       ],

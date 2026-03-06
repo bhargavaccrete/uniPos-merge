@@ -13,6 +13,7 @@ import 'package:unipos/util/images.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
 
 class CategoryTab extends StatefulWidget {
@@ -58,7 +59,6 @@ class _CategoryTabState extends State<CategoryTab> {
         _selectedImage = File(pickedFile.path);
       });
     }
-    Navigator.pop(context);
   }
 
   void _clearImage() {
@@ -69,16 +69,24 @@ class _CategoryTabState extends State<CategoryTab> {
   }
 
   Future<void> _addcategoryHive() async {
-    if (_categoryController.text.trim().isEmpty) {
-      Navigator.pop(context);
-      NotificationService.instance.showError('Category name cannot be Empty');
+    final trimmedName = _categoryController.text.trim();
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Category name cannot be empty');
+      return;
+    }
+
+    // Duplicate name check
+    final exists = categoryStore.categories
+        .any((c) => c.name.toLowerCase() == trimmedName.toLowerCase());
+    if (exists) {
+      NotificationService.instance.showError('A category with this name already exists');
       return;
     }
 
     final newcategory = Category(
       imagePath: _selectedImage != null ? _selectedImage!.path : null,
       id: const Uuid().v4(),
-      name: _categoryController.text.trim(),
+      name: trimmedName,
     );
 
     await categoryStore.addCategory(newcategory);
@@ -87,6 +95,14 @@ class _CategoryTabState extends State<CategoryTab> {
   }
 
   void _deleteCategoryhive(dynamic id) async {
+    // Cascade-delete all items belonging to this category first
+    final itemsToDelete = itemStore.items
+        .where((item) => item.categoryOfItem == id)
+        .map((item) => item.id)
+        .toList();
+    for (final itemId in itemsToDelete) {
+      await itemStore.deleteItem(itemId);
+    }
     await categoryStore.deleteCategory(id);
   }
 
@@ -112,7 +128,7 @@ class _CategoryTabState extends State<CategoryTab> {
                     Container(
                       padding: EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.category, color: AppColors.primary),
@@ -248,7 +264,7 @@ class _CategoryTabState extends State<CategoryTab> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -396,11 +412,11 @@ class _CategoryTabState extends State<CategoryTab> {
     );
   }
 
-  Widget _buildCategoryCard(Category category, List items, {required bool isGrid}) {
+  Widget _buildCategoryCard(Category category, List<Items> items, {required bool isGrid}) {
     return Card(
       margin: isGrid ? EdgeInsets.zero : EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -417,10 +433,10 @@ class _CategoryTabState extends State<CategoryTab> {
                   width: isGrid ? 50 : 60,
                   height: isGrid ? 50 : 60,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                       width: 2,
                     ),
                   ),
@@ -463,7 +479,7 @@ class _CategoryTabState extends State<CategoryTab> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -571,6 +587,12 @@ class _CategoryTabState extends State<CategoryTab> {
               ),
             ),
 
+            // Bulk Enable / Disable
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildBulkToggle(category, items, isGrid: isGrid),
+            ],
+
             // Audit Trail (only in mobile view)
             if (!isGrid &&
                 (category.createdTime != null ||
@@ -625,6 +647,58 @@ class _CategoryTabState extends State<CategoryTab> {
                   ],
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Bulk toggle ──────────────────────────────────────────────────────────────
+
+  Future<void> _bulkToggleCategory(
+      String categoryId, List<Items> items) async {
+    // Enable all if any disabled; disable all if every item is enabled
+    final anyDisabled = items.any((i) => !i.isEnabled);
+    for (final item in items.where((i) => i.isEnabled != anyDisabled)) {
+      await itemStore.toggleItemStatus(item.id);
+    }
+  }
+
+  Widget _buildBulkToggle(Category category, List<Items> items,
+      {required bool isGrid}) {
+    final allEnabled = items.every((i) => i.isEnabled);
+    final label = allEnabled ? 'Disable All' : 'Enable All';
+    final bg = allEnabled ? Colors.orange.shade50 : Colors.green.shade50;
+    final border =
+        allEnabled ? Colors.orange.shade200 : Colors.green.shade200;
+    final icon = allEnabled
+        ? Icons.visibility_off_outlined
+        : Icons.visibility_outlined;
+    final fg =
+        allEnabled ? Colors.orange.shade700 : Colors.green.shade700;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _bulkToggleCategory(category.id, items),
+      child: Container(
+        width: double.infinity,
+        padding:
+            EdgeInsets.symmetric(vertical: isGrid ? 6 : 9),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: fg),
+            const SizedBox(width: 6),
+            Text(label,
+                style: GoogleFonts.poppins(
+                    fontSize: isGrid ? 11 : 12,
+                    fontWeight: FontWeight.w600,
+                    color: fg)),
           ],
         ),
       ),
@@ -688,7 +762,7 @@ class _CategoryTabState extends State<CategoryTab> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: Offset(0, -2),
           ),

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
 import '../../../util/color.dart';
-import '../../../util/responsive.dart';
+import '../../../util/common/app_responsive.dart';
 
 /// Business Type Selection Step
-/// UI Only - uses Observer to listen to store changes
-/// Calls store methods for actions
 class BusinessTypeStep extends StatelessWidget {
   final SetupWizardStore store;
   final VoidCallback onNext;
@@ -21,110 +20,224 @@ class BusinessTypeStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hPad = AppResponsive.getValue<double>(
+        context, mobile: 20, tablet: 32, desktop: 40);
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Select Your Business Type',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.darkNeutral,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'This helps us customize UniPOS for your needs',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 30),
+          _buildHeader(context),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          _buildSubtitle(context),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+          _buildTypeCards(context),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+          _buildNavButtons(context),
+        ],
+      ),
+    );
+  }
 
-          // Business Types Grid
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: Responsive.isMobile(context) ? 2 : 3,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-              childAspectRatio: 1.6,
-            ),
-            itemCount: store.businessTypes.length,
-            itemBuilder: (context, index) {
-              final type = store.businessTypes[index];
-              // Each card wrapped in Observer to react to selection change
-              return Observer(
-                builder: (_) {
-                  final isSelected = store.selectedBusinessTypeId == type['id'];
-                  return _BusinessTypeCard(
-                    id: type['id']!,
-                    title: type['name']!,
-                    description: type['description']!,
-                    iconName: type['icon']!,
-                    isSelected: isSelected,
-                    onTap: () async {
-                      await store.selectBusinessType(type['id']!, type['name']!);
-                    },
-                  );
-                },
-              );
-            },
-          ),
+  // ── Header ──────────────────────────────────────────────────────────────────
 
-          const SizedBox(height: 40),
-
-          // Navigation Buttons - uses Observer for button state
-          Observer(
-            builder: (_) => Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onPrevious,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      side: BorderSide(color: AppColors.primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text('Back'),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: store.canProceedFromBusinessType
-                        ? () async {
-                            // Business type already selected and saved on card tap
-                            // Just ensure it's persisted and proceed
-                            await store.saveBusinessType();
-                            onNext();
-                          }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text(
-                      'Continue',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
+  Widget _buildHeader(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary,
+                AppColors.primary.withValues(alpha: 0.75),
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.storefront_rounded,
+              color: Colors.white, size: 28),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Business Type',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.headingFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'Choose how UniPOS should be configured',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubtitle(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.08),
+        borderRadius:
+            BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border:
+            Border.all(color: AppColors.info.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline,
+              color: AppColors.info,
+              size: AppResponsive.iconSize(context)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'This sets up your POS layout, workflows, and features. You cannot change this later.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Type Cards ──────────────────────────────────────────────────────────────
+
+  Widget _buildTypeCards(BuildContext context) {
+    final types = store.businessTypes;
+    final isWide = AppResponsive.isTablet(context) ||
+        AppResponsive.isDesktop(context);
+    final gap = AppResponsive.mediumSpacing(context);
+
+    if (isWide) {
+      // Side-by-side on tablet/desktop
+      return IntrinsicHeight(
+        child: Row(
+          children: [
+            for (int i = 0; i < types.length; i++) ...[
+              if (i > 0) SizedBox(width: gap),
+              Expanded(
+                child: Observer(builder: (_) {
+                  final isSelected =
+                      store.selectedBusinessTypeId == types[i]['id'];
+                  return _BusinessTypeCard(
+                    type: types[i],
+                    isSelected: isSelected,
+                    isWide: true,
+                    onTap: () =>
+                        store.selectBusinessType(types[i]['id']!, types[i]['name']!),
+                  );
+                }),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // Stacked on mobile
+    return Column(
+      children: [
+        for (int i = 0; i < types.length; i++) ...[
+          if (i > 0) SizedBox(height: gap),
+          Observer(builder: (_) {
+            final isSelected =
+                store.selectedBusinessTypeId == types[i]['id'];
+            return _BusinessTypeCard(
+              type: types[i],
+              isSelected: isSelected,
+              isWide: false,
+              onTap: () =>
+                  store.selectBusinessType(types[i]['id']!, types[i]['name']!),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  // ── Nav Buttons ─────────────────────────────────────────────────────────────
+
+  Widget _buildNavButtons(BuildContext context) {
+    return Observer(
+      builder: (_) => Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onPrevious,
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: Text('Back',
+                  style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.divider),
+                padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.getValue<double>(
+                        context, mobile: 14, tablet: 16, desktop: 16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context))),
+              ),
+            ),
+          ),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: store.canProceedFromBusinessType
+                  ? () async {
+                      await store.saveBusinessType();
+                      onNext();
+                    }
+                  : null,
+              icon: const Icon(Icons.arrow_forward,
+                  size: 16, color: AppColors.white),
+              label: Text(
+                'Continue',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                disabledBackgroundColor:
+                    AppColors.primary.withValues(alpha: 0.4),
+                padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.getValue<double>(
+                        context, mobile: 14, tablet: 16, desktop: 16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context))),
+                elevation: 0,
+              ),
             ),
           ),
         ],
@@ -133,93 +246,178 @@ class BusinessTypeStep extends StatelessWidget {
   }
 }
 
-/// Individual Business Type Card Widget
+// ── Business Type Card ─────────────────────────────────────────────────────────
+
 class _BusinessTypeCard extends StatelessWidget {
-  final String id;
-  final String title;
-  final String description;
-  final String iconName;
+  final Map<String, String> type;
   final bool isSelected;
+  final bool isWide;
   final VoidCallback onTap;
 
   const _BusinessTypeCard({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.iconName,
+    required this.type,
     required this.isSelected,
+    required this.isWide,
     required this.onTap,
   });
 
-  IconData _getIcon() {
-    switch (iconName) {
+  IconData _icon() {
+    switch (type['icon']) {
       case 'store':
-        return Icons.store;
+        return Icons.store_rounded;
       case 'restaurant':
-        return Icons.restaurant;
-      case 'build':
-        return Icons.build;
-      case 'shopping_basket':
-        return Icons.shopping_basket;
-      case 'medical_services':
-        return Icons.medical_services;
-      case 'category':
-        return Icons.category;
+        return Icons.restaurant_rounded;
       default:
-        return Icons.business;
+        return Icons.business_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final iconSize = AppResponsive.getValue<double>(
+        context, mobile: 40, tablet: 52, desktop: 60);
+    final titleFs = AppResponsive.getValue<double>(
+        context, mobile: 15, tablet: 17, desktop: 18);
+    final descFs = AppResponsive.captionFontSize(context);
+
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.all(
+            AppResponsive.getValue<double>(context, mobile: 18, tablet: 24, desktop: 28)),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.05)
+              : AppColors.white,
+          borderRadius: BorderRadius.circular(
+              AppResponsive.largeBorderRadius(context)),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey[300]!,
+            color: isSelected
+                ? AppColors.primary
+                : AppColors.divider,
             width: isSelected ? 2 : 1,
           ),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: AppColors.primary.withOpacity(0.2),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-          ],
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _getIcon(),
-              size: 40,
-              color: isSelected ? AppColors.primary : Colors.grey[600],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? AppColors.primary : AppColors.darkNeutral,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[500],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+        child: isWide
+            ? _wideLayout(context, iconSize, titleFs, descFs)
+            : _compactLayout(context, iconSize, titleFs, descFs),
+      ),
+    );
+  }
+
+  // Tablet: icon + text side-by-side
+  Widget _wideLayout(
+      BuildContext context, double iconSize, double titleFs, double descFs) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _iconBadge(iconSize),
+        const SizedBox(height: 16),
+        _texts(context, titleFs, descFs, center: true),
+        if (isSelected) ...[
+          const SizedBox(height: 14),
+          _selectedBadge(),
+        ],
+      ],
+    );
+  }
+
+  // Mobile: icon left, text right
+  Widget _compactLayout(
+      BuildContext context, double iconSize, double titleFs, double descFs) {
+    return Row(
+      children: [
+        _iconBadge(iconSize),
+        const SizedBox(width: 16),
+        Expanded(child: _texts(context, titleFs, descFs, center: false)),
+        if (isSelected) ...[
+          const SizedBox(width: 12),
+          _selectedBadge(),
+        ],
+      ],
+    );
+  }
+
+  Widget _iconBadge(double size) {
+    return Container(
+      padding: EdgeInsets.all(size * 0.25),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? AppColors.primary.withValues(alpha: 0.12)
+            : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Icon(
+        _icon(),
+        size: size,
+        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+      ),
+    );
+  }
+
+  Widget _texts(BuildContext context, double titleFs, double descFs,
+      {required bool center}) {
+    return Column(
+      crossAxisAlignment:
+          center ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      children: [
+        Text(
+          type['name'] ?? '',
+          textAlign: center ? TextAlign.center : TextAlign.start,
+          style: GoogleFonts.poppins(
+            fontSize: titleFs,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? AppColors.primary : AppColors.textPrimary,
+          ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          type['description'] ?? '',
+          textAlign: center ? TextAlign.center : TextAlign.start,
+          style: GoogleFonts.poppins(
+            fontSize: descFs,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _selectedBadge() {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check, size: 12, color: Colors.white),
+          const SizedBox(width: 4),
+          Text('Selected',
+              style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white)),
+        ],
       ),
     );
   }

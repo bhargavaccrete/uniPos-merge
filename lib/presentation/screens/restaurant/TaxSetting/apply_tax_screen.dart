@@ -60,18 +60,13 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     try {
       final double rate = widget.taxToApply.taxperecentage! / 100.0;
 
-      debugPrint("🔵 Applying tax: ${widget.taxToApply.taxname} at rate: $rate (${widget.taxToApply.taxperecentage}%)");
-      debugPrint("🔵 Selected items: ${_selectedItemIds.length}");
-
       for (String id in _selectedItemIds) {
         try {
           final item = itemStore.items.firstWhere((item) => item.id == id);
-          debugPrint("🔵 Applying tax to: ${item.name}, current taxRate: ${item.taxRate}");
           item.applyTax(rate);
           await itemStore.updateItem(item);
-          debugPrint("🔵 After apply - ${item.name}, new taxRate: ${item.taxRate}");
         } catch (e) {
-          debugPrint("❌ Item not found with id: $id");
+          // item not found, skip
         }
       }
 
@@ -96,7 +91,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
           item.removeTax();
           await itemStore.updateItem(item);
         } catch (e) {
-          debugPrint("❌ Item not found with id: $id");
+          // item not found, skip
         }
       }
 
@@ -169,6 +164,34 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
           }
 
           final items = itemStore.items;
+
+          if (items.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inventory_2_outlined, size: isTablet ? 80 : 64, color: Colors.grey.shade400),
+                  SizedBox(height: isTablet ? 20 : 16),
+                  Text(
+                    'No items available',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 18 : 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Add items to your menu first',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 14 : 13,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
 
           return Column(
             children: [
@@ -283,9 +306,9 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                   ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
                                   : AppSettings.isTaxInclusive
                                       ? item.taxRate != null
-                                          ? DecimalSettings.formatAmount(item.basePrice)
-                                          : DecimalSettings.formatAmount(item.price!)
-                                      : DecimalSettings.formatAmount(item.price!),
+                                          ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.basePrice)}'
+                                          : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}'
+                                      : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}',
                               style: GoogleFonts.poppins(
                                 fontSize: isTablet ? 16 : 15,
                                 fontWeight: FontWeight.bold,

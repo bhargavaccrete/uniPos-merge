@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -55,20 +54,19 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
       ],
     ];
 
-    // Calculate growth metrics
-    final orderGrowth = data.previousOrders > 0
-        ? ((data.currentOrders - data.previousOrders) / data.previousOrders * 100)
-        : 0.0;
-    final amountGrowth = data.previousAmount > 0
-        ? ((data.currentAmount - data.previousAmount) / data.previousAmount * 100)
-        : 0.0;
+    // FIX 4: Use string helper consistent with _calculateGrowth (returns 'New' not '0%').
+    String growthStr(double prev, double cur) {
+      if (prev == 0) return cur > 0 ? 'New' : '0%';
+      final g = ((cur - prev) / prev) * 100;
+      return '${g >= 0 ? '+' : ''}${g.toStringAsFixed(1)}%';
+    }
 
     // Prepare summary
     final summary = {
       'Report Type': 'Year Comparison',
       'Comparison Period': '${data.previousPeriod} vs ${data.currentPeriod}',
-      'Order Growth': '${orderGrowth >= 0 ? '+' : ''}${orderGrowth.toStringAsFixed(1)}%',
-      'Amount Growth': '${amountGrowth >= 0 ? '+' : ''}${amountGrowth.toStringAsFixed(1)}%',
+      'Order Growth': growthStr(data.previousOrders.toDouble(), data.currentOrders.toDouble()),
+      'Amount Growth': growthStr(data.previousAmount, data.currentAmount),
     };
 
     // Show export dialog
@@ -100,20 +98,25 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
     double previousAmount = 0.0;
 
     for (final order in allOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      // FIX 1: Skip voided and fully refunded orders.
+      final status = order.orderStatus ?? '';
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
-      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      // Compute net amount from items (consistent with salesbycategory report):
+      final itemsTotal = order.items.fold(0.0, (s, i) => s + i.finalItemPrice * i.quantity);
+      final billDiscount = order.Discount ?? 0.0;
+      final gst = order.isTaxInclusive == true ? 0.0 : (order.gstAmount ?? 0.0);
+      final netAmount = (itemsTotal - billDiscount + gst) - (order.refundAmount ?? 0.0);
 
       // Current year
-      if (order.orderAt!.isAfter(currentYearStart) ||
-          order.orderAt!.isAtSameMomentAs(currentYearStart)) {
+      if (!order.orderAt!.isBefore(currentYearStart)) {
         currentOrders++;
         currentAmount += netAmount;
       }
-      // Previous year
-      else if (order.orderAt!.isAfter(previousYearStart) &&
-          order.orderAt!.isBefore(previousYearEnd)) {
+      // FIX 2: Previous year start uses !isBefore (inclusive) to catch midnight orders.
+      else if (!order.orderAt!.isBefore(previousYearStart) &&
+          !order.orderAt!.isAfter(previousYearEnd)) {
         previousOrders++;
         previousAmount += netAmount;
       }
@@ -494,8 +497,9 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
   }
 
   String _calculateGrowth(double previous, double current) {
+    // FIX 3: previous=0 with current>0 is "New" — can't compute % from zero base.
     if (previous == 0) {
-      return current > 0 ? '+100%' : '0%';
+      return current > 0 ? 'New' : '0%';
     }
     final growth = ((current - previous) / previous) * 100;
     return '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%';

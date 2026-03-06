@@ -59,8 +59,10 @@ abstract class _ShiftStore with Store {
         }).toList();
         break;
       case 'Week':
-        final weekAgo = now.subtract(const Duration(days: 7));
-        result = result.where((s) => s.startTime.isAfter(weekAgo)).toList();
+        // FIX 4: Use calendar week (Monday start) not a rolling 7-day window.
+        final monday = now.subtract(Duration(days: now.weekday - 1));
+        final startOfWeek = DateTime(monday.year, monday.month, monday.day);
+        result = result.where((s) => !s.startTime.isBefore(startOfWeek)).toList();
         break;
       case 'Month':
         result = result
@@ -106,9 +108,16 @@ abstract class _ShiftStore with Store {
       for (final s in loaded) {
         if (s.isOpen) {
           final orders = await _repository.getOrdersForShift(s);
+          final validOrders = orders.where((o) {
+            final status = (o.orderStatus ?? '').toUpperCase();
+            return status != 'VOID' &&
+                status != 'VOIDED' &&
+                status != 'FULLY_REFUNDED' &&
+                status != 'PARTIALLY_REFUNDED';
+          }).toList();
           enriched.add(s.copyWith(
-            orderCount: orders.length,
-            totalSales: orders.fold<double>(
+            orderCount: validOrders.length,
+            totalSales: validOrders.fold<double>(
                 0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0))),
           ));
         } else {
@@ -174,8 +183,15 @@ abstract class _ShiftStore with Store {
       }
 
       final orders = await _repository.getOrdersForShift(shift);
-      final orderCount = orders.length;
-      final totalSales = orders.fold<double>(
+      final validOrders = orders.where((o) {
+        final status = (o.orderStatus ?? '').toUpperCase();
+        return status != 'VOID' &&
+            status != 'VOIDED' &&
+            status != 'FULLY_REFUNDED' &&
+            status != 'PARTIALLY_REFUNDED';
+      }).toList();
+      final orderCount = validOrders.length;
+      final totalSales = validOrders.fold<double>(
           0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0)));
 
       final closed = shift.copyWith(

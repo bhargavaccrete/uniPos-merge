@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
-import '../../../../constants/restaurant/color.dart';
-import '../../../../core/di/service_locator.dart';
-import '../../../../data/models/restaurant/db/expensel_316.dart';
-import '../../../widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../../data/models/restaurant/db/expensel_316.dart';
 class ViewExpense extends StatefulWidget {
   const ViewExpense({super.key});
 
@@ -134,7 +133,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                         Container(
                           padding: EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
+                            color: Colors.blue.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
@@ -221,6 +220,9 @@ class _ViewExpenseState extends State<ViewExpense> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
                       style: GoogleFonts.poppins(fontSize: 15),
                       decoration: InputDecoration(
                         hintText: 'Enter amount',
@@ -393,7 +395,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                                       Container(
                                         padding: EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.1),
+                                          color: Colors.red.withValues(alpha:0.1),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Icon(Icons.delete_rounded, color: Colors.red, size: 24),
@@ -483,23 +485,17 @@ class _ViewExpenseState extends State<ViewExpense> {
                               }
                               setState(() => _isSubmitting = true);
                               try {
-                                // Combine selected date with current time if editing today's expense
+                                // Always combine selected date with current time (consistent with add)
                                 final now = DateTime.now();
-                                final isSameDay = selectedDate.year == now.year &&
-                                                  selectedDate.month == now.month &&
-                                                  selectedDate.day == now.day;
-
-                                final expenseDateTime = isSameDay
-                                    ? DateTime(
-                                        selectedDate.year,
-                                        selectedDate.month,
-                                        selectedDate.day,
-                                        now.hour,
-                                        now.minute,
-                                        now.second,
-                                        now.millisecond,
-                                      )
-                                    : selectedDate;
+                                final expenseDateTime = DateTime(
+                                  selectedDate.year,
+                                  selectedDate.month,
+                                  selectedDate.day,
+                                  now.hour,
+                                  now.minute,
+                                  now.second,
+                                  now.millisecond,
+                                );
 
                                 final updatedExpense = expense.copyWith(
                                   dateandTime: expenseDateTime,
@@ -553,10 +549,7 @@ class _ViewExpenseState extends State<ViewExpense> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final height = size.height;
-    final width = size.width;
+    final isTablet = AppResponsive.isTablet(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -569,7 +562,7 @@ class _ViewExpenseState extends State<ViewExpense> {
               color: AppColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha:0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -841,7 +834,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
+                              color: Colors.black.withValues(alpha:0.03),
                               blurRadius: 8,
                               offset: Offset(0, 2),
                             ),
@@ -852,7 +845,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                             Container(
                               padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
+                                color: AppColors.primary.withValues(alpha:0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
@@ -899,7 +892,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                                   Container(
                                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
+                                      color: Colors.blue.withValues(alpha:0.1),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(

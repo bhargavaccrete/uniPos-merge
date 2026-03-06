@@ -4,14 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/util/color.dart';
-import '../../../../constants/restaurant/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
-import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import '../../../../util/common/currency_helper.dart';
 
 
 class ManageInventory extends StatefulWidget {
@@ -236,8 +236,7 @@ class _ManageInventoryState extends State<ManageInventory> {
 
 
   Widget _buildItemTile(Items item) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = AppResponsive.isTablet(context);
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -278,8 +277,8 @@ class _ManageInventoryState extends State<ManageInventory> {
                             ),
                             decoration: BoxDecoration(
                               color: item.isSoldByWeight
-                                  ? Colors.blue.withOpacity(0.1)
-                                  : Colors.purple.withOpacity(0.1),
+                                  ? Colors.blue.withValues(alpha:0.1)
+                                  : Colors.purple.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -312,8 +311,8 @@ class _ManageInventoryState extends State<ManageInventory> {
                   ),
                   decoration: BoxDecoration(
                     color: item.isInStock
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.red.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha:0.1)
+                        : Colors.red.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -368,7 +367,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                   border: Border.all(color: AppColors.divider),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withValues(alpha:0.02),
                       blurRadius: 4,
                       offset: Offset(0, 1),
                     ),
@@ -395,11 +394,11 @@ class _ManageInventoryState extends State<ManageInventory> {
                             vertical: isTablet ? 5 : 4,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            '${CurrencyHelper.currentSymbol}${variant.price.toStringAsFixed(2)}',
+                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}',
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w700,
                               fontSize: isTablet ? 13 : 12,
@@ -560,10 +559,7 @@ class _ManageInventoryState extends State<ManageInventory> {
   }
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final width = size.width;
-    final height = size.height;
+    final isTablet = AppResponsive.isTablet(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -581,7 +577,7 @@ class _ManageInventoryState extends State<ManageInventory> {
               color: AppColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha:0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -633,7 +629,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                   Container(
                     padding: EdgeInsets.all(isTablet ? 10 : 8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -685,16 +681,16 @@ class _ManageInventoryState extends State<ManageInventory> {
                 Container(
                   padding: EdgeInsets.all(isTablet ? 14 : 12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.05),
+                    color: Colors.blue.withValues(alpha:0.05),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                    border: Border.all(color: Colors.blue.withValues(alpha:0.2)),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
+                          color: Colors.blue.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -825,7 +821,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha:0.05),
                             blurRadius: 10,
                             offset: Offset(0, 2),
                           ),
@@ -860,7 +856,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           leading: Container(
                             padding: EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(

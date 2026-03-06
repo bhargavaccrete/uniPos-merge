@@ -54,7 +54,7 @@ class _ManagemenuState extends State<Managemenu>
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
+                    color: AppColors.primary.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: Offset(0, 4),
                   ),
@@ -80,8 +80,8 @@ class _ManagemenuState extends State<Managemenu>
               ),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? Colors.white.withOpacity(0.2)
-                    : AppColors.primary.withOpacity(0.1),
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -169,7 +169,7 @@ class _ManagemenuState extends State<Managemenu>
                 Container(
                   padding: EdgeInsets.all(isTablet ? 10 : 8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -205,7 +205,7 @@ class _ManagemenuState extends State<Managemenu>
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),

@@ -219,9 +219,16 @@ class _RefundDataViewState extends State<RefundDataView> {
     List<PastOrderModel> resultingList = [];
     final now = DateTime.now();
 
+    // Only genuine refund statuses — guards against VOIDED orders with refundedAt accidentally set.
+    bool isRefundedOrder(order) {
+      final status = order.orderStatus ?? '';
+      return status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED';
+    }
+
     if (widget.period == RefundPeriod.Custom) {
       if (_startDate != null && _endDate != null) {
         resultingList = _allOrders.where((order) {
+          if (!isRefundedOrder(order)) return false;
           if (order.refundedAt == null) return false;
           return order.refundedAt!.isAfter(_startDate!.subtract(const Duration(seconds: 1))) &&
               order.refundedAt!.isBefore(_endDate!.add(const Duration(days: 1)));
@@ -231,6 +238,7 @@ class _RefundDataViewState extends State<RefundDataView> {
       switch (widget.period) {
         case RefundPeriod.Today:
           resultingList = _allOrders.where((order) {
+            if (!isRefundedOrder(order)) return false;
             if (order.refundedAt == null) return false;
             final refundDate = order.refundedAt!;
             return refundDate.year == now.year &&
@@ -244,6 +252,7 @@ class _RefundDataViewState extends State<RefundDataView> {
           final endOfWeek = startOfWeek.add(const Duration(days: 7));
 
           resultingList = _allOrders.where((order) {
+            if (!isRefundedOrder(order)) return false;
             if (order.refundedAt == null) return false;
             final refundDate = order.refundedAt!;
             return !refundDate.isBefore(startOfWeek) && refundDate.isBefore(endOfWeek);
@@ -251,6 +260,7 @@ class _RefundDataViewState extends State<RefundDataView> {
           break;
         case RefundPeriod.Month:
           resultingList = _allOrders.where((order) {
+            if (!isRefundedOrder(order)) return false;
             if (order.refundedAt == null) return false;
             final refundDate = order.refundedAt!;
             return refundDate.year == now.year && refundDate.month == now.month;
@@ -258,6 +268,7 @@ class _RefundDataViewState extends State<RefundDataView> {
           break;
         case RefundPeriod.Year:
           resultingList = _allOrders.where((order) {
+            if (!isRefundedOrder(order)) return false;
             if (order.refundedAt == null) return false;
             return order.refundedAt!.year == now.year;
           }).toList();

@@ -3,7 +3,6 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
@@ -49,20 +48,29 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
     double previousAmount = 0.0;
 
     for (final order in allOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      // FIX 1: Skip voided and fully refunded orders.
+      final status = order.orderStatus ?? '';
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
-      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      // Compute net amount from items (consistent with salesbycategory report):
+      // itemsTotal = sum of per-item prices after item-level discounts
+      // subtract bill-level discount and add exclusive GSTreveniue
+      // This correctly handles both old orders (where totalPrice may be pre-discount)
+      // and new orders (where totalPrice is already post-discount).
+      final itemsTotal = order.items.fold(0.0, (s, i) => s + i.finalItemPrice * i.quantity);
+      final billDiscount = order.Discount ?? 0.0;
+      final gst = order.isTaxInclusive == true ? 0.0 : (order.gstAmount ?? 0.0);
+      final netAmount = (itemsTotal - billDiscount + gst) - (order.refundAmount ?? 0.0);
 
       // Current week
-      if (order.orderAt!.isAfter(currentWeekStartMidnight) ||
-          order.orderAt!.isAtSameMomentAs(currentWeekStartMidnight)) {
+      if (!order.orderAt!.isBefore(currentWeekStartMidnight)) {
         currentOrders++;
         currentAmount += netAmount;
       }
-      // Previous week
-      else if (order.orderAt!.isAfter(previousWeekStart) &&
-          order.orderAt!.isBefore(previousWeekEnd)) {
+      // FIX 2: Previous week start uses !isBefore (inclusive) to match midnight orders.
+      else if (!order.orderAt!.isBefore(previousWeekStart) &&
+          !order.orderAt!.isAfter(previousWeekEnd)) {
         previousOrders++;
         previousAmount += netAmount;
       }
@@ -139,7 +147,7 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
                   Container(
                     padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -251,173 +259,7 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
                       AppResponsive.verticalSpace(context),
 
                       // Comparison Table
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                          border: Border.all(color: AppColors.divider, width: 0.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              columnSpacing: AppResponsive.tableColumnSpacing(context),
-                              headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
-                              headingRowHeight: AppResponsive.tableHeadingHeight(context),
-                              dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
-                              dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-                              columns: [
-                                DataColumn(
-                                  label: Text(
-                                    'Details',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: AppResponsive.bodyFontSize(context),
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Previous Week',
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: AppResponsive.bodyFontSize(context),
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Current Week',
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: AppResponsive.bodyFontSize(context),
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              rows: [
-                                DataRow(
-                                  cells: [
-                                    DataCell(
-                                      Text(
-                                        'Total Orders',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.smallFontSize(context),
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          data.previousOrders.toString(),
-                                          style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.smallFontSize(context),
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          data.currentOrders.toString(),
-                                          style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.smallFontSize(context),
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                DataRow(
-                                  cells: [
-                                    DataCell(
-                                      Text(
-                                        'Total Amount (${CurrencyHelper.currentSymbol})',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.smallFontSize(context),
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          DecimalSettings.formatAmount(data.previousAmount),
-                                          style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.smallFontSize(context),
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          DecimalSettings.formatAmount(data.currentAmount),
-                                          style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.smallFontSize(context),
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.green.shade700,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                DataRow(
-                                  cells: [
-                                    DataCell(
-                                      Text(
-                                        'Growth %',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.smallFontSize(context),
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(child: Text('-')),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          _calculateGrowth(data.previousAmount, data.currentAmount),
-                                          style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.smallFontSize(context),
-                                            fontWeight: FontWeight.w600,
-                                            color: _getGrowthColor(data.previousAmount, data.currentAmount),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildComparisonTable(data),
                     ],
                   ),
                 ),
@@ -429,6 +271,185 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
     );
   }
 
+  Widget _buildComparisonTable(ComparisonData data) {
+    final screenWidth = AppResponsive.screenWidth(context);
+    final cellFontSize = AppResponsive.smallFontSize(context);
+    final headerFontSize = AppResponsive.bodyFontSize(context);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: screenWidth - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
+            ),
+            child: DataTable(
+              columnSpacing: AppResponsive.tableColumnSpacing(context),
+              headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
+              headingRowHeight: AppResponsive.tableHeadingHeight(context),
+              dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
+              dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
+              columns: [
+                DataColumn(
+                  label: Text(
+                    'Details',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: headerFontSize,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    data.previousPeriod,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: headerFontSize,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    data.currentPeriod,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: headerFontSize,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+              rows: [
+                DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        'Total Orders',
+                        style: GoogleFonts.poppins(
+                          fontSize: cellFontSize,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          data.previousOrders.toString(),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          data.currentOrders.toString(),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        'Total Amount (${CurrencyHelper.currentSymbol})',
+                        style: GoogleFonts.poppins(
+                          fontSize: cellFontSize,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          DecimalSettings.formatAmount(data.previousAmount),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          DecimalSettings.formatAmount(data.currentAmount),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                DataRow(
+                  cells: [
+                    DataCell(
+                      Text(
+                        'Growth %',
+                        style: GoogleFonts.poppins(
+                          fontSize: cellFontSize,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Center(child: Text('-', style: GoogleFonts.poppins(fontSize: cellFontSize))),
+                    ),
+                    DataCell(
+                      Center(
+                        child: Text(
+                          _calculateGrowth(data.previousAmount, data.currentAmount),
+                          style: GoogleFonts.poppins(
+                            fontSize: cellFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: _getGrowthColor(data.previousAmount, data.currentAmount),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   String _getCurrentWeekStart() {
     final now = DateTime.now();
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
@@ -436,8 +457,9 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
   }
 
   String _calculateGrowth(double previous, double current) {
+    // FIX 3: previous=0 with current>0 is "New" not "+100%" — can't compute % from zero base.
     if (previous == 0) {
-      return current > 0 ? '+100%' : '0%';
+      return current > 0 ? 'New' : '0%';
     }
     final growth = ((current - previous) / previous) * 100;
     return '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(1)}%';
@@ -454,12 +476,12 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
     final headers = ['Details', data.previousPeriod, data.currentPeriod];
 
     // Calculate growth percentages
-    final orderGrowth = data.previousOrders == 0
-        ? (data.currentOrders > 0 ? 100.0 : 0.0)
-        : ((data.currentOrders - data.previousOrders) / data.previousOrders) * 100;
-    final amountGrowth = data.previousAmount == 0
-        ? (data.currentAmount > 0 ? 100.0 : 0.0)
-        : ((data.currentAmount - data.previousAmount) / data.previousAmount) * 100;
+    final orderGrowthStr = data.previousOrders == 0
+        ? (data.currentOrders > 0 ? 'New' : '0%')
+        : '${((data.currentOrders - data.previousOrders) / data.previousOrders * 100) >= 0 ? '+' : ''}${((data.currentOrders - data.previousOrders) / data.previousOrders * 100).toStringAsFixed(1)}%';
+    final amountGrowthStr = data.previousAmount == 0
+        ? (data.currentAmount > 0 ? 'New' : '0%')
+        : '${((data.currentAmount - data.previousAmount) / data.previousAmount * 100) >= 0 ? '+' : ''}${((data.currentAmount - data.previousAmount) / data.previousAmount * 100).toStringAsFixed(1)}%';
 
     // Prepare data rows
     final dataRows = [
@@ -469,11 +491,7 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
         ReportExportService.formatCurrency(data.previousAmount),
         ReportExportService.formatCurrency(data.currentAmount)
       ],
-      [
-        'Growth %',
-        '-',
-        '${amountGrowth >= 0 ? '+' : ''}${amountGrowth.toStringAsFixed(1)}%'
-      ],
+      ['Growth %', '-', amountGrowthStr],
     ];
 
     // Prepare summary
@@ -481,8 +499,8 @@ class _ComparisonByWeekState extends State<ComparisonByWeek> {
       'Report Type': 'Week Comparison',
       'Previous Period': data.previousPeriod,
       'Current Period': data.currentPeriod,
-      'Order Growth': '${orderGrowth >= 0 ? '+' : ''}${orderGrowth.toStringAsFixed(1)}%',
-      'Amount Growth': '${amountGrowth >= 0 ? '+' : ''}${amountGrowth.toStringAsFixed(1)}%',
+      'Order Growth': orderGrowthStr,
+      'Amount Growth': amountGrowthStr,
     };
 
     // Show export dialog

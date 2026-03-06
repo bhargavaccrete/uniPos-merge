@@ -1,3 +1,5 @@
+
+
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -5,10 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
-import '../../../../../util/common/app_responsive.dart';
+import '../../../../../util/color.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
-import '../componets/Button.dart';
-import '../componets/Textform.dart';
 import 'add_category_dialog.dart';
 import 'add_item_form_state.dart';
 import 'category_selector_sheet.dart';
@@ -18,36 +18,65 @@ import 'widgets/category_selector_button.dart';
 import 'widgets/inventory_toggle.dart';
 import 'widgets/selling_method_selector.dart';
 
-/// Bottom sheet for adding a new item
+/// Responsive add-item sheet:
+/// - Mobile  → bottom sheet (DraggableScrollableSheet)
+/// - Tablet/Desktop → centered Dialog (width capped at 580)
 class AddItemSheet extends StatefulWidget {
   final Function(String)? onCategorySelected;
   final VoidCallback? onItemAdded;
+  final bool isDialog;
 
   const AddItemSheet({
     super.key,
     this.onCategorySelected,
+
     this.onItemAdded,
+    this.isDialog = false,
   });
 
-  /// Show the add item sheet
   static Future<void> show(
     BuildContext context, {
     Function(String)? onCategorySelected,
     VoidCallback? onItemAdded,
   }) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return AddItemSheet(
+    final isWide = MediaQuery.of(context).size.width >= 850;
+
+    if (isWide) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 580,
+              maxHeight: MediaQuery.of(context).size.height * 0.88,
+            ),
+            child: AddItemSheet(
+              isDialog: true,
+              onCategorySelected: onCategorySelected,
+              onItemAdded: onItemAdded,
+            ),
+          ),
+        ),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => AddItemSheet(
+          isDialog: false,
           onCategorySelected: onCategorySelected,
           onItemAdded: onItemAdded,
-        );
-      },
-    );
+        ),
+      );
+    }
   }
 
   @override
@@ -64,23 +93,28 @@ class _AddItemSheetState extends State<AddItemSheet> {
     super.dispose();
   }
 
+  // ── Image ─────────────────────────────────────────────────────────────────
+
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      final pickedFile = await picker.pickImage(
+          source: ImageSource.gallery, imageQuality: 85);
       if (pickedFile == null) return;
-
       final Uint8List bytes = await pickedFile.readAsBytes();
-      const maxSizeInBytes = 3 * 1024 * 1024;
-      if (bytes.length > maxSizeInBytes) {
-        NotificationService.instance.showError('Image size must be less than 3MB. Please choose a smaller image.');
+      if (bytes.length > 3 * 1024 * 1024) {
+        NotificationService.instance.showError(
+            'Image size must be less than 3MB. Please choose a smaller image.');
         return;
       }
-      setState(() { _formState.setImage(bytes); });
-    } catch (e) {
-      NotificationService.instance.showError('Failed to pick image. Please try again.');
+      setState(() => _formState.setImage(bytes));
+    } catch (_) {
+      NotificationService.instance
+          .showError('Failed to pick image. Please try again.');
     }
   }
+
+  // ── Selectors ────────────────────────────────────────────────────────────
 
   Future<void> _selectCategory() async {
     final result = await CategorySelectorSheet.show(
@@ -92,11 +126,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
         if (wasAdded) _selectCategory();
       },
     );
-
     if (result != null) {
-      setState(() {
-        _formState.setCategory(result.id, result.name);
-      });
+      setState(() => _formState.setCategory(result.id, result.name));
     }
   }
 
@@ -105,13 +136,12 @@ class _AddItemSheetState extends State<AddItemSheet> {
       context,
       currentSelection: _formState.vegCategory,
     );
-
     if (result != null) {
-      setState(() {
-        _formState.setVegCategory(result);
-      });
+      setState(() => _formState.setVegCategory(result));
     }
   }
+
+  // ── Save / More Info ─────────────────────────────────────────────────────
 
   Future<void> _saveItem() async {
     if (_isSaving) return;
@@ -120,20 +150,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
       _showValidationError(validation);
       return;
     }
-
-    setState(() { _isSaving = true; });
+    setState(() => _isSaving = true);
     try {
       final item = await _formState.toItem();
       await itemStore.addItem(item);
       widget.onItemAdded?.call();
       if (mounted) {
         Navigator.pop(context);
-        if (widget.onCategorySelected != null && _formState.selectedCategoryId != null) {
+        if (widget.onCategorySelected != null &&
+            _formState.selectedCategoryId != null) {
           widget.onCategorySelected!(_formState.selectedCategoryId!);
         }
       }
     } finally {
-      if (mounted) setState(() { _isSaving = false; });
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -143,69 +173,146 @@ class _AddItemSheetState extends State<AddItemSheet> {
       _showValidationError(validation);
       return;
     }
-
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddMoreInfoScreen(
-          initialData: _formState.toMap(),
-        ),
+        builder: (context) =>
+            AddMoreInfoScreen(initialData: _formState.toMap()),
       ),
     );
-
     if (result != null) {
-      setState(() {
-        _formState.updateFromMoreInfo(result);
-      });
-
-      if (result['shouldSave'] == true) {
-        await _saveItem();
-      }
+      setState(() => _formState.updateFromMoreInfo(result));
+      if (result['shouldSave'] == true) await _saveItem();
     }
   }
 
   void _showValidationError(ValidationResult validation) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            'Missing Required Fields',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Missing Required Fields',
+            style:
+                GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
+        content: Text(validation.errorMessage,
+            style: GoogleFonts.poppins(fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK',
+                style: GoogleFonts.poppins(
+                    color: AppColors.primary, fontWeight: FontWeight.w600)),
           ),
-          content: Text(
-            validation.errorMessage,
-            style: GoogleFonts.poppins(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'OK',
-                style: GoogleFonts.poppins(color: Colors.deepOrange),
-              ),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return DraggableScrollableSheet(
-      initialChildSize: 0.9,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    return widget.isDialog ? _buildDialogLayout() : _buildSheetLayout();
+  }
+
+  // ── Dialog Layout ─────────────────────────────────────────────────────────
+
+  Widget _buildDialogLayout() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildDialogHeader(),
+          const Divider(height: 1, color: AppColors.divider),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: _formFields(),
+              ),
+            ),
           ),
-          child: Column(
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDialogHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 12, 20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary,
+                  AppColors.primary.withValues(alpha: 0.75),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.restaurant_menu_rounded,
+                color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Add Menu Item',
+                    style: GoogleFonts.poppins(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary)),
+                Text('Fill in the item details below',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded,
+                color: AppColors.textSecondary, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Sheet Layout (mobile) ─────────────────────────────────────────────────
+
+  Widget _buildSheetLayout() {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) {
+          return Column(
             children: [
               // Drag handle
               Padding(
@@ -222,60 +329,179 @@ class _AddItemSheetState extends State<AddItemSheet> {
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  padding: EdgeInsets.fromLTRB(15, 5, 15, 40 + bottomInset),
+                  padding: EdgeInsets.fromLTRB(20, 4, 20, 40 + bottomInset),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                _buildHeader(),
-                const SizedBox(height: 20),
-                _buildItemNameField(),
-                const SizedBox(height: 15),
-                _buildSellingMethodSelector(),
-                const SizedBox(height: 15),
-                _buildPriceField(),
-                const SizedBox(height: 15),
-                _buildCategorySelector(),
-                const SizedBox(height: 15),
-                _buildVegSelector(),
-                const SizedBox(height: 15),
-                _buildDescriptionField(),
-                const SizedBox(height: 15),
-                _buildInventoryToggle(),
-                const SizedBox(height: 20),
-                _buildImageUploader(),
-                const SizedBox(height: 20),
-                _buildActionButtons(),
-              ],
-            ),
-          ),
+                      _buildSheetHeader(),
+                      const SizedBox(height: 20),
+                      ..._formFields(),
+                    ],
+                  ),
+                ),
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildHeader() {
-    return Center(
-      child: Text(
-        "Add Item",
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
-          fontWeight: FontWeight.bold,
-        ),
+          );
+        },
       ),
     );
   }
 
+  Widget _buildSheetHeader() {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary,
+                AppColors.primary.withValues(alpha: 0.75),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.restaurant_menu_rounded,
+              color: Colors.white, size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Add Menu Item',
+                  style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary)),
+              Text('Fill in the item details below',
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Shared Form Fields ────────────────────────────────────────────────────
+
+  List<Widget> _formFields() {
+    return [
+      _buildItemNameField(),
+      const SizedBox(height: 14),
+      _buildSellingMethodSelector(),
+      const SizedBox(height: 14),
+      _buildPriceField(),
+      const SizedBox(height: 14),
+      _buildCategorySelector(),
+      const SizedBox(height: 14),
+      _buildVegSelector(),
+      const SizedBox(height: 14),
+      _buildDescriptionField(),
+      const SizedBox(height: 14),
+      _buildInventoryToggle(),
+      const SizedBox(height: 16),
+      _buildImageUploader(),
+      const SizedBox(height: 24),
+      _buildActionButtons(),
+    ];
+  }
+
+  // ── Field Helpers ─────────────────────────────────────────────────────────
+
+  InputDecoration _inputDecoration(String label, IconData icon,
+      {String? prefixText}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.poppins(
+          color: AppColors.textSecondary, fontSize: 13),
+      prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+      prefixText: prefixText,
+      prefixStyle: GoogleFonts.poppins(
+          fontSize: 14, color: AppColors.textPrimary),
+      filled: true,
+      fillColor: AppColors.surfaceLight,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    );
+  }
+
   Widget _buildItemNameField() {
-    return SizedBox(
-      height: AppResponsive.height(context, 0.06),
-      child: CommonTextForm(
-        borderc: 5,
-        labelText: 'Item Name',
-        controller: _formState.itemNameController,
-        obsecureText: false,
+    return TextField(
+      controller: _formState.itemNameController,
+      style:
+          GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+      decoration: _inputDecoration('Item Name', Icons.fastfood_outlined),
+    );
+  }
+
+  Widget _buildPriceField() {
+    return TextField(
+      controller: _formState.priceController,
+      keyboardType: TextInputType.number,
+      style:
+          GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+      decoration:
+          _inputDecoration('Price', Icons.currency_rupee, prefixText: '₹ '),
+    );
+  }
+
+  Widget _buildDescriptionField() {
+    return TextField(
+      controller: _formState.descriptionController,
+      maxLines: 3,
+      minLines: 1,
+      style:
+          GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        labelText: 'Description (Optional)',
+        labelStyle: GoogleFonts.poppins(
+            color: AppColors.textSecondary, fontSize: 13),
+        alignLabelWithHint: true,
+        prefixIcon: const Padding(
+          padding: EdgeInsets.only(bottom: 44),
+          child: Icon(Icons.notes_outlined,
+              color: AppColors.primary, size: 20),
+        ),
+        filled: true,
+        fillColor: AppColors.surfaceLight,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.divider),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
@@ -284,29 +510,10 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return SellingMethodSelector(
       sellingMethod: _formState.sellingMethod,
       selectedUnit: _formState.selectedUnit,
-      onMethodChanged: (method) {
-        setState(() {
-          _formState.setSellingMethod(method);
-        });
-      },
-      onUnitChanged: (unit) {
-        setState(() {
-          _formState.setUnit(unit);
-        });
-      },
-    );
-  }
-
-  Widget _buildPriceField() {
-    return SizedBox(
-      height: AppResponsive.height(context, 0.06),
-      child: CommonTextForm(
-        borderc: 5,
-        labelText: 'Price',
-        controller: _formState.priceController,
-        obsecureText: false,
-        keyboardType: TextInputType.number,
-      ),
+      onMethodChanged: (method) =>
+          setState(() => _formState.setSellingMethod(method)),
+      onUnitChanged: (unit) =>
+          setState(() => _formState.setUnit(unit)),
     );
   }
 
@@ -334,39 +541,14 @@ class _AddItemSheetState extends State<AddItemSheet> {
     );
   }
 
-  Widget _buildDescriptionField() {
-    return TextField(
-      controller: _formState.descriptionController,
-      maxLines: 3,
-      minLines: 1,
-      style: GoogleFonts.poppins(fontSize: 14),
-      decoration: InputDecoration(
-        labelText: 'Description (Optional)',
-        labelStyle: GoogleFonts.poppins(color: Colors.grey),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(5)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(5),
-          borderSide: const BorderSide(color: Colors.deepOrange),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      ),
-    );
-  }
-
   Widget _buildInventoryToggle() {
     return InventoryToggle(
       trackInventory: _formState.trackInventory,
       allowOrderWhenOutOfStock: _formState.allowOrderWhenOutOfStock,
-      onTrackInventoryChanged: (value) {
-        setState(() {
-          _formState.setTrackInventory(value);
-        });
-      },
-      onAllowOutOfStockChanged: (value) {
-        setState(() {
-          _formState.setAllowOrderWhenOutOfStock(value);
-        });
-      },
+      onTrackInventoryChanged: (value) =>
+          setState(() => _formState.setTrackInventory(value)),
+      onAllowOutOfStockChanged: (value) =>
+          setState(() => _formState.setAllowOrderWhenOutOfStock(value)),
     );
   }
 
@@ -379,60 +561,53 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   Widget _buildActionButtons() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-          child: CommonButton(
-            onTap: _handleAddMoreInfo,
-            bgcolor: Colors.white,
-            bordercolor: Colors.deepOrange,
-            height: AppResponsive.height(context, 0.06),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.deepOrange,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Add More Info',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.2, desktop: 14.4),
-                  ),
-                )
-              ],
+          child: OutlinedButton.icon(
+            onPressed: _handleAddMoreInfo,
+            icon: const Icon(Icons.tune_rounded, size: 18),
+            label: Text('More Info',
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
-          child: CommonButton(
-            onTap: _isSaving ? () {} : _saveItem,
-            height: AppResponsive.height(context, 0.06),
-            child: _isSaving
+          flex: 2,
+          child: ElevatedButton.icon(
+            onPressed: _isSaving ? null : _saveItem,
+            icon: _isSaving
                 ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.add, color: Colors.deepOrange),
-                      ),
-                      const SizedBox(width: 5),
-                      Text("Add Item", style: GoogleFonts.poppins(color: Colors.white)),
-                    ],
-                  ),
+                : const Icon(Icons.check_rounded,
+                    size: 18, color: Colors.white),
+            label: Text(
+              _isSaving ? 'Saving…' : 'Add Item',
+              style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              disabledBackgroundColor:
+                  AppColors.primary.withValues(alpha: 0.5),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
           ),
         ),
       ],

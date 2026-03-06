@@ -20,6 +20,7 @@ import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_s
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/screens/restaurant/auth/setup_items_list_screen.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
@@ -78,8 +79,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   String? _selectedTaxId; // Changed from List to single nullable String
   bool _didLoadDependencies = false; // Guard to prevent excessive reloading
 
+  // Focus nodes for keyboard tab-order
+  final _nameFocusNode = FocusNode();
+  final _priceFocusNode = FocusNode();
+  final _descriptionFocusNode = FocusNode();
+  final _stockFocusNode = FocusNode();
+
+  // Double-tap guard
+  bool _isSaving = false;
+
+  // Inline category error
+  bool _showCategoryError = false;
+
+  // Items added this session (for summary list)
+  final List<Map<String, String>> _addedItems = [];
+
   // Items added counter
-  int _itemsAdded = 0;
   int _totalItemsInDatabase = 0;
 
   @override
@@ -106,6 +121,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     _priceController.dispose();
     _descriptionController.dispose();
     _stockController.dispose();
+    _nameFocusNode.dispose();
+    _priceFocusNode.dispose();
+    _descriptionFocusNode.dispose();
+    _stockFocusNode.dispose();
     super.dispose();
   }
 
@@ -216,6 +235,14 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         errors.add('Price must be a valid number');
       } else if (price <= 0) {
         errors.add('Price must be greater than 0');
+      } else if (price > 99999.99) {
+        errors.add('Price cannot exceed ₹99,999.99');
+      } else {
+        // Allow max 2 decimal places
+        final parts = _priceController.text.trim().split('.');
+        if (parts.length == 2 && parts[1].length > 2) {
+          errors.add('Price can have at most 2 decimal places');
+        }
       }
     }
 
@@ -423,12 +450,23 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   // ============ SAVE ITEM ============
 
   Future<void> _saveItem() async {
+    if (_isSaving) return; // double-tap guard
+
     // Validate all fields
     final errors = _validateForm();
     if (errors.isNotEmpty) {
+      // Show inline category error if category missing
+      if (_selectedCategoryId == null) {
+        setState(() => _showCategoryError = true);
+      }
       _showValidationDialog(errors);
       return;
     }
+
+    setState(() {
+      _isSaving = true;
+      _showCategoryError = false;
+    });
 
     try {
       // Show loading
@@ -491,17 +529,28 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         // Show success
         NotificationService.instance.showSuccess('Item "${item.name}" added successfully!');
 
+        // Track in session summary
+        setState(() {
+          _addedItems.insert(0, {
+            'name': item.name,
+            'price': item.price?.toStringAsFixed(2) ?? '0.00',
+            'category': _selectedCategoryName ?? '',
+            'type': item.isVeg ?? 'Veg',
+          });
+          _totalItemsInDatabase++;
+        });
+
         // Reset form
         _resetForm();
 
-        // Increment counters
-        setState(() {
-          _itemsAdded++;
-          _totalItemsInDatabase++;
+        // Return focus to item name for quick next entry
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) _nameFocusNode.requestFocus();
         });
       } else {
         // Show error from store
-        NotificationService.instance.showError('Error saving item: ${itemStore.errorMessage ?? "Unknown error"}');
+        NotificationService.instance.showError(
+            itemStore.errorMessage ?? 'Error saving item');
       }
     } catch (e) {
       // Close loading
@@ -509,6 +558,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
       // Show error
       NotificationService.instance.showError('Error saving item: $e');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -520,6 +571,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _stockController.clear();
       _selectedCategoryId = null;
       _selectedCategoryName = null;
+      _showCategoryError = false;
       _selectedImage = null;
       _selectedImageBytes = null;
       _savedImagePath = null;
@@ -631,6 +683,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             _buildSectionHeader('Additional Options', Icons.extension),
             const SizedBox(height: 15),
             _buildAdditionalOptionsSection(),
+            if (_totalItemsInDatabase > 0) ...[
+              const SizedBox(height: 25),
+              _buildViewItemsBanner(),
+            ],
             const SizedBox(height: 100), // Space for bottom bar
           ],
         ),
@@ -797,79 +853,124 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           // Item Name (Required)
           CommonTextForm(
             controller: _itemNameController,
+            focusNode: _nameFocusNode,
             labelText: 'Item Name*',
             hintText: 'e.g., Margherita Pizza',
             obsecureText: false,
             icon: const Icon(Icons.restaurant_menu),
+            onfieldsumbitted: (_) =>
+                FocusScope.of(context).requestFocus(_priceFocusNode),
           ),
           const SizedBox(height: 15),
 
           // Price (Required)
           CommonTextForm(
             controller: _priceController,
+            focusNode: _priceFocusNode,
             labelText: 'Price*',
             hintText: '0.00',
             obsecureText: false,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             icon: const Icon(Icons.currency_rupee),
+            onfieldsumbitted: (_) =>
+                FocusScope.of(context).requestFocus(_descriptionFocusNode),
           ),
           const SizedBox(height: 15),
 
-          // Category (Required)
-          InkWell(
-            onTap: _showCategorySelection,
-            child: Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.category, color: AppColors.primary),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Category*',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _selectedCategoryName ?? 'Select or Add Category',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: _selectedCategoryName != null
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: _selectedCategoryName != null
-                                ? Colors.black87
-                                : Colors.grey[400],
-                          ),
-                        ),
-                      ],
+          // Category (Required) — with inline error
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () {
+                  setState(() => _showCategoryError = false);
+                  _showCategorySelection();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _showCategoryError
+                          ? AppColors.danger
+                          : Colors.grey[300]!,
+                      width: _showCategoryError ? 1.5 : 1,
                     ),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-                ],
+                  child: Row(
+                    children: [
+                      Icon(Icons.category,
+                          color: _showCategoryError
+                              ? AppColors.danger
+                              : AppColors.primary),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Category*',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: _showCategoryError
+                                    ? AppColors.danger
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _selectedCategoryName ?? 'Select or Add Category',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: _selectedCategoryName != null
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: _selectedCategoryName != null
+                                    ? Colors.black87
+                                    : (_showCategoryError
+                                        ? AppColors.danger
+                                        : Colors.grey[400]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios,
+                          size: 16, color: Colors.grey[400]),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              if (_showCategoryError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 14, color: AppColors.danger),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Category is required',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: AppColors.danger),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 15),
 
           // Description (Optional)
           CommonTextForm(
             controller: _descriptionController,
+            focusNode: _descriptionFocusNode,
             labelText: 'Description (Optional)',
             hintText: 'Brief description of the item',
             obsecureText: false,
             maxline: 3,
             icon: const Icon(Icons.description),
+            onfieldsumbitted: (_) => FocusScope.of(context).unfocus(),
           ),
           const SizedBox(height: 15),
 
@@ -1495,6 +1596,66 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ============ VIEW ITEMS BANNER ============
+
+  Widget _buildViewItemsBanner() {
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const SetupItemsListScreen()),
+        );
+        // Refresh count in case items were edited/deleted
+        await _loadItemCount();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: AppColors.success.withValues(alpha: 0.3), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_outline,
+                  color: AppColors.success, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$_totalItemsInDatabase item${_totalItemsInDatabase > 1 ? 's' : ''} added',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.success),
+                  ),
+                  Text(
+                    'Tap to view, edit or verify items',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios,
+                size: 14, color: AppColors.textSecondary),
+          ],
         ),
       ),
     );

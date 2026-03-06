@@ -61,6 +61,7 @@ class _manageStaffState extends State<manageStaff> {
       mobileNo: mobileController.text.trim(),
       emailId: mailController.text.trim(),
       pinNo: RestaurantAuthHelper.hashPassword(pinNoController.text.trim()),
+      isActive: true,
       createdAt: DateTime.now(),
     );
     await staffStore.addStaff(newstaff);
@@ -555,7 +556,7 @@ class _manageStaffState extends State<manageStaff> {
                               hintText: 'Select Role',
                             ),
                             style: GoogleFonts.poppins(fontSize: isTablet ? 15 : 14, color: Colors.black87),
-                            items: ['Select Role',  'Manager','Cashier', 'Waiter',]
+                            items: ['Select Role', 'Manager', 'Cashier', 'Waiter']
                                 .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                                 .toList(),
                             onChanged: (v) => setState(() => selectedrole = v ?? 'Select Role'),
@@ -692,8 +693,8 @@ class _manageStaffState extends State<manageStaff> {
         TextEditingController(text: staff.mobileNo);
     TextEditingController editEmailController =
         TextEditingController(text: staff.emailId);
-    TextEditingController editPinController =
-        TextEditingController(text: staff.pinNo);
+    // FIX: Never pre-fill with the stored hash — re-hash only if user types a new PIN.
+    TextEditingController editPinController = TextEditingController();
     String editSelectedRole = staff.isCashier;
     bool isActive = staff.isActive ?? true;
 
@@ -790,7 +791,7 @@ class _manageStaffState extends State<manageStaff> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: DropdownButton<String>(
-                          value: ['Cashier', 'Waiter', 'Manager', 'Kitchen Staff']
+                          value: ['Cashier', 'Waiter', 'Manager']
                                   .contains(editSelectedRole)
                               ? editSelectedRole
                               : 'Cashier',
@@ -800,7 +801,7 @@ class _manageStaffState extends State<manageStaff> {
                             fontSize: isTablet ? 15 : 14,
                             color: Colors.black87,
                           ),
-                          items: ['Cashier', 'Waiter', 'Manager', 'Kitchen Staff']
+                          items: ['Manager', 'Cashier', 'Waiter']
                               .map((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
@@ -850,7 +851,7 @@ class _manageStaffState extends State<manageStaff> {
                       SizedBox(height: 16),
                       CommonTextForm(
                         obsecureText: true,
-                        labelText: 'PIN Number',
+                        labelText: 'New PIN (leave blank to keep current)',
                         LabelColor: Colors.orange,
                         controller: editPinController,
                         BorderColor: Colors.orange,
@@ -858,8 +859,10 @@ class _manageStaffState extends State<manageStaff> {
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'PIN is required';
-                          if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
+                          // Optional — only validate if user typed something
+                          if (v != null && v.trim().isNotEmpty) {
+                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
+                          }
                           return null;
                         },
                       ),
@@ -930,6 +933,16 @@ class _manageStaffState extends State<manageStaff> {
                           ElevatedButton(
                             onPressed: () async {
                               if (!_editFormKey.currentState!.validate()) return;
+                              // FIX: Duplicate username check (exclude this staff's own record).
+                              final newUsername = editUserNameController.text.trim().toLowerCase();
+                              final isDuplicate = staffStore.staff.any(
+                                (s) => s.id != staff.id && s.userName.toLowerCase() == newUsername,
+                              );
+                              if (isDuplicate) {
+                                NotificationService.instance.showError('Username already exists.');
+                                return;
+                              }
+                              final newPin = editPinController.text.trim();
                               final updatedStaff = staff.copyWith(
                                 userName: editUserNameController.text.trim(),
                                 firstName: editFirstNameController.text.trim(),
@@ -937,7 +950,10 @@ class _manageStaffState extends State<manageStaff> {
                                 isCashier: editSelectedRole,
                                 mobileNo: editMobileController.text.trim(),
                                 emailId: editEmailController.text.trim(),
-                                pinNo: RestaurantAuthHelper.hashPassword(editPinController.text.trim()),
+                                // Only re-hash if user typed a new PIN; keep existing hash otherwise.
+                                pinNo: newPin.isNotEmpty
+                                    ? RestaurantAuthHelper.hashPassword(newPin)
+                                    : staff.pinNo,
                                 isActive: isActive,
                               );
                               await _updateStaff(updatedStaff);

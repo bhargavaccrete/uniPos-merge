@@ -8,7 +8,6 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/images.dart';
 import 'package:uuid/uuid.dart';
 
@@ -62,35 +61,71 @@ class _ChoiceTabState extends State<ChoiceTab> {
       }
     });
 
-    showModalBottomSheet(
-      isScrollControlled: true,
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _buildBottomSheet(),
-      ),
-    );
+    final isWide = MediaQuery.of(context).size.width >= 850;
+    if (isWide) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+            ),
+            child: _buildBottomSheet(isDialog: true),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        isScrollControlled: true,
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: _buildBottomSheet(isDialog: false),
+        ),
+      );
+    }
   }
 
-  Widget _buildBottomSheet() {
+  Widget _buildBottomSheet({bool isDialog = false}) {
     return StatefulBuilder(
       builder: (BuildContext context, StateSetter setModalState) {
         return Container(
-          padding: EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header
-                Row(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: isDialog
+                ? BorderRadius.circular(20)
+                : const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!isDialog) ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
+              // Header
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, isDialog ? 16 : 12, 12, 8),
+                child: Row(
                   children: [
                     Container(
                       padding: EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.checklist, color: AppColors.primary),
@@ -103,9 +138,27 @@ class _ChoiceTabState extends State<ChoiceTab> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (isDialog) ...[
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.grey.shade100,
+                          foregroundColor: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                Divider(height: 30),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
 
                 // Choice Name Field
                 TextField(
@@ -275,7 +328,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -461,8 +514,11 @@ class _ChoiceTabState extends State<ChoiceTab> {
                     ),
                   ),
                 ),
-              ],
-            ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -473,6 +529,15 @@ class _ChoiceTabState extends State<ChoiceTab> {
     final trimmedName = choiceController.text.trim();
     if (trimmedName.isEmpty) {
       NotificationService.instance.showError('Choice name cannot be empty');
+      return;
+    }
+
+    // Duplicate name check (excluding current item when editing)
+    final exists = choiceStore.choices.any((c) =>
+        c.name.toLowerCase() == trimmedName.toLowerCase() &&
+        c.id != (editingChoice?.id ?? ''));
+    if (exists) {
+      NotificationService.instance.showError('A choice with this name already exists');
       return;
     }
 
@@ -571,7 +636,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -714,7 +779,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -728,7 +793,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
           leading: Container(
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -750,7 +815,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -867,7 +932,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
   Widget _buildGridChoiceCard(ChoicesModel choice) {
     return Card(
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -881,7 +946,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
                 Container(
                   padding: EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -909,7 +974,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -1035,7 +1100,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: Offset(0, -2),
           ),

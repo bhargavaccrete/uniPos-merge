@@ -319,7 +319,9 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     switch (widget.period) {
       case VoidOrderPeriod.Today:
         final today = DateTime(now.year, now.month, now.day);
+        // FIX 1: Guard orderAt null before force-unwrap.
         filtered = orders.where((order) {
+          if (order.orderAt == null) return false;
           final orderDate = order.orderAt!;
           final orderDay = DateTime(orderDate.year, orderDate.month, orderDate.day);
           return orderDay == today;
@@ -329,23 +331,27 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       case VoidOrderPeriod.ThisWeek:
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+        // FIX 1: Guard orderAt null; FIX 2: use !isBefore for inclusive Monday boundary.
         filtered = orders.where((order) {
-          final orderDate = order.orderAt!;
-          return orderDate.isAfter(startOfWeekDate.subtract(const Duration(days: 1)));
+          if (order.orderAt == null) return false;
+          return !order.orderAt!.isBefore(startOfWeekDate);
         }).toList();
         break;
 
       case VoidOrderPeriod.Month:
+        // FIX 1: Guard orderAt null before force-unwrap.
         filtered = orders.where((order) {
+          if (order.orderAt == null) return false;
           final orderDate = order.orderAt!;
           return orderDate.year == _selectedMonthYear && orderDate.month == _selectedMonth;
         }).toList();
         break;
 
       case VoidOrderPeriod.Year:
+        // FIX 1: Guard orderAt null before force-unwrap.
         filtered = orders.where((order) {
-          final orderDate = order.orderAt!;
-          return orderDate.year == _selectedYear;
+          if (order.orderAt == null) return false;
+          return order.orderAt!.year == _selectedYear;
         }).toList();
         break;
 
@@ -354,10 +360,11 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
           final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
           final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
 
+          // FIX 1: Guard orderAt null before force-unwrap.
           filtered = orders.where((order) {
+            if (order.orderAt == null) return false;
             final orderDate = order.orderAt!;
-            return orderDate.isAfter(start.subtract(const Duration(seconds: 1))) &&
-                   orderDate.isBefore(end.add(const Duration(seconds: 1)));
+            return !orderDate.isBefore(start) && !orderDate.isAfter(end);
           }).toList();
         }
         break;
@@ -372,10 +379,8 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
 
   void _calculateSummary() {
     _totalVoidCount = _voidOrders.length;
-    _totalVoidAmount = _voidOrders.fold(0.0, (sum, order) {
-      final amount = double.tryParse(order.totalPrice.toString()) ?? 0.0;
-      return sum + amount;
-    });
+    // FIX 3: totalPrice is non-nullable double — no need for tryParse.
+    _totalVoidAmount = _voidOrders.fold(0.0, (sum, order) => sum + order.totalPrice);
     _averageVoidAmount = _totalVoidCount > 0 ? _totalVoidAmount / _totalVoidCount : 0.0;
   }
 
@@ -1086,10 +1091,11 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                   ),
                 ],
                 rows: _voidOrders.map((order) {
-                  final orderDate = order.orderAt!;
+                  // FIX 1 & 3: orderAt guarded; totalPrice used directly.
+                  final orderDate = order.orderAt ?? DateTime.now();
                   final formattedDate = DateFormat('dd/MM/yyyy').format(orderDate);
                   final formattedTime = DateFormat('hh:mm a').format(orderDate);
-                  final amount = double.tryParse(order.totalPrice.toString()) ?? 0.0;
+                  final amount = order.totalPrice;
 
                   return DataRow(
                     onSelectChanged: (_) {
@@ -1247,7 +1253,8 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       case VoidOrderPeriod.ThisWeek:
         return 'This Week';
       case VoidOrderPeriod.Month:
-        return '$_selectedMonth $_selectedMonthYear';
+        // FIX 4: Use month name instead of raw integer.
+        return '${_monthNames[_selectedMonth - 1]} $_selectedMonthYear';
       case VoidOrderPeriod.Year:
         return '$_selectedYear';
       case VoidOrderPeriod.Custom:

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/util/color.dart';
 
 import '../../../constants/restaurant/color.dart';
-import '../../../domain/services/restaurant/day_management_service.dart';
 
 class OpeningBalanceDialog extends StatefulWidget {
   const OpeningBalanceDialog({super.key});
@@ -65,10 +65,9 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
       // Save reference to navigator before async call
       final navigator = Navigator.of(context);
 
-      await DayManagementService.setOpeningBalance(balance);
-
+      // Do NOT call setOpeningBalance here — the caller (AdminWelcome._checkDayStarted)
+      // is responsible for persistence. Calling it here causes a duplicate cash movement entry.
       if (mounted) {
-        // Use the saved navigator reference instead of context
         navigator.pop(balance);
       }
     } catch (e) {
@@ -182,15 +181,9 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
         actions: [
           if (!_isLoading)
             TextButton(
-              onPressed: () async {
-                // Save reference to navigator before async call
-                final navigator = Navigator.of(context);
-
-                // Set opening balance to 0 and continue
-                await DayManagementService.setOpeningBalance(0.0);
-                if (mounted) {
-                  navigator.pop(0.0);
-                }
+              onPressed: () {
+                // Return 0.0 — caller handles persistence to avoid duplicate cash movement
+                Navigator.of(context).pop(0.0);
               },
               child: Text(
                 'Start with Rs. 0',

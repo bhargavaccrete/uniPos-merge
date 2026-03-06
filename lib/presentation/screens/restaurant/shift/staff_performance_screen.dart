@@ -7,6 +7,7 @@ import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 
 // ── Computed data class ───────────────────────────────────────────────────────
 
@@ -95,14 +96,17 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
               s.startTime.month == now.month &&
               s.startTime.day == now.day;
         case 'Week':
-          return s.startTime.isAfter(now.subtract(const Duration(days: 7)));
+          // FIX 1: Use calendar week (Monday start) not a rolling 7-day window.
+          final monday = now.subtract(Duration(days: now.weekday - 1));
+          final startOfWeek = DateTime(monday.year, monday.month, monday.day);
+          return !s.startTime.isBefore(startOfWeek);
         case 'Month':
           return s.startTime.year == now.year &&
               s.startTime.month == now.month;
         case 'Custom':
           if (_customFrom == null) return true;
-          final after =
-              s.startTime.isAfter(_customFrom!.subtract(const Duration(seconds: 1)));
+          // FIX 2: Inclusive boundary — !isBefore is correct for same-day starts.
+          final after = !s.startTime.isBefore(_customFrom!);
           final before = _customTo == null ||
               s.startTime.isBefore(_customTo!.add(const Duration(days: 1)));
           return after && before;
@@ -161,11 +165,10 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
       for (final shift in shifts) {
         final shiftEnd = shift.endTime ?? DateTime.now();
         for (final e in allExpenses) {
+          // FIX 3: Precise inclusive boundary — no off-by-one-second tricks.
           if (!countedExpenseIds.contains(e.id) &&
-              e.dateandTime.isAfter(
-                  shift.startTime.subtract(const Duration(seconds: 1))) &&
-              e.dateandTime
-                  .isBefore(shiftEnd.add(const Duration(seconds: 1)))) {
+              !e.dateandTime.isBefore(shift.startTime) &&
+              !e.dateandTime.isAfter(shiftEnd)) {
             totalExpenses += e.amount;
             countedExpenseIds.add(e.id);
           }
@@ -178,6 +181,9 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
       final Map<String, int> orderTypes = {};
 
       for (final o in orders) {
+        // FIX 4: Skip fully cancelled orders — they inflate discounts/refunds/type counts.
+        final status = (o.orderStatus as String?) ?? '';
+        if (status == 'VOIDED' || status == 'VOID' || status == 'FULLY_REFUNDED') continue;
         totalDiscounts += (o.Discount as double?) ?? 0.0;
         totalRefunds += (o.refundAmount as double?) ?? 0.0;
         final type = (o.orderType as String?) ?? 'Unknown';
@@ -662,7 +668,8 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
                     Icons.receipt_long, Colors.white),
                 _summaryTile(
                     context,
-                    '$currency${totalRevenue.toStringAsFixed(0)}',
+                    // FIX 5: Use DecimalSettings for consistent currency formatting.
+                    '$currency${DecimalSettings.formatAmount(totalRevenue)}',
                     'Revenue',
                     Icons.attach_money,
                     Colors.white),
@@ -708,7 +715,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     final msg = _filterPeriod == 'Today'
         ? 'No staff shifts recorded today'
         : _filterPeriod == 'Week'
-            ? 'No shifts in the past 7 days'
+            ? 'No shifts this week'
             : _filterPeriod == 'Month'
                 ? 'No shifts this month'
                 : _filterPeriod == 'Custom'
@@ -874,7 +881,7 @@ class _StaffCardState extends State<_StaffCard>
               // Revenue (key metric always visible)
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Text(
-                    '${widget.currency}${p.totalSales.toStringAsFixed(0)}',
+                    '${widget.currency}${DecimalSettings.formatAmount(p.totalSales)}',
                     style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w700,
@@ -903,7 +910,7 @@ class _StaffCardState extends State<_StaffCard>
               _chip(context, Icons.timer_outlined, p.durationLabel,
                   Colors.blue),
               _chip(context, Icons.trending_up,
-                  'Avg ${widget.currency}${p.avgOrderValue.toStringAsFixed(0)}/order',
+                  'Avg ${widget.currency}${DecimalSettings.formatAmount(p.avgOrderValue)}/order',
                   Colors.green),
               _chip(context, Icons.speed,
                   '${p.ordersPerHour.toStringAsFixed(1)}/hr',

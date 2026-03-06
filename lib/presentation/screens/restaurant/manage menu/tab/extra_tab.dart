@@ -9,7 +9,6 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
-import '../../../../../presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
@@ -78,134 +77,198 @@ class _ExtraTabState extends State<ExtraTab> {
       editingId = null;
     }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+    final isWide = MediaQuery.of(context).size.width >= 850;
+    if (isWide) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 520,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+            ),
+            child: _buildExtraBottomSheet(isDialog: true),
+          ),
         ),
-        child: _buildExtraBottomSheet(),
-      ),
-    );
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: _buildExtraBottomSheet(isDialog: false),
+        ),
+      );
+    }
   }
 
-  Widget _buildExtraBottomSheet() {
+  Widget _buildExtraBottomSheet({bool isDialog = false}) {
     return Container(
-      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: isDialog
+            ? BorderRadius.circular(20)
+            : const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
+          if (!isDialog) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                child: Icon(Icons.star, color: AppColors.primary),
-              ),
-              SizedBox(width: 12),
-              Text(
-                editingId == null ? 'Add Extra Category' : 'Edit Extra Category',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          Divider(height: 30),
-          TextField(
-            controller: _extrasController,
-            style: GoogleFonts.poppins(fontSize: 14),
-            decoration: InputDecoration(
-              labelText: "Extra Category Name",
-              labelStyle: GoogleFonts.poppins(color: Colors.grey),
-              prefixIcon: Icon(Icons.edit, color: AppColors.primary),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 2),
               ),
             ),
-          ),
-          SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _minimumController,
-                  keyboardType: TextInputType.number,
-                  style: GoogleFonts.poppins(fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: "Min Selection",
-                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                    prefixIcon: Icon(Icons.remove_circle_outline, color: AppColors.primary),
-                    hintText: '0',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
-                    ),
+          ],
+          // Header
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, isDialog ? 16 : 12, 12, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.star, color: AppColors.primary),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  editingId == null ? 'Add Extra Category' : 'Edit Extra Category',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _maximumController,
-                  keyboardType: TextInputType.number,
-                  style: GoogleFonts.poppins(fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: "Max Selection",
-                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                    prefixIcon: Icon(Icons.add_circle_outline, color: AppColors.primary),
-                    hintText: '0',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                if (isDialog) ...[
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.grey.shade100,
+                      foregroundColor: Colors.grey.shade600,
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              ],
+            ),
           ),
-          SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _addOrEditExtra,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          const Divider(height: 1),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    editingId == null
-                        ? Icons.add_circle_outline
-                        : Icons.check_circle_outline,
-                    color: Colors.white,
+                  TextField(
+                    controller: _extrasController,
+                    style: GoogleFonts.poppins(fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: "Extra Category Name",
+                      labelStyle: GoogleFonts.poppins(color: Colors.grey),
+                      prefixIcon: Icon(Icons.edit, color: AppColors.primary),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.primary, width: 2),
+                      ),
+                    ),
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    editingId == null ? 'Add' : 'Update',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _minimumController,
+                          keyboardType: TextInputType.number,
+                          style: GoogleFonts.poppins(fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: "Min Selection",
+                            labelStyle: GoogleFonts.poppins(color: Colors.grey),
+                            prefixIcon: Icon(Icons.remove_circle_outline,
+                                color: AppColors.primary),
+                            hintText: '0',
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _maximumController,
+                          keyboardType: TextInputType.number,
+                          style: GoogleFonts.poppins(fontSize: 14),
+                          decoration: InputDecoration(
+                            labelText: "Max Selection",
+                            labelStyle: GoogleFonts.poppins(color: Colors.grey),
+                            prefixIcon: Icon(Icons.add_circle_outline,
+                                color: AppColors.primary),
+                            hintText: '0',
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _addOrEditExtra,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            editingId == null
+                                ? Icons.add_circle_outline
+                                : Icons.check_circle_outline,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            editingId == null ? 'Add' : 'Update',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -249,40 +312,73 @@ class _ExtraTabState extends State<ExtraTab> {
       _selectedVariants.clear();
     }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+    final isWide = MediaQuery.of(context).size.width >= 850;
+    if (isWide) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+            ),
+            child: _buildToppingBottomSheet(extra, isDialog: true),
+          ),
         ),
-        child: _buildToppingBottomSheet(extra),
-      ),
-    );
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: _buildToppingBottomSheet(extra, isDialog: false),
+        ),
+      );
+    }
   }
 
-  Widget _buildToppingBottomSheet(Extramodel extra) {
+  Widget _buildToppingBottomSheet(Extramodel extra, {bool isDialog = false}) {
     return StatefulBuilder(
       builder: (context, setModalState) => Container(
-        padding: EdgeInsets.all(20),
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: isDialog
+              ? BorderRadius.circular(20)
+              : const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isDialog) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+            // Header
+            Padding(
+              padding: EdgeInsets.fromLTRB(20, isDialog ? 16 : 12, 12, 8),
+              child: Row(
                 children: [
                   Container(
                     padding: EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(Icons.local_pizza, color: AppColors.primary),
@@ -309,9 +405,26 @@ class _ExtraTabState extends State<ExtraTab> {
                       ],
                     ),
                   ),
+                  if (isDialog)
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        foregroundColor: Colors.grey.shade600,
+                      ),
+                    ),
                 ],
               ),
-              Divider(height: 30),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
 
               // Topping Name
               TextField(
@@ -473,6 +586,9 @@ class _ExtraTabState extends State<ExtraTab> {
           ),
         ),
       ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -489,7 +605,7 @@ class _ExtraTabState extends State<ExtraTab> {
             width: 2,
           ),
           borderRadius: BorderRadius.circular(12),
-          color: isSelected ? AppColors.primary.withOpacity(0.05) : Colors.white,
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -825,7 +941,7 @@ class _ExtraTabState extends State<ExtraTab> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -968,7 +1084,7 @@ class _ExtraTabState extends State<ExtraTab> {
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -982,7 +1098,7 @@ class _ExtraTabState extends State<ExtraTab> {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(Icons.star, color: Colors.green.shade700, size: 24),
@@ -1004,7 +1120,7 @@ class _ExtraTabState extends State<ExtraTab> {
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -1186,7 +1302,7 @@ class _ExtraTabState extends State<ExtraTab> {
   Widget _buildGridExtraCard(Extramodel extra) {
     return Card(
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -1203,7 +1319,7 @@ class _ExtraTabState extends State<ExtraTab> {
                     Container(
                       padding: EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(Icons.star, color: Colors.green.shade700, size: 20),
@@ -1227,7 +1343,7 @@ class _ExtraTabState extends State<ExtraTab> {
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -1390,7 +1506,7 @@ class _ExtraTabState extends State<ExtraTab> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: Offset(0, -2),
           ),

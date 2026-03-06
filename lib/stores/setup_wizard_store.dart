@@ -142,10 +142,6 @@ abstract class _SetupWizardStore with Store {
   List<Map<String, String>> get businessTypes => [
         {'id': 'retail', 'name': 'Retail Store', 'description': 'General retail and shopping', 'icon': 'store'},
         {'id': 'restaurant', 'name': 'Restaurant', 'description': 'Food service and dining', 'icon': 'restaurant'},
-        {'id': 'services', 'name': 'Services', 'description': 'Professional services', 'icon': 'build'},
-        {'id': 'grocery', 'name': 'Grocery', 'description': 'Supermarket and grocery', 'icon': 'shopping_basket'},
-        {'id': 'pharmacy', 'name': 'Pharmacy', 'description': 'Medical and pharmacy', 'icon': 'medical_services'},
-        {'id': 'other', 'name': 'Other', 'description': 'Other business types', 'icon': 'category'},
       ];
 
   // ==================== ACTIONS ====================

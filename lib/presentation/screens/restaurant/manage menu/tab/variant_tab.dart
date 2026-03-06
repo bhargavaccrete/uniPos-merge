@@ -73,7 +73,7 @@ class _VariantTabState extends State<VariantTab> {
               Container(
                 padding: EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(Icons.tune, color: AppColors.primary),
@@ -146,6 +146,15 @@ class _VariantTabState extends State<VariantTab> {
     final trimmedName = variantController.text.trim();
     if (trimmedName.isEmpty) {
       NotificationService.instance.showError('Variant name cannot be empty');
+      return;
+    }
+
+    // Duplicate name check (excluding current item when editing)
+    final exists = variantStore.variants.any((v) =>
+        v.name.toLowerCase() == trimmedName.toLowerCase() &&
+        v.id != (editingVariante?.id ?? ''));
+    if (exists) {
+      NotificationService.instance.showError('A variant with this name already exists');
       return;
     }
 
@@ -222,7 +231,7 @@ class _VariantTabState extends State<VariantTab> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -365,7 +374,7 @@ class _VariantTabState extends State<VariantTab> {
     if (isGrid) {
       return Card(
         elevation: 2,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -377,7 +386,7 @@ class _VariantTabState extends State<VariantTab> {
               Container(
                 padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -447,7 +456,7 @@ class _VariantTabState extends State<VariantTab> {
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -458,7 +467,7 @@ class _VariantTabState extends State<VariantTab> {
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -527,7 +536,7 @@ class _VariantTabState extends State<VariantTab> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: Offset(0, -2),
           ),
