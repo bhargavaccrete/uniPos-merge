@@ -12,7 +12,6 @@ import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/category_management_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen.dart';
@@ -21,6 +20,10 @@ import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/setup_items_list_screen.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_item_form_state.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/widgets/category_selector_button.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/widgets/selling_method_selector.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
@@ -60,9 +63,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   String _itemType = 'Veg'; // Default: Veg
 
   // Selling Method
-  bool _isSoldByWeight = false;
-  String? _selectedUnit; // kg, gm
-  final List<String> _units = ['kg', 'gm'];
+  SellingMethod _sellingMethod = SellingMethod.byUnit;
+  String _selectedUnit = 'kg';
 
   // Inventory Management
   bool _trackInventory = false;
@@ -250,9 +252,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       errors.add('Category is required');
     }
 
-    if (_isSoldByWeight && _selectedUnit == null) {
-      errors.add('Unit must be selected when selling by weight');
-    }
+    // Unit is always set (defaults to 'kg') so no validation needed
 
     return errors;
   }
@@ -502,8 +502,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         price: double.parse(_priceController.text.trim()),
         imageBytes: imageBytes,
         isVeg: _itemType == 'Veg' ? 'Veg' : 'Non-Veg',
-        isSoldByWeight: _isSoldByWeight,
-        unit: _isSoldByWeight ? _selectedUnit : null,
+        isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
+        unit: _sellingMethod == SellingMethod.byWeight ? _selectedUnit : null,
         trackInventory: _trackInventory,
         stockQuantity: _trackInventory
             ? double.tryParse(_stockController.text.trim()) ?? 0.0
@@ -576,8 +576,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _selectedImageBytes = null;
       _savedImagePath = null;
       _itemType = 'Veg';
-      _isSoldByWeight = false;
-      _selectedUnit = null;
+      _sellingMethod = SellingMethod.byUnit;
+      _selectedUnit = 'kg';
       _trackInventory = false;
       _allowOrderWhenOutOfStock = false;
       _selectedVariants = [];
@@ -593,7 +593,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: _buildAppBar(),
+      appBar: widget.onNext != null ? null : _buildAppBar(),
       body: _buildBody(),
       bottomNavigationBar: _buildBottomBar(),
     );
@@ -609,7 +609,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               onPressed: widget.onPrevious,
             )
           : null,
-      title: Column(
+      title: widget.onNext != null ? null : Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -851,29 +851,27 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Item Name (Required)
-          CommonTextForm(
+          AppTextField(
             controller: _itemNameController,
             focusNode: _nameFocusNode,
-            labelText: 'Item Name*',
-            hintText: 'e.g., Margherita Pizza',
-            obsecureText: false,
-            icon: const Icon(Icons.restaurant_menu),
-            onfieldsumbitted: (_) =>
-                FocusScope.of(context).requestFocus(_priceFocusNode),
+            label: 'Item Name',
+            hint: 'e.g., Margherita Pizza',
+            icon: Icons.restaurant_menu_rounded,
+            required: true,
+            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_priceFocusNode),
           ),
           const SizedBox(height: 15),
 
           // Price (Required)
-          CommonTextForm(
+          AppTextField(
             controller: _priceController,
             focusNode: _priceFocusNode,
-            labelText: 'Price*',
-            hintText: '0.00',
-            obsecureText: false,
+            label: 'Price',
+            hint: '0.00',
+            icon: Icons.currency_rupee_rounded,
+            required: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            icon: const Icon(Icons.currency_rupee),
-            onfieldsumbitted: (_) =>
-                FocusScope.of(context).requestFocus(_descriptionFocusNode),
+            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_descriptionFocusNode),
           ),
           const SizedBox(height: 15),
 
@@ -881,65 +879,12 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              InkWell(
+              CategorySelectorButton(
+                selectedCategoryName: _selectedCategoryName,
                 onTap: () {
                   setState(() => _showCategoryError = false);
                   _showCategorySelection();
                 },
-                child: Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: _showCategoryError
-                          ? AppColors.danger
-                          : Colors.grey[300]!,
-                      width: _showCategoryError ? 1.5 : 1,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.category,
-                          color: _showCategoryError
-                              ? AppColors.danger
-                              : AppColors.primary),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Category*',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: _showCategoryError
-                                    ? AppColors.danger
-                                    : Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _selectedCategoryName ?? 'Select or Add Category',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: _selectedCategoryName != null
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                color: _selectedCategoryName != null
-                                    ? Colors.black87
-                                    : (_showCategoryError
-                                        ? AppColors.danger
-                                        : Colors.grey[400]),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.arrow_forward_ios,
-                          size: 16, color: Colors.grey[400]),
-                    ],
-                  ),
-                ),
               ),
               if (_showCategoryError)
                 Padding(
@@ -962,15 +907,15 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           const SizedBox(height: 15),
 
           // Description (Optional)
-          CommonTextForm(
+          AppTextField(
             controller: _descriptionController,
             focusNode: _descriptionFocusNode,
-            labelText: 'Description (Optional)',
-            hintText: 'Brief description of the item',
-            obsecureText: false,
-            maxline: 3,
-            icon: const Icon(Icons.description),
-            onfieldsumbitted: (_) => FocusScope.of(context).unfocus(),
+            label: 'Description (Optional)',
+            hint: 'Brief description of the item',
+            icon: Icons.notes_outlined,
+            maxLines: 3,
+            minLines: 1,
+            onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
           ),
           const SizedBox(height: 15),
 
@@ -1026,32 +971,36 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         else
           InkWell(
             onTap: _pickImage,
+            borderRadius: BorderRadius.circular(12),
             child: Container(
-              height: 150,
+              height: 140,
               width: double.infinity,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!, width: 2, style: BorderStyle.solid),
+                color: AppColors.surfaceLight,
+                border: Border.all(color: AppColors.divider),
                 borderRadius: BorderRadius.circular(12),
-                color: Colors.grey[50],
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_photo_alternate, size: 50, color: Colors.grey[400]),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add_photo_alternate_rounded,
+                        size: 30, color: AppColors.primary),
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     'Tap to upload image',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.primary),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     'From Gallery',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
+                    style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -1141,105 +1090,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Widget _buildSellingMethodSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildSellingMethodOption(
-                  'By Unit',
-                  Icons.shopping_bag,
-                  !_isSoldByWeight,
-                  () => setState(() {
-                    _isSoldByWeight = false;
-                    _selectedUnit = null;
-                  }),
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: _buildSellingMethodOption(
-                  'By Weight',
-                  Icons.scale,
-                  _isSoldByWeight,
-                  () => setState(() => _isSoldByWeight = true),
-                ),
-              ),
-            ],
-          ),
-          if (_isSoldByWeight) ...[
-            const SizedBox(height: 15),
-            DropdownButtonFormField<String>(
-              value: _selectedUnit,
-              decoration: InputDecoration(
-                labelText: 'Select Unit*',
-                labelStyle: GoogleFonts.poppins(),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: Icon(Icons.straighten, color: AppColors.primary),
-              ),
-              items: _units.map((unit) {
-                return DropdownMenuItem<String>(
-                  value: unit,
-                  child: Text(unit, style: GoogleFonts.poppins()),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedUnit = value),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSellingMethodOption(
-    String label,
-    IconData icon,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(10),
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: isSelected ? AppColors.primary : Colors.grey[600], size: 28),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? AppColors.primary : Colors.black87,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return SellingMethodButton(
+      method: _sellingMethod,
+      unit: _selectedUnit,
+      onTap: () async {
+        final result = await SellingMethodSheet.show(
+          context,
+          currentMethod: _sellingMethod,
+          currentUnit: _selectedUnit,
+        );
+        if (result != null) {
+          setState(() {
+            _sellingMethod = result.method;
+            _selectedUnit = result.unit;
+          });
+        }
+      },
     );
   }
 
@@ -1287,13 +1153,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           if (_trackInventory) ...[
             const Divider(),
             const SizedBox(height: 10),
-            CommonTextForm(
+            AppTextField(
               controller: _stockController,
-              labelText: 'Current Stock',
-              hintText: '0',
-              obsecureText: false,
+              focusNode: _stockFocusNode,
+              label: 'Current Stock',
+              hint: '0',
+              icon: Icons.inventory_2_rounded,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              icon: const Icon(Icons.inventory),
             ),
             const SizedBox(height: 10),
             SwitchListTile(

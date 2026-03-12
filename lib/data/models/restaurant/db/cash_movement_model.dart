@@ -53,6 +53,28 @@ class CashMovementModel extends HiveObject {
     required this.staffName,
   });
 
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'timestamp': timestamp.toIso8601String(),
+        'type': type,
+        'amount': amount,
+        'reason': reason,
+        'note': note,
+        'staffName': staffName,
+      };
+
+  factory CashMovementModel.fromMap(Map<String, dynamic> map) =>
+      CashMovementModel(
+        id: map['id'] ?? '',
+        timestamp:
+            DateTime.tryParse(map['timestamp'] ?? '') ?? DateTime.now(),
+        type: map['type'] ?? 'in',
+        amount: (map['amount'] ?? 0).toDouble(),
+        reason: map['reason'] ?? '',
+        note: map['note'] as String?,
+        staffName: map['staffName'] ?? '',
+      );
+
   /// True if this movement adds cash to the drawer
   bool get isCashIn => type == 'in';
 

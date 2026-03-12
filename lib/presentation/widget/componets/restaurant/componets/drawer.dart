@@ -1,16 +1,14 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/domain/services/restaurant/auto_backup_service.dart';
 import 'package:unipos/domain/services/common/unified_backup_service.dart';
-import 'package:unipos/domain/services/common/backup_encryption_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/main.dart' as main_app;
@@ -593,10 +591,7 @@ class _DrawerrState extends State<Drawerr> {
     );
   }
 
-  void _showImportExportDialog(BuildContext context) async {
-    bool initialEnabled = await AutoBackupService.isAutoBackupEnabled();
-    String? initialBackup = await AutoBackupService.getLastBackupDate();
-
+  void _showImportExportDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -617,205 +612,6 @@ class _DrawerrState extends State<Drawerr> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Auto Backup Toggle
-                    Container(
-                      padding: AppResponsive.getValue(context, mobile: EdgeInsets.all(12), tablet: EdgeInsets.all(14)),
-                      decoration: BoxDecoration(
-                        color: initialEnabled
-                            ? Colors.green.shade50
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: initialEnabled
-                              ? Colors.green.shade300
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                initialEnabled
-                                    ? Icons.check_circle
-                                    : Icons.cancel,
-                                color: initialEnabled
-                                    ? Colors.green
-                                    : Colors.grey,
-                              ),
-                              AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                              Expanded(
-                                child: Text(
-                                  'Daily Auto Backup',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: AppResponsive.bodyFontSize(context),
-                                  ),
-                                ),
-                              ),
-                              Switch(
-                                value: initialEnabled,
-                                onChanged: (value) async {
-                                  setState(() {
-                                    initialEnabled = value;
-                                  });
-                                  await AutoBackupService.setAutoBackupEnabled(value);
-                                  if (context.mounted) {
-                                    if (value) {
-                                      NotificationService.instance.showSuccess('Auto backup enabled!');
-                                    } else {
-                                      NotificationService.instance.showSuccess('Auto backup disabled');
-                                    }
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                          if (initialBackup != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                'Last backup: $initialBackup',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.captionFontSize(context),
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-
-                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-                    Divider(),
-                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-                    // Backup Encryption Password Setup
-                    StatefulBuilder(
-                      builder: (context, setEncState) {
-                        return FutureBuilder<bool>(
-                          future: BackupEncryptionService.hasPassword(),
-                          builder: (context, snapshot) {
-                            final hasPassword = snapshot.data ?? false;
-
-                            Future<void> showPasswordDialog({bool isChange = false}) async {
-                              final pwdController = TextEditingController();
-                              bool obscure = true;
-                              await showDialog(
-                                context: context,
-                                builder: (ctx) => StatefulBuilder(
-                                  builder: (ctx, setDlgState) => AlertDialog(
-                                    title: Text(
-                                      isChange ? 'Change Password' : 'Set Backup Password',
-                                      style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
-                                    ),
-                                    content: TextField(
-                                      controller: pwdController,
-                                      obscureText: obscure,
-                                      decoration: InputDecoration(
-                                        hintText: 'Enter password',
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                        suffixIcon: IconButton(
-                                          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                                          onPressed: () => setDlgState(() => obscure = !obscure),
-                                        ),
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx),
-                                        child: Text('Cancel'),
-                                      ),
-                                      ElevatedButton(
-                                        onPressed: () async {
-                                          final pwd = pwdController.text.trim();
-                                          if (pwd.isNotEmpty) {
-                                            await BackupEncryptionService.setPassword(pwd);
-                                            if (ctx.mounted) Navigator.pop(ctx);
-                                            setEncState(() {});
-                                          }
-                                        },
-                                        child: Text('Confirm'),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.lock_outline,
-                                        size: AppResponsive.smallIconSize(context), color: Colors.grey.shade700),
-                                    AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                                    Text(
-                                      'Backup Encryption',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.smallFontSize(context),
-                                          fontWeight: FontWeight.w500),
-                                    ),
-                                    Spacer(),
-                                    if (!hasPassword)
-                                      OutlinedButton(
-                                        onPressed: () => showPasswordDialog(),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                          minimumSize: Size(0, 32),
-                                          side: BorderSide(color: AppColors.success),
-                                        ),
-                                        child: Text(
-                                          'Set Password',
-                                          style: GoogleFonts.poppins(
-                                              fontSize: AppResponsive.captionFontSize(context),
-                                              color: AppColors.success),
-                                        ),
-                                      )
-                                    else ...[
-                                      TextButton(
-                                        onPressed: () => showPasswordDialog(isChange: true),
-                                        style: TextButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          minimumSize: Size(0, 32),
-                                        ),
-                                        child: Text(
-                                          'Change',
-                                          style: GoogleFonts.poppins(
-                                              fontSize: AppResponsive.captionFontSize(context), color: Colors.orange),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: Icon(Icons.clear, size: 18, color: Colors.red),
-                                        tooltip: 'Remove password',
-                                        padding: EdgeInsets.zero,
-                                        constraints: BoxConstraints(),
-                                        onPressed: () async {
-                                          await BackupEncryptionService.clearPassword();
-                                          setEncState(() {});
-                                        },
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                if (hasPassword)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 26, top: 2),
-                                    child: Text(
-                                      'Backups will be encrypted',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.captionFontSize(context), color: AppColors.success),
-                                    ),
-                                  ),
-                                AppResponsive.verticalSpace(context, size: SpacingSize.small),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    ),
-
                     // Download to Downloads Button
 
                     ElevatedButton.icon(
@@ -895,7 +691,7 @@ class _DrawerrState extends State<Drawerr> {
 
                     AppResponsive.verticalSpace(context, size: SpacingSize.medium),
 
-                    // Choose Folder Button
+                    // Share Backup Button
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
@@ -904,61 +700,36 @@ class _DrawerrState extends State<Drawerr> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      icon: Icon(Icons.folder_open, color: Colors.white),
+                      icon: Icon(Icons.share, color: Colors.white),
                       label: Text(
-                        'Choose Folder',
+                        'Share Backup',
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: AppResponsive.buttonFontSize(context),
                         ),
                       ),
                       onPressed: () async {
-                        Navigator.pop(context);
-
-                        String? selectedDirectory;
-                        try {
-                          selectedDirectory =
-                              await FilePicker.platform.getDirectoryPath();
-                        } catch (e) {
-                          debugPrint('❌ Folder picker error: $e');
-                          final globalContext =
-                              main_app.navigatorKey.currentContext;
-                          if (globalContext != null && globalContext.mounted) {
-                            NotificationService.instance.showError('Error selecting folder: $e');
-                          }
-                          return;
-                        }
-
-                        if (selectedDirectory == null) {
-                          final globalContext =
-                              main_app.navigatorKey.currentContext;
-                          if (globalContext != null && globalContext.mounted) {
-                            NotificationService.instance.showSuccess('Folder selection cancelled');
-                          }
-                          return;
-                        }
-
-                        final globalContext = main_app.navigatorKey.currentContext;
-                        if (globalContext == null) return;
+                        final outerContext = context;
+                        Navigator.pop(outerContext);
 
                         final navigatorState =
-                            Navigator.of(globalContext, rootNavigator: true);
+                            Navigator.of(outerContext, rootNavigator: true);
                         showDialog(
-                          context: globalContext,
+                          context: outerContext,
                           barrierDismissible: false,
-                          builder: (BuildContext context) {
-                            return WillPopScope(
-                              onWillPop: () async => false,
+                          builder: (BuildContext ctx) {
+                            return PopScope(
+                              canPop: false,
                               child: AlertDialog(
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    CircularProgressIndicator(),
-                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+                                    const CircularProgressIndicator(),
+                                    AppResponsive.verticalSpace(ctx, size: SpacingSize.medium),
                                     Text(
                                       'Creating backup...\nPlease wait',
                                       textAlign: TextAlign.center,
-                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(ctx)),
                                     ),
                                   ],
                                 ),
@@ -969,10 +740,9 @@ class _DrawerrState extends State<Drawerr> {
 
                         String? filePath;
                         try {
-                          filePath = await UnifiedBackupService
-                              .exportToCustomFolder(selectedDirectory);
+                          filePath = await UnifiedBackupService.exportToShare();
                         } catch (e) {
-                          debugPrint('❌ Backup error: $e');
+                          debugPrint('❌ Share backup error: $e');
                         } finally {
                           try {
                             navigatorState.pop();
@@ -981,17 +751,20 @@ class _DrawerrState extends State<Drawerr> {
                           }
                         }
 
-                        await Future.delayed(Duration(milliseconds: 300));
-
-                        final finalContext = main_app.navigatorKey.currentContext;
-                        if (finalContext == null) return;
+                        await Future.delayed(const Duration(milliseconds: 300));
 
                         if (filePath == null) {
-                          NotificationService.instance.showError('Backup creation failed');
+                          final globalContext = main_app.navigatorKey.currentContext;
+                          if (globalContext != null && globalContext.mounted) {
+                            NotificationService.instance.showError('Backup creation failed');
+                          }
                           return;
                         }
 
-                        NotificationService.instance.showSuccess('Backup saved successfully! Location: $selectedDirectory');
+                        await Share.shareXFiles(
+                          [XFile(filePath)],
+                          subject: 'UniPOS Backup',
+                        );
                       },
                     ),
 

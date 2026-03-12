@@ -9,7 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
-import '../../../widget/componets/restaurant/componets/Textform.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 import 'apply_tax_screen.dart';
 
 class Addtax extends StatefulWidget {
@@ -534,25 +534,22 @@ class _AddtaxState extends State<Addtax> {
                     Row(
                       children: [
                         Expanded(
-                          child: CommonTextForm(
-                            obsecureText: false,
+                          child: AppTextField(
                             controller: _taxNameController,
-                            labelText: 'Tax Name*',
-                            LabelColor: AppColors.primary,
-                            BorderColor: AppColors.primary,
-                            borderc: 12,
+                            label: 'Tax Name',
+                            hint: 'e.g. GST, VAT',
+                            icon: Icons.receipt_outlined,
+                            required: true,
                           ),
                         ),
                         SizedBox(width: 12),
                         Expanded(
-                          child: CommonTextForm(
+                          child: AppTextField(
                             controller: _taxNumberController,
-                            labelText: 'Tax %',
-                            LabelColor: AppColors.primary,
-                            BorderColor: AppColors.primary,
-                            borderc: 12,
+                            label: 'Tax %',
+                            hint: 'e.g. 18',
+                            icon: Icons.percent_rounded,
                             keyboardType: TextInputType.numberWithOptions(decimal: true),
-                            obsecureText: false,
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                             ],

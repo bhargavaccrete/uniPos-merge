@@ -335,42 +335,10 @@ class _OrderdetailsState extends State<Orderdetails> {
                       final remainingQty = originalQty - refundedQty;
                       final bool itemIsFullyRefunded = refundedQty > 0 && refundedQty >= originalQty;
 
-                      // Calculate line total with proper discount and tax handling
-                      final basePrice = it.price; // Original price
-                      final itemDiscount = it.discount ?? 0.0; // Item-level discount
-                      final priceAfterItemDiscount = it.finalItemPrice; // price - item.discount
-
-                      double finalPricePerItem;
-
-                      // Check if discount is on items (item.discount > 0) or on bill (order.Discount > 0)
-                      if (itemDiscount > 0) {
-                        // Discount is applied to individual items
-                        // Tax is calculated on discounted price
-                        final taxAmount = priceAfterItemDiscount * (it.taxRate ?? 0.0);
-                        finalPricePerItem = priceAfterItemDiscount + taxAmount;
-                      } else {
-                        // Discount is on total bill - distribute proportionally
-                        // Calculate total value of ALL items for proportional discount
-                        double totalItemsValue = 0.0;
-                        for (var orderItem in items) {
-                          totalItemsValue += orderItem.finalItemPrice * (orderItem.quantity ?? 0);
-                        }
-
-                        // Calculate this item's proportional share of order discount
-                        double itemDiscountShare = 0.0;
-                        final orderDiscount = currentOrder.Discount ?? 0.0;
-                        if (totalItemsValue > 0 && orderDiscount > 0) {
-                          final itemProportion = priceAfterItemDiscount / totalItemsValue;
-                          itemDiscountShare = orderDiscount * itemProportion;
-                        }
-
-                        // Apply order discount and tax
-                        final priceAfterOrderDiscount = priceAfterItemDiscount - itemDiscountShare;
-                        final taxAmount = priceAfterOrderDiscount * (it.taxRate ?? 0.0);
-                        finalPricePerItem = priceAfterOrderDiscount + taxAmount;
-                      }
-
-                      final lineTotal = finalPricePerItem * remainingQty;
+                      // Line total = item unit price × qty (same as bill).
+                      // item.price is the base price as entered on the menu.
+                      // Tax and order-level discount are shown only in the totals section.
+                      final lineTotal = it.finalItemPrice * remainingQty;
 
                       return Card(
                         elevation: 0,
@@ -499,19 +467,19 @@ class _OrderdetailsState extends State<Orderdetails> {
                                               ),
                                             ),
                                           ),
-                                        // Display tax information
+                                        // Tax rate badge (info only — GST total shown at bottom)
                                         if (it.taxRate != null && it.taxRate! > 0)
                                           Padding(
                                             padding: const EdgeInsets.only(top: 4.0),
                                             child: Row(
                                               children: [
-                                                Icon(Icons.receipt, size: 12, color: Colors.grey.shade600),
+                                                Icon(Icons.receipt, size: 12, color: Colors.grey.shade500),
                                                 SizedBox(width: 4),
                                                 Text(
-                                                  'Tax: ${(it.taxRate! * 100).toStringAsFixed(0)}% (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(priceAfterItemDiscount * it.taxRate!)})',
+                                                  'Tax: ${(it.taxRate! * 100).toStringAsFixed(0)}%',
                                                   style: GoogleFonts.poppins(
                                                     fontSize: 11,
-                                                    color: Colors.grey.shade600,
+                                                    color: Colors.grey.shade500,
                                                   ),
                                                 ),
                                               ],
@@ -567,10 +535,11 @@ class _OrderdetailsState extends State<Orderdetails> {
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 child: Column(
                   children: [
-                    _totalRow('Sub Total', _money(currentOrder.subTotal)),
+                    // Pre-discount subtotal = taxable (post-discount) + discount
+                    _totalRow('Sub Total', _money((currentOrder.subTotal ?? 0) + (currentOrder.Discount ?? 0))),
                     if ((currentOrder.Discount ?? 0) > 0) ...[
                       const SizedBox(height: 6),
-                      _totalRow('Discount', _money(currentOrder.Discount)),
+                      _totalRow('Discount', '-${_money(currentOrder.Discount)}', color: Colors.green.shade700),
                     ],
                     if ((currentOrder.loyaltyPointsUsed ?? 0) > 0) ...[
                       const SizedBox(height: 6),
@@ -755,6 +724,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         orderTotalPrice: remainingTotal,
         orderDiscount: currentOrder.Discount ?? 0.0,
         orderSubTotal: currentOrder.subTotal ?? 0.0,
+        isTaxInclusive: currentOrder.isTaxInclusive ?? false,
       ),
     );
 

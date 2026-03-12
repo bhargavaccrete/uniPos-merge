@@ -340,227 +340,229 @@ class _TableScreenState extends State<TableScreen> {
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Header: Add Table + Legend
-          Container(
-            padding: AppResponsive.padding(context),
-            color: AppColors.white,
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: _addTable,
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(
-                      vertical: AppResponsive.getValue(context, mobile: 16, tablet: 18),
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.tablesTab,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.tablesTab.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add,
-                          color: AppColors.white,
-                          size: AppResponsive.getValue(context, mobile: 20, tablet: 22),
-                        ),
-                        AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                        Text(
-                          'Add Table',
-                          style: GoogleFonts.poppins(
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        body: Column(
+          children: [
+            // Header: Add Table + Legend
+            Container(
+              padding: AppResponsive.padding(context),
+              color: AppColors.white,
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _addTable,
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.getValue(context, mobile: 16, tablet: 18),
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.tablesTab,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.tablesTab.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add,
                             color: AppColors.white,
-                            fontSize: AppResponsive.getValue(context, mobile: 16, tablet: 17),
-                            fontWeight: FontWeight.w600,
+                            size: AppResponsive.getValue(context, mobile: 20, tablet: 22),
                           ),
-                        ),
-                      ],
+                          AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                          Text(
+                            'Add Table',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.white,
+                              fontSize: AppResponsive.getValue(context, mobile: 16, tablet: 17),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildLegendItem(AppColors.success, 'Available', isTablet),
-                    _buildLegendItem(AppColors.warning, 'Reserved', isTablet),
-                    _buildLegendItem(AppColors.danger, 'Occupied', isTablet),
-                  ],
-                ),
-              ],
+                  AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildLegendItem(AppColors.success, 'Available', isTablet),
+                      _buildLegendItem(AppColors.warning, 'Reserved', isTablet),
+                      _buildLegendItem(AppColors.danger, 'Occupied', isTablet),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-
-          // Tables Grid
-          Expanded(
-            child: Observer(
-              builder: (_) {
-                if (tableStore.isLoading && tableStore.tables.isEmpty) {
-                  return Center(child: CircularProgressIndicator());
-                }
-
-                if (tableStore.tables.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.table_restaurant_outlined, size: 80, color: AppColors.divider),
-                        SizedBox(height: 16),
-                        Text(
-                          'No tables found.',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
+      
+            // Tables Grid
+            Expanded(
+              child: Observer(
+                builder: (_) {
+                  if (tableStore.isLoading && tableStore.tables.isEmpty) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+      
+                  if (tableStore.tables.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.table_restaurant_outlined, size: 80, color: AppColors.divider),
+                          SizedBox(height: 16),
+                          Text(
+                            'No tables found.',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Add one to get started.',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
+                          SizedBox(height: 4),
+                          Text(
+                            'Add one to get started.',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w400,
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final allTables = tableStore.tables;
-                final crossAxisCount = AppResponsive.gridColumns(context, mobile: 2, tablet: 4, desktop: 4);
-
-                return GridView.builder(
-                  padding: AppResponsive.padding(context),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: AppResponsive.gridSpacing(context),
-                    mainAxisSpacing: AppResponsive.gridSpacing(context),
-                    childAspectRatio: AppResponsive.gridAspectRatio(context),
-                  ),
-                  itemCount: allTables.length,
-                  itemBuilder: (context, index) {
-                    final table = allTables[index];
-
-                    // Show customer name from the linked active order (if any)
-                    final activeOrder = orderStore.getActiveOrderByTableId(table.id);
-                    final customerName = activeOrder?.customerName?.isNotEmpty == true
-                        ? activeOrder!.customerName!
-                        : null;
-
-                    return TableCard(
-                      table: table,
-                      customerName: customerName,
-                      onLongPress: () => _showTableActions(table),
-                      onTap: () {
-                        final isOccupied = table.status == 'Processing' ||
-                            table.status == 'Cooking' ||
-                            table.status == 'Running' ||
-                            table.status == 'Ready' ||
-                            table.status == 'Served';
-
-                        if (isOccupied) {
-                          // Open active order in cart
-                          if (activeOrder != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CartScreen(
-                                  existingOrder: activeOrder,
-                                  selectedTableNo: table.id,
-                                ),
-                              ),
-                            );
-                          } else {
-                            // Orphaned table — status is occupied but no order exists
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                title: Text(
-                                  'No Active Order Found',
-                                  style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w700),
-                                ),
-                                content: Text(
-                                  'Table "${table.id}" shows as ${table.status} but has no linked order.\n\nWhat would you like to do?',
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: Text('Cancel',
-                                        style: GoogleFonts.poppins(
-                                            color: AppColors.textSecondary)),
-                                  ),
-                                  TextButton(
-                                    onPressed: () async {
-                                      Navigator.pop(ctx);
-                                      await tableStore.deleteTable(table.id);
-                                      NotificationService.instance.showSuccess(
-                                          'Table "${table.id}" deleted.');
-                                    },
-                                    child: Text('Delete Table',
-                                        style: GoogleFonts.poppins(
-                                            color: Colors.red)),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      Navigator.pop(ctx);
-                                      await tableStore.updateTableStatus(
-                                          table.id, 'Available');
-                                      NotificationService.instance.showSuccess(
-                                          'Table "${table.id}" reset to Available.');
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10)),
-                                    ),
-                                    child: Text('Reset to Available',
-                                        style: GoogleFonts.poppins(
-                                            color: Colors.white)),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                        } else {
-                          // Available or Reserved — start a new order
-                          if (widget.isfromcart == true) {
-                            Navigator.pop(context, table.id);
-                          } else {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    Startorder(newOrderForTableId: table.id),
-                              ),
-                            );
-                          }
-                        }
-                      },
+                        ],
+                      ),
                     );
-                  },
-                );
-              },
+                  }
+      
+                  final allTables = tableStore.tables;
+                  final crossAxisCount = AppResponsive.gridColumns(context, mobile: 2, tablet: 4, desktop: 4);
+      
+                  return GridView.builder(
+                    padding: AppResponsive.padding(context),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: AppResponsive.gridSpacing(context),
+                      mainAxisSpacing: AppResponsive.gridSpacing(context),
+                      childAspectRatio: AppResponsive.gridAspectRatio(context),
+                    ),
+                    itemCount: allTables.length,
+                    itemBuilder: (context, index) {
+                      final table = allTables[index];
+      
+                      // Show customer name from the linked active order (if any)
+                      final activeOrder = orderStore.getActiveOrderByTableId(table.id);
+                      final customerName = activeOrder?.customerName?.isNotEmpty == true
+                          ? activeOrder!.customerName!
+                          : null;
+      
+                      return TableCard(
+                        table: table,
+                        customerName: customerName,
+                        onLongPress: () => _showTableActions(table),
+                        onTap: () {
+                          final isOccupied = table.status == 'Processing' ||
+                              table.status == 'Cooking' ||
+                              table.status == 'Running' ||
+                              table.status == 'Ready' ||
+                              table.status == 'Served';
+      
+                          if (isOccupied) {
+                            // Open active order in cart
+                            if (activeOrder != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CartScreen(
+                                    existingOrder: activeOrder,
+                                    selectedTableNo: table.id,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              // Orphaned table — status is occupied but no order exists
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  title: Text(
+                                    'No Active Order Found',
+                                    style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                  content: Text(
+                                    'Table "${table.id}" shows as ${table.status} but has no linked order.\n\nWhat would you like to do?',
+                                    style: GoogleFonts.poppins(fontSize: 14),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: Text('Cancel',
+                                          style: GoogleFonts.poppins(
+                                              color: AppColors.textSecondary)),
+                                    ),
+                                    TextButton(
+                                      onPressed: () async {
+                                        Navigator.pop(ctx);
+                                        await tableStore.deleteTable(table.id);
+                                        NotificationService.instance.showSuccess(
+                                            'Table "${table.id}" deleted.');
+                                      },
+                                      child: Text('Delete Table',
+                                          style: GoogleFonts.poppins(
+                                              color: Colors.red)),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        Navigator.pop(ctx);
+                                        await tableStore.updateTableStatus(
+                                            table.id, 'Available');
+                                        NotificationService.instance.showSuccess(
+                                            'Table "${table.id}" reset to Available.');
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                      ),
+                                      child: Text('Reset to Available',
+                                          style: GoogleFonts.poppins(
+                                              color: Colors.white)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          } else {
+                            // Available or Reserved — start a new order
+                            if (widget.isfromcart == true) {
+                              Navigator.pop(context, table.id);
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      Startorder(newOrderForTableId: table.id),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

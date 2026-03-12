@@ -48,6 +48,9 @@ class ReceiptData {
   // Loyalty points redeemed as discount (shown as a separate line on bill)
   final int? loyaltyPointsDiscount;
 
+  // Tax mode stored at order creation time (use this instead of live AppSettings)
+  final bool? isTaxInclusive;
+
   ReceiptData({
     required this.sale,
     required this.items,
@@ -68,6 +71,7 @@ class ReceiptData {
     this.logoBytes,
     this.itemTotal,
     this.loyaltyPointsDiscount,
+    this.isTaxInclusive,
   });
 }
 
@@ -441,7 +445,7 @@ class ReceiptPdfService {
           // Totals - Display only (NO calculations)
           // All values pre-calculated by CartCalculationService
               () {
-            final isRestaurantInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
+            final isRestaurantInclusive = AppConfig.isRestaurant && (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
 
             // ✅ GOLDEN RULE: Only display pre-calculated values
             // itemTotal: From CartCalculationService.itemTotal
@@ -451,37 +455,37 @@ class ReceiptPdfService {
             // totalAmount: From CartCalculationService.grandTotal (mapped to sale.totalAmount)
 
             if (isRestaurantInclusive) {
-              // TAX INCLUSIVE MODE - Labels only
+              // TAX INCLUSIVE MODE
               return pw.Column(
                 children: [
-                  // Sub Total - Use itemTotal (before discount) if available
+                  // Sub Total (includes tax)
                   if (showSubtotal)
-                    _buildThermalTotalRow('Sub Total', data.itemTotal ?? data.sale.subtotal),
-                  // Discount - Pre-calculated (only show if > 0)
+                    _buildThermalTotalRow('Sub Total (Incl. Tax)', data.itemTotal ?? data.sale.subtotal),
+                  // Discount
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-                  // Points Redeemed - only show if loyalty points were used
+                  // Points Redeemed
                   if ((data.loyaltyPointsDiscount ?? 0) > 0)
                     _buildThermalTotalRow('Points Redeemed', -(data.loyaltyPointsDiscount!.toDouble())),
-                  // GST (Included) - Pre-calculated
+                  // GST extracted from price (not added on top)
                   if (showTax && data.sale.taxAmount > 0)
-                    _buildThermalTotalRow('GST', data.sale.taxAmount),
+                    _buildThermalTotalRow('GST (Included)', data.sale.taxAmount),
                 ],
               );
             } else {
-              // TAX EXCLUSIVE MODE - Labels only
+              // TAX EXCLUSIVE MODE
               return pw.Column(
                 children: [
-                  // Sub Total - Use itemTotal (before discount) if available
+                  // Sub Total (before tax)
                   if (showSubtotal)
                     _buildThermalTotalRow('Sub Total', data.itemTotal ?? data.sale.subtotal),
-                  // Discount - Pre-calculated (only show if > 0)
+                  // Discount
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-                  // Points Redeemed - only show if loyalty points were used
+                  // Points Redeemed
                   if ((data.loyaltyPointsDiscount ?? 0) > 0)
                     _buildThermalTotalRow('Points Redeemed', -(data.loyaltyPointsDiscount!.toDouble())),
-                  // GST - Pre-calculated
+                  // GST added on top
                   if (showTax && data.sale.taxAmount > 0)
                     _buildThermalTotalRow('GST', data.sale.taxAmount),
                 ],
@@ -854,7 +858,7 @@ class ReceiptPdfService {
             pw.Container(
               width: 250,
               child: () {
-                final isRestaurantInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
+                final isRestaurantInclusive = AppConfig.isRestaurant && (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
 
                 // ✅ GOLDEN RULE: Only display pre-calculated values
                 // itemTotal: From CartCalculationService.itemTotal

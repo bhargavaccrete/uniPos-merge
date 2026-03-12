@@ -31,6 +31,9 @@ class AppSettings {
     "Discount On Items": false, // ✅ WORKING
     "Decimal Precision": true, // 🔢 Decimal places control
 
+    // Staff & Shifts
+    "Shift Handover": true, // Enable 2-step cash handover between staff shifts
+
 
 
     // Printing
@@ -164,6 +167,7 @@ class AppSettings {
 
   static bool get visualKeyboard => values["Visual Keyboard"] ?? false;
   static bool get addressSuggestion => values["Addresss Suggestion"] ?? true;
+  static bool get shiftHandover => values["Shift Handover"] ?? true;
 
   // static bool get  sepratedQuantity => values["Separate Quantity"] ?? false;
   // static bool get autoPrintKotOnDelete => values["Auto Print KOT On Delete Item"] ?? false;

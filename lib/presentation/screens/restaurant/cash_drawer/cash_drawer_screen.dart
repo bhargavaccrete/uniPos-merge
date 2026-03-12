@@ -15,6 +15,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 // ─── Entry type for the merged activity log ───────────────────────────────────
 
@@ -311,17 +312,26 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
 
-    // Fixed reason options — keeps data clean for reporting
-    const reasons = [
+    final isCashIn = type == 'in';
+    // Separate reason lists for Cash In vs Cash Out
+    const cashInReasons = [
       'Owner deposit',
+      'Petty cash return',
+      'Safe drop return',
+      'Loan received',
+      'Change fund',
+      'Other',
+    ];
+    const cashOutReasons = [
       'Safe drop',
       'Petty cash',
       'Advance to staff',
       'Supplier payment',
+      'Loan given',
       'Other',
     ];
+    final reasons = isCashIn ? cashInReasons : cashOutReasons;
     String selectedReason = reasons.first;
-    final isCashIn = type == 'in';
 
     await showDialog(
       context: context,
@@ -371,69 +381,72 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Amount
-                    Text('Amount',
-                        style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary)),
-                    const SizedBox(height: 6),
-                    TextField(
+                    AppTextField(
                       controller: amountCtrl,
+                      label: 'Amount',
+                      hint: '0.00',
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                       ],
-                      decoration: InputDecoration(
-                        prefixText: '${CurrencyHelper.currentSymbol} ',
-                        hintText: '0.00',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(
-                              color: isCashIn ? Colors.green : Colors.red,
-                              width: 2),
+                      prefixWidget: Padding(
+                        padding: const EdgeInsets.only(left: 14, right: 8),
+                        child: Text(
+                          CurrencyHelper.currentSymbol,
+                          style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
 
                     // Reason dropdown
-                    Text('Reason',
-                        style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary)),
-                    const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
                       value: selectedReason,
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, color: AppColors.textPrimary),
                       decoration: InputDecoration(
+                        labelText: 'Reason',
+                        labelStyle: GoogleFonts.poppins(
+                            fontSize: 13, color: AppColors.textSecondary),
+                        prefixIcon: const Icon(Icons.list_alt_rounded,
+                            color: AppColors.primary, size: 20),
+                        filled: true,
+                        fillColor: AppColors.surfaceLight,
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: AppColors.divider)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: AppColors.divider)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: AppColors.primary, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 12),
+                            horizontal: 16, vertical: 14),
                       ),
                       items: reasons
-                          .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                          .map((r) => DropdownMenuItem(
+                              value: r,
+                              child: Text(r,
+                                  style: GoogleFonts.poppins(fontSize: 14))))
                           .toList(),
-                      onChanged: (v) => setDs(() => selectedReason = v ?? reasons.first),
+                      onChanged: (v) =>
+                          setDs(() => selectedReason = v ?? reasons.first),
                     ),
                     const SizedBox(height: 16),
 
                     // Optional note
-                    Text('Note (optional)',
-                        style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary)),
-                    const SizedBox(height: 6),
-                    TextField(
+                    AppTextField(
                       controller: noteCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Add extra details...',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
+                      label: 'Note',
+                      hint: 'Add extra details... (optional)',
+                      icon: Icons.notes_rounded,
                     ),
                   ],
                 ),
@@ -1270,48 +1283,34 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
               const SizedBox(height: 16),
 
               // Cash count input
-              Text('Cash counted in drawer',
-                  style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary)),
-              const SizedBox(height: 6),
-              TextField(
+              AppTextField(
                 controller: _amountCtrl,
+                label: 'Cash counted in drawer',
+                hint: '0.00',
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d+\.?\d{0,2}'))
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                 ],
-                decoration: InputDecoration(
-                  prefixText: '$currency ',
-                  hintText: '0.00',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: Colors.orange.shade700, width: 2),
+                prefixWidget: Padding(
+                  padding: const EdgeInsets.only(left: 14, right: 8),
+                  child: Text(
+                    currency,
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
 
               // Optional note
-              Text('Note (optional)',
-                  style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary)),
-              const SizedBox(height: 6),
-              TextField(
+              AppTextField(
                 controller: _noteCtrl,
-                decoration: InputDecoration(
-                  hintText: 'e.g. "Left ₹1500, all good"',
-                  border:
-                      OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+                label: 'Note',
+                hint: 'e.g. "Left ₹1500, all good" (optional)',
+                icon: Icons.notes_rounded,
               ),
             ],
           ),
@@ -1413,6 +1412,13 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   // After completion, show result before closing
   String? _resultStatus;
   double? _variance;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild on every keystroke so the live comparison panel updates in real time
+    _amountCtrl.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -1520,46 +1526,39 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
                 const SizedBox(height: 20),
 
                 // Incoming staff counts
-                Text('Count the cash now',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary)),
-                const SizedBox(height: 6),
-                TextField(
+                AppTextField(
                   controller: _amountCtrl,
+                  label: 'Count the cash now',
+                  hint: '0.00',
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+\.?\d{0,2}'))
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                   ],
-                  decoration: InputDecoration(
-                    prefixText: '$currency ',
-                    hintText: '0.00',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                          color: Colors.blue, width: 2),
+                  prefixWidget: Padding(
+                    padding: const EdgeInsets.only(left: 14, right: 8),
+                    child: Text(
+                      currency,
+                      style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary),
                     ),
                   ),
                 ),
+
+                // Live comparison panel — updates on every keystroke
+                if (_amountCtrl.text.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildLiveComparisonPanel(currency),
+                ],
+
                 const SizedBox(height: 16),
-                Text('Note (optional)',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary)),
-                const SizedBox(height: 6),
-                TextField(
+                AppTextField(
                   controller: _noteCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Any remarks...',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
+                  label: 'Note',
+                  hint: 'Any remarks... (optional)',
+                  icon: Icons.notes_rounded,
                 ),
               ],
             ),
@@ -1594,6 +1593,97 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
           ),
         ]),
       ),
+    );
+  }
+
+  // ── Live comparison panel ─────────────────────────────────────────────────
+
+  Widget _buildLiveComparisonPanel(String currency) {
+    final counted = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+    final diff = counted - widget.closedAmount;
+    final isMatch = diff.abs() <= 1.0;
+    final isShortage = diff < -1.0;
+
+    final Color panelColor;
+    final Color textColor;
+    final IconData icon;
+    final String label;
+
+    if (isMatch) {
+      panelColor = Colors.green.withOpacity(0.08);
+      textColor = Colors.green.shade700;
+      icon = Icons.check_circle_outline;
+      label = 'Amounts match';
+    } else if (isShortage) {
+      panelColor = Colors.red.withOpacity(0.07);
+      textColor = Colors.red.shade700;
+      icon = Icons.warning_amber_rounded;
+      label = 'Shortage';
+    } else {
+      panelColor = Colors.orange.withOpacity(0.08);
+      textColor = Colors.orange.shade800;
+      icon = Icons.info_outline_rounded;
+      label = 'Overage';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: panelColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: textColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          _buildCompareRow('Reported by ${widget.closedBy}',
+              '$currency ${widget.closedAmount.toStringAsFixed(2)}', Colors.grey.shade700),
+          const SizedBox(height: 6),
+          _buildCompareRow('You counted',
+              '$currency ${counted.toStringAsFixed(2)}', AppColors.textPrimary),
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(children: [
+                Icon(icon, size: 16, color: textColor),
+                const SizedBox(width: 6),
+                Text(label,
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
+              ]),
+              Text(
+                isMatch
+                    ? 'No difference'
+                    : '${diff < 0 ? '-' : '+'}$currency ${diff.abs().toStringAsFixed(2)}',
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
+              ),
+            ],
+          ),
+          if (!isMatch) ...[
+            const SizedBox(height: 8),
+            Text(
+              isShortage
+                  ? 'The missing amount will be flagged as a discrepancy for manager review. It does NOT affect the drawer balance automatically.'
+                  : 'The extra amount stays in the drawer and will be flagged as overage for manager review.',
+              style: GoogleFonts.poppins(fontSize: 11, color: textColor),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompareRow(String label, String value, Color valueColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+        Text(value,
+            style: GoogleFonts.poppins(
+                fontSize: 13, fontWeight: FontWeight.w600, color: valueColor)),
+      ],
     );
   }
 
@@ -1648,10 +1738,15 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   }
 
   Future<void> _confirm() async {
+    if (_amountCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Count the cash and enter the amount first')));
+      return;
+    }
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     if (amount < 0) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Enter the cash amount')));
+          .showSnackBar(const SnackBar(content: Text('Amount cannot be negative')));
       return;
     }
     setState(() => _isSaving = true);

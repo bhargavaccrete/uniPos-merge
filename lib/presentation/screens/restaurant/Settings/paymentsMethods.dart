@@ -4,8 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/stores/payment_method_store.dart';
 import 'package:unipos/util/color.dart';
-import '../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class Paymentsmethods extends StatefulWidget {
   @override
@@ -93,25 +93,12 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
             // Content
             Padding(
               padding: EdgeInsets.all(16),
-              child: TextField(
+              child: AppTextField(
                 controller: _nameController,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'Method Name',
-                  labelStyle: GoogleFonts.poppins(fontSize: 14),
-                  hintText: 'e.g., PhonePe, Google Pay',
-                  hintStyle: GoogleFonts.poppins(fontSize: 13),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppColors.primary, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
+                label: 'Method Name',
+                hint: 'e.g., PhonePe, Google Pay',
+                icon: Icons.payment_rounded,
+                required: true,
               ),
             ),
           ],
@@ -203,23 +190,12 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
             // Content
             Padding(
               padding: EdgeInsets.all(16),
-              child: TextField(
+              child: AppTextField(
                 controller: _nameController,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: 'Method Name',
-                  labelStyle: GoogleFonts.poppins(fontSize: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppColors.primary, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
+                label: 'Method Name',
+                hint: 'Enter method name',
+                icon: Icons.payment_rounded,
+                required: true,
               ),
             ),
           ],

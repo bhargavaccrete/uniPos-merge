@@ -8,6 +8,7 @@ import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';
+import '../../common/app_text_field.dart';
 import 'image_picker_sheet.dart';
 
 /// Dialog/Sheet for adding a new category — responsive:
@@ -149,17 +150,16 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   Widget _buildDialogLayout() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Colors.grey[50],
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildHeader(isDialog: true),
-          const Divider(height: 1),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: _formFields(),
             ),
           ),
@@ -170,9 +170,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
 
   Widget _buildSheetLayout() {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -192,11 +192,10 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             _buildHeader(isDialog: false),
-            const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: _formFields(),
             ),
           ],
@@ -207,44 +206,21 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
 
   Widget _buildHeader({required bool isDialog}) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, isDialog ? 16 : 4, 12, 16),
+      padding: EdgeInsets.fromLTRB(20, isDialog ? 20 : 8, 16, 16),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary,
-                  AppColors.primary.withValues(alpha: 0.7),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.category_outlined,
-                color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Add Category',
-                style: GoogleFonts.poppins(
-                    fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              Text(
-                'Create a new menu category',
-                style: GoogleFonts.poppins(
-                    fontSize: 12, color: AppColors.textSecondary),
-              ),
-            ],
+          Icon(Icons.category_outlined, color: AppColors.primary, size: 24),
+          const SizedBox(width: 10),
+          Text(
+            'Add Category',
+            style: GoogleFonts.poppins(
+                fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
           ),
           if (isDialog) ...[
             const Spacer(),
             IconButton(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close),
+              icon: const Icon(Icons.close, size: 20),
               style: IconButton.styleFrom(
                 backgroundColor: AppColors.surfaceLight,
                 foregroundColor: AppColors.textSecondary,
@@ -260,111 +236,29 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Category Name',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+        // ── Category Name card ──────────────────────────────────────
+        _sectionHeader('Category Name', Icons.label_outline_rounded),
+        const SizedBox(height: 12),
+        _card(
+          child: AppTextField(
+            controller: _categoryNameController,
+            label: 'Category Name',
+            hint: 'e.g., Beverages, Starters',
+            icon: Icons.category_outlined,
+            required: true,
           ),
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _categoryNameController,
-          style:
-              GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: 'Enter category name',
-            hintStyle:
-                GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-            prefixIcon:
-                const Icon(Icons.category_outlined, color: AppColors.primary),
-            filled: true,
-            fillColor: AppColors.surfaceLight,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-          ),
-        ),
+
         const SizedBox(height: 20),
-        Text(
-          'Category Image (optional)',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _pickImage,
-          child: Container(
-            height: 140,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              border: Border.all(color: AppColors.divider, width: 1.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: _selectedImageBytes != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child:
-                        Image.memory(_selectedImageBytes!, fit: BoxFit.cover),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.add_photo_alternate,
-                        color: AppColors.textSecondary.withValues(alpha: 0.5),
-                        size: 40,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tap to upload image',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '600×400 • PNG, JPG (Max 3MB)',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-        if (_selectedImageBytes != null) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => setState(() => _selectedImageBytes = null),
-              icon: const Icon(Icons.close, size: 16),
-              label: Text('Remove image',
-                  style: GoogleFonts.poppins(fontSize: 13)),
-              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            ),
-          ),
-        ],
+
+        // ── Image card ───────────────────────────────────────────────
+        _sectionHeader('Category Image (Optional)', Icons.image_outlined),
+        const SizedBox(height: 12),
+        _card(child: _buildImagePicker()),
+
         const SizedBox(height: 24),
+
+        // ── Save button ──────────────────────────────────────────────
         SizedBox(
           width: double.infinity,
           height: 50,
@@ -381,10 +275,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
             label: Text(
               _isSaving ? 'Saving…' : 'Add Category',
               style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
@@ -398,6 +291,113 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         ),
         const SizedBox(height: 8),
       ],
+    );
+  }
+
+  Widget _sectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87),
+        ),
+      ],
+    );
+  }
+
+  Widget _card({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildImagePicker() {
+    if (_selectedImageBytes != null) {
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              _selectedImageBytes!,
+              height: 160,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedImageBytes = null),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                    color: Colors.red, shape: BoxShape.circle),
+                child: const Icon(Icons.close, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return InkWell(
+      onTap: _pickImage,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 130,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          border: Border.all(color: AppColors.divider),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add_photo_alternate_rounded,
+                  size: 28, color: AppColors.primary),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Tap to upload image',
+              style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primary),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'From Gallery',
+              style: GoogleFonts.poppins(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

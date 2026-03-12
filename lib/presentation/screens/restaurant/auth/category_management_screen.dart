@@ -7,9 +7,9 @@ import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 /// Category Management Screen
 /// Allows users to view, add, edit, and delete categories with images
@@ -491,165 +491,92 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      backgroundColor: Colors.grey[50],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
+      child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 500),
-        padding: const EdgeInsets.all(25),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
+                // ── Header ─────────────────────────────────────────
                 Row(
                   children: [
-                    Icon(Icons.category, color: AppColors.primary, size: 28),
+                    Icon(Icons.category_outlined,
+                        color: AppColors.primary, size: 24),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _isEditing ? 'Edit Category' : 'Add New Category',
                         style: GoogleFonts.poppins(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.pop(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surfaceLight,
+                        foregroundColor: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 20),
 
-                // Category Name
-                CommonTextForm(
-                  controller: _nameController,
-                  labelText: 'Category Name*',
-                  hintText: 'e.g., Pizza, Burgers, Beverages',
-                  obsecureText: false,
-                  icon: const Icon(Icons.label),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Category name is required';
-                    }
-                    return null;
-                  },
+                // ── Category Name ───────────────────────────────────
+                _sectionHeader('Category Name', Icons.label_outline_rounded),
+                const SizedBox(height: 12),
+                _card(
+                  child: AppTextField(
+                    controller: _nameController,
+                    label: 'Category Name',
+                    hint: 'e.g., Beverages, Starters',
+                    icon: Icons.category_outlined,
+                    required: true,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Category name is required';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
                 const SizedBox(height: 20),
 
-                // Category Image
-                Text(
-                  'Category Image (Optional)',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (_selectedImage != null || _existingImagePath != null)
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: _selectedImage != null
-                            ? Image.file(
-                                _selectedImage!,
-                                height: 150,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                              )
-                            : Image.file(
-                                File(_existingImagePath!),
-                                height: 150,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 150,
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.broken_image, size: 50),
-                                  );
-                                },
-                              ),
-                      ),
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: InkWell(
-                          onTap: _removeImage,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.close, color: Colors.white, size: 18),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  InkWell(
-                    onTap: _pickImage,
-                    child: Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey[300]!,
-                          width: 2,
-                          style: BorderStyle.solid,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey[50],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey[400]),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Tap to upload image',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 30),
+                // ── Category Image ──────────────────────────────────
+                _sectionHeader(
+                    'Category Image (Optional)', Icons.image_outlined),
+                const SizedBox(height: 12),
+                _card(child: _buildImagePicker()),
+                const SizedBox(height: 24),
 
-                // Action Buttons
+                // ── Buttons ─────────────────────────────────────────
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.grey[300]!),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
+                      child: CommonButton(
+                        onTap: () => Navigator.pop(context),
+                        bgcolor: Colors.white,
+                        bordercolor: Colors.grey[300],
+                        bordercircular: 10,
+                        height: 50,
                         child: Text(
                           'Cancel',
                           style: GoogleFonts.poppins(
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w600,
-                          ),
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 15),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: CommonButton(
                         onTap: _saveCategory,
@@ -659,10 +586,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                         child: Text(
                           _isEditing ? 'Update' : 'Add',
                           style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
@@ -671,6 +597,123 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87),
+        ),
+      ],
+    );
+  }
+
+  Widget _card({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildImagePicker() {
+    final hasImage = _selectedImage != null || _existingImagePath != null;
+    if (hasImage) {
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: _selectedImage != null
+                ? Image.file(_selectedImage!,
+                    height: 150, width: double.infinity, fit: BoxFit.cover)
+                : Image.file(
+                    File(_existingImagePath!),
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 150,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, size: 50),
+                    ),
+                  ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: _removeImage,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                    color: Colors.red, shape: BoxShape.circle),
+                child:
+                    const Icon(Icons.close, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return InkWell(
+      onTap: _pickImage,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 130,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          border: Border.all(color: AppColors.divider),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add_photo_alternate_rounded,
+                  size: 28, color: AppColors.primary),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Tap to upload image',
+              style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primary),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'From Gallery',
+              style: GoogleFonts.poppins(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+          ],
         ),
       ),
     );

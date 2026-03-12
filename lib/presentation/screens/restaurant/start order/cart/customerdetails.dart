@@ -20,8 +20,8 @@ import '../../../../../stores/payment_method_store.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../widget/componets/common/split_payment_widget.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
-import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
+import '../../../../widget/componets/common/app_text_field.dart';
 import '../startorder.dart';
 import '../../util/restaurant_print_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
@@ -236,6 +236,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         child: Container(
           padding: EdgeInsets.all(isTablet ? 20 : 16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Show selected customer info
               if (selectedCustomer != null)
@@ -347,6 +348,27 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   ),
                 ),
 
+              // Customer Information section header
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.person_outline, color: AppColors.primary, size: 16),
+                    const SizedBox(width: 8),
+                    Text('Customer Information',
+                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    const Spacer(),
+                    Text('Optional', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+
               // Autocomplete Name Field
               Autocomplete<RestaurantCustomer>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
@@ -367,62 +389,69 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   }
                   _nameController = controller;
 
-                  return CommonTextForm(
+                  return AppTextField(
                     controller: controller,
-                    borderc: 5,
-                    obsecureText: false,
-                    BorderColor: AppColors.primary,
-                    labelText: 'Name (type to search existing customers)',
-                    LabelColor: AppColors.primary,
                     focusNode: focusNode,
-                    onfieldsumbitted: (v) {
-                      FocusScope.of(context).requestFocus(emailnode);
-                    },
+                    label: 'Customer Name',
+                    hint: 'Search by name…',
+                    icon: Icons.person_outline,
+                    onFieldSubmitted: (v) => FocusScope.of(context).requestFocus(emailnode),
                   );
                 },
                 optionsViewBuilder: (context, onSelected, options) {
                   return Align(
                     alignment: Alignment.topLeft,
                     child: Material(
-                      elevation: 4,
-                      borderRadius: BorderRadius.circular(8),
+                      elevation: 0,
+                      borderRadius: BorderRadius.circular(12),
                       child: Container(
                         width: width * 0.9,
-                        constraints: BoxConstraints(maxHeight: 200),
-                        margin: EdgeInsets.only(top: 8),
-                        child: ListView.builder(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        margin: const EdgeInsets.only(top: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.divider),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+                        ),
+                        child: ListView.separated(
                           padding: EdgeInsets.zero,
                           shrinkWrap: true,
                           itemCount: options.length,
+                          separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
                           itemBuilder: (context, index) {
                             final customer = options.elementAt(index);
-                            return ListTile(
-                              dense: true,
-                              leading: CircleAvatar(
-                                radius: 18,
-                                backgroundColor: AppColors.primary.withOpacity(0.2),
-                                child: Text(
-                                  customer.name?.isNotEmpty == true
-                                      ? customer.name![0].toUpperCase()
-                                      : '?',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => onSelected(customer),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: AppColors.primary.withOpacity(0.12),
+                                      child: Text(
+                                        customer.name?.isNotEmpty == true ? customer.name![0].toUpperCase() : '?',
+                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(customer.name ?? 'Unknown',
+                                              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                                          Text('${customer.phone ?? ''} • ${customer.totalVisites} visits',
+                                              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(Icons.north_west, size: 14, color: AppColors.textSecondary),
+                                  ],
                                 ),
                               ),
-                              title: Text(
-                                customer.name ?? 'Unknown',
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              ),
-                              subtitle: Text(
-                                '${customer.phone ?? ''} • ${customer.totalVisites} visits',
-                                style: GoogleFonts.poppins(fontSize: 12),
-                              ),
-                              onTap: () {
-                                onSelected(customer);
-                              },
                             );
                           },
                         ),
@@ -431,16 +460,16 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   );
                 },
               ),
-              SizedBox(height: 10),
-              CommonTextForm(
-                  focusNode: emailnode,
-                  controller: _emailController,
-                  borderc: 5,
-                  BorderColor: AppColors.primary,
-                  labelText: 'Email Id (optional)',
-                  LabelColor: AppColors.primary,
-                  obsecureText: false),
-              SizedBox(height: 10),
+              const SizedBox(height: 14),
+              AppTextField(
+                focusNode: emailnode,
+                controller: _emailController,
+                label: 'Email',
+                hint: 'Email ID (optional)',
+                icon: Icons.mail_outline,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 14),
 
               // Autocomplete Mobile Field
               Autocomplete<RestaurantCustomer>(
@@ -462,72 +491,78 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   }
                   _mobileController = controller;
 
-                  return CommonTextForm(
+                  return AppTextField(
                     controller: controller,
+                    focusNode: focusNode,
+                    label: 'Mobile Number',
+                    hint: 'Mobile number',
                     keyboardType: TextInputType.number,
                     maxLength: 10,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    borderc: 5,
-                    BorderColor: AppColors.primary,
-                    labelText: 'Mobile No (type to search)',
-                    LabelColor: AppColors.primary,
-                    obsecureText: false,
-                    icon: CountryCodePicker(
-                      padding: EdgeInsets.all(10),
+                    prefixWidget: CountryCodePicker(
+                      padding: EdgeInsets.zero,
                       initialSelection: 'IN',
                       favorite: ['+91', 'IN'],
                       showCountryOnly: false,
                       showFlag: false,
                     ),
-                    focusNode: focusNode,
-                    onfieldsumbitted: (v) {
-                      FocusScope.of(context).requestFocus(namenode);
-                    },
+                    onFieldSubmitted: (v) => FocusScope.of(context).requestFocus(namenode),
                   );
                 },
                 optionsViewBuilder: (context, onSelected, options) {
                   return Align(
                     alignment: Alignment.topLeft,
                     child: Material(
-                      elevation: 4,
-                      borderRadius: BorderRadius.circular(8),
+                      elevation: 0,
+                      borderRadius: BorderRadius.circular(12),
                       child: Container(
                         width: width * 0.9,
-                        constraints: BoxConstraints(maxHeight: 200),
-                        margin: EdgeInsets.only(top: 8),
-                        child: ListView.builder(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        margin: const EdgeInsets.only(top: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.divider),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+                        ),
+                        child: ListView.separated(
                           padding: EdgeInsets.zero,
                           shrinkWrap: true,
                           itemCount: options.length,
+                          separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
                           itemBuilder: (context, index) {
                             final customer = options.elementAt(index);
-                            return ListTile(
-                              dense: true,
-                              leading: CircleAvatar(
-                                radius: 18,
-                                backgroundColor: AppColors.primary.withOpacity(0.2),
-                                child: Text(
-                                  customer.name?.isNotEmpty == true
-                                      ? customer.name![0].toUpperCase()
-                                      : '?',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => onSelected(customer),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: AppColors.primary.withOpacity(0.12),
+                                      child: Text(
+                                        customer.name?.isNotEmpty == true ? customer.name![0].toUpperCase() : '?',
+                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(customer.name ?? 'Unknown',
+                                              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                                          Text('${customer.phone ?? ''} • ${customer.totalVisites} visits',
+                                              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(Icons.north_west, size: 14, color: AppColors.textSecondary),
+                                  ],
                                 ),
                               ),
-                              title: Text(
-                                customer.name ?? 'Unknown',
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              ),
-                              subtitle: Text(
-                                '${customer.phone ?? ''} • ${customer.totalVisites} visits',
-                                style: GoogleFonts.poppins(fontSize: 12),
-                              ),
-                              onTap: () {
-                                onSelected(customer);
-                              },
                             );
                           },
                         ),
@@ -550,87 +585,60 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
               SizedBox(height: 10),
 
-              widget.orderType == 'Delivery'
-                  ? Column(
-                      children: [
-                        Divider(),
-                        Text(
-                          'Address',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+              if (widget.orderType == 'Delivery')
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          border: Border(bottom: BorderSide(color: AppColors.divider)),
                         ),
-                        SizedBox(
-                          height: 5,
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, color: AppColors.primary, size: 18),
+                            const SizedBox(width: 8),
+                            Text('Delivery Address', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+                          ],
                         ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          controller: _houseController,
-                          borderc: 10,
-                          BorderColor: AppColors.primary,
-                          // HintColor: AppColors.primary,
-                          // hintText: 'Name',
-                          labelText: 'House NO',
-                          LabelColor: AppColors.primary,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppTextField(controller: _houseController, label: 'House / Flat No', hint: 'e.g. B-101', icon: Icons.home_outlined),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(child: AppTextField(controller: _cityController, label: 'City', hint: 'City', icon: Icons.location_city_outlined)),
+                                const SizedBox(width: 12),
+                                Expanded(child: AppTextField(controller: _areaController, label: 'Area', hint: 'Area / Locality', icon: Icons.map_outlined)),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(child: AppTextField(controller: _stateController, label: 'State', hint: 'State', icon: Icons.flag_outlined)),
+                                const SizedBox(width: 12),
+                                Expanded(child: AppTextField(controller: _postCodeController, label: 'Post Code', hint: 'PIN code', icon: Icons.pin_drop_outlined, keyboardType: TextInputType.number)),
+                              ],
+                            ),
+                          ],
                         ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          controller: _stateController,
-                          borderc: 10,
-                          BorderColor: AppColors.primary,
-                          // HintColor: AppColors.primary,
-                          // hintText: 'Name',
-                          labelText: 'State',
-                          LabelColor: AppColors.primary,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          borderc: 10,
-                          BorderColor: AppColors.primary,
-                          // HintColor: AppColors.primary,
-                          // hintText: 'Name',
-                          controller: _cityController,
-                          labelText: 'City',
-                          LabelColor: AppColors.primary,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          borderc: 10,
-                          BorderColor: AppColors.primary,
-                          // HintColor: AppColors.primary,
-                          // hintText: 'Name',
-                          controller: _areaController,
-                          labelText: 'Area',
-                          LabelColor: AppColors.primary,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        CommonTextForm(
-                          obsecureText: false,
-                          borderc: 10,
-                          BorderColor: AppColors.primary,
-                          // HintColor: AppColors.primary,
-                          // hintText: 'Name',
-                          controller: _postCodeController,
-                          labelText: 'Post Code',
-                          LabelColor: AppColors.primary,
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        Divider(),
-                      ],
-                    )
-                  : SizedBox(),
+                      ),
+                    ],
+                  ),
+                ),
 
               // Service/Delivery Charge Card
               Container(
@@ -650,16 +658,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 child: Row(
                   children: [
                     Expanded(
-                        flex: 2,
-                        child: CommonTextForm(
-                            controller: _serviceChargeController,
-                            borderc: 8,
-                            BorderColor: AppColors.primary.withOpacity(0.3),
-                            labelText: widget.orderType == 'Delivery'
-                                ? 'Delivery Charge'
-                                : 'Service Charges(%)',
-                            LabelColor: AppColors.primary,
-                            obsecureText: false)),
+                      flex: 2,
+                      child: AppTextField(
+                        controller: _serviceChargeController,
+                        label: widget.orderType == 'Delivery' ? 'Delivery Charge' : 'Service Charge',
+                        hint: widget.orderType == 'Delivery' ? 'Delivery charge amount' : 'Service charge %',
+                        icon: widget.orderType == 'Delivery' ? Icons.delivery_dining : Icons.percent,
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
                     SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
@@ -740,27 +747,35 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   Row(
                     children: [
                       Expanded(
-                        child: ListTile(
-                          title: Text('Amount',
-                              style: GoogleFonts.poppins(fontSize: 12)),
-                          leading: Radio<DiscountType>(
-                              value: DiscountType.amount,
-                              groupValue: _selectedDiscountType,
-                              onChanged: (value) => setState(() {
-                                    _selectedDiscountType = value!;
-                                  })),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedDiscountType = DiscountType.amount),
+                          child: Row(
+                            children: [
+                              Radio<DiscountType>(
+                                value: DiscountType.amount,
+                                groupValue: _selectedDiscountType,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (value) => setState(() => _selectedDiscountType = value!),
+                              ),
+                              Text('Amount', style: GoogleFonts.poppins(fontSize: 12)),
+                            ],
+                          ),
                         ),
                       ),
                       Expanded(
-                        child: ListTile(
-                          title: Text('Percentage',
-                              style: GoogleFonts.poppins(fontSize: 12)),
-                          leading: Radio<DiscountType>(
-                              value: DiscountType.percentage,
-                              groupValue: _selectedDiscountType,
-                              onChanged: (value) => setState(() {
-                                    _selectedDiscountType = value!;
-                                  })),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedDiscountType = DiscountType.percentage),
+                          child: Row(
+                            children: [
+                              Radio<DiscountType>(
+                                value: DiscountType.percentage,
+                                groupValue: _selectedDiscountType,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (value) => setState(() => _selectedDiscountType = value!),
+                              ),
+                              Text('Percentage', style: GoogleFonts.poppins(fontSize: 12)),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -789,20 +804,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
                       Row(
                         children: [
                           Expanded(
-                              flex: 2,
-                              child: CommonTextForm(
-                                  controller:
-                                      _selectedDiscountType == DiscountType.amount
-                                          ? _amountController
-                                          : _amountpercentageContorller,
-                                  borderc: 10,
-                                  BorderColor: Colors.grey,
-                                  labelText:
-                                      _selectedDiscountType == DiscountType.amount
-                                          ? 'Enter Amount'
-                                          : "Enter Percentage",
-                                  LabelColor: Colors.grey,
-                                  obsecureText: false)),
+                            flex: 2,
+                            child: AppTextField(
+                              controller: _selectedDiscountType == DiscountType.amount
+                                  ? _amountController
+                                  : _amountpercentageContorller,
+                              label: _selectedDiscountType == DiscountType.amount ? 'Amount' : 'Percentage',
+                              hint: _selectedDiscountType == DiscountType.amount ? 'Enter amount' : 'Enter percentage',
+                              icon: _selectedDiscountType == DiscountType.amount ? Icons.currency_rupee : Icons.percent,
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
                           SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
@@ -872,11 +884,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
                       if (calculations.discountAmount != null &&
                           calculations.discountAmount! > 0 &&
                           SelectedRemark == 'other')
-                        CommonTextForm(
+                        AppTextField(
                           controller: _remarkController,
-                          borderc: 5,
-                          obsecureText: false,
-                          labelText: 'Remark',
+                          label: 'Remark',
+                          hint: 'Enter remark',
+                          icon: Icons.note_alt_outlined,
                         ),
                       SizedBox(height: 5),
 
@@ -972,6 +984,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       ),
     );
   }
+
 
   Widget _buildPercentageButton(String text, double percentage) {
     final isSelected = _amountpercentageContorller.text == percentage.toString();

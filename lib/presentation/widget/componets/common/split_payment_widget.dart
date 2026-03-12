@@ -199,8 +199,18 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   }
 
   void _addPaymentEntry({double initialAmount = 0}) {
+    final enabledMethods = _paymentMethodStore.enabledMethods;
+    final usedMethods = _payments.map((p) => p.method).toSet();
+    // Auto-select first method not already used by another entry
+    final defaultMethod = enabledMethods.isNotEmpty
+        ? (enabledMethods.firstWhere(
+            (m) => !usedMethods.contains(m.value),
+            orElse: () => enabledMethods.first,
+          ).value)
+        : 'cash';
+
     setState(() {
-      final entry = PaymentEntry(amount: initialAmount);
+      final entry = PaymentEntry(method: defaultMethod, amount: initialAmount);
       if (initialAmount > 0) {
         entry.amountController.text = initialAmount.toStringAsFixed(2);
       }

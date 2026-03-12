@@ -121,7 +121,33 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   Future<void> _validateFile() async {
-    if (_selectedFilePath == null && !kIsWeb) {
+    if (kIsWeb) {
+      // Web: validate using in-memory bytes
+      final bytes = _selectedFileBytes;
+      if (bytes == null || bytes.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid file: no data found'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      final fileName = _selectedFileName ?? 'backup.zip';
+      setState(() {
+        _fileValidated = true;
+        _fileMetadata = {
+          'storeName': fileName.replaceAll('.zip', ''),
+          'backupDate': 'Recent',
+          'dataSize': _formatFileSize(bytes.length),
+          'version': '1.0',
+          'recordCount': 'Backup file ready to restore',
+        };
+      });
+      return;
+    }
+
+    if (_selectedFilePath == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Invalid file path'),
@@ -215,7 +241,11 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   Future<void> _restoreData() async {
-    if (_selectedFilePath == null) return;
+    if (kIsWeb) {
+      if (_selectedFileBytes == null || _selectedFileBytes!.isEmpty) return;
+    } else {
+      if (_selectedFilePath == null) return;
+    }
 
     // ✅ Guard: Prevent duplicate restore calls
     if (_isRestoring) {
@@ -234,8 +264,11 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     });
 
     try {
-      // Import directly using the selected file path (using UnifiedBackupService)
-      final success = await UnifiedBackupService.importFromFilePath(context, _selectedFilePath!);
+      // Import using bytes on web, file path on mobile/desktop
+      final success = kIsWeb
+          ? await UnifiedBackupService.importFromBytes(
+              context, _selectedFileBytes!, _selectedFileName ?? 'backup.zip')
+          : await UnifiedBackupService.importFromFilePath(context, _selectedFilePath!);
 
       if (!success) {
         throw Exception('Import failed - please check the backup file format');

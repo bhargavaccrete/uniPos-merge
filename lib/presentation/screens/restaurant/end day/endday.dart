@@ -17,8 +17,7 @@ import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/domain/services/restaurant/eod_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import '../../../widget/restaurant/opening_balance_dialog.dart';
 
@@ -54,7 +53,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     setState(() => _isLoading = true);
 
     try {
-      // Verify ALL required boxes are initialized before proceeding
       final requiredBoxes = {
         'restaurant_eodBox': 'EOD reports',
         'dayManagementBox': 'day management',
@@ -73,14 +71,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       if (missingBoxes.isNotEmpty) {
         throw Exception(
             'EOD system not fully initialized. Missing boxes:\n${missingBoxes.join('\n')}\n\n'
-                'Please restart the app completely (stop and relaunch).'
-        );
+                'Please restart the app completely (stop and relaunch).');
       }
 
       print('✅ All boxes reported as open, attempting to access data...');
 
-      // Check if EOD was completed after the current day started
-      // This is more robust than checking if EOD was completed "today"
       final lastEODDate = await _getLastEODDate();
       final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
       final today = DateTime.now();
@@ -89,7 +84,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       print('🔍 Day start timestamp: $dayStartTimestamp');
       print('🔍 Today date: $today');
 
-      // If EOD was completed AFTER the current day was started, the day has been closed
       final isEODCompletedAfterDayStart = lastEODDate != null &&
           dayStartTimestamp != null &&
           lastEODDate.isAfter(dayStartTimestamp);
@@ -97,7 +91,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       print('🔍 Is EOD completed after day start: $isEODCompletedAfterDayStart');
 
       if (isEODCompletedAfterDayStart) {
-        // EOD was completed for the current active day, show empty state
         print('ℹ️ EOD already completed for the current day - showing empty state');
         setState(() {
           _currentReport = null;
@@ -109,12 +102,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         return;
       }
 
-      // Check if the day has been started
       final dayStarted = await DayManagementService.isDayStarted();
       print('🔍 Day started: $dayStarted');
 
       if (!dayStarted) {
-        // Day hasn't been started, show empty state
         print('ℹ️ Day not started - showing empty state');
         setState(() {
           _currentReport = null;
@@ -126,18 +117,15 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         return;
       }
 
-      // Load past orders (don't check if empty - let EOD report handle filtering by date)
       print('📦 Fetching past orders...');
       await pastOrderStore.loadPastOrders();
       final pastOrders = pastOrderStore.pastOrders.toList();
       print('✅ Got ${pastOrders.length} past orders in total');
 
-      // 1) Get opening balance
       print('📊 Getting opening balance...');
       final currentOpeningBalance = await DayManagementService.getOpeningBalance();
       print('✅ Opening balance: $currentOpeningBalance');
 
-      // 2) Always generate EOD from Past Orders for selectedDate
       print('📋 Generating EOD report...');
       final report = await EODService.generateEODReport(
         date: selectedDate,
@@ -146,12 +134,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       );
       print('✅ EOD report generated');
 
-      // 3) Expected CASH only
       final expectedCashAmount = report.paymentSummaries
           .where((p) => p.paymentType.toLowerCase().trim() == 'cash')
           .fold<double>(0.0, (sum, p) => sum + p.totalAmount);
 
-      // 4) Decide whether there's anything to show
       final hasAnyData = (report.totalSales > 0) ||
           (report.totalOrderCount > 0) ||
           (report.totalDiscount > 0) ||
@@ -159,7 +145,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           (report.totalExpenses > 0) ||
           (currentOpeningBalance > 0);
 
-      // Load today's manual Cash In / Cash Out movements
       final dayStart = await DayManagementService.getDayStartTimestamp()
           ?? DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
       await cashMovementStore.loadTodayMovements(dayStart);
@@ -180,15 +165,14 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
   }
 
-
   void _calculateDifference() {
     if (_actualCashController.text.isNotEmpty) {
       final actual = double.tryParse(_actualCashController.text) ?? 0.0;
-      // Expected total cash should include opening balance + cash sales - ONLY cash expenses
-      // Non-cash expenses (Card/Online/Other) don't affect physical cash drawer
       final expectedTotalCash = openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
       final difference = actual - expectedTotalCash;
       _differenceController.text = difference.toStringAsFixed(2);
+    } else {
+      _differenceController.text = '';
     }
   }
 
@@ -198,72 +182,49 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       return;
     }
 
-    // Check if there are any active orders remaining
     await orderStore.loadOrders();
-    
+
     print('🔍 DEBUG: Checking for active orders before End Day...');
     print('   Total Orders in Active Store: ${orderStore.orders.length}');
-    
-    // Robust filter: ANY order that is NOT paid and NOT cancelled/voided is active.
+
     final activeOrders = orderStore.orders.where((o) {
-        final status = o.status.toLowerCase();
-        final isVoided = status == 'voided' || status == 'cancelled';
-        final isPaid = o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid';
-        
-        // If it's voided, it's not active.
-        if (isVoided) return false;
-        
-        // If it's paid, it's not active (assuming paid means complete).
-        if (isPaid) return false;
-        
-        // Otherwise, it's active.
-        return true;
+      final status = o.status.toLowerCase();
+      final isVoided = status == 'voided' || status == 'cancelled';
+      final isPaid = o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid';
+      if (isVoided) return false;
+      if (isPaid) return false;
+      return true;
     }).toList();
 
     print('   Detected Active Orders: ${activeOrders.length}');
 
     if (activeOrders.isNotEmpty) {
-      // Show error dialog preventing End of Day
       await _showActiveOrdersError(activeOrders.length);
       return;
     }
 
-    // Show confirmation dialog
     final confirmed = await _showConfirmationDialog();
     if (!confirmed) return;
 
-    // Save the actual cash amount before clearing
     final actualCashAmount = double.parse(_actualCashController.text);
 
-    // Clear screen immediately and show loading
     setState(() {
       _isGenerating = true;
-      _currentReport = null;  // Clear the report immediately
+      _currentReport = null;
       _actualCashController.clear();
       _differenceController.clear();
     });
 
     try {
-
-      // 1. Generate EOD report with current data
       final report = await EODService.generateEODReport(
         date: selectedDate,
         openingBalance: openingBalance,
         actualCash: actualCashAmount,
       );
 
-      // 2. Save EOD report
       await EODService.saveEODReport(report);
-
-      // 3. Clear all transactional data (orders, expenses, cart)
-      // NOTE: This clears active orders and cart, but keeps past orders and expenses for reports
       await DataClearService.clearAllTransactionalData();
 
-      // 4. DO NOT clear past orders - they are needed for reports
-      // Past orders should remain for historical reporting
-      // await DataClearService.clearCompletedOrders(); // REMOVED - Keep past orders for reports
-
-      // 4b. Close ALL open shifts (cashiers may not have ended their shift before EOD)
       await shiftStore.loadShifts();
       final openShifts = shiftStore.shifts.where((s) => s.isOpen).toList();
       for (final s in openShifts) {
@@ -271,12 +232,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       }
       await RestaurantSession.clearShiftSession();
 
-      // 5. Mark day as completed
       await _markDayCompleted();
 
-      // 6. Show safe drop dialog — admin records cash withdrawal before logout.
-      //    markDayEnded + logout happen inside the dialog after confirmation.
-      //    Pass the discrepancy so it gets recorded as an ADJUSTMENT transaction.
       final expectedTotalCash =
           openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
       final discrepancy = actualCashAmount - expectedTotalCash;
@@ -284,9 +241,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         await _showSafeDropDialog(actualCashAmount, discrepancy: discrepancy);
       }
     } catch (e) {
-      setState(() {
-        _isGenerating = false;
-      });
+      setState(() => _isGenerating = false);
 
       String errorMessage = 'Error completing End of Day';
       if (e.toString().contains('FormatException')) {
@@ -301,15 +256,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
   }
 
-  /// Non-dismissible dialog after EOD: admin records how much cash they're
-  /// taking to the safe. The remainder becomes next day's opening balance.
-  /// [discrepancy] = actualCash − expectedCash (positive = overage, negative = shortage).
   Future<void> _showSafeDropDialog(double actualCash,
       {double discrepancy = 0.0}) async {
     final withdrawalController = TextEditingController(
       text: actualCash.toStringAsFixed(2),
     );
-    // Snapshot the closer's name BEFORE clearSession() wipes it
     final closerName = RestaurantSession.staffName ??
         (RestaurantSession.loginType == 'admin' ? 'Admin' : 'Staff');
 
@@ -327,12 +278,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           'Left in drawer: Rs.${closingBalance.toStringAsFixed(2)}';
 
       try {
-        // 1. Record EOD discrepancy as an ADJUSTMENT transaction (audit only,
-        //    does not affect the cash-in/out balance formula).
         if (discrepancy.abs() > 0.01) {
           final expectedAmt = actualCash - discrepancy;
           await cashMovementStore.addAdjustment(
-            signedAmount: discrepancy, // negative = shortage, positive = overage
+            signedAmount: discrepancy,
             reason: discrepancy < 0 ? 'EOD Shortage' : 'EOD Overage',
             note: 'Expected: Rs.${expectedAmt.toStringAsFixed(2)}, '
                 'Counted: Rs.${actualCash.toStringAsFixed(2)}',
@@ -340,7 +289,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           );
         }
 
-        // 2. Record safe drop ONLY if amount > 0
         if (w > 0) {
           await cashMovementStore.addMovement(
             type: 'out',
@@ -350,12 +298,9 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           );
         }
       } catch (e) {
-        // Movement recording failed — log it but do NOT block the day close.
-        // The discrepancy/safe-drop amount is still visible in the EOD report.
         debugPrint('⚠️ Cash movement recording failed during EOD: $e');
       }
 
-      // Always persist closing balance regardless of movement save result
       await DayManagementService.markDayEnded(closingBalance: closingBalance);
 
       NotificationService.instance
@@ -410,212 +355,259 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
             return PopScope(
               canPop: false,
-              child: AlertDialog(
-                title: Column(
-                  children: [
-                    Icon(Icons.savings_outlined, size: 48, color: Colors.teal),
-                    const SizedBox(height: 6),
-                    Text(
-                      'End of Day — Safe Drop',
-                      style: GoogleFonts.poppins(
-                          fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Closed by: $closerName',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-                content: SingleChildScrollView(
+              child: Dialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Day summary row
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 24),
                         decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.teal.shade200),
+                          gradient: LinearGradient(
+                            colors: [Colors.teal.shade600, Colors.teal.shade400],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                         ),
                         child: Column(
                           children: [
-                            _safeDropRow('Opening Balance',
-                                openingBalance, Colors.grey[700]!),
-                            _safeDropRow('Cash Sales',
-                                expectedCash, Colors.grey[700]!),
-                            if (_cashIn > 0)
-                              _safeDropRow(
-                                  'Cash In', _cashIn, Colors.green[700]!),
-                            if (cashExpenses > 0)
-                              _safeDropRow('Cash Expenses',
-                                  -cashExpenses, Colors.red[700]!),
-                            if (_cashOut > 0)
-                              _safeDropRow(
-                                  'Cash Out', -_cashOut, Colors.red[700]!),
-                            const Divider(height: 14),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('You counted',
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.teal.shade800)),
-                                Text(
-                                    'Rs. ${actualCash.toStringAsFixed(2)}',
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.teal.shade800)),
-                              ],
-                            ),
-                            // Show discrepancy if present
-                            if (discrepancy.abs() > 0.01) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: discrepancy < 0
-                                      ? Colors.red.shade50
-                                      : Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: discrepancy < 0
-                                        ? Colors.red.shade200
-                                        : Colors.green.shade200,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.warning_amber_rounded,
-                                        size: 14,
-                                        color: discrepancy < 0
-                                            ? Colors.red.shade700
-                                            : Colors.green.shade700),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        discrepancy < 0
-                                            ? 'Shortage of Rs.${discrepancy.abs().toStringAsFixed(2)} — will be logged as ADJUSTMENT'
-                                            : 'Overage of Rs.${discrepancy.toStringAsFixed(2)} — will be logged as ADJUSTMENT',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 11,
-                                          color: discrepancy < 0
-                                              ? Colors.red.shade700
-                                              : Colors.green.shade700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
                               ),
-                            ],
+                              child: const Icon(Icons.savings_rounded, size: 36, color: Colors.white),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'End of Day — Safe Drop',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Closed by: $closerName',
+                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.white70),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'How much are you taking to the safe?',
-                        style: GoogleFonts.poppins(
-                            fontSize: 13, color: Colors.grey[700]),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: withdrawalController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d+\.?\d{0,2}')),
-                        ],
-                        onChanged: (_) =>
-                            setDialogState(() => fieldError = null),
-                        decoration: InputDecoration(
-                          prefixText: 'Rs. ',
-                          hintText: '0.00',
-                          errorText: fieldError,
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                                color: Colors.teal.shade600, width: 2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Live "stays in drawer" display
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: remaining > 0
-                              ? Colors.green.shade50
-                              : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: remaining > 0
-                                ? Colors.green.shade200
-                                : Colors.grey.shade300,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Stays in drawer (next opening)',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12, color: Colors.grey[600]),
-                            ),
-                            Text(
-                              'Rs. ${remaining.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: remaining > 0
-                                    ? Colors.green.shade700
-                                    : Colors.grey[600]!,
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.teal.shade100),
+                              ),
+                              child: Column(
+                                children: [
+                                  _safeDropRow('Opening Balance', openingBalance, Colors.grey[700]!),
+                                  const SizedBox(height: 4),
+                                  _safeDropRow('Cash Sales', expectedCash, Colors.grey[700]!),
+                                  if (_cashIn > 0) ...[
+                                    const SizedBox(height: 4),
+                                    _safeDropRow('Cash In', _cashIn, Colors.green[700]!),
+                                  ],
+                                  if (cashExpenses > 0) ...[
+                                    const SizedBox(height: 4),
+                                    _safeDropRow('Cash Expenses', -cashExpenses, Colors.red[700]!),
+                                  ],
+                                  if (_cashOut > 0) ...[
+                                    const SizedBox(height: 4),
+                                    _safeDropRow('Cash Out', -_cashOut, Colors.red[700]!),
+                                  ],
+                                  Divider(height: 16, color: Colors.teal.shade200),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('You counted',
+                                          style: GoogleFonts.poppins(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.teal.shade800)),
+                                      Text(
+                                          'Rs. ${actualCash.toStringAsFixed(2)}',
+                                          style: GoogleFonts.poppins(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.teal.shade800)),
+                                    ],
+                                  ),
+                                  if (discrepancy.abs() > 0.01) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: discrepancy < 0 ? Colors.red.shade50 : Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: discrepancy < 0 ? Colors.red.shade200 : Colors.green.shade200,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.warning_amber_rounded,
+                                              size: 14,
+                                              color: discrepancy < 0 ? Colors.red.shade700 : Colors.green.shade700),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              discrepancy < 0
+                                                  ? 'Shortage Rs.${discrepancy.abs().toStringAsFixed(2)} — logged as ADJUSTMENT'
+                                                  : 'Overage Rs.${discrepancy.toStringAsFixed(2)} — logged as ADJUSTMENT',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 11,
+                                                color: discrepancy < 0 ? Colors.red.shade700 : Colors.green.shade700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
+
+                            const SizedBox(height: 16),
+
+                            Text(
+                              'Amount to take to safe',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[800]),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: withdrawalController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                              ],
+                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                              onChanged: (_) => setDialogState(() => fieldError = null),
+                              decoration: InputDecoration(
+                                prefixText: 'Rs. ',
+                                prefixStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.teal.shade700),
+                                hintText: '0.00',
+                                errorText: fieldError,
+                                filled: true,
+                                fillColor: Colors.teal.shade50,
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.teal.shade200)),
+                                enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.teal.shade200)),
+                                focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.teal.shade600, width: 2)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: remaining > 0 ? Colors.green.shade50 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: remaining > 0 ? Colors.green.shade200 : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.account_balance_wallet_outlined,
+                                          size: 14,
+                                          color: remaining > 0 ? Colors.green.shade600 : Colors.grey[500]!),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Stays in drawer (next opening)',
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                            color: remaining > 0 ? Colors.green.shade700 : Colors.grey[600]!),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Rs. ${remaining.toStringAsFixed(2)}',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: remaining > 0 ? Colors.green.shade700 : Colors.grey[600]!,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: isConfirming ? null : confirm,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal.shade600,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: isConfirming
+                                    ? const SizedBox(
+                                        height: 20, width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : Text('Confirm & Logout',
+                                        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                            if (!isConfirming) ...[
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 44,
+                                child: TextButton(
+                                  onPressed: () async {
+                                    withdrawalController.text = '0.00';
+                                    await confirm();
+                                  },
+                                  style: TextButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                  child: Text('Leave all in drawer',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 14, color: Colors.grey.shade600)),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                actions: [
-                  if (!isConfirming)
-                    TextButton(
-                      onPressed: () async {
-                        if (isConfirming) return;
-                        withdrawalController.text = '0.00';
-                        await confirm();
-                      },
-                      child: Text('Leave all in drawer',
-                          style: GoogleFonts.poppins(color: Colors.grey)),
-                    ),
-                  ElevatedButton(
-                    onPressed: isConfirming ? null : confirm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                    ),
-                    child: isConfirming
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : Text('Confirm & Logout',
-                            style: GoogleFonts.poppins(color: Colors.white)),
-                  ),
-                ],
               ),
             );
           },
@@ -626,7 +618,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     withdrawalController.dispose();
   }
 
-  /// Helper for the safe drop day-summary rows.
   Widget _safeDropRow(String label, double amount, Color color) {
     final isNeg = amount < 0;
     return Padding(
@@ -652,11 +643,12 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           title: Row(
             children: [
-              Icon(Icons.error, color: Colors.red, size: 28),
+              Icon(Icons.error_rounded, color: Colors.red, size: 28),
               SizedBox(width: 10),
-              Text('Cannot End Day', style: GoogleFonts.poppins(fontSize: 18)),
+              Text('Cannot End Day', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
             ],
           ),
           content: Text(
@@ -666,8 +658,13 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: Text('OK', style: GoogleFonts.poppins(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text('OK', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             ),
           ],
         );
@@ -680,20 +677,26 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Confirm End of Day', style: GoogleFonts.poppins()),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Text('Confirm End of Day', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
           content: Text(
             'This will:\n\n• Save the End of Day report\n• Clear cart and active orders\n• Keep past orders for reports\n• Keep expenses for reports\n• Mark day as completed\n• Return to home screen\n\nContinue?',
-            style: GoogleFonts.poppins(),
+            style: GoogleFonts.poppins(fontSize: 14),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: GoogleFonts.poppins()),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: Text('Confirm', style: GoogleFonts.poppins(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text('Confirm', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             ),
           ],
         );
@@ -710,9 +713,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final dateStr = prefs.getString('last_eod_date');
-      if (dateStr != null) {
-        return DateTime.parse(dateStr);
-      }
+      if (dateStr != null) return DateTime.parse(dateStr);
     } catch (e) {
       debugPrint('Error getting last EOD date: $e');
     }
@@ -750,7 +751,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             build: (pw.Context ctx) => pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                // Header
                 pw.Center(
                   child: pw.Text(storeName,
                       style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
@@ -759,28 +759,20 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                 pw.SizedBox(height: 4),
                 pw.Divider(),
                 pw.SizedBox(height: 8),
-
-                // Opening balance
                 _pdfRow('Opening Balance', '$symbol ${report.openingBalance.toStringAsFixed(2)}'),
                 pw.SizedBox(height: 12),
-
-                // Order types
                 pw.Text('Order Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
                 pw.SizedBox(height: 4),
                 ...report.orderSummaries.map((o) =>
                     _pdfRow('${o.orderType} (${o.orderCount} orders)',
                         '$symbol ${o.totalAmount.toStringAsFixed(2)}')),
                 pw.SizedBox(height: 12),
-
-                // Payment types
                 pw.Text('Payment Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
                 pw.SizedBox(height: 4),
                 ...report.paymentSummaries.map((p) =>
                     _pdfRow('${p.paymentType} (${p.transactionCount} txns)',
                         '$symbol ${p.totalAmount.toStringAsFixed(2)}')),
                 pw.SizedBox(height: 12),
-
-                // Tax
                 if (report.taxSummaries.isNotEmpty) ...[
                   pw.Text('Tax Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
                   pw.SizedBox(height: 4),
@@ -788,10 +780,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                       _pdfRow('${t.taxName} (${t.taxRate}%)', '$symbol ${t.taxAmount.toStringAsFixed(2)}')),
                   pw.SizedBox(height: 12),
                 ],
-
                 pw.Divider(),
-
-                // Totals
                 _pdfRow('Total Discount', '$symbol ${report.totalDiscount.toStringAsFixed(2)}'),
                 _pdfRow('Total Tax', '$symbol ${report.totalTax.toStringAsFixed(2)}'),
                 _pdfRow('Total Expenses', '$symbol ${report.totalExpenses.toStringAsFixed(2)}'),
@@ -838,74 +827,702 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       builder: (context) => OpeningBalanceDialog(),
     );
     if (result != null && mounted) {
-      // After starting the day, navigate to Welcome Admin screen
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => AdminWelcome()),
-        (route) => false, // Remove all previous routes
+        (route) => false,
       );
     }
   }
 
+  // ── UI helpers ────────────────────────────────────────────────────────────
+
+  AppBar _buildAppBar(bool isTablet) {
+    return AppBar(
+      elevation: 0,
+      backgroundColor: AppColors.white,
+      iconTheme: IconThemeData(color: AppColors.textPrimary),
+      title: Text(
+        'End of Day Settlement',
+        style: GoogleFonts.poppins(
+          fontSize: isTablet ? 22 : 20,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      actions: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 10, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(isTablet ? 10 : 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.person_outline_rounded,
+                    size: isTablet ? 22 : 20, color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
+                    style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 13 : 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary),
+                  ),
+                  Text(
+                    RestaurantSession.effectiveRole,
+                    style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 11 : 10,
+                        color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Column(children: children),
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String title, IconData icon, Color color) {
+    return Row(children: [
+      Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8)),
+        child: Icon(icon, color: color, size: 16),
+      ),
+      const SizedBox(width: 10),
+      Text(title,
+          style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary)),
+    ]);
+  }
+
+  Widget _calcRow(String label, double amount, String currency, Color color) {
+    final isNeg = amount < 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 12, color: AppColors.textSecondary)),
+          Text(
+            '${isNeg ? '-' : '+'} $currency ${amount.abs().toStringAsFixed(2)}',
+            style: GoogleFonts.poppins(
+                fontSize: 12, fontWeight: FontWeight.w500, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _paymentIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'cash': return Icons.money_rounded;
+      case 'card':
+      case 'card/online': return Icons.credit_card_rounded;
+      case 'upi':
+      case 'qr': return Icons.qr_code_rounded;
+      default: return Icons.payment_rounded;
+    }
+  }
+
+  Widget _orderTypesCard(String currency) {
+    if (_currentReport == null || _currentReport!.orderSummaries.isEmpty) {
+      return _sectionCard([
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text('No orders recorded',
+              style: GoogleFonts.poppins(
+                  color: AppColors.textSecondary, fontSize: 13)),
+        ),
+      ]);
+    }
+
+    final summaries = _currentReport!.orderSummaries;
+    final children = <Widget>[];
+    for (int i = 0; i < summaries.length; i++) {
+      final s = summaries[i];
+      children.add(Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Colors.teal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.restaurant_menu_rounded,
+                size: 18, color: Colors.teal),
+          ),
+          title: Text(s.orderType,
+              style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary)),
+          subtitle: Text('${s.orderCount} orders',
+              style: GoogleFonts.poppins(
+                  fontSize: 12, color: AppColors.textSecondary)),
+          trailing: Text('$currency ${s.totalAmount.toStringAsFixed(2)}',
+              style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.teal.shade700)),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Column(children: [
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Avg Order Value',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                      Text(
+                          '$currency ${s.averageOrderValue.toStringAsFixed(2)}',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, fontWeight: FontWeight.w500)),
+                    ]),
+                const SizedBox(height: 4),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total Amount',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                      Text('$currency ${s.totalAmount.toStringAsFixed(2)}',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.teal.shade700)),
+                    ]),
+              ]),
+            ),
+          ],
+        ),
+      ));
+      if (i < summaries.length - 1) {
+        children.add(Divider(height: 1, color: AppColors.divider));
+      }
+    }
+    return _sectionCard(children);
+  }
+
+  Widget _discountTaxCard(String currency) {
+    final children = <Widget>[];
+
+    // Discount row
+    children.add(Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.local_offer_rounded,
+                  size: 16, color: Colors.orange),
+            ),
+            const SizedBox(width: 12),
+            Text('Total Discount',
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary)),
+          ]),
+          Text(
+              '$currency ${_currentReport?.totalDiscount.toStringAsFixed(2) ?? '0.00'}',
+              style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red)),
+        ],
+      ),
+    ));
+
+    if (_currentReport != null && _currentReport!.taxSummaries.isNotEmpty) {
+      children.add(Divider(height: 1, color: AppColors.divider));
+
+      for (int i = 0; i < _currentReport!.taxSummaries.length; i++) {
+        final tax = _currentReport!.taxSummaries[i];
+        children.add(Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.percent_rounded,
+                  size: 16, color: Colors.blue),
+            ),
+            title: Text(tax.taxName,
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w500)),
+            trailing: Text(
+                '$currency ${tax.taxAmount.toStringAsFixed(2)}',
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue.shade700)),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10)),
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Taxable Amount',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                      Text('$currency ${tax.taxableAmount.toStringAsFixed(2)}',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, fontWeight: FontWeight.w500)),
+                    ]),
+              ),
+            ],
+          ),
+        ));
+      }
+
+      children.add(Divider(height: 1, color: AppColors.divider));
+      children.add(Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Total Tax',
+                style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary)),
+            Text(
+                '$currency ${_currentReport?.totalTax.toStringAsFixed(2) ?? '0.00'}',
+                style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.blue.shade700)),
+          ],
+        ),
+      ));
+    }
+
+    return _sectionCard(children);
+  }
+
+  Widget _paymentsCard(String currency) {
+    if (_currentReport == null ||
+        _currentReport!.paymentSummaries.isEmpty) {
+      return _sectionCard([
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text('No payments recorded',
+              style: GoogleFonts.poppins(
+                  color: AppColors.textSecondary, fontSize: 13)),
+        ),
+      ]);
+    }
+
+    final payments = _currentReport!.paymentSummaries;
+    final children = <Widget>[];
+    for (int i = 0; i < payments.length; i++) {
+      final p = payments[i];
+      children.add(Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Colors.teal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(_paymentIcon(p.paymentType),
+                size: 16, color: Colors.teal),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${p.paymentType} Payment',
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, fontWeight: FontWeight.w500)),
+                Text('${p.transactionCount} transactions',
+                    style: GoogleFonts.poppins(
+                        fontSize: 11, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          Text('$currency ${p.totalAmount.toStringAsFixed(2)}',
+              style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.teal.shade700)),
+        ]),
+      ));
+      if (i < payments.length - 1) {
+        children.add(
+            Divider(height: 1, indent: 52, color: AppColors.divider));
+      }
+    }
+
+    // Grand total
+    children.add(Divider(height: 1, color: AppColors.divider));
+    children.add(Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('Grand Total',
+              style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                  '$currency ${_currentReport?.totalSales.toStringAsFixed(2) ?? '0.00'}',
+                  style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary)),
+              Text('${_currentReport?.totalOrderCount ?? 0} orders',
+                  style: GoogleFonts.poppins(
+                      fontSize: 11, color: AppColors.textSecondary)),
+            ],
+          ),
+        ],
+      ),
+    ));
+
+    return _sectionCard(children);
+  }
+
+  Widget _cashReconciliationCard(String currency, bool isTablet) {
+    final expectedTotal =
+        openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
+
+    return _sectionCard([
+      // Breakdown summary
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Expected Cash Breakdown',
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
+            const SizedBox(height: 10),
+            _calcRow('Opening Balance', openingBalance, currency,
+                Colors.grey[700]!),
+            _calcRow(
+                'Cash Sales', expectedCash, currency, Colors.grey[700]!),
+            if (_cashIn > 0)
+              _calcRow('Cash In', _cashIn, currency, Colors.green[700]!),
+            if (cashExpenses > 0)
+              _calcRow('Cash Expenses', -cashExpenses, currency,
+                  Colors.red[700]!),
+            if (_cashOut > 0)
+              _calcRow('Cash Out', -_cashOut, currency, Colors.orange[700]!),
+            if (totalExpenses > cashExpenses)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(children: [
+                      Icon(Icons.info_outline,
+                          size: 12, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Text('Non-Cash Expenses',
+                          style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: AppColors.textSecondary)),
+                    ]),
+                    Text(
+                        '$currency ${(totalExpenses - cashExpenses).toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+            const Divider(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Total Expected Cash',
+                    style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary)),
+                Text('$currency ${expectedTotal.toStringAsFixed(2)}',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary)),
+              ],
+            ),
+          ],
+        ),
+      ),
+
+      Divider(height: 1, color: AppColors.divider),
+
+      // Input section
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            AppTextField(
+              controller: _actualCashController,
+              label: 'Actual Cash in Drawer',
+              hint: 'Enter counted cash amount',
+              icon: Icons.payments_rounded,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                    RegExp(r'^\d+\.?\d{0,2}')),
+              ],
+              prefixWidget: Padding(
+                padding:
+                    const EdgeInsets.only(left: 14, right: 8),
+                child: Text(currency,
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary)),
+              ),
+              onChanged: (_) => _calculateDifference(),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Reactive difference display
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _differenceController,
+              builder: (ctx, value, _) {
+                final diff = double.tryParse(value.text);
+                final isNeg = diff != null && diff < 0;
+                final hasVal = value.text.isNotEmpty;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: !hasVal
+                        ? AppColors.surfaceLight
+                        : (isNeg
+                            ? Colors.red.shade50
+                            : Colors.green.shade50),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: !hasVal
+                            ? AppColors.divider
+                            : (isNeg
+                                ? Colors.red.shade200
+                                : Colors.green.shade200)),
+                  ),
+                  child: Row(children: [
+                    Icon(
+                      !hasVal
+                          ? Icons.calculate_outlined
+                          : (isNeg
+                              ? Icons.trending_down_rounded
+                              : Icons.trending_up_rounded),
+                      size: 20,
+                      color: !hasVal
+                          ? AppColors.textSecondary
+                          : (isNeg ? Colors.red : Colors.green),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Difference',
+                            style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: AppColors.textSecondary)),
+                        Text(
+                          !hasVal
+                              ? 'Enter actual cash above'
+                              : '$currency ${value.text}',
+                          style: GoogleFonts.poppins(
+                            fontSize: !hasVal ? 13 : 16,
+                            fontWeight: hasVal
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            color: !hasVal
+                                ? AppColors.textSecondary
+                                : (isNeg
+                                    ? Colors.red.shade700
+                                    : Colors.green.shade700),
+                          ),
+                        ),
+                        if (hasVal && isNeg)
+                          Text('Shortage — will be logged',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: Colors.red.shade400)),
+                        if (hasVal && !isNeg && diff != 0)
+                          Text('Overage — will be logged',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: Colors.green.shade600)),
+                      ],
+                    ),
+                  ]),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              height: isTablet ? 54 : 50,
+              child: ElevatedButton.icon(
+                onPressed: _isGenerating ? null : _completeEndOfDay,
+                icon: _isGenerating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.nightlight_round,
+                        color: Colors.white),
+                label: Text(
+                  _isGenerating ? 'Processing...' : 'End of Day',
+                  style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal.shade700,
+                  disabledBackgroundColor: Colors.teal.shade300,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  // ── Main build ────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
+    final isTablet = MediaQuery.of(context).size.width > 600;
     final currency = CurrencyHelper.currentSymbol;
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_ios_new),
-          ),
-        ),
+        backgroundColor: AppColors.surfaceLight,
+        appBar: _buildAppBar(isTablet),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    // If generating EOD or no data to show
     if (_isGenerating || _currentReport == null) {
       return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_ios_new),
-          ),
-          title: Text('End of Day Settlement', style: GoogleFonts.poppins()),
-        ),
+        backgroundColor: AppColors.surfaceLight,
+        appBar: _buildAppBar(isTablet),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (_isGenerating) ...[
-                CircularProgressIndicator(),
-                SizedBox(height: 20),
-                Text(
-                  'Processing End of Day...',
-                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500),
-                ),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                Text('Processing End of Day...',
+                    style: GoogleFonts.poppins(
+                        fontSize: 18, fontWeight: FontWeight.w500)),
               ] else ...[
-                Icon(Icons.check_circle_outline, size: 80, color: Colors.green),
-                SizedBox(height: 20),
-                Text(
-                  'No active transactions',
-                  style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w500),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle_outline_rounded,
+                      size: 72, color: Colors.green),
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Start a new day to see EOD data',
-                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
-                ),
-                SizedBox(height: 24),
+                const SizedBox(height: 20),
+                Text('No active transactions',
+                    style: GoogleFonts.poppins(
+                        fontSize: 20, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Text('Start a new day to begin recording transactions',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14, color: AppColors.textSecondary)),
+                const SizedBox(height: 28),
                 ElevatedButton.icon(
                   onPressed: _startDay,
-                  icon: Icon(Icons.play_circle_fill),
-                  label: Text('Start Day'),
+                  icon: const Icon(Icons.play_circle_fill_rounded,
+                      color: Colors.white),
+                  label: Text('Start New Day',
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 28, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ],
@@ -916,606 +1533,124 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: Icon(Icons.arrow_back_ios_new)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Row(
-              children: [
-                Icon(Icons.person_outline_outlined),
-                Column(
-                  children: [
-                    Text(
-                      RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
-                      style: GoogleFonts.poppins(fontSize: 12),
-                    ),
-                    Text(
-                      RestaurantSession.effectiveRole,
-                      style:
-                      GoogleFonts.poppins(fontSize: 10, color: Colors.grey),
-                    )
-                  ],
-                )
-              ],
-            ),
-          )
-        ],
-      ),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: _buildAppBar(isTablet),
       body: SingleChildScrollView(
-        child: Container(
-          padding: EdgeInsets.all(15),
-          child:
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              'End of Day Settlement',
-              style: GoogleFonts.poppins(
-                  fontSize: 20, fontWeight: FontWeight.w500),
-            ),
-            SizedBox(height: 25),
-            Container(
-              padding: EdgeInsets.all(10),
-              width: width,
-              height: height * 0.07,
-              decoration:
-              BoxDecoration(border: Border.all(color: AppColors.primary)),
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Opening Balance:',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(
-                          color: AppColors.primary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      '$currency ${openingBalance.toStringAsFixed(2)}',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(
-                          fontSize: 16, fontWeight: FontWeight.w600),
-                    )
-                  ]),
-            ),
-            SizedBox(
-              height: 25,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CommonButton(
-                    bordercolor: Colors.teal.shade800,
-                    bgcolor: Colors.teal.shade800,
-                    bordercircular: 2,
-                    width: width * 0.4,
-                    height: height * 0.04,
-                    onTap: _printSummary,
-                    child: Text(
-                      'Print Summary',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16),
-                    )),
-                CommonButton(
-                    bordercolor: Colors.teal.shade800,
-                    bgcolor: Colors.teal.shade800,
-                    bordercircular: 2,
-                    width: width * 0.3,
-                    height: height * 0.04,
-                    onTap: _loadEODData,
-                    child: Text(
-                      'Refresh',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16),
-                    )),
-              ],
-            ),
-            SizedBox(height: 25),
-            Text(
-              'Order Type',
-              style: GoogleFonts.poppins(
-                  fontSize: 18, fontWeight: FontWeight.w500),
-            ),
-            // Dynamic Order Type Tiles
-            if (_currentReport != null)
-              ..._currentReport!.orderSummaries.map((orderSummary) {
-                return Container(
-                  margin: EdgeInsets.symmetric(vertical: 6),
+        padding: EdgeInsets.all(isTablet ? 20 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Opening balance + action buttons
+            Row(children: [
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: isTablet ? 20 : 16,
+                      vertical: isTablet ? 18 : 14),
                   decoration: BoxDecoration(
-                    color: Colors.teal[100],
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Theme(
-                    data: Theme.of(context)
-                        .copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      tilePadding: EdgeInsets.symmetric(horizontal: 15),
-                      childrenPadding:
-                      EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(orderSummary.orderType,
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500)),
-                          Text('#${orderSummary.orderCount}',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins()),
-                          Text('$currency ${orderSummary.totalAmount.toStringAsFixed(2)}',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500)),
-                        ],
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.circle, color: Colors.green, size: 12),
-                                SizedBox(width: 10),
-                                Text('Avg Order Value',
-                                    textScaler: TextScaler.linear(1),
-                                    style: GoogleFonts.poppins()),
-                              ],
-                            ),
-                            Text(
-                              '$currency ${orderSummary.averageOrderValue.toStringAsFixed(2)}',
-                              textScaler: TextScaler.linear(1),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 5),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.circle, color: Colors.green, size: 12),
-                                SizedBox(width: 10),
-                                Text('Total Amount',
-                                    textScaler: TextScaler.linear(1),
-                                    style: GoogleFonts.poppins()),
-                              ],
-                            ),
-                            Text(
-                              '$currency ${orderSummary.totalAmount.toStringAsFixed(2)}',
-                              textScaler: TextScaler.linear(1),
-                            ),
-                          ],
-                        ),
-                      ],
+                      child: const Icon(Icons.account_balance_rounded,
+                          color: Colors.white, size: 22),
                     ),
-                  ),
-                );
-              }),
-
-            SizedBox(height: 20),
-
-            // TOTAL DISCOUNT SECTION
-            Text(
-              'Total Discount',
-              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500),
-            ),
-            Container(
-              height: height * 0.06,
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              margin: EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.orange[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total Discount Given',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                  Text('$currency ${_currentReport?.totalDiscount.toStringAsFixed(2) ?? '0.00'}',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: Colors.red)),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 20),
-
-            // TAX BREAKDOWN SECTION
-            Text(
-              'Tax Breakdown',
-              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500),
-            ),
-            if (_currentReport != null && _currentReport!.taxSummaries.isNotEmpty)
-              ..._currentReport!.taxSummaries.map((tax) {
-                return Container(
-                  margin: EdgeInsets.symmetric(vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      tilePadding: EdgeInsets.symmetric(horizontal: 15),
-                      childrenPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(tax.taxName,
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                          Text('$currency ${tax.taxAmount.toStringAsFixed(2)}',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.circle, color: Colors.blue, size: 12),
-                                SizedBox(width: 10),
-                                Text('Taxable Amount',
-                                    textScaler: TextScaler.linear(1),
-                                    style: GoogleFonts.poppins()),
-                              ],
-                            ),
-                            Text(
-                              '$currency ${tax.taxableAmount.toStringAsFixed(2)}',
-                              textScaler: TextScaler.linear(1),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-
-            // Total Tax Summary
-            Container(
-              height: height * 0.06,
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              margin: EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.blue[200],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('TOTAL TAX',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                  Text('$currency ${_currentReport?.totalTax.toStringAsFixed(2) ?? '0.00'}',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.blue[800])),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 20),
-
-            Text(
-              'Payment Type',
-              textScaler: TextScaler.linear(1),
-              style: GoogleFonts.poppins(
-                  fontSize: 20, fontWeight: FontWeight.w500),
-            ),
-            SizedBox(height: 10),
-            // Dynamic Payment Types
-            if (_currentReport != null)
-              ..._currentReport!.paymentSummaries.map((payment) {
-                return Container(
-                  height: height * 0.06,
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  margin: EdgeInsets.symmetric(vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.teal[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('${payment.paymentType} Payment',
-                          textScaler: TextScaler.linear(1),
-                          style:
-                          GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                      Text('#${payment.transactionCount}',
-                          textScaler: TextScaler.linear(1),
-                          style:
-                          GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                      Text('$currency ${payment.totalAmount.toStringAsFixed(2)}',
-                          textScaler: TextScaler.linear(1),
-                          style:
-                          GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                );
-              }),
-            Container(
-              height: height * 0.06,
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              margin: EdgeInsets.symmetric(vertical: 6),
-              // spacing between tiles
-              decoration: BoxDecoration(
-                color: Colors.teal[100], // light teal background
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Grand Total Payment',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                  Text('#${_currentReport?.totalOrderCount ?? 0}',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                  Text('$currency ${_currentReport?.totalSales.toStringAsFixed(2) ?? '0.00'}',
-                      textScaler: TextScaler.linear(1),
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                ],
-              ),
-            ),
-
-            // Expected Cash
-            SizedBox(
-              height: 25,
-            ),
-
-            Container(
-              margin: EdgeInsets.only(bottom: 20),
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              width: width,
-              // height: height * 0.8,
-              decoration: BoxDecoration(
-                border: Border.all(),
-                borderRadius: BorderRadius.circular(10),
-                // color: Colors.teal.shade300
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Expected Cash (Sales Only)',
-                    textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(
-                        fontSize: 18, fontWeight: FontWeight.w500),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  SizedBox(
-                    height: height * 0.07,
-                    child: CommonTextForm(
-                      hintText: expectedCash.toStringAsFixed(2),
-                      obsecureText: false,
-                      BorderColor: AppColors.primary,
-                      borderc: 0,
-                      enabled: false,
-                    ),
-                  ),
-                  SizedBox(
-                    height: 15,
-                  ),
-                  // Expected Total Cash calculation display
-                  Container(
-                    padding: EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      border: Border.all(color: Colors.blue[200]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
+                    const SizedBox(width: 12),
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Expected Total Cash:',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue[800],
-                          ),
-                        ),
-                        SizedBox(height: 5),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Opening Balance:',
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                            Text(
-                              '$currency ${openingBalance.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Cash Sales:',
-                              style: GoogleFonts.poppins(fontSize: 12),
-                            ),
-                            Text(
-                              '$currency ${expectedCash.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Cash Expenses:',
-                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.red[700]),
-                            ),
-                            Text(
-                              '- $currency ${cashExpenses.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.red[700]),
-                            ),
-                          ],
-                        ),
-                        if (_cashIn > 0) Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Cash In:', style: GoogleFonts.poppins(fontSize: 12, color: Colors.green[700])),
-                            Text('+ $currency ${_cashIn.toStringAsFixed(2)}',
-                                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.green[700])),
-                          ],
-                        ),
-                        if (_cashOut > 0) Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Cash Out:', style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange[700])),
-                            Text('- $currency ${_cashOut.toStringAsFixed(2)}',
-                                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.orange[700])),
-                          ],
-                        ),
-                        if (totalExpenses > cashExpenses) Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.info_outline, size: 14, color: Colors.grey[600]),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Non-Cash Expenses:',
-                                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey[600]),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              '$currency ${(totalExpenses - cashExpenses).toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.grey[600]),
-                            ),
-                          ],
-                        ),
-                        Divider(thickness: 1),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Total Expected Cash:',
-                              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              '$currency ${(openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses).toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blue[800]),
-                            ),
-                          ],
-                        ),
+                        Text('Opening Balance',
+                            style: GoogleFonts.poppins(
+                                fontSize: 12, color: Colors.white70)),
+                        Text('$currency ${openingBalance.toStringAsFixed(2)}',
+                            style: GoogleFonts.poppins(
+                                fontSize: isTablet ? 20 : 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white)),
                       ],
                     ),
-                  ),
-                  SizedBox(
-                    height: 25,
-                  ),
-                  Text(
-                    'Actual Cash',
-                    textScaler: TextScaler.linear(1),
-                    style: GoogleFonts.poppins(
-                        fontSize: 18, fontWeight: FontWeight.w500),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  SizedBox(
-                    height: height * 0.07,
-                    child: TextField(
-                      controller: _actualCashController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d+\.?\d{0,2}'))
-                      ],
-                      onChanged: (value) => _calculateDifference(),
-                      decoration: InputDecoration(
-                        hintText: 'Enter Actual Cash',
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: AppColors.primary),
-                          borderRadius: BorderRadius.circular(0),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: AppColors.primary),
-                          borderRadius: BorderRadius.circular(0),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 25,
-                  ),
-                  Text(
-                    'Difference',
-                    style: GoogleFonts.poppins(
-                        fontSize: 18, fontWeight: FontWeight.w500),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  SizedBox(
-                    height: height * 0.07,
-                    child: TextField(
-                      controller: _differenceController,
-                      enabled: false,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: _differenceController.text.contains('-')
-                                  ? Colors.red
-                                  : Colors.green),
-                          borderRadius: BorderRadius.circular(0),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 25,
-                  ),
-                  CommonButton(
-                      height: height * 0.06,
-                      bordercircular: 0,
-                      onTap: _isGenerating
-                          ? () {}
-                          : () => _completeEndOfDay(),
-                      child: _isGenerating
-                          ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                          : Text(
-                        'End of The Day',
-                        textScaler: TextScaler.linear(1),
-                        style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 18,
-                            color: Colors.white),
-                      ))
-                ],
+                  ]),
+                ),
               ),
-            )
-          ]),
+              const SizedBox(width: 12),
+              Column(children: [
+                _iconActionButton(
+                    icon: Icons.print_rounded,
+                    label: 'Print',
+                    color: Colors.teal,
+                    onTap: _printSummary),
+                const SizedBox(height: 8),
+                _iconActionButton(
+                    icon: Icons.refresh_rounded,
+                    label: 'Refresh',
+                    color: Colors.blueGrey,
+                    onTap: _loadEODData),
+              ]),
+            ]),
+
+            const SizedBox(height: 20),
+
+            _sectionLabel('Order Types', Icons.receipt_long_rounded, Colors.teal),
+            const SizedBox(height: 8),
+            _orderTypesCard(currency),
+
+            const SizedBox(height: 20),
+
+            _sectionLabel('Discounts & Tax', Icons.percent_rounded, Colors.orange),
+            const SizedBox(height: 8),
+            _discountTaxCard(currency),
+
+            const SizedBox(height: 20),
+
+            _sectionLabel('Payment Breakdown', Icons.payment_rounded, Colors.blue),
+            const SizedBox(height: 8),
+            _paymentsCard(currency),
+
+            const SizedBox(height: 20),
+
+            _sectionLabel('Cash Reconciliation',
+                Icons.account_balance_wallet_rounded, AppColors.primary),
+            const SizedBox(height: 8),
+            _cashReconciliationCard(currency, isTablet),
+
+            const SizedBox(height: 20),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _iconActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: color)),
+        ]),
       ),
     );
   }

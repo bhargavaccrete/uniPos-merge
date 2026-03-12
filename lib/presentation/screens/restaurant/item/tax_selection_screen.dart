@@ -3,12 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 
 import '../../../../util/common/app_responsive.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 class TaxSelectionScreen extends StatefulWidget {
   final String? selectedTaxId;
   final double? currentTaxRate;
@@ -281,26 +281,19 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
+              AppTextField(
                 controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Tax Name',
-                  labelStyle: GoogleFonts.poppins(),
-                  border: const OutlineInputBorder(),
-                  hintText: 'e.g., GST, VAT, Sales Tax',
-                ),
+                label: 'Tax Name',
+                hint: 'e.g. GST, VAT, Sales Tax',
+                icon: Icons.receipt_outlined,
               ),
               const SizedBox(height: 15),
-              TextField(
+              AppTextField(
                 controller: percentageController,
+                label: 'Tax Percentage (%)',
+                hint: 'e.g. 18',
+                icon: Icons.percent_rounded,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'Tax Percentage',
-                  labelStyle: GoogleFonts.poppins(),
-                  border: const OutlineInputBorder(),
-                  hintText: 'e.g., 18',
-                  suffixText: '%',
-                ),
               ),
             ],
           ),

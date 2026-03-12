@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
@@ -108,6 +109,8 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildExtraBottomSheet({bool isDialog = false}) {
+    final isEditing = editingId != null;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -118,158 +121,170 @@ class _ExtraTabState extends State<ExtraTab> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!isDialog) ...[
-            const SizedBox(height: 12),
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+          // ── Drag handle ────────────────────────────────────────────
+          if (!isDialog)
+            Padding(
+              padding: const EdgeInsets.only(top: 10, bottom: 4),
+              child: Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
             ),
-          ],
-          // Header
+
+          // ── Header ─────────────────────────────────────────────────
           Padding(
-            padding: EdgeInsets.fromLTRB(20, isDialog ? 16 : 12, 12, 8),
+            padding:
+                EdgeInsets.fromLTRB(20, isDialog ? 20 : 12, 12, 12),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.star, color: AppColors.primary),
-                ),
-                SizedBox(width: 12),
-                Text(
-                  editingId == null ? 'Add Extra Category' : 'Edit Extra Category',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                  child: Icon(
+                    isEditing ? Icons.edit_rounded : Icons.star_outline_rounded,
+                    color: AppColors.primary,
+                    size: 20,
                   ),
                 ),
-                if (isDialog) ...[
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey.shade100,
-                      foregroundColor: Colors.grey.shade600,
-                    ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isEditing
+                            ? 'Edit Extra Category'
+                            : 'Add Extra Category',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        isEditing
+                            ? 'Update extra group details'
+                            : 'Group related toppings together',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: Colors.grey.shade500),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close, color: Colors.grey.shade500),
+                  splashRadius: 20,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: Colors.grey.shade100),
+
+          // ── Form body ───────────────────────────────────────────────
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
+                  // Category name
+                  AppTextField(
                     controller: _extrasController,
-                    style: GoogleFonts.poppins(fontSize: 14),
-                    decoration: InputDecoration(
-                      labelText: "Extra Category Name",
-                      labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                      prefixIcon: Icon(Icons.edit, color: AppColors.primary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.primary, width: 2),
-                      ),
-                    ),
+                    label: 'Category Name',
+                    hint: 'e.g. Sauces, Toppings, Sides',
+                    icon: Icons.star_outline_rounded,
+                    required: true,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 14),
+
+                  // Min / Max row
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
+                        child: AppTextField(
                           controller: _minimumController,
+                          label: 'Min Selection',
+                          hint: '0',
+                          icon: Icons.remove_circle_outline_rounded,
                           keyboardType: TextInputType.number,
-                          style: GoogleFonts.poppins(fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: "Min Selection",
-                            labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                            prefixIcon: Icon(Icons.remove_circle_outline,
-                                color: AppColors.primary),
-                            hintText: '0',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  BorderSide(color: AppColors.primary, width: 2),
-                            ),
-                          ),
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: TextField(
+                        child: AppTextField(
                           controller: _maximumController,
+                          label: 'Max Selection',
+                          hint: '0',
+                          icon: Icons.add_circle_outline_rounded,
                           keyboardType: TextInputType.number,
-                          style: GoogleFonts.poppins(fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: "Max Selection",
-                            labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                            prefixIcon: Icon(Icons.add_circle_outline,
-                                color: AppColors.primary),
-                            hintText: '0',
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  BorderSide(color: AppColors.primary, width: 2),
-                            ),
-                          ),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _addOrEditExtra,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 20),
+
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 13),
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text('Cancel',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w500)),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            editingId == null
-                                ? Icons.add_circle_outline
-                                : Icons.check_circle_outline,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: _addOrEditExtra,
+                          icon: Icon(
+                            isEditing
+                                ? Icons.check_rounded
+                                : Icons.add_circle_outline_rounded,
+                            size: 18,
                             color: Colors.white,
                           ),
-                          SizedBox(width: 8),
-                          Text(
-                            editingId == null ? 'Add' : 'Update',
+                          label: Text(
+                            isEditing ? 'Update' : 'Add Extra',
                             style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white),
                           ),
-                        ],
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -344,239 +359,343 @@ class _ExtraTabState extends State<ExtraTab> {
 
   Widget _buildToppingBottomSheet(Extramodel extra, {bool isDialog = false}) {
     return StatefulBuilder(
-      builder: (context, setModalState) => Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: isDialog
-              ? BorderRadius.circular(20)
-              : const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isDialog) ...[
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-            ],
-            // Header
-            Padding(
-              padding: EdgeInsets.fromLTRB(20, isDialog ? 16 : 12, 12, 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.local_pizza, color: AppColors.primary),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          editingToppingIndex != null ? 'Edit Topping' : 'Add Topping',
-                          style: GoogleFonts.poppins(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          'To: ${extra.Ename}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isDialog)
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.grey.shade100,
-                        foregroundColor: Colors.grey.shade600,
+      builder: (context, setModalState) {
+        final isEditing = editingToppingIndex != null;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: isDialog
+                ? BorderRadius.circular(20)
+                : const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.88,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Drag handle ──────────────────────────────────────────
+              if (!isDialog)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10, bottom: 4),
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-              // Topping Name
-              TextField(
-                controller: _toppingController,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: "Topping Name",
-                  labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                  prefixIcon: Icon(Icons.edit, color: AppColors.primary),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.primary, width: 2),
                   ),
                 ),
-              ),
-              SizedBox(height: 15),
 
-              // Veg/Non-Veg Selector
-              Text(
-                'Type',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-              SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildVegOption(true, setModalState),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: _buildVegOption(false, setModalState),
-                  ),
-                ],
-              ),
-              SizedBox(height: 15),
-
-              // Contains Size Checkbox
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
+              // ── Header ────────────────────────────────────────────────
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    20, isDialog ? 20 : 12, 12, 12),
                 child: Row(
                   children: [
-                    Checkbox(
-                      value: hasSize,
-                      activeColor: AppColors.primary,
-                      onChanged: (value) {
-                        setModalState(() {
-                          hasSize = value!;
-                          if (hasSize) {
-                            _variantPriceControllers.clear();
-                            _selectedVariants.clear();
-                            for (var variant in _availableVariants) {
-                              _variantPriceControllers[variant.id] =
-                                  TextEditingController(
-                                      text: _priceController.text.isEmpty
-                                          ? '0'
-                                          : _priceController.text);
-                            }
-                          } else {
-                            _variantPriceControllers.values
-                                .forEach((controller) => controller.dispose());
-                            _variantPriceControllers.clear();
-                            _selectedVariants.clear();
-                          }
-                        });
-                      },
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isEditing
+                            ? Icons.edit_rounded
+                            : Icons.add_circle_outline_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
                     ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Contains Size',
+                            isEditing ? 'Edit Topping' : 'Add Topping',
                             style: GoogleFonts.poppins(
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: FontWeight.w600,
+                              color: Colors.black87,
                             ),
                           ),
-                          Text(
-                            'Enable if this topping has different sizes',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                            ),
+                          Row(
+                            children: [
+                              Icon(Icons.folder_outlined,
+                                  size: 12, color: AppColors.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                extra.Ename,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon:
+                          Icon(Icons.close, color: Colors.grey.shade500),
+                      splashRadius: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
                   ],
                 ),
               ),
-              SizedBox(height: 15),
+              Divider(height: 1, color: Colors.grey.shade100),
 
-              // Price Field or Variant Prices
-              if (!hasSize)
-                TextField(
-                  controller: _priceController,
-                  keyboardType: TextInputType.number,
-                  style: GoogleFonts.poppins(fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: "Price",
-                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                    prefixIcon: Icon(Icons.currency_rupee, color: AppColors.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
-                    ),
-                  ),
-                ),
-
-              if (hasSize) _buildVariantPricesSection(setModalState),
-
-              SizedBox(height: 20),
-
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () => _saveTopping(extra),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              // ── Scrollable body ───────────────────────────────────────
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.check_circle_outline, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text(
-                        'Save Topping',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+
+                      // Topping Name
+                      AppTextField(
+                        controller: _toppingController,
+                        label: 'Topping Name',
+                        hint: 'e.g. Extra Cheese, Mushrooms',
+                        icon: Icons.local_pizza_outlined,
+                        required: true,
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Veg / Non-Veg
+                      Text('Type',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600)),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.divider),
                         ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                                child: _buildVegOption(
+                                    true, setModalState,
+                                    isLeft: true)),
+                            Container(
+                                width: 1,
+                                height: 52,
+                                color: AppColors.divider),
+                            Expanded(
+                                child: _buildVegOption(
+                                    false, setModalState,
+                                    isLeft: false)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Contains Size toggle
+                      InkWell(
+                        onTap: () {
+                          setModalState(() {
+                            hasSize = !hasSize;
+                            if (hasSize) {
+                              _variantPriceControllers.clear();
+                              _selectedVariants.clear();
+                              for (var v in _availableVariants) {
+                                _variantPriceControllers[v.id] =
+                                    TextEditingController(
+                                        text: _priceController.text
+                                                .isEmpty
+                                            ? '0'
+                                            : _priceController.text);
+                              }
+                            } else {
+                              for (var c in _variantPriceControllers
+                                  .values) {
+                                c.dispose();
+                              }
+                              _variantPriceControllers.clear();
+                              _selectedVariants.clear();
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: hasSize
+                                ? AppColors.primary
+                                    .withValues(alpha: 0.07)
+                                : AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: hasSize
+                                  ? AppColors.primary
+                                  : AppColors.divider,
+                              width: hasSize ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.straighten_rounded,
+                                size: 20,
+                                color: hasSize
+                                    ? AppColors.primary
+                                    : Colors.grey.shade400,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Contains Size',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: hasSize
+                                              ? AppColors.primary
+                                              : Colors.black87,
+                                        )),
+                                    Text(
+                                        'Topping has different size prices',
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            color:
+                                                Colors.grey.shade500)),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: hasSize,
+                                activeColor: AppColors.primary,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (v) {
+                                  setModalState(() {
+                                    hasSize = v;
+                                    if (hasSize) {
+                                      _variantPriceControllers.clear();
+                                      _selectedVariants.clear();
+                                      for (var vr in _availableVariants) {
+                                        _variantPriceControllers[vr.id] =
+                                            TextEditingController(
+                                                text: _priceController
+                                                        .text.isEmpty
+                                                    ? '0'
+                                                    : _priceController
+                                                        .text);
+                                      }
+                                    } else {
+                                      for (var c
+                                          in _variantPriceControllers
+                                              .values) {
+                                        c.dispose();
+                                      }
+                                      _variantPriceControllers.clear();
+                                      _selectedVariants.clear();
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Price or variant prices
+                      if (!hasSize) ...[
+                        AppTextField(
+                          controller: _priceController,
+                          label: 'Price',
+                          hint: '0.00',
+                          icon: Icons.currency_rupee_rounded,
+                          keyboardType: TextInputType.number,
+                          prefixWidget: Padding(
+                            padding: const EdgeInsets.only(left: 12, right: 4),
+                            child: Text(
+                              CurrencyHelper.currentSymbol,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 13, color: Colors.black87),
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      if (hasSize)
+                        _buildVariantPricesSection(setModalState),
+
+                      const SizedBox(height: 20),
+
+                      // Action buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 13),
+                                side: BorderSide(
+                                    color: Colors.grey.shade300),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: Text('Cancel',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w500)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _saveTopping(extra),
+                              icon: Icon(
+                                isEditing
+                                    ? Icons.check_rounded
+                                    : Icons.add_circle_outline_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              label: Text(
+                                isEditing
+                                    ? 'Update Topping'
+                                    : 'Save Topping',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 13),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -584,62 +703,60 @@ class _ExtraTabState extends State<ExtraTab> {
               ),
             ],
           ),
-        ),
-      ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildVegOption(bool isVegOption, StateSetter setModalState) {
+  Widget _buildVegOption(bool isVegOption, StateSetter setModalState,
+      {required bool isLeft}) {
     final isSelected = isveg == isVegOption;
+    final dotColor = isVegOption ? Colors.green : Colors.red;
 
     return InkWell(
       onTap: () => setModalState(() => isveg = isVegOption),
-      child: Container(
-        padding: EdgeInsets.all(12),
+      borderRadius: BorderRadius.horizontal(
+        left: isLeft ? const Radius.circular(11) : Radius.zero,
+        right: isLeft ? Radius.zero : const Radius.circular(11),
+      ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 12),
         decoration: BoxDecoration(
-          border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey.shade300,
-            width: 2,
+          color: isSelected
+              ? dotColor.withValues(alpha: 0.07)
+              : Colors.transparent,
+          borderRadius: BorderRadius.horizontal(
+            left: isLeft ? const Radius.circular(11) : Radius.zero,
+            right: isLeft ? Radius.zero : const Radius.circular(11),
           ),
-          borderRadius: BorderRadius.circular(12),
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(
-                  color: isVegOption ? Colors.green : Colors.red,
-                  width: 2,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.circle,
-                color: isVegOption ? Colors.green : Colors.red,
-                size: 14,
-              ),
-            ),
-            SizedBox(width: 8),
+            Icon(Icons.circle,
+                color: dotColor,
+                size: isSelected ? 12 : 10),
+            const SizedBox(width: 8),
             Text(
               isVegOption ? 'Veg' : 'Non-Veg',
               style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 13,
+                fontWeight:
+                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                color:
+                    isSelected ? dotColor : Colors.grey.shade600,
               ),
             ),
             if (isSelected) ...[
-              SizedBox(width: 8),
-              Icon(
-                Icons.check_circle,
-                color: AppColors.primary,
-                size: 18,
+              const SizedBox(width: 6),
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                    color: dotColor, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded,
+                    size: 11, color: Colors.white),
               ),
             ],
           ],
@@ -649,61 +766,58 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildVariantPricesSection(StateSetter setModalState) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.tune, size: 18, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text(
-                'Size-based Pricing',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Size-based Pricing',
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600)),
+            const Spacer(),
+            Text('Select sizes to enable',
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: Colors.grey.shade400)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ..._availableVariants.map((variant) {
+          final isSelected = _selectedVariants.contains(variant.id);
+          final controller = _variantPriceControllers[variant.id];
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppColors.primary.withValues(alpha: 0.05)
+                  : AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color:
+                    isSelected ? AppColors.primary : AppColors.divider,
+                width: isSelected ? 1.5 : 1,
               ),
-            ],
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Select sizes and set prices for each',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.grey.shade600,
             ),
-          ),
-          SizedBox(height: 12),
-          ..._availableVariants.map((variant) {
-            final isSelected = _selectedVariants.contains(variant.id);
-            final controller = _variantPriceControllers[variant.id];
-            return Container(
-              margin: EdgeInsets.only(bottom: 8),
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.grey.shade200,
-                  width: 1.5,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Checkbox(
+            child: Row(
+              children: [
+                // Checkbox
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
                     value: isSelected,
                     activeColor: AppColors.primary,
-                    onChanged: (bool? value) {
+                    materialTapTargetSize:
+                        MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4)),
+                    onChanged: (v) {
                       setModalState(() {
-                        if (value == true) {
+                        if (v == true) {
                           _selectedVariants.add(variant.id);
                           _variantPriceControllers[variant.id] =
                               TextEditingController(
@@ -712,52 +826,83 @@ class _ExtraTabState extends State<ExtraTab> {
                                       : _priceController.text);
                         } else {
                           _selectedVariants.remove(variant.id);
-                          _variantPriceControllers[variant.id]?.dispose();
-                          _variantPriceControllers.remove(variant.id);
+                          _variantPriceControllers[variant.id]
+                              ?.dispose();
+                          _variantPriceControllers
+                              .remove(variant.id);
                         }
                       });
                     },
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      variant.name,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected ? Colors.black87 : Colors.grey,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    variant.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: isSelected
+                          ? Colors.black87
+                          : Colors.grey.shade500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: controller,
+                    enabled: isSelected,
+                    keyboardType: TextInputType.number,
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, color: Colors.black87),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
+                      hintText: '0.00',
+                      hintStyle: GoogleFonts.poppins(
+                          fontSize: 12, color: Colors.grey.shade400),
+                      prefixText: CurrencyHelper.currentSymbol,
+                      prefixStyle: GoogleFonts.poppins(
+                          fontSize: 13, color: Colors.black87),
+                      filled: true,
+                      fillColor: isSelected
+                          ? Colors.white
+                          : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                            color: isSelected
+                                ? AppColors.divider
+                                : Colors.transparent),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: AppColors.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                            color: AppColors.primary, width: 1.5),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                            color: Colors.transparent),
                       ),
                     ),
                   ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: controller,
-                      enabled: isSelected,
-                      keyboardType: TextInputType.number,
-                      style: GoogleFonts.poppins(fontSize: 14),
-                      decoration: InputDecoration(
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        labelText: 'Price',
-                        labelStyle: GoogleFonts.poppins(fontSize: 12),
-                        prefixText: CurrencyHelper.currentSymbol,
-                        filled: !isSelected,
-                        fillColor: !isSelected ? Colors.grey.shade100 : null,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ],
-      ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
     );
   }
 
@@ -935,46 +1080,20 @@ class _ExtraTabState extends State<ExtraTab> {
       body: Column(
         children: [
           // Modern Search Bar
-          Container(
+          Padding(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  hintText: 'Search extras...',
-                  hintStyle: GoogleFonts.poppins(
-                    color: Colors.grey.shade500,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
-                  suffixIcon: query.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.grey, size: 20),
-                          onPressed: () {
-                            _searchController.clear();
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                ),
-              ),
+            child: AppTextField(
+              controller: _searchController,
+              hint: 'Search extras…',
+              icon: Icons.search_rounded,
+              suffixIcon: query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      onPressed: () {
+                        _searchController.clear();
+                      },
+                    )
+                  : null,
             ),
           ),
 

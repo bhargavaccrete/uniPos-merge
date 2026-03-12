@@ -28,6 +28,8 @@ class _ManageInventoryState extends State<ManageInventory> {
   final Map<String, TextEditingController> _stockControllers = {};
   final Map<String, bool> _expandedCategories = {};
   final Set<String> _busyKeys = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -40,6 +42,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     for (var controller in _stockControllers.values) {
       controller.dispose();
     }
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -677,6 +680,43 @@ class _ManageInventoryState extends State<ManageInventory> {
                 ),
                 SizedBox(height: 12),
 
+                // Search Bar
+                TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                  style: GoogleFonts.poppins(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search items...',
+                    hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textSecondary),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.close_rounded, size: 18, color: AppColors.textSecondary),
+                            onPressed: () => setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            }),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: AppColors.surfaceLight,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 12),
+
                 // Info Card
                 Container(
                   padding: EdgeInsets.all(isTablet ? 14 : 12),
@@ -805,14 +845,20 @@ class _ManageInventoryState extends State<ManageInventory> {
                   itemBuilder: (context, index) {
                     final category = categories[index];
                     final categoryItems = items
-                        .where((item) => item.categoryOfItem == category.id && item.trackInventory == true)
+                        .where((item) =>
+                            item.categoryOfItem == category.id &&
+                            item.trackInventory == true &&
+                            (_searchQuery.isEmpty || item.name.toLowerCase().contains(_searchQuery)))
                         .toList();
 
                     if (categoryItems.isEmpty) {
                       return SizedBox.shrink();
                     }
 
-                    final isExpanded = _expandedCategories[category.id] ?? false;
+                    // Auto-expand when search is active
+                    final isExpanded = _searchQuery.isNotEmpty
+                        ? true
+                        : (_expandedCategories[category.id] ?? false);
 
                     return Container(
                       margin: EdgeInsets.only(bottom: 12),

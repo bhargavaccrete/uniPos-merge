@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
+import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../util/color.dart';
 
 /// Store Details Step
@@ -25,7 +27,6 @@ class StoreDetailsStep extends StatefulWidget {
 class _StoreDetailsStepState extends State<StoreDetailsStep> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers for text fields
   late TextEditingController _storeNameController;
   late TextEditingController _ownerNameController;
   late TextEditingController _phoneController;
@@ -40,38 +41,19 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _initializeControllers();
   }
 
-  // Helper function to get non-empty value or default
   String getValue(String? storeValue, String defaultValue) {
-    return (storeValue != null && storeValue.isNotEmpty)
-        ? storeValue
-        : defaultValue;
+    return (storeValue != null && storeValue.isNotEmpty) ? storeValue : defaultValue;
   }
 
   void _initializeControllers() {
-    // Initialize controllers with store values or defaults
-    _storeNameController = TextEditingController(
-      text: getValue(widget.store.storeName, 'Green Apple')
-    );
-    _ownerNameController = TextEditingController(
-      text: getValue(widget.store.ownerName, 'Bhargav')
-    );
-    _phoneController = TextEditingController(
-      text: getValue(widget.store.phone, '7845963574')
-    );
-    _emailController = TextEditingController(
-      text: getValue(widget.store.email, 'info@apple.com')
-    );
-    _addressController = TextEditingController(
-      text: getValue(widget.store.address, 'Infocity, Gandhinnagar')
-    );
-    _gstController = TextEditingController(
-      text: getValue(widget.store.gstin, 'GVFU415151YVBF')
-    );
-    _panController = TextEditingController(
-      text: getValue(widget.store.pan, 'FU415151YVBF')
-    );
+    _storeNameController = TextEditingController(text: getValue(widget.store.storeName, 'Green Apple'));
+    _ownerNameController = TextEditingController(text: getValue(widget.store.ownerName, 'Bhargav'));
+    _phoneController = TextEditingController(text: getValue(widget.store.phone, '7845963574'));
+    _emailController = TextEditingController(text: getValue(widget.store.email, 'info@apple.com'));
+    _addressController = TextEditingController(text: getValue(widget.store.address, 'Infocity, Gandhinnagar'));
+    _gstController = TextEditingController(text: getValue(widget.store.gstin, 'GVFU415151YVBF'));
+    _panController = TextEditingController(text: getValue(widget.store.pan, 'FU415151YVBF'));
   }
-
 
   @override
   void dispose() {
@@ -106,237 +88,203 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           children: [
             Text(
               'Store Information',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppColors.darkNeutral,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text(
               'Basic details about your store',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+              style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 28),
 
             // Store Name
-            TextFormField(
+            AppTextField(
               controller: _storeNameController,
-              decoration: InputDecoration(
-                labelText: 'Store Name*',
-                prefixIcon: Icon(Icons.store, color: AppColors.primary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              onChanged: (value) => widget.store.setStoreName(value),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Store name is required';
-                }
-                return null;
-              },
+              label: 'Store Name',
+              hint: 'e.g. Green Apple Cafe',
+              icon: Icons.store_rounded,
+              required: true,
+              onChanged: (v) => widget.store.setStoreName(v),
+              validator: (v) => (v == null || v.isEmpty) ? 'Store name is required' : null,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
             // Owner Name
-            TextFormField(
+            AppTextField(
               controller: _ownerNameController,
-              decoration: InputDecoration(
-                labelText: 'Owner Name*',
-                prefixIcon: Icon(Icons.person, color: AppColors.primary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              onChanged: (value) => widget.store.setOwnerName(value),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Owner name is required';
-                }
-                return null;
-              },
+              label: 'Owner Name',
+              hint: 'e.g. Bhargav Patel',
+              icon: Icons.person_rounded,
+              required: true,
+              onChanged: (v) => widget.store.setOwnerName(v),
+              validator: (v) => (v == null || v.isEmpty) ? 'Owner name is required' : null,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
-            /*------------------Image Upload-------------*/
-
+            // Logo Upload
+            Text(
+              'Store Logo',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
             Card(
-              elevation: 5,
-              color: Colors.white,
+              elevation: 0,
+              color: AppColors.surfaceLight,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: AppColors.divider),
+              ),
               child: Observer(
-                  builder:(_){
-                    bool hasImage = widget.store.logoByte != null;
-                    return InkWell(
-                      onTap: (){
-                        widget.store.pickLogo();
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: hasImage ? Colors.black : Colors.teal.shade100,
-                          image: hasImage?
-                              DecorationImage(
+                builder: (_) {
+                  bool hasImage = widget.store.logoByte != null;
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => widget.store.pickLogo(),
+                    child: Container(
+                      width: double.infinity,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: hasImage ? Colors.black : AppColors.surfaceLight,
+                        image: hasImage
+                            ? DecorationImage(
                                 image: MemoryImage(widget.store.logoByte!),
-                                fit: BoxFit.contain
+                                fit: BoxFit.contain,
                               )
-                              :null
-                        ),
-                        child: Stack(
-                          children: [
-                            if(!hasImage)
-                              Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children:[
-                                    Icon(Icons.image,color: Colors.teal.shade700,size: 60,),
-                                    SizedBox(height: 10,),
-
-                                    Text('UPLOAD LOGO',style: TextStyle(fontSize:16,color: Colors.teal.shade900,
-                                    fontWeight:FontWeight.w600
-                                    ),)
-
-                                  ]
+                            : null,
+                      ),
+                      child: Stack(
+                        children: [
+                          if (!hasImage)
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.08),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.add_photo_alternate_rounded,
+                                        color: AppColors.primary, size: 36),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Upload Logo',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Tap to browse your files',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 12, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (hasImage)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: InkWell(
+                                onTap: () => widget.store.deleteLogo(),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(Icons.delete_rounded,
+                                      color: Colors.white, size: 18),
                                 ),
                               ),
-
-
-                            if(hasImage)
-                              Positioned(
-
-                                  child: InkWell(
-                                onTap: (){
-                                  widget.store.deleteLogo();
-                                },
-                                    child: Container(
-                                      padding: EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color:Colors.white,width: 2),
-                                      ),
-                                      child: Icon(
-                                        Icons.delete,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-
-                              ))
-
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
-                    );
-                  } ),
+                    ),
+                  );
+                },
+              ),
             ),
-
-            const SizedBox(height: 20),
-
+            const SizedBox(height: 18),
 
             // Phone & Email Row
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: TextFormField(
+                  child: AppTextField(
                     controller: _phoneController,
+                    label: 'Phone Number',
+                    hint: '9876543210',
+                    icon: Icons.phone_rounded,
+                    required: true,
                     keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: 'Phone Number*',
-                      prefixIcon: Icon(Icons.phone, color: AppColors.primary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    onChanged: (value) => widget.store.setPhone(value),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Phone is required';
-                      }
-                      return null;
-                    },
+                    onChanged: (v) => widget.store.setPhone(v),
+                    validator: (v) => (v == null || v.isEmpty) ? 'Phone is required' : null,
                   ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: TextFormField(
+                  child: AppTextField(
                     controller: _emailController,
+                    label: 'Email',
+                    hint: 'info@store.com',
+                    icon: Icons.email_rounded,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email, color: AppColors.primary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    onChanged: (value) => widget.store.setEmail(value),
+                    onChanged: (v) => widget.store.setEmail(v),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
             // Address
-            TextFormField(
+            AppTextField(
               controller: _addressController,
+              label: 'Store Address',
+              hint: 'Street, City, State',
+              icon: Icons.location_on_rounded,
               maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Store Address',
-                prefixIcon: Icon(Icons.location_on, color: AppColors.primary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              onChanged: (value) => widget.store.setAddress(value),
+              onChanged: (v) => widget.store.setAddress(v),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
             // GST & PAN Row
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: TextFormField(
+                  child: AppTextField(
                     controller: _gstController,
-                    decoration: InputDecoration(
-                      labelText: 'GST Number (Optional)',
-                      prefixIcon: Icon(Icons.receipt_long, color: AppColors.primary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    onChanged: (value) => widget.store.setGstin(value),
+                    label: 'GST Number',
+                    hint: 'Optional',
+                    icon: Icons.receipt_long_rounded,
+                    onChanged: (v) => widget.store.setGstin(v),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: TextFormField(
+                  child: AppTextField(
                     controller: _panController,
-                    decoration: InputDecoration(
-                      labelText: 'PAN Number (Optional)',
-                      prefixIcon: Icon(Icons.credit_card, color: AppColors.secondary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFF8F9FA),
-                    ),
-                    onChanged: (value) => widget.store.setPan(value),
+                    label: 'PAN Number',
+                    hint: 'Optional',
+                    icon: Icons.credit_card_rounded,
+                    onChanged: (v) => widget.store.setPan(v),
                   ),
                 ),
               ],
@@ -356,12 +304,16 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                       },
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 15),
-                        side: BorderSide(color: AppColors.primary),
+                        side: const BorderSide(color: AppColors.primary),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Back'),
+                      child: Text(
+                        'Back',
+                        style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500, color: AppColors.primary),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 15),
@@ -379,8 +331,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        elevation: 0,
                       ),
                       child: widget.store.isLoading
                           ? const SizedBox(
@@ -391,9 +344,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
+                          : Text(
                               'Continue',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,

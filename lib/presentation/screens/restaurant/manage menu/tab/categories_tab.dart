@@ -2,16 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
-import 'package:uuid/uuid.dart';
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
@@ -25,9 +22,6 @@ class CategoryTab extends StatefulWidget {
 
 class _CategoryTabState extends State<CategoryTab> {
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _categoryController = TextEditingController();
-  File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
   String query = '';
 
   @override
@@ -43,55 +37,7 @@ class _CategoryTabState extends State<CategoryTab> {
   @override
   void dispose() {
     _searchController.dispose();
-    _categoryController.dispose();
     super.dispose();
-  }
-
-  void _showImagePicker() {
-    _pickImage(ImageSource.gallery);
-  }
-
-
-  Future<void> _pickImage(ImageSource source) async {
-    final pickedFile = await _picker.pickImage(source: source);
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
-    }
-  }
-
-  void _clearImage() {
-    setState(() {
-      _selectedImage = null;
-      _categoryController.clear();
-    });
-  }
-
-  Future<void> _addcategoryHive() async {
-    final trimmedName = _categoryController.text.trim();
-    if (trimmedName.isEmpty) {
-      NotificationService.instance.showError('Category name cannot be empty');
-      return;
-    }
-
-    // Duplicate name check
-    final exists = categoryStore.categories
-        .any((c) => c.name.toLowerCase() == trimmedName.toLowerCase());
-    if (exists) {
-      NotificationService.instance.showError('A category with this name already exists');
-      return;
-    }
-
-    final newcategory = Category(
-      imagePath: _selectedImage != null ? _selectedImage!.path : null,
-      id: const Uuid().v4(),
-      name: trimmedName,
-    );
-
-    await categoryStore.addCategory(newcategory);
-    _clearImage();
-    Navigator.pop(context);
   }
 
   void _deleteCategoryhive(dynamic id) async {
@@ -106,140 +52,8 @@ class _CategoryTabState extends State<CategoryTab> {
     await categoryStore.deleteCategory(id);
   }
 
-  void _showAddCategoryBottomSheet() {
-    showModalBottomSheet(
-      isScrollControlled: true,
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.category, color: AppColors.primary),
-                    ),
-                    SizedBox(width: 12),
-                    Text(
-                      'Add New Category',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                Divider(height: 30),
-                TextField(
-                  controller: _categoryController,
-                  style: GoogleFonts.poppins(fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: "Category Name",
-                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                    prefixIcon: Icon(Icons.edit, color: AppColors.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20),
-                InkWell(
-                  onTap: _showImagePicker,
-                  child: Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300, width: 2),
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.grey.shade50,
-                    ),
-                    child: _selectedImage != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.file(
-                              _selectedImage!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            ),
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_photo_alternate,
-                                  color: Colors.grey.shade400, size: 50),
-                              SizedBox(height: 10),
-                              Text(
-                                'Upload Image',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                '600 x 400 • PNG, JPG (Max 3MB)',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
-                SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _addcategoryHive,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_circle_outline, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          'Add Category',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  Future<void> _showAddCategoryBottomSheet() async {
+    await AddCategoryDialog.show(context);
   }
 
   int _getGridColumns(double width) {
@@ -258,46 +72,20 @@ class _CategoryTabState extends State<CategoryTab> {
       body: Column(
         children: [
           // Modern Search Bar
-          Container(
+          Padding(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  hintText: 'Search categories...',
-                  hintStyle: GoogleFonts.poppins(
-                    color: Colors.grey.shade500,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
-                  suffixIcon: query.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.grey, size: 20),
-                          onPressed: () {
-                            _searchController.clear();
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                ),
-              ),
+            child: AppTextField(
+              controller: _searchController,
+              hint: 'Search categories…',
+              icon: Icons.search_rounded,
+              suffixIcon: query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      onPressed: () {
+                        _searchController.clear();
+                      },
+                    )
+                  : null,
             ),
           ),
 

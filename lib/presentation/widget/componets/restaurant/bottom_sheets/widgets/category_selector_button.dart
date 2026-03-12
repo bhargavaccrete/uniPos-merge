@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import '../../../../../../util/common/app_responsive.dart';
-import '../../componets/Button.dart';
+import '../../../../../../util/color.dart';
 
 /// Button that shows selected category and opens category selector
 class CategorySelectorButton extends StatelessWidget {
@@ -17,31 +15,42 @@ class CategorySelectorButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: AppResponsive.height(context, 0.06),
-      decoration: BoxDecoration(
-        border: Border.all(width: 0.5, color: Colors.black38),
-      ),
-      child: CommonButton(
-        height: AppResponsive.height(context, 0.05),
-        bgcolor: Colors.transparent,
-        bordercolor: Colors.black12,
-        bordercircular: 0,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 5),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
+    final hasSelection = selectedCategoryName != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.category_outlined,
+              size: 20,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
                 selectedCategoryName ?? 'Select Category',
                 style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
+                  fontSize: 14,
+                  color: hasSelection
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios)
-            ],
-          ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 22,
+              color: AppColors.textSecondary,
+            ),
+          ],
         ),
       ),
     );

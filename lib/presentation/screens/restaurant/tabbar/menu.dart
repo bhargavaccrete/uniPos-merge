@@ -12,6 +12,7 @@ import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/restaurant/componets/visual_keyboard.dart';
 import 'WeightItemDialog.dart';
 import 'item_options_dialog.dart';
@@ -449,47 +450,6 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      floatingActionButton: isTablet ? null : Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Refresh button
-          FloatingActionButton(
-            mini: true,
-            heroTag: 'refresh',
-            onPressed: _isLoadingData ? null : () async {
-              print('🔄 Manual refresh triggered');
-              await _loadData(force: true);
-            },
-            backgroundColor: _isLoadingData ? AppColors.success.withOpacity(0.5) : AppColors.success,
-            child: _isLoadingData
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Icon(Icons.refresh, color: Colors.white, size: 20),
-          ),
-          SizedBox(height: 10),
-          Observer(
-            builder: (_) {
-              final hasItems = restaurantCartStore.cartItems.isNotEmpty;
-              return Padding(
-                padding: EdgeInsets.only(bottom: hasItems ? 80 : 0),
-                child: FloatingActionButton(
-                  heroTag: 'category',
-                  onPressed: _showCategoryJumpSheet,
-                  backgroundColor: AppColors.primary,
-                  elevation: 6,
-                  child: Icon(Icons.category, color: Colors.white, size: 28),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
       body: isTablet ? _buildTabletLayout(context, size) : _buildMobileLayout(context, size),
     );
   }
@@ -507,14 +467,13 @@ class _MenuScreenState extends State<MenuScreen> {
                 padding: EdgeInsets.only(top: 10, bottom: hasItems ? 80 : 0),
                 child: Column(
                   children: [
-                    // Search text field
+                    // Search + Code row with inline refresh
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Container(
+                            child: SizedBox(
                                 height: height * 0.04,
                                 child: TextField(
                                   textAlign: TextAlign.center,
@@ -528,23 +487,24 @@ class _MenuScreenState extends State<MenuScreen> {
                                       keyboardType: KeyboardType.text,
                                     );
                                   } : null,
+                                  style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
                                   decoration: InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                       hintText: 'Code Here',
                                       filled: true,
-                                      fillColor: Colors.white,
+                                      fillColor: AppColors.surfaceLight,
                                       suffixIcon: AppSettings.visualKeyboard
                                           ? Icon(Icons.keyboard, size: 18, color: AppColors.primary)
                                           : null,
-                                      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                      border: OutlineInputBorder()),
+                                      hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary, fontSize: 12),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider))),
                                 )),
                           ),
                           SizedBox(width: 8),
                           Expanded(
-                            child: Container(
+                            child: SizedBox(
                                 height: height * 0.04,
                                 child: TextField(
                                   textAlign: TextAlign.center,
@@ -558,23 +518,99 @@ class _MenuScreenState extends State<MenuScreen> {
                                       keyboardType: KeyboardType.text,
                                     );
                                   } : null,
+                                  style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
                                   decoration: InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                       hintText: 'Search Items',
                                       filled: true,
-                                      fillColor: Colors.white,
+                                      fillColor: AppColors.surfaceLight,
                                       suffixIcon: AppSettings.visualKeyboard
                                           ? Icon(Icons.keyboard, size: 18, color: AppColors.primary)
-                                          : Icon(Icons.search, size: 18, color: Colors.grey),
-                                      hintStyle: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
-                                      border: OutlineInputBorder()),
+                                          : Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
+                                      hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary, fontSize: 12),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider))),
                                 )),
+                          ),
+                          SizedBox(width: 8),
+                          // Inline refresh button — replaces the FAB
+                          SizedBox(
+                            width: height * 0.04,
+                            height: height * 0.04,
+                            child: Material(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: _isLoadingData ? null : () => _loadData(force: true),
+                                child: Center(
+                                  child: _isLoadingData
+                                      ? SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                          ),
+                                        )
+                                      : Icon(Icons.refresh, color: AppColors.primary, size: 18),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
+
+                    // Horizontal category quick-nav strip — replaces the category FAB
+                    Observer(
+                      builder: (_) {
+                        final cats = categoryStore.categories;
+                        if (cats.isEmpty) return const SizedBox.shrink();
+                        return SizedBox(
+                          height: 34,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            itemCount: cats.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (context, i) {
+                              final cat = cats[i];
+                              return GestureDetector(
+                                onTap: () {
+                                  final key = _categoryKeys[cat.id];
+                                  if (key?.currentContext != null) {
+                                    Scrollable.ensureVisible(
+                                      key!.currentContext!,
+                                      duration: const Duration(milliseconds: 400),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: AppColors.divider),
+                                  ),
+                                  child: Text(
+                                    cat.name,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 4),
 
                     // Collapsible Category Sections
                     Expanded(
@@ -760,20 +796,10 @@ class _MenuScreenState extends State<MenuScreen> {
                   // Search Bar
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: TextField(
+                    child: AppTextField(
                       controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search menu items...',
-                        prefixIcon: Icon(Icons.search, size: 20, color: AppColors.textSecondary),
-                        filled: true,
-                        fillColor: AppColors.surfaceMedium,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        hintStyle: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary),
-                      ),
+                      hint: 'Search menu items…',
+                      icon: Icons.search_rounded,
                     ),
                   ),
 
@@ -1222,7 +1248,7 @@ class _ItemListTileState extends State<_ItemListTile> {
                             Text(_getPriceDisplay(), style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
                           if (widget.item.trackInventory) ...[
                             if (showPrice) const SizedBox(width: 10),
-                            _buildStockBadge(stockStatus),
+                            Flexible(child: _buildStockBadge(stockStatus)),
                           ],
                         ],
                       ),
@@ -1270,6 +1296,6 @@ class _ItemListTileState extends State<_ItemListTile> {
       case StockStatus.outOfStock: bgColor = AppColors.danger.withOpacity(0.12); textColor = AppColors.danger; break;
       case StockStatus.notTracked: return const SizedBox.shrink();
     }
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)), child: Text(text, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)));
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)), child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)));
   }
 }

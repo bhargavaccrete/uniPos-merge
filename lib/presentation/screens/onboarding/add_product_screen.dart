@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/util/color.dart';
@@ -710,64 +711,65 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   Widget _buildImagePicker() {
     return Observer(
-      builder: (_) => GestureDetector(
-        onTap: _pickImage,
-        child: Container(
-          height: 120,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: _formStore.imageBytes != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.memory(
-                    _formStore.imageBytes!,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                  ),
-                )
-              : _formStore.imagePath != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        File(_formStore.imagePath!),
-                        fit: BoxFit.cover,
-                        width: double.infinity,
+      builder: (_) {
+        final hasBytes = _formStore.imageBytes != null;
+        final hasPath = _formStore.imagePath != null;
+        return InkWell(
+          onTap: _pickImage,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: hasBytes
+                ? Image.memory(_formStore.imageBytes!, fit: BoxFit.cover, width: double.infinity)
+                : hasPath
+                    ? Image.file(File(_formStore.imagePath!), fit: BoxFit.cover, width: double.infinity)
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.add_photo_alternate_rounded,
+                                size: 28, color: AppColors.primary),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to add image',
+                            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+                          ),
+                        ],
                       ),
-                    )
-                  : Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey[400]),
-              const SizedBox(height: 8),
-              Text(
-                'Tap to add image',
-                style: TextStyle(color: Colors.grey[500]),
-              ),
-            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildVegToggle() {
     return Observer(
       builder: (_) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(10),
+          color: AppColors.surfaceLight,
+          border: Border.all(color: AppColors.divider),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            const Icon(Icons.eco, color: AppColors.success),
-            const SizedBox(width: 12),
-            const Text('Type: '),
-            const SizedBox(width: 8),
+            const Icon(Icons.eco_rounded, color: AppColors.success, size: 20),
+            const SizedBox(width: 10),
+            Text('Type: ', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(width: 4),
             ChoiceChip(
               label: const Text('Veg'),
               selected: _formStore.isVeg == 'veg',
@@ -806,16 +808,16 @@ class _AddProductScreenState extends State<AddProductScreen>
 
           return DropdownButtonFormField<String>(
             value: selectedValue,
-            decoration: InputDecoration(
-              labelText: 'Category*',
-              prefixIcon: const Icon(Icons.category, color: AppColors.primary),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            ),
+            decoration: _fieldDec('Category*', Icons.category_rounded),
+            style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
             items: productStore.categories.map((category) {
-              return DropdownMenuItem(value: category, child: Text(category));
+              return DropdownMenuItem(
+                value: category,
+                child: Text(category, style: GoogleFonts.poppins(fontSize: 14)),
+              );
             }).toList(),
             onChanged: (value) => _formStore.setSelectedCategoryId(value),
-            hint: const Text('Select category'),
+            hint: Text('Select category', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
           );
         },
       );
@@ -850,18 +852,15 @@ class _AddProductScreenState extends State<AddProductScreen>
               }
             },
             child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Category*',
-                prefixIcon: const Icon(Icons.category, color: AppColors.primary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                suffixIcon: const Icon(Icons.arrow_drop_down),
-              ),
+              decoration: _fieldDec('Category*', Icons.category_rounded,
+                  suffixIcon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary)),
               child: Text(
                 selectedValue != null && categories.isNotEmpty
                     ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
                     : 'Select or Add Category',
-                style: TextStyle(
-                  color: selectedValue != null ? Colors.black : Colors.grey[600],
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: selectedValue != null ? AppColors.textPrimary : AppColors.textSecondary,
                 ),
               ),
             ),
@@ -887,17 +886,12 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     return DropdownButtonFormField<String>(
       value: _taxRateController.text.isEmpty ? null : _taxRateController.text,
-      decoration: InputDecoration(
-        labelText: 'GST Rate (%)',
-        prefixIcon: const Icon(Icons.percent, color: AppColors.primary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        filled: true,
-        fillColor: Colors.white,
-      ),
+      decoration: _fieldDec('GST Rate (%)', Icons.percent),
+      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
       items: gstRates.map((rate) {
         return DropdownMenuItem(
           value: rate,
-          child: Text('$rate%'),
+          child: Text('$rate%', style: GoogleFonts.poppins(fontSize: 14)),
         );
       }).toList(),
       onChanged: (value) {
@@ -905,7 +899,7 @@ class _AddProductScreenState extends State<AddProductScreen>
           _taxRateController.text = value ?? '';
         });
       },
-      hint: const Text('Select GST rate'),
+      hint: Text('Select GST rate', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
     );
   }
 
@@ -930,17 +924,12 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     return DropdownButtonFormField<String>(
       value: currentValue,
-      decoration: InputDecoration(
-        labelText: 'Tax Rate',
-        prefixIcon: const Icon(Icons.receipt_outlined, color: AppColors.primary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        filled: true,
-        fillColor: Colors.white,
-      ),
+      decoration: _fieldDec('Tax Rate', Icons.receipt_outlined),
+      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
       items: taxRates.map<DropdownMenuItem<String>>((tax) {
         return DropdownMenuItem<String>(
           value: tax['rate']!,
-          child: Text('${tax['name']} (${tax['rate']}%)'),
+          child: Text('${tax['name']} (${tax['rate']}%)', style: GoogleFonts.poppins(fontSize: 14)),
         );
       }).toList(),
       onChanged: (value) {
@@ -948,7 +937,7 @@ class _AddProductScreenState extends State<AddProductScreen>
           _taxRateController.text = value ?? '';
         });
       },
-      hint: const Text('Select tax rate'),
+      hint: Text('Select tax rate', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
     );
   }
 
@@ -2372,6 +2361,30 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   // ==================== HELPER WIDGETS ====================
 
+  InputDecoration _fieldDec(String label, IconData icon, {Color? iconColor, Widget? suffixIcon}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.poppins(color: AppColors.textSecondary, fontSize: 13),
+      prefixIcon: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: AppColors.surfaceLight,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -2385,14 +2398,8 @@ class _AddProductScreenState extends State<AddProductScreen>
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: iconColor ?? AppColors.primary),
-        suffixIcon: suffixIcon,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
+      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+      decoration: _fieldDec(label, icon, iconColor: iconColor, suffixIcon: suffixIcon),
     );
   }
 

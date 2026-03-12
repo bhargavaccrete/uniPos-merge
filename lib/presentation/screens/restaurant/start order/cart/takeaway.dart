@@ -18,7 +18,7 @@ import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
-import '../../../../widget/componets/restaurant/componets/Textform.dart';
+import '../../../../widget/componets/common/app_text_field.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import 'customerdetails.dart';
@@ -1499,401 +1499,373 @@ class _TakeawayState extends State<Takeaway> {
                   builder: (BuildContext context) {
                     return StatefulBuilder(
                       builder: (context, setDialogState) {
-                        return AlertDialog(
-                          title: Center(
-                            child: Text(
-                              'Place Order',
-                              textScaler: TextScaler.linear(1),
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+
+                        // Helper: suggestion dropdown list
+                        Widget _suggestionList(
+                          List<RestaurantCustomer> suggestions,
+                          void Function(RestaurantCustomer) onSelect,
+                        ) =>
+                            Container(
+                              constraints: const BoxConstraints(maxHeight: 160),
+                              margin: const EdgeInsets.only(top: 4, bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.divider),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.06),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                          content: Container(
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                itemCount: suggestions.length,
+                                separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
+                                itemBuilder: (context, index) {
+                                  final c = suggestions[index];
+                                  return InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () => onSelect(c),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      child: Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 16,
+                                            backgroundColor: AppColors.primary.withOpacity(0.12),
+                                            child: Text(
+                                              c.name?.isNotEmpty == true ? c.name![0].toUpperCase() : '?',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  c.name ?? 'Unknown',
+                                                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
+                                                ),
+                                                Text(
+                                                  '${c.phone ?? ''} • ${c.totalVisites} visits',
+                                                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(Icons.north_west, size: 14, color: AppColors.textSecondary),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
 
-                            width: width * 0.9,
-                            height: height * 0.7,
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: [
-                              Text('Customer Details',
-                                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500), textAlign: TextAlign.start),
-                              const SizedBox(height: 10),
-
-                              // Show selected customer info
-                              if (selectedCustomer != null)
+                        return Dialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                          child: Container(
+                            width: 480,
+                            constraints: BoxConstraints(maxHeight: height * 0.85),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // ── Header ──────────────────────────────────
                                 Container(
-                                  width: width,
-                                  padding: EdgeInsets.all(8),
-                                  margin: EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.shade50,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.green.shade200),
+                                    color: AppColors.primary.withOpacity(0.06),
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                                    border: Border(bottom: BorderSide(color: AppColors.divider)),
                                   ),
                                   child: Row(
                                     children: [
-                                      CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: Colors.green.shade200,
-                                        child: Text(
-                                          selectedCustomer!.name?.isNotEmpty == true
-                                              ? selectedCustomer!.name![0].toUpperCase()
-                                              : '?',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green.shade700,
-                                          ),
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(10),
                                         ),
+                                        child: Icon(Icons.receipt_long_outlined, color: AppColors.primary, size: 20),
                                       ),
-                                      SizedBox(width: 8),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              selectedCustomer!.name ?? 'Unknown',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                              ),
+                                              'Place Order',
+                                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
                                             ),
                                             Text(
-                                              '${selectedCustomer!.totalVisites} visits • ${selectedCustomer!.loyaltyPoints} pts',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 10,
-                                                color: Colors.grey[700],
-                                              ),
+                                              'Add customer details (optional)',
+                                              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                                             ),
                                           ],
                                         ),
                                       ),
                                       IconButton(
-                                        icon: Icon(Icons.clear, color: Colors.red, size: 18),
-                                        padding: EdgeInsets.zero,
-                                        constraints: BoxConstraints(),
-                                        onPressed: () {
-                                          setDialogState(() {
-                                            selectedCustomer = null;
-                                            nameController.clear();
-                                            emailController.clear();
-                                            mobileController.clear();
-                                          });
-                                        },
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        icon: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                                        tooltip: 'Close',
                                       ),
                                     ],
                                   ),
                                 ),
 
-                              // Name Field with inline suggestions
-                              CommonTextForm(
-                                hintText: 'Name (type to search customers)',
-                                controller: nameController,
-                                BorderColor: AppColors.primary,
-                                HintColor: AppColors.primary,
-                                obsecureText: false,
-                                onChanged: (value) async {
-                                  if (value.isEmpty) {
-                                    setDialogState(() {
-                                      showNameSuggestions = false;
-                                      nameSuggestions = [];
-                                    });
-                                  } else {
-                                    final results = await restaurantCustomerStore.searchCustomers(value);
-                                    setDialogState(() {
-                                      nameSuggestions = results;
-                                      showNameSuggestions = nameSuggestions.isNotEmpty;
-                                    });
-                                  }
-                                },
-                              ),
+                                // ── Scrollable body ──────────────────────────
+                                Flexible(
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
 
-                              // Name suggestions list
-                              if (showNameSuggestions && nameSuggestions.isNotEmpty)
-                                Container(
-                                  constraints: BoxConstraints(maxHeight: 150),
-                                  margin: EdgeInsets.only(top: 5, bottom: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 4,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: nameSuggestions.length,
-                                    itemBuilder: (context, index) {
-                                      final customer = nameSuggestions[index];
-                                      return InkWell(
-                                        onTap: () {
-                                          setDialogState(() {
-                                            selectedCustomer = customer;
-                                            nameController.text = customer.name ?? '';
-                                            emailController.text = '';
-                                            mobileController.text = customer.phone ?? '';
-                                            showNameSuggestions = false;
-                                            nameSuggestions = [];
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: Colors.grey.shade200,
-                                                width: 1,
-                                              ),
+                                        // Selected customer banner
+                                        if (selectedCustomer != null) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.shade50,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.green.shade200),
                                             ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              CircleAvatar(
-                                                radius: 16,
-                                                backgroundColor: AppColors.primary.withOpacity(0.2),
-                                                child: Text(
-                                                  customer.name?.isNotEmpty == true
-                                                      ? customer.name![0].toUpperCase()
-                                                      : '?',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppColors.primary,
+                                            child: Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 18,
+                                                  backgroundColor: Colors.green.shade200,
+                                                  child: Text(
+                                                    selectedCustomer!.name?.isNotEmpty == true
+                                                        ? selectedCustomer!.name![0].toUpperCase()
+                                                        : '?',
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.green.shade700,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                              SizedBox(width: 8),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      customer.name ?? 'Unknown',
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w600,
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        selectedCustomer!.name ?? 'Unknown',
+                                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
                                                       ),
-                                                    ),
-                                                    Text(
-                                                      '${customer.phone ?? ''} • ${customer.totalVisites} visits',
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize: 10,
-                                                        color: Colors.grey[600],
+                                                      Text(
+                                                        '${selectedCustomer!.totalVisites} visits • ${selectedCustomer!.loyaltyPoints} pts',
+                                                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.green.shade700),
                                                       ),
-                                                    ),
-                                                  ],
+                                                    ],
+                                                  ),
                                                 ),
+                                                GestureDetector(
+                                                  onTap: () => setDialogState(() {
+                                                    selectedCustomer = null;
+                                                    nameController.clear();
+                                                    emailController.clear();
+                                                    mobileController.clear();
+                                                  }),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.all(4),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.red.shade50,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Icon(Icons.close, size: 16, color: Colors.red.shade400),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                        ],
+
+                                        // ── Name field ──────────────────────
+                                        AppTextField(
+                                          controller: nameController,
+                                          label: 'Customer Name',
+                                          hint: 'e.g. John Doe',
+                                          icon: Icons.person_outline,
+                                          onChanged: (value) async {
+                                            if (value.isEmpty) {
+                                              setDialogState(() {
+                                                showNameSuggestions = false;
+                                                nameSuggestions = [];
+                                              });
+                                            } else {
+                                              final results = await restaurantCustomerStore.searchCustomers(value);
+                                              setDialogState(() {
+                                                nameSuggestions = results;
+                                                showNameSuggestions = nameSuggestions.isNotEmpty;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                        if (showNameSuggestions && nameSuggestions.isNotEmpty)
+                                          _suggestionList(nameSuggestions, (c) {
+                                            setDialogState(() {
+                                              selectedCustomer = c;
+                                              nameController.text = c.name ?? '';
+                                              emailController.text = '';
+                                              mobileController.text = c.phone ?? '';
+                                              showNameSuggestions = false;
+                                              nameSuggestions = [];
+                                            });
+                                          })
+                                        else
+                                          const SizedBox(height: 14),
+
+                                        // ── Mobile field ─────────────────────
+                                        AppTextField(
+                                          controller: mobileController,
+                                          label: 'Mobile Number',
+                                          hint: 'e.g. 9876543210',
+                                          icon: Icons.phone_outlined,
+                                          keyboardType: TextInputType.number,
+                                          maxLength: 10,
+                                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                          onChanged: (value) async {
+                                            if (value.isEmpty) {
+                                              setDialogState(() {
+                                                showPhoneSuggestions = false;
+                                                phoneSuggestions = [];
+                                              });
+                                            } else {
+                                              final results = await restaurantCustomerStore.searchCustomers(value);
+                                              setDialogState(() {
+                                                phoneSuggestions = results;
+                                                showPhoneSuggestions = phoneSuggestions.isNotEmpty;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                        if (showPhoneSuggestions && phoneSuggestions.isNotEmpty)
+                                          _suggestionList(phoneSuggestions, (c) {
+                                            setDialogState(() {
+                                              selectedCustomer = c;
+                                              nameController.text = c.name ?? '';
+                                              emailController.text = '';
+                                              mobileController.text = c.phone ?? '';
+                                              showPhoneSuggestions = false;
+                                              phoneSuggestions = [];
+                                            });
+                                          })
+                                        else
+                                          const SizedBox(height: 14),
+
+                                        // ── Email + Remark row ───────────────
+                                        Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(
+                                              child: AppTextField(
+                                                controller: emailController,
+                                                label: 'Email',
+                                                hint: 'Optional',
+                                                icon: Icons.mail_outline,
+                                                keyboardType: TextInputType.emailAddress,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: AppTextField(
+                                                controller: remarkController,
+                                                label: 'Remark',
+                                                hint: 'e.g. No onions',
+                                                icon: Icons.note_alt_outlined,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+
+                                        const SizedBox(height: 20),
+
+                                        // ── Total banner ─────────────────────
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withOpacity(0.06),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.payments_outlined, size: 18, color: AppColors.primary),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'To Be Paid',
+                                                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                                  ),
+                                                ],
+                                              ),
+                                              Text(
+                                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
+                                                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary),
                                               ),
                                             ],
                                           ),
                                         ),
-                                      );
-                                    },
+                                      ],
+                                    ),
                                   ),
                                 ),
 
-                              if (!showNameSuggestions)
-                                const SizedBox(height: 10),
-
-                              // Phone Field with inline suggestions
-                              CommonTextForm(
-                                hintText: 'Mobile No (type to search customers)',
-                                controller: mobileController,
-                                BorderColor: AppColors.primary,
-                                HintColor: AppColors.primary,
-                                obsecureText: false,
-                                keyboardType: TextInputType.number,
-                                maxLength: 10,
-                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                onChanged: (value) async {
-                                  if (value.isEmpty) {
-                                    setDialogState(() {
-                                      showPhoneSuggestions = false;
-                                      phoneSuggestions = [];
-                                    });
-                                  } else {
-                                    final results = await restaurantCustomerStore.searchCustomers(value);
-                                    setDialogState(() {
-                                      phoneSuggestions = results;
-                                      showPhoneSuggestions = phoneSuggestions.isNotEmpty;
-                                    });
-                                  }
-                                },
-                              ),
-
-                              // Phone suggestions list
-                              if (showPhoneSuggestions && phoneSuggestions.isNotEmpty)
+                                // ── Action buttons ───────────────────────────
                                 Container(
-                                  constraints: BoxConstraints(maxHeight: 150),
-                                  margin: EdgeInsets.only(top: 5, bottom: 10),
+                                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        blurRadius: 4,
-                                        offset: Offset(0, 2),
+                                    border: Border(top: BorderSide(color: AppColors.divider)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      OutlinedButton.icon(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        icon: const Icon(Icons.close, size: 16),
+                                        label: Text('Cancel', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(0, 48),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          side: BorderSide(color: AppColors.divider),
+                                          foregroundColor: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => _placeOrder(calculations),
+                                          icon: const Icon(Icons.check_circle_outline, size: 18),
+                                          label: Text('Place Order', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15)),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(0, 48),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            elevation: 0,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: phoneSuggestions.length,
-                                    itemBuilder: (context, index) {
-                                      final customer = phoneSuggestions[index];
-                                      return InkWell(
-                                        onTap: () {
-                                          setDialogState(() {
-                                            selectedCustomer = customer;
-                                            nameController.text = customer.name ?? '';
-                                            emailController.text = '';
-                                            mobileController.text = customer.phone ?? '';
-                                            showPhoneSuggestions = false;
-                                            phoneSuggestions = [];
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: Colors.grey.shade200,
-                                                width: 1,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              CircleAvatar(
-                                                radius: 16,
-                                                backgroundColor: AppColors.primary.withOpacity(0.2),
-                                                child: Text(
-                                                  customer.name?.isNotEmpty == true
-                                                      ? customer.name![0].toUpperCase()
-                                                      : '?',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppColors.primary,
-                                                  ),
-                                                ),
-                                              ),
-                                              SizedBox(width: 8),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      customer.name ?? 'Unknown',
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      '${customer.phone ?? ''} • ${customer.totalVisites} visits',
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize: 10,
-                                                        color: Colors.grey[600],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
                                 ),
-
-                              if (!showPhoneSuggestions)
-                                const SizedBox(height: 25),
-                              CommonTextForm(
-                                  hintText: 'Email ID (Optional)',
-                                  controller: emailController,
-                                  BorderColor: AppColors.primary,
-                                  HintColor: AppColors.primary,
-                                  obsecureText: false),
-                              const SizedBox(height: 10),
-                              CommonTextForm(
-                                  hintText: 'Remark',
-                                  controller: remarkController,
-                                  BorderColor: AppColors.primary,
-                                  HintColor: AppColors.primary,
-                                  obsecureText: false),
-                              const SizedBox(height: 25),
-                              const Divider(),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('To Be Paid', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-                                  Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
-                                      style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              const Divider(),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-
-                                  // butttons for placing new order
-                                  Expanded(
-                                    child: CommonButton(
-                                      // width: width * 0.3,
-                                      height: height * 0.06,
-                                      bordercircular: 2,
-                                      onTap: ()=> _placeOrder(calculations),
-                                      child: Center(
-                                        child: Text('Print & Order',
-                                            style: GoogleFonts.poppins(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 16,
-                                            )),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 5,
-                                  ),
-
-                                  Expanded(
-                                    child: CommonButton(
-                                      // width: width * 0.3,
-                                      height: height * 0.06,
-                                      bordercircular: 2,
-                                      onTap: ()=> _placeOrder(calculations),
-                                      child: Center(
-                                        child: Text('Place Order',
-                                            style: GoogleFonts.poppins(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 16,
-                                            )),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // SizedBox(height: 10,)
-                                ],
-                              ),
+                              ],
                             ),
                           ),
-                          titlePadding: const EdgeInsets.all(20),
-                          alignment: Alignment.center,
-                          actions: [],
                         );
                       },
                     );

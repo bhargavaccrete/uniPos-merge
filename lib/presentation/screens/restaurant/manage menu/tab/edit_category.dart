@@ -8,6 +8,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class EditCategory extends StatefulWidget {
   final Category category;
@@ -109,38 +110,12 @@ class _EditCategoryState extends State<EditCategory> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Name Field ─────────────────────────────────────────────
-            Text('Category Name',
-                style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            TextField(
+            AppTextField(
               controller: nameController,
-              style: GoogleFonts.poppins(
-                  fontSize: 14, color: AppColors.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'Enter category name',
-                hintStyle: GoogleFonts.poppins(
-                    fontSize: 13, color: AppColors.textSecondary),
-                prefixIcon: const Icon(Icons.category_outlined,
-                    color: AppColors.primary),
-                filled: true,
-                fillColor: AppColors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-              ),
+              label: 'Category Name',
+              hint: 'Enter category name',
+              icon: Icons.category_outlined,
+              required: true,
             ),
 
             const SizedBox(height: 24),

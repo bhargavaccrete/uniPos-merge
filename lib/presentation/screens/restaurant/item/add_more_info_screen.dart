@@ -3,12 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
 import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
 import 'variant_selection_screen.dart';
 import 'choice_selection_screen.dart';
 import 'extra_selection_screen.dart';
 import 'tax_selection_screen.dart';
-import 'package:unipos/util/color.dart';
 class AddMoreInfoScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
 
@@ -48,16 +46,16 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Add More Info',
           style: GoogleFonts.poppins(
-            color: Colors.black,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -71,7 +69,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
               'Enhance your item with additional options',
               style: GoogleFonts.poppins(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ),
             SizedBox(height: 30),

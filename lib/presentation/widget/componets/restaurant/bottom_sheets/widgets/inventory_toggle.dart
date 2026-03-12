@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import '../../componets/filterButton.dart';
+import '../../../../../../util/color.dart';
 
 /// Widget for toggling inventory management settings
 class InventoryToggle extends StatelessWidget {
@@ -21,80 +20,110 @@ class InventoryToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         children: [
-          // Manage Inventory Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Manage Inventory",
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-              Row(
-                children: [
-                  Filterbutton(
-                    title: 'YES',
-                    selectedFilter: trackInventory ? 'YES' : 'NO',
-                    onpressed: () => onTrackInventoryChanged(true),
-                  ),
-                  const SizedBox(width: 8),
-                  Filterbutton(
-                    title: 'NO',
-                    selectedFilter: trackInventory ? 'YES' : 'NO',
-                    onpressed: () => onTrackInventoryChanged(false),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // Out of Stock Option (shown only when inventory is YES)
-          if (trackInventory) ...[
-            const SizedBox(height: 12),
-            Divider(height: 1, color: Colors.grey.shade300),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // ── Track Inventory row ────────────────────────────────────
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
               children: [
+                Icon(Icons.inventory_2_outlined,
+                    size: 20, color: AppColors.primary),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    "Allow order if out of stock",
+                    'Manage Inventory',
                     style: GoogleFonts.poppins(
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Row(
-                  children: [
-                    Filterbutton(
-                      title: 'YES',
-                      selectedFilter: allowOrderWhenOutOfStock ? 'YES' : 'NO',
-                      onpressed: () => onAllowOutOfStockChanged(true),
-                    ),
-                    const SizedBox(width: 6),
-                    Filterbutton(
-                      title: 'NO',
-                      selectedFilter: allowOrderWhenOutOfStock ? 'YES' : 'NO',
-                      onpressed: () => onAllowOutOfStockChanged(false),
-                    ),
-                  ],
+                _yesNoToggle(
+                  value: trackInventory,
+                  onChanged: onTrackInventoryChanged,
                 ),
               ],
             ),
+          ),
+
+          // ── Out-of-stock row (visible only when inventory ON) ──────
+          if (trackInventory) ...[
+            Divider(height: 1, color: AppColors.divider),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.remove_shopping_cart_outlined,
+                      size: 20, color: Colors.orange.shade600),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Allow order if out of stock',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  _yesNoToggle(
+                    value: allowOrderWhenOutOfStock,
+                    onChanged: onAllowOutOfStockChanged,
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _yesNoToggle({
+    required bool value,
+    required Function(bool) onChanged,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _chip('YES', value, () => onChanged(true)),
+        const SizedBox(width: 6),
+        _chip('NO', !value, () => onChanged(false)),
+      ],
+    );
+  }
+
+  Widget _chip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }

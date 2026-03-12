@@ -5,6 +5,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
@@ -94,6 +95,17 @@ class _ChoiceTabState extends State<ChoiceTab> {
   Widget _buildBottomSheet({bool isDialog = false}) {
     return StatefulBuilder(
       builder: (BuildContext context, StateSetter setModalState) {
+        final isEditing = editingChoice != null;
+
+        void _addOption() {
+          final val = optionController.text.trim();
+          if (val.isEmpty) return;
+          setModalState(() {
+            tempOptions.add(ChoiceOption(id: const Uuid().v4(), name: val));
+            optionController.clear();
+          });
+        }
+
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -104,416 +116,341 @@ class _ChoiceTabState extends State<ChoiceTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isDialog) ...[
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
+              // ── Drag handle (sheet only) ───────────────────────────────
+              if (!isDialog)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10, bottom: 4),
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                 ),
-              ],
-              // Header
+
+              // ── Header ─────────────────────────────────────────────────
               Padding(
-                padding: EdgeInsets.fromLTRB(20, isDialog ? 16 : 12, 12, 8),
+                padding: EdgeInsets.fromLTRB(20, isDialog ? 20 : 12, 12, 12),
                 child: Row(
                   children: [
                     Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.checklist, color: AppColors.primary),
-                    ),
-                    SizedBox(width: 12),
-                    Text(
-                      editingChoice == null ? 'Add Choice' : 'Edit Choice',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                      child: Icon(
+                        isEditing ? Icons.edit_rounded : Icons.checklist_rounded,
+                        color: AppColors.primary,
+                        size: 20,
                       ),
                     ),
-                    if (isDialog) ...[
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.grey.shade100,
-                          foregroundColor: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-
-                // Choice Name Field
-                TextField(
-                  controller: choiceController,
-                  style: GoogleFonts.poppins(fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: "Choice Name",
-                    labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                    prefixIcon: Icon(Icons.edit, color: AppColors.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20),
-
-                // Selection Type Section
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.radio_button_checked, size: 20, color: AppColors.primary),
-                          SizedBox(width: 8),
                           Text(
-                            'Selection Type',
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setModalState(() {
-                                  allowMultipleSelection = false;
-                                });
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: !allowMultipleSelection ? AppColors.primary : Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: !allowMultipleSelection ? AppColors.primary : Colors.grey.shade300,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.radio_button_checked,
-                                      size: 18,
-                                      color: !allowMultipleSelection ? Colors.white : Colors.grey,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Single',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: !allowMultipleSelection ? Colors.white : Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setModalState(() {
-                                  allowMultipleSelection = true;
-                                });
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: allowMultipleSelection ? AppColors.primary : Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: allowMultipleSelection ? AppColors.primary : Colors.grey.shade300,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.check_box,
-                                      size: 18,
-                                      color: allowMultipleSelection ? Colors.white : Colors.grey,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Multiple',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: allowMultipleSelection ? Colors.white : Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        allowMultipleSelection
-                            ? '✓ Customers can select multiple options'
-                            : '✓ Customers can select only one option',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 20),
-
-                // Options Section
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.list_alt, size: 20, color: AppColors.primary),
-                          SizedBox(width: 8),
-                          Text(
-                            'Options',
+                            isEditing ? 'Edit Choice' : 'Add Choice',
                             style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
                             ),
                           ),
-                          Spacer(),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${tempOptions.length}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
+                          Text(
+                            isEditing
+                                ? 'Update this choice group'
+                                : 'Create a new customer choice group',
+                            style: GoogleFonts.poppins(
+                                fontSize: 12, color: Colors.grey.shade500),
                           ),
                         ],
                       ),
-                      SizedBox(height: 12),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close, color: Colors.grey.shade500),
+                      splashRadius: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: Colors.grey.shade100),
 
-                      // Add Option Field
+              // ── Scrollable form body ───────────────────────────────────
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+
+                      // ── Choice Name ──────────────────────────────────
+                      AppTextField(
+                        controller: choiceController,
+                        label: 'Choice Name',
+                        hint: 'e.g. Spice Level, Add-ons',
+                        icon: Icons.checklist_rounded,
+                        required: true,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Selection Type ───────────────────────────────
+                      Text('Selection Type',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600)),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _selectionChip(
+                                label: 'Single',
+                                subtitle: 'Pick one',
+                                icon: Icons.radio_button_checked_rounded,
+                                isSelected: !allowMultipleSelection,
+                                onTap: () => setModalState(
+                                    () => allowMultipleSelection = false),
+                                isLeft: true,
+                              ),
+                            ),
+                            Container(
+                                width: 1,
+                                height: 56,
+                                color: AppColors.divider),
+                            Expanded(
+                              child: _selectionChip(
+                                label: 'Multiple',
+                                subtitle: 'Pick many',
+                                icon: Icons.check_box_rounded,
+                                isSelected: allowMultipleSelection,
+                                onTap: () => setModalState(
+                                    () => allowMultipleSelection = true),
+                                isLeft: false,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Options ──────────────────────────────────────
+                      Row(
+                        children: [
+                          Text('Options',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade600)),
+                          const Spacer(),
+                          if (tempOptions.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${tempOptions.length} added',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Add-option input row
                       Row(
                         children: [
                           Expanded(
-                            child: TextField(
+                            child: AppTextField(
                               controller: optionController,
-                              style: GoogleFonts.poppins(fontSize: 14),
-                              decoration: InputDecoration(
-                                hintText: "Add option...",
-                                hintStyle: GoogleFonts.poppins(
-                                  color: Colors.grey.shade500,
-                                  fontSize: 14,
-                                ),
-                                prefixIcon: Icon(Icons.add_circle_outline,
-                                    color: Colors.grey.shade600, size: 20),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 12,
-                                ),
-                              ),
-                              onSubmitted: (value) {
-                                if (value.trim().isNotEmpty) {
-                                  setModalState(() {
-                                    tempOptions.add(ChoiceOption(
-                                      id: Uuid().v4(),
-                                      name: value.trim(),
-                                    ));
-                                    optionController.clear();
-                                  });
-                                }
-                              },
+                              hint: 'e.g. Mild, Medium, Hot…',
+                              icon: Icons.add_circle_outline_rounded,
+                              onFieldSubmitted: (_) => _addOption(),
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: IconButton(
-                              icon: Icon(Icons.add, color: Colors.white),
-                              onPressed: () {
-                                if (optionController.text.trim().isNotEmpty) {
-                                  setModalState(() {
-                                    tempOptions.add(ChoiceOption(
-                                      id: Uuid().v4(),
-                                      name: optionController.text.trim(),
-                                    ));
-                                    optionController.clear();
-                                  });
-                                }
-                              },
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: _addOption,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.add_rounded,
+                                  color: Colors.white, size: 22),
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 10),
 
-                      // Options List
-                      if (tempOptions.isNotEmpty)
+                      // Options list
+                      if (tempOptions.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: AppColors.divider,
+                                style: BorderStyle.solid),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.playlist_add_rounded,
+                                  size: 32, color: Colors.grey.shade300),
+                              const SizedBox(height: 6),
+                              Text('No options added yet',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade400)),
+                            ],
+                          ),
+                        )
+                      else
                         ...tempOptions.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final option = entry.value;
+                          final idx = entry.key;
+                          final opt = entry.value;
                           return Container(
-                            margin: EdgeInsets.only(bottom: 8),
-                            padding: EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.surfaceLight,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.grey.shade200),
+                              border:
+                                  Border.all(color: AppColors.divider),
                             ),
                             child: Row(
                               children: [
                                 Container(
-                                  width: 6,
-                                  height: 6,
+                                  width: 22,
+                                  height: 22,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    option.name,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: Colors.black87,
+                                  child: Center(
+                                    child: Text(
+                                      '${idx + 1}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
                                     ),
                                   ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(opt.name,
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          color: Colors.black87)),
                                 ),
                                 InkWell(
-                                  onTap: () {
-                                    setModalState(() {
-                                      tempOptions.removeAt(index);
-                                    });
-                                  },
+                                  onTap: () => setModalState(
+                                      () => tempOptions.removeAt(idx)),
+                                  borderRadius: BorderRadius.circular(6),
                                   child: Container(
-                                    padding: EdgeInsets.all(4),
+                                    padding: const EdgeInsets.all(5),
                                     decoration: BoxDecoration(
                                       color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius:
+                                          BorderRadius.circular(6),
                                     ),
-                                    child: Icon(
-                                      Icons.close,
-                                      size: 16,
-                                      color: Colors.red,
-                                    ),
+                                    child: const Icon(
+                                        Icons.close_rounded,
+                                        size: 15,
+                                        color: Colors.red),
                                   ),
                                 ),
                               ],
                             ),
                           );
-                        }).toList(),
+                        }),
 
-                      if (tempOptions.isEmpty)
-                        Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Text(
-                              'No options added yet',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey.shade500,
+                      const SizedBox(height: 20),
+
+                      // ── Action buttons ───────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 13),
+                                side: BorderSide(
+                                    color: Colors.grey.shade300),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: Text('Cancel',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade700,
+                                      fontWeight: FontWeight.w500)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: () =>
+                                  _addOrEditChoice(tempOptions),
+                              icon: Icon(
+                                isEditing
+                                    ? Icons.check_rounded
+                                    : Icons.add_circle_outline_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              label: Text(
+                                isEditing ? 'Update Choice' : 'Add Choice',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 13),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 20),
-
-                // Save Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () => _addOrEditChoice(tempOptions),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        ],
                       ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          editingChoice == null
-                              ? Icons.add_circle_outline
-                              : Icons.check_circle_outline,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          editingChoice == null ? 'Add Choice' : 'Update Choice',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
                     ],
                   ),
                 ),
@@ -522,6 +459,60 @@ class _ChoiceTabState extends State<ChoiceTab> {
           ),
         );
       },
+    );
+  }
+
+  Widget _selectionChip({
+    required String label,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isLeft,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.horizontal(
+        left: isLeft ? const Radius.circular(12) : Radius.zero,
+        right: isLeft ? Radius.zero : const Radius.circular(12),
+      ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.horizontal(
+            left: isLeft ? const Radius.circular(11) : Radius.zero,
+            right: isLeft ? Radius.zero : const Radius.circular(11),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 18,
+                color: isSelected ? AppColors.primary : Colors.grey.shade400),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.grey.shade600)),
+                Text(subtitle,
+                    style: GoogleFonts.poppins(
+                        fontSize: 10, color: Colors.grey.shade400)),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -630,46 +621,20 @@ class _ChoiceTabState extends State<ChoiceTab> {
       body: Column(
         children: [
           // Modern Search Bar
-          Container(
+          Padding(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: TextField(
-                controller: searchController,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  hintText: 'Search choices...',
-                  hintStyle: GoogleFonts.poppins(
-                    color: Colors.grey.shade500,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
-                  suffixIcon: query.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.grey, size: 20),
-                          onPressed: () {
-                            searchController.clear();
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                ),
-              ),
+            child: AppTextField(
+              controller: searchController,
+              hint: 'Search choices…',
+              icon: Icons.search_rounded,
+              suffixIcon: query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      onPressed: () {
+                        searchController.clear();
+                      },
+                    )
+                  : null,
             ),
           ),
 

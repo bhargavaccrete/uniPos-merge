@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class AddEditCustomerScreen extends StatefulWidget {
   final RestaurantCustomer? customer;
@@ -250,46 +252,12 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             SizedBox(height: isTablet ? 14 : 12),
 
             // Name Field
-            TextFormField(
+            AppTextField(
               controller: _nameController,
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 14,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Customer Name *',
-                labelStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                  color: Colors.grey.shade600,
-                ),
-                hintText: 'Enter customer name',
-                hintStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                ),
-                prefixIcon: Icon(
-                  Icons.person_outline_rounded,
-                  color: AppColors.primary,
-                  size: isTablet ? 22 : 20,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: isTablet ? 16 : 14,
-                ),
-              ),
-              textCapitalization: TextCapitalization.words,
+              label: 'Customer Name',
+              hint: 'Enter customer name',
+              icon: Icons.person_outline_rounded,
+              required: true,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter customer name';
@@ -301,52 +269,21 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             SizedBox(height: isTablet ? 18 : 16),
 
             // Phone Field
-            TextFormField(
+            AppTextField(
               controller: _phoneController,
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 14,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Phone Number *',
-                labelStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                  color: Colors.grey.shade600,
-                ),
-                hintText: 'Enter phone number',
-                hintStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                ),
-                prefixIcon: Icon(
-                  Icons.phone_rounded,
-                  color: AppColors.primary,
-                  size: isTablet ? 22 : 20,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: isTablet ? 16 : 14,
-                ),
-              ),
+              label: 'Phone Number',
+              hint: 'Enter 10-digit phone number',
+              icon: Icons.phone_rounded,
+              required: true,
               keyboardType: TextInputType.phone,
+              maxLength: 10,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter phone number';
                 }
-                if (value.trim().length < 10) {
-                  return 'Please enter a valid phone number';
+                if (value.trim().length != 10) {
+                  return 'Phone number must be exactly 10 digits';
                 }
                 return null;
               },
@@ -366,93 +303,22 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             SizedBox(height: isTablet ? 14 : 12),
 
             // Food Preference Field
-            TextFormField(
+            AppTextField(
               controller: _foodPreferenceController,
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 14,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Food Preference',
-                labelStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                  color: Colors.grey.shade600,
-                ),
-                hintText: 'E.g., Vegetarian, Non-Veg, Vegan',
-                hintStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                ),
-                prefixIcon: Icon(
-                  Icons.restaurant_menu_rounded,
-                  color: AppColors.primary,
-                  size: isTablet ? 22 : 20,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: isTablet ? 16 : 14,
-                ),
-              ),
-              textCapitalization: TextCapitalization.sentences,
+              label: 'Food Preference',
+              hint: 'E.g., Vegetarian, Non-Veg, Vegan',
+              icon: Icons.restaurant_menu_rounded,
             ),
 
             SizedBox(height: isTablet ? 18 : 16),
 
             // Notes Field
-            TextFormField(
+            AppTextField(
               controller: _notesController,
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 14,
-              ),
-              decoration: InputDecoration(
-                labelText: 'Notes',
-                labelStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                  color: Colors.grey.shade600,
-                ),
-                hintText: 'Any special notes about this customer',
-                hintStyle: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
-                ),
-                prefixIcon: Icon(
-                  Icons.notes_rounded,
-                  color: AppColors.primary,
-                  size: isTablet ? 22 : 20,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: isTablet ? 16 : 14,
-                ),
-                alignLabelWithHint: true,
-              ),
+              label: 'Notes',
+              hint: 'Any special notes about this customer',
+              icon: Icons.notes_rounded,
               maxLines: 4,
-              textCapitalization: TextCapitalization.sentences,
             ),
 
             SizedBox(height: isTablet ? 28 : 24),

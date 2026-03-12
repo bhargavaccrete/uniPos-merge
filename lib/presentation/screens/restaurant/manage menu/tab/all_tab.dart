@@ -3,13 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
-import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
@@ -57,48 +57,22 @@ class _AllTabState extends State<AllTab> {
       body: Column(
         children: [
           // Modern Search Bar
-          Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: TextField(
-                    controller: searchController,
-                    style: GoogleFonts.poppins(fontSize: 14),
-                    decoration: InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      hintText: 'Search categories or items...',
-                      hintStyle: GoogleFonts.poppins(
-                        color: Colors.grey.shade500,
-                        fontSize: 14,
-                      ),
-                      prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
-                      suffixIcon: query.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear, color: Colors.grey, size: 20),
-                              onPressed: () {
-                                searchController.clear();
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-              ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: AppTextField(
+              controller: searchController,
+              hint: 'Search categories or items…',
+              icon: Icons.search_rounded,
+              suffixIcon: query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      onPressed: () {
+                        searchController.clear();
+                      },
+                    )
+                  : null,
+            ),
+          ),
 
               // Content Area
               Expanded(
@@ -258,15 +232,15 @@ class _AllTabState extends State<AllTab> {
                                                 size: 13,
                                                 color: fg,
                                               ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                allEnabled ? 'Disable All' : 'Enable All',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: fg,
-                                                ),
-                                              ),
+                                              // const SizedBox(width: 4),
+                                              // Text(
+                                              //   allEnabled ? 'Disable All' : 'Enable All',
+                                              //   style: GoogleFonts.poppins(
+                                              //     fontSize: 11,
+                                              //     fontWeight: FontWeight.w600,
+                                              //     color: fg,
+                                              //   ),
+                                              // ),
                                             ],
                                           ),
                                         ),

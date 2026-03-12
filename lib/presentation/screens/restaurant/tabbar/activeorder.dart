@@ -9,6 +9,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/restaurant/componets/OrderCard.dart';
 import '../start order/cart/cart.dart';
 import '../../../../services/websocket_client_service.dart';
@@ -178,22 +179,53 @@ class _ActiveorderState extends State<Activeorder> {
   // In _ActiveorderState class
 
 // This function shows the main dialog with KOT-level status updates
-  void _showStatusUpdateDialog(OrderModel order, bool istakeaway,) {
+  void _showStatusUpdateDialog(OrderModel order, bool istakeaway) {
+    // Local mutable copy of KOT statuses — updated optimistically inside the dialog
+    final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+    for (var kotNum in order.kotNumbers) {
+      kotStatuses.putIfAbsent(kotNum, () => order.status);
+    }
+
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
-            // Get current KOT statuses
-            final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+          builder: (dialogContext, setDialogState) {
+            // ── helpers ────────────────────────────────────────────────
+            Future<void> updateOne(int kotNum, String newStatus) async {
+              setDialogState(() => kotStatuses[kotNum] = newStatus);
+              final allServed = order.kotNumbers.every((k) => kotStatuses[k] == 'Served');
+              if (newStatus == 'Served' && allServed) {
+                final latestOrder = orderStore.orders.firstWhere(
+                  (o) => o.id == order.id, orElse: () => order);
+                if (latestOrder.paymentStatus == 'Paid') {
+                  Navigator.pop(dialogContext);
+                  await _moveOrderToPast(latestOrder);
+                  return;
+                }
+              }
+              await _updateKotStatus(order, kotNum, newStatus);
+            }
 
-            // Initialize missing KOT statuses
-            for (var kotNum in order.kotNumbers) {
-              if (!kotStatuses.containsKey(kotNum)) {
-                kotStatuses[kotNum] = order.status;
+            Future<void> updateAll(String newStatus) async {
+              for (final k in order.kotNumbers) {
+                setDialogState(() => kotStatuses[k] = newStatus);
+              }
+              // Run all updates in parallel
+              await Future.wait(
+                order.kotNumbers.map((k) => _updateKotStatus(order, k, newStatus)),
+              );
+              if (newStatus == 'Served') {
+                final latestOrder = orderStore.orders.firstWhere(
+                  (o) => o.id == order.id, orElse: () => order);
+                if (latestOrder.paymentStatus == 'Paid') {
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  await _moveOrderToPast(latestOrder);
+                }
               }
             }
 
+            // ── UI ─────────────────────────────────────────────────────
             return AlertDialog(
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -205,13 +237,13 @@ class _ActiveorderState extends State<Activeorder> {
                     ),
                   ),
                   InkWell(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => Navigator.pop(dialogContext),
                     child: Icon(Icons.cancel, color: Colors.grey),
-                  )
+                  ),
                 ],
               ),
               content: SingleChildScrollView(
-                child: Container(
+                child: SizedBox(
                   width: 400,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -241,11 +273,41 @@ class _ActiveorderState extends State<Activeorder> {
                           ],
                         ),
                       ),
+                      SizedBox(height: 12),
+
+                      // ── Bulk action row ──────────────────────────────
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade100),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Mark All KOTs as:',
+                              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blue.shade800),
+                            ),
+                            SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(child: _buildStatusButton('Cooking', Colors.orange, () => updateAll('Cooking'))),
+                                SizedBox(width: 6),
+                                Expanded(child: _buildStatusButton('Ready', Colors.blue, () => updateAll('Ready'))),
+                                SizedBox(width: 6),
+                                Expanded(child: _buildStatusButton('Served', Colors.green, () => updateAll('Served'))),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                       SizedBox(height: 16),
 
                       // KOT Status Updates
                       Text(
-                        'Update KOT Status:',
+                        'Update Individual KOT:',
                         style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                       SizedBox(height: 12),
@@ -290,46 +352,41 @@ class _ActiveorderState extends State<Activeorder> {
                                 ),
                               ),
                               SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
+                              Row(
                                 children: [
-                                  if (currentStatus != 'Cooking')
-                                    _buildStatusButton('Cooking', Colors.orange, () async {
-                                      Navigator.pop(context);
-                                      await _updateKotStatus(order, kotNum, 'Cooking');
-                                    }),
-                                  if (currentStatus != 'Ready')
-                                    _buildStatusButton('Ready', Colors.blue, () async {
-                                      Navigator.pop(context);
-                                      await _updateKotStatus(order, kotNum, 'Ready');
-                                    }),
-                                  if (currentStatus != 'Served')
-                                    _buildStatusButton('Served', Colors.green, () async {
-                                      Navigator.pop(context);
-                                      // Get latest order state from store before deciding
-                                      final latestOrder = orderStore.orders.firstWhere(
-                                        (o) => o.id == order.id,
-                                        orElse: () => order,
-                                      );
-                                      final allServed = order.kotNumbers.every((k) =>
-                                        (k == kotNum) || (kotStatuses[k] == 'Served')
-                                      );
-                                      if (allServed && latestOrder.paymentStatus == 'Paid') {
-                                        await _moveOrderToPast(latestOrder);
-                                      } else {
-                                        await _updateKotStatus(order, kotNum, 'Served');
-                                      }
-                                    }),
+                                  Expanded(
+                                    child: currentStatus == 'Cooking'
+                                        ? _buildStatusButtonDisabled('Cooking', Colors.orange)
+                                        : _buildStatusButton('Cooking', Colors.orange, () => updateOne(kotNum, 'Cooking')),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Expanded(
+                                    child: currentStatus == 'Ready'
+                                        ? _buildStatusButtonDisabled('Ready', Colors.blue)
+                                        : _buildStatusButton('Ready', Colors.blue, () => updateOne(kotNum, 'Ready')),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Expanded(
+                                    child: currentStatus == 'Served'
+                                        ? _buildStatusButtonDisabled('Served', Colors.green)
+                                        : _buildStatusButton('Served', Colors.green, () => updateOne(kotNum, 'Served')),
+                                  ),
                                 ],
                               ),
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ),
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text('Close', style: GoogleFonts.poppins(color: Colors.grey.shade700)),
+                ),
+              ],
             );
           },
         );
@@ -339,16 +396,37 @@ class _ActiveorderState extends State<Activeorder> {
 
   // Helper to build status button
   Widget _buildStatusButton(String status, Color color, VoidCallback onTap) {
-    return ElevatedButton(
-      onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+    return SizedBox(
+      height: 34,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        child: Text(
+          status,
+          style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+        ),
       ),
-      child: Text(
-        status,
-        style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+    );
+  }
+
+  Widget _buildStatusButtonDisabled(String status, Color color) {
+    return SizedBox(
+      height: 34,
+      child: ElevatedButton(
+        onPressed: null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color.withValues(alpha: 0.25),
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        child: Text(
+          status,
+          style: GoogleFonts.poppins(color: color.withValues(alpha: 0.6), fontSize: 12),
+        ),
       ),
     );
   }
@@ -566,7 +644,7 @@ class _ActiveorderState extends State<Activeorder> {
         children: [
           // Order Type Filter Row
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             color: AppColors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -580,7 +658,7 @@ class _ActiveorderState extends State<Activeorder> {
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(8),
@@ -613,40 +691,22 @@ class _ActiveorderState extends State<Activeorder> {
           ),
 
           // Search Bar
-          Container(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-            color: AppColors.white,
-            child: TextField(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: AppTextField(
               controller: _searchController,
+              hint: 'Search by customer, table or KOT…',
+              icon: Icons.search_rounded,
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
               onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
-              style: GoogleFonts.poppins(fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search by customer, table or KOT…',
-                hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary, fontSize: 13),
-                prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear, color: AppColors.textSecondary),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-              ),
             ),
           ),
 

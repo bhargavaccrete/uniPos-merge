@@ -333,6 +333,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
           // Icon/Illustration
           _buildIllustration(item, size: isMobile ? 200 : 300),
           SizedBox(height: isMobile ? 40 : 60),
+
           // Text content
           _buildTextContent(item),
         ],

@@ -50,6 +50,45 @@ abstract class _CashHandoverStore with Store {
     }
   }
 
+  /// Single-step shift-end record.
+  ///
+  /// Replaces the 2-step PENDING flow. Called when outgoing staff counts cash
+  /// at shift end. Variance is computed immediately against the POS-expected
+  /// balance and saved as MATCHED or DISCREPANCY — never PENDING.
+  ///
+  /// [countedAmount]  — what the cashier physically counted in the drawer
+  /// [expectedAmount] — what the POS system expected (opening + sales + in − out − expenses)
+  @action
+  Future<bool> recordShiftEnd({
+    required String closedBy,
+    required double countedAmount,
+    required double expectedAmount,
+    String? note,
+  }) async {
+    try {
+      final variance = countedAmount - expectedAmount;
+      final status = variance.abs() <= 1.0 ? 'MATCHED' : 'DISCREPANCY';
+      final now = DateTime.now();
+      final handover = CashHandoverModel(
+        id: const Uuid().v4(),
+        closedBy: closedBy,
+        closedAt: now,
+        closedAmount: countedAmount,
+        closedNote: note,
+        receivedBy: 'System',       // marks this as a single-step record
+        receivedAt: now,
+        receivedAmount: expectedAmount, // POS-expected balance
+        status: status,
+        variance: variance,
+      );
+      await _repository.saveHandover(handover);
+      return true;
+    } catch (e) {
+      errorMessage = 'Failed to record shift end: $e';
+      return false;
+    }
+  }
+
   /// Step 1 — Called when outgoing staff ends their shift and counts the cash.
   ///
   /// Creates a PENDING handover record. The incoming staff will complete

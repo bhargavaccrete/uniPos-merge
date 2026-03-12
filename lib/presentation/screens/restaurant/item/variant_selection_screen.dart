@@ -4,9 +4,8 @@ import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../../util/common/app_responsive.dart';
-import '../../../widget/componets/restaurant/componets/Textform.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
@@ -304,25 +303,16 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   ),
 
                   if (isSelected) ...[
-                    SizedBox(height: 10),
-                    TextField(
+                    const SizedBox(height: 10),
+                    AppTextField(
                       controller: controller,
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: 'Price for ${variant.name}',
-                        prefixText: '₹ ',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: AppColors.primary),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                      label: 'Price for ${variant.name}',
+                      hint: '0.00',
+                      prefixWidget: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        child: Text('₹', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
                       ),
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
                     ),
                   ],
                 ],
@@ -423,11 +413,11 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   ),
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: variantNameController,
-                  labelText: 'Variant Name',
-                  obsecureText: false,
-                  borderc: 8,
+                  label: 'Variant Name',
+                  hint: 'e.g. Small, Medium, Large',
+                  icon: Icons.tune_rounded,
                 ),
               ],
             ),
@@ -524,11 +514,11 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   ),
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: variantNameController,
-                  labelText: 'Variant Name',
-                  obsecureText: false,
-                  borderc: 8,
+                  label: 'Variant Name',
+                  hint: 'e.g. Small, Medium, Large',
+                  icon: Icons.tune_rounded,
                 ),
               ],
             ),

@@ -10,6 +10,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
+import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
@@ -405,7 +406,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
             children: [
               Expanded(
                 flex: 2,
-                child: _inputField(
+                child: AppTextField(
                   controller: _taxNameController,
                   label: 'Tax Name',
                   hint: 'e.g. GST, VAT',
@@ -414,12 +415,12 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _inputField(
+                child: AppTextField(
                   controller: _taxRateController,
                   label: 'Rate %',
                   hint: '18',
                   icon: Icons.percent,
-                  isNumber: true,
+                  keyboardType: TextInputType.number,
                 ),
               ),
               const SizedBox(width: 10),
@@ -439,46 +440,6 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _inputField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    bool isNumber = false,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 18, color: AppColors.textSecondary),
-        labelStyle: GoogleFonts.poppins(
-            fontSize: 13, color: AppColors.textSecondary),
-        hintStyle: GoogleFonts.poppins(
-            fontSize: 13, color: AppColors.divider),
-        filled: true,
-        fillColor: AppColors.surfaceLight,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
       ),
     );
   }

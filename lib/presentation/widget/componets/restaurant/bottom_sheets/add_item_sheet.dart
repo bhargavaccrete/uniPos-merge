@@ -10,13 +10,14 @@ import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import 'add_category_dialog.dart';
+import '../../common/app_text_field.dart';
 import 'add_item_form_state.dart';
 import 'category_selector_sheet.dart';
 import 'image_picker_sheet.dart';
 import 'veg_selector_sheet.dart';
 import 'widgets/category_selector_button.dart';
 import 'widgets/inventory_toggle.dart';
-import 'widgets/selling_method_selector.dart';
+import 'widgets/selling_method_selector.dart' show SellingMethodSheet, SellingMethodButton;
 
 /// Responsive add-item sheet:
 /// - Mobile  → bottom sheet (DraggableScrollableSheet)
@@ -417,103 +418,65 @@ class _AddItemSheetState extends State<AddItemSheet> {
     ];
   }
 
-  // ── Field Helpers ─────────────────────────────────────────────────────────
-
-  InputDecoration _inputDecoration(String label, IconData icon,
-      {String? prefixText}) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: GoogleFonts.poppins(
-          color: AppColors.textSecondary, fontSize: 13),
-      prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
-      prefixText: prefixText,
-      prefixStyle: GoogleFonts.poppins(
-          fontSize: 14, color: AppColors.textPrimary),
-      filled: true,
-      fillColor: AppColors.surfaceLight,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.divider),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.divider),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-    );
-  }
+  // ── Field Builders ────────────────────────────────────────────────────────
 
   Widget _buildItemNameField() {
-    return TextField(
+    return AppTextField(
       controller: _formState.itemNameController,
-      style:
-          GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-      decoration: _inputDecoration('Item Name', Icons.fastfood_outlined),
+      label: 'Item Name',
+      hint: 'e.g. Margherita Pizza',
+      icon: Icons.fastfood_outlined,
+      required: true,
     );
   }
 
   Widget _buildPriceField() {
-    return TextField(
+    return AppTextField(
       controller: _formState.priceController,
+      label: 'Price',
+      hint: '0.00',
+      prefixWidget: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Text('₹',
+            style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary)),
+      ),
       keyboardType: TextInputType.number,
-      style:
-          GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-      decoration:
-          _inputDecoration('Price', Icons.currency_rupee, prefixText: '₹ '),
     );
   }
 
   Widget _buildDescriptionField() {
-    return TextField(
+    return AppTextField(
       controller: _formState.descriptionController,
+      label: 'Description',
+      hint: 'Optional',
+      icon: Icons.notes_outlined,
       maxLines: 3,
       minLines: 1,
-      style:
-          GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        labelText: 'Description (Optional)',
-        labelStyle: GoogleFonts.poppins(
-            color: AppColors.textSecondary, fontSize: 13),
-        alignLabelWithHint: true,
-        prefixIcon: const Padding(
-          padding: EdgeInsets.only(bottom: 44),
-          child: Icon(Icons.notes_outlined,
-              color: AppColors.primary, size: 20),
-        ),
-        filled: true,
-        fillColor: AppColors.surfaceLight,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      ),
     );
   }
 
+  Future<void> _selectSellingMethod() async {
+    final result = await SellingMethodSheet.show(
+      context,
+      currentMethod: _formState.sellingMethod,
+      currentUnit: _formState.selectedUnit,
+    );
+    if (result != null) {
+      setState(() {
+        _formState.setSellingMethod(result.method);
+        _formState.setUnit(result.unit);
+      });
+    }
+  }
+
   Widget _buildSellingMethodSelector() {
-    return SellingMethodSelector(
-      sellingMethod: _formState.sellingMethod,
-      selectedUnit: _formState.selectedUnit,
-      onMethodChanged: (method) =>
-          setState(() => _formState.setSellingMethod(method)),
-      onUnitChanged: (unit) =>
-          setState(() => _formState.setUnit(unit)),
+    return SellingMethodButton(
+      method: _formState.sellingMethod,
+      unit: _formState.selectedUnit,
+      onTap: _selectSellingMethod,
     );
   }
 

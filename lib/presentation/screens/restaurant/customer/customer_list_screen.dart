@@ -7,6 +7,7 @@ import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
 import 'customer_detail_screen.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -289,44 +290,24 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             padding: EdgeInsets.all(isTablet ? 20 : 16),
             child: Column(
               children: [
-                TextField(
+                AppTextField(
                   controller: _searchController,
-                  onChanged: _searchCustomers,
-                  style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 15 : 14,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or phone...',
-                    hintStyle: GoogleFonts.poppins(
-                      fontSize: isTablet ? 15 : 14,
-                      color: Colors.grey.shade500,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: AppColors.primary,
-                      size: isTablet ? 24 : 22,
-                    ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear, size: isTablet ? 22 : 20),
-                            onPressed: () {
-                              _searchController.clear();
-                              _searchCustomers('');
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: isTablet ? 16 : 12,
-                    ),
-                  ),
+                  hint: 'Search by name or phone...',
+                  icon: Icons.search_rounded,
+                  onChanged: (v) {
+                    _searchCustomers(v);
+                    setState(() {});
+                  },
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                            _searchCustomers('');
+                            setState(() {});
+                          },
+                        )
+                      : null,
                 ),
                 SizedBox(height: isTablet ? 16 : 12),
                 SizedBox(

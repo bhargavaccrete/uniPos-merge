@@ -5,8 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
+import 'package:unipos/util/restaurant/staticswitch.dart';
+import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import '../../../../screens/restaurant/welcome_Admin.dart';
 import '../../../../screens/restaurant/AuthSelectionScreen.dart';
 import '../../../../screens/restaurant/need help/needhelp.dart';
@@ -130,8 +133,8 @@ class DrawerManage extends StatelessWidget {
                     },
                     isTablet: isTablet,
                   ),
-                  // End Shift — shown only when a shift is open
-                  if (RestaurantSession.hasOpenShift)
+                  // End Shift — shown only when a shift is open AND handover is enabled
+                  if (RestaurantSession.hasOpenShift && AppSettings.shiftHandover)
                     _buildDrawerItem(
                       context: context,
                       icon: Icons.lock_clock_rounded,
@@ -321,33 +324,96 @@ class DrawerManage extends StatelessWidget {
     );
   }
 
+  /// Computes the expected cash in the drawer right now using the same formula
+  /// as the Cash Drawer screen: opening + cashSales + cashIn − cashOut − cashExpenses
+  Future<double> _loadExpectedBalance() async {
+    final opening = await DayManagementService.getOpeningBalance();
+    final dayStart = await DayManagementService.getDayStartTimestamp() ?? DateTime.now();
+
+    await cashMovementStore.loadTodayMovements(dayStart);
+    await pastOrderStore.loadPastOrders();
+    await expenseStore.loadExpenses();
+
+    double cashSales = 0;
+    for (final o in pastOrderStore.pastOrders) {
+      final status = (o.orderStatus ?? '').toUpperCase();
+      if (status == 'VOIDED') continue;
+      final isToday = o.orderAt?.isAfter(dayStart.subtract(const Duration(seconds: 1))) ?? false;
+      if (!isToday) continue;
+      final method = (o.paymentmode ?? '').toLowerCase().trim();
+      if (method == 'cash') {
+        cashSales += (o.totalPrice - (o.refundAmount ?? 0.0)).clamp(0.0, double.infinity);
+      } else if (o.isSplitPayment == true) {
+        for (final p in o.paymentList) {
+          if ((p['method'] as String? ?? '').toLowerCase() == 'cash') {
+            cashSales += (p['amount'] as num? ?? 0).toDouble();
+          }
+        }
+      }
+    }
+
+    double cashExpenses = 0;
+    for (final e in expenseStore.expenses) {
+      final isC = (e.paymentType ?? '').toLowerCase().trim() == 'cash';
+      final isToday = e.dateandTime.isAfter(dayStart.subtract(const Duration(seconds: 1)));
+      if (isC && isToday) cashExpenses += e.amount;
+    }
+
+    return opening + cashSales + cashMovementStore.totalCashIn
+        - cashMovementStore.totalCashOut - cashExpenses;
+  }
+
   void _showEndShiftDialog(BuildContext context) {
     final shift = shiftStore.activeShift;
     if (shift == null) return;
+
+    // Capture navigator before the drawer closes and its context becomes stale.
+    // NavigatorState outlives the DrawerManage widget, so it's safe to use
+    // across async gaps without a mounted check.
+    final navigator = Navigator.of(context);
 
     final duration = DateTime.now().difference(shift.startTime);
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
 
-    // Phase tracking: false = End Shift confirm, true = Cash Handover form
+    // Phase tracking
     bool isClosing = false;
-    bool showHandover = false;
+    bool showCashCount = false;
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     bool isSaving = false;
+    // Loaded once when cash count begins
+    Future<double>? balanceFuture;
+    double? resolvedExpected;
+    bool listenerAdded = false;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) {
-          // ── Phase 2: Cash Handover form ─────────────────────────────
-          if (showHandover) {
+          // Register amount listener once so live diff updates on every keystroke
+          if (!listenerAdded) {
+            listenerAdded = true;
+            amountCtrl.addListener(() => setS(() {}));
+          }
+
+          // ── Phase 2: Shift Cash Count ────────────────────────────────
+          if (showCashCount) {
+            final currency = CurrencyHelper.currentSymbol;
+            final counted = double.tryParse(amountCtrl.text.trim());
+            final diff = (counted != null && resolvedExpected != null)
+                ? counted - resolvedExpected!
+                : null;
+            final isShort = diff != null && diff < -1.0;
+            final isOver  = diff != null && diff > 1.0;
+
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               contentPadding: EdgeInsets.zero,
               content: SingleChildScrollView(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  // Header
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -362,22 +428,24 @@ class DrawerManage extends StatelessWidget {
                           color: Colors.orange.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.swap_horiz_rounded, color: Colors.orange, size: 24),
+                        child: const Icon(Icons.point_of_sale_rounded, color: Colors.orange, size: 24),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Cash Handover',
+                          Text('Shift Cash Count',
                               style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
-                          Text('Count the drawer before you leave',
+                          Text('Count the cash in the drawer',
                               style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
                         ]),
                       ),
                     ]),
                   ),
+
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      // Who is ending shift
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -387,21 +455,74 @@ class DrawerManage extends StatelessWidget {
                         child: Row(children: [
                           const Icon(Icons.person_outline, size: 18, color: Colors.grey),
                           const SizedBox(width: 8),
-                          Text('Handing over as: ${shift.staffName}',
+                          Text('Shift ended by: ${shift.staffName}',
                               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
                         ]),
                       ),
+                      const SizedBox(height: 12),
+
+                      // POS Expected balance
+                      FutureBuilder<double>(
+                        future: balanceFuture,
+                        builder: (ctx, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(children: [
+                                const SizedBox(width: 14, height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2)),
+                                const SizedBox(width: 10),
+                                Text('Calculating expected balance...',
+                                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.blue.shade700)),
+                              ]),
+                            );
+                          }
+                          if (snap.hasError || !snap.hasData) return const SizedBox.shrink();
+                          final balance = snap.data!;
+                          resolvedExpected = balance;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text('POS expects in drawer',
+                                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.blue.shade700)),
+                                  Text('Based on sales, cash in/out',
+                                      style: GoogleFonts.poppins(fontSize: 10, color: Colors.blue.shade400)),
+                                ]),
+                                Text(
+                                  '$currency ${balance.toStringAsFixed(2)}',
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 20, fontWeight: FontWeight.w800, color: Colors.blue.shade800),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+
                       const SizedBox(height: 16),
-                      Text('Cash counted in drawer',
+                      Text('Cash you counted',
                           style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
                               color: Colors.grey.shade700)),
                       const SizedBox(height: 6),
                       TextField(
                         controller: amountCtrl,
+                        autofocus: true,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
                         decoration: InputDecoration(
-                          prefixText: 'Rs. ',
+                          prefixText: '$currency ',
                           hintText: '0.00',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           focusedBorder: OutlineInputBorder(
@@ -410,6 +531,63 @@ class DrawerManage extends StatelessWidget {
                           ),
                         ),
                       ),
+
+                      // Live difference panel
+                      if (diff != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isShort
+                                ? Colors.red.shade50
+                                : isOver
+                                    ? Colors.orange.shade50
+                                    : Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isShort
+                                  ? Colors.red.shade200
+                                  : isOver
+                                      ? Colors.orange.shade200
+                                      : Colors.green.shade200,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isShort ? 'Short' : isOver ? 'Over' : 'Matched',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isShort
+                                      ? Colors.red.shade700
+                                      : isOver
+                                          ? Colors.orange.shade700
+                                          : Colors.green.shade700,
+                                ),
+                              ),
+                              Text(
+                                isShort
+                                    ? '-$currency ${diff.abs().toStringAsFixed(2)}'
+                                    : isOver
+                                        ? '+$currency ${diff.toStringAsFixed(2)}'
+                                        : '$currency 0.00',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: isShort
+                                      ? Colors.red.shade700
+                                      : isOver
+                                          ? Colors.orange.shade700
+                                          : Colors.green.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 16),
                       Text('Note (optional)',
                           style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
@@ -418,7 +596,7 @@ class DrawerManage extends StatelessWidget {
                       TextField(
                         controller: noteCtrl,
                         decoration: InputDecoration(
-                          hintText: 'e.g. "Left Rs.1500, all good"',
+                          hintText: 'e.g. "All good" or explain any difference',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
@@ -430,12 +608,9 @@ class DrawerManage extends StatelessWidget {
                 TextButton(
                   onPressed: isSaving ? null : () async {
                     Navigator.pop(ctx);
-                    // Auto-logout after ending shift
                     await _clearLoginState();
-                    if (context.mounted) {
-                      Navigator.pushNamedAndRemoveUntil(
-                          context, RouteNames.restaurantLogin, (r) => false);
-                    }
+                    navigator.pushNamedAndRemoveUntil(
+                        RouteNames.restaurantLogin, (r) => false);
                   },
                   child: Text('Skip', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
                 ),
@@ -444,22 +619,21 @@ class DrawerManage extends StatelessWidget {
                     final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
                     if (amount <= 0) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Enter the cash amount')));
+                          const SnackBar(content: Text('Enter the cash amount you counted')));
                       return;
                     }
                     setS(() => isSaving = true);
-                    await cashHandoverStore.createHandover(
+                    final expectedBalance = await (balanceFuture ?? Future.value(0.0));
+                    await cashHandoverStore.recordShiftEnd(
                       closedBy: shift.staffName,
-                      closedAmount: amount,
-                      closedNote: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+                      countedAmount: amount,
+                      expectedAmount: expectedBalance,
+                      note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
                     );
                     if (ctx.mounted) Navigator.pop(ctx);
-                    // Auto-logout after ending shift
                     await _clearLoginState();
-                    if (context.mounted) {
-                      Navigator.pushNamedAndRemoveUntil(
-                          context, RouteNames.restaurantLogin, (r) => false);
-                    }
+                    navigator.pushNamedAndRemoveUntil(
+                        RouteNames.restaurantLogin, (r) => false);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange.shade700,
@@ -470,7 +644,7 @@ class DrawerManage extends StatelessWidget {
                   child: isSaving
                       ? const SizedBox(width: 18, height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text('Confirm Handover',
+                      : Text('Save & End Shift',
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                 ),
               ],
@@ -545,8 +719,19 @@ class DrawerManage extends StatelessWidget {
                         final closed = await shiftStore.closeShift(shift.id);
                         if (closed != null) {
                           await RestaurantSession.clearShiftSession();
-                          // Switch dialog to handover phase in-place
-                          if (ctx.mounted) setS(() => showHandover = true);
+                          if (!AppSettings.shiftHandover) {
+                            // Handover disabled — skip Phase 2, go straight to logout
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            await _clearLoginState();
+                            navigator.pushNamedAndRemoveUntil(
+                                RouteNames.restaurantLogin, (r) => false);
+                            return;
+                          }
+                          // Switch to cash count phase; kick off balance load once
+                          if (ctx.mounted) setS(() {
+                            showCashCount = true;
+                            balanceFuture ??= _loadExpectedBalance();
+                          });
                         } else {
                           if (ctx.mounted) {
                             setS(() => isClosing = false);

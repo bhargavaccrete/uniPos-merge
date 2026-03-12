@@ -269,7 +269,10 @@ class HiveBoxNames {
     restaurantExpense,
     appCounters,
     testBillBox,
-    restaurantCustomer
+    restaurantCustomer,
+    restaurantShift,
+    restaurantCashMovements,
+    restaurantCashHandovers,
   ];
 
   /// All common box names (shared between retail and restaurant)

@@ -4,8 +4,8 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/images.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
@@ -52,90 +52,155 @@ class _VariantTabState extends State<VariantTab> {
     showModalBottomSheet(
       isScrollControlled: true,
       context: context,
-      shape: RoundedRectangleBorder(
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _buildBottomSheet(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, _) => _buildBottomSheet(ctx),
       ),
     );
   }
 
-  Widget _buildBottomSheet() {
+  Widget _buildBottomSheet(BuildContext ctx) {
+    final isEditing = editingVariante != null;
+    final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+
     return Container(
-      padding: EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + bottomInset),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Drag handle ──────────────────────────────────────────────
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          // ── Header ───────────────────────────────────────────────────
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.tune, color: AppColors.primary),
-              ),
-              SizedBox(width: 12),
-              Text(
-                editingVariante == null ? 'Add Variant' : 'Edit Variant',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
+                child: Icon(
+                  isEditing ? Icons.edit_rounded : Icons.tune_rounded,
+                  color: AppColors.primary,
+                  size: 20,
                 ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isEditing ? 'Edit Variant' : 'Add Variant',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      isEditing
+                          ? 'Update the variant name'
+                          : 'Create a new variant option',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(ctx),
+                icon: Icon(Icons.close, color: Colors.grey.shade500),
+                splashRadius: 20,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
-          Divider(height: 30),
-          TextField(
+
+          Divider(height: 28, color: Colors.grey.shade100),
+
+          // ── Variant Name field ────────────────────────────────────────
+          AppTextField(
             controller: variantController,
-            style: GoogleFonts.poppins(fontSize: 14),
-            decoration: InputDecoration(
-              labelText: "Variant Name",
-              labelStyle: GoogleFonts.poppins(color: Colors.grey),
-              prefixIcon: Icon(Icons.edit, color: AppColors.primary),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 2),
-              ),
-            ),
+            label: 'Variant Name',
+            hint: 'e.g. Small, Medium, Large',
+            icon: Icons.tune_rounded,
+            required: true,
           ),
-          SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _addOrEditVariante,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 20),
+
+          // ── Action buttons ────────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w500),
+                  ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    editingVariante == null ? Icons.add_circle_outline : Icons.check_circle_outline,
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _addOrEditVariante,
+                  icon: Icon(
+                    isEditing
+                        ? Icons.check_rounded
+                        : Icons.add_circle_outline_rounded,
+                    size: 18,
                     color: Colors.white,
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    editingVariante == null ? 'Add Variant' : 'Update Variant',
+                  label: Text(
+                    isEditing ? 'Update Variant' : 'Add Variant',
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white),
                   ),
-                ],
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -225,46 +290,20 @@ class _VariantTabState extends State<VariantTab> {
       body: Column(
         children: [
           // Modern Search Bar
-          Container(
+          Padding(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: TextField(
-                controller: searchController,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  hintText: 'Search variants...',
-                  hintStyle: GoogleFonts.poppins(
-                    color: Colors.grey.shade500,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
-                  suffixIcon: query.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.grey, size: 20),
-                          onPressed: () {
-                            searchController.clear();
-                          },
-                        )
-                      : null,
-                  border: InputBorder.none,
-                ),
-              ),
+            child: AppTextField(
+              controller: searchController,
+              hint: 'Search variants…',
+              icon: Icons.search_rounded,
+              suffixIcon: query.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      onPressed: () {
+                        searchController.clear();
+                      },
+                    )
+                  : null,
             ),
           ),
 

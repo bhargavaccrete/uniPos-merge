@@ -8,7 +8,7 @@ import '../../../../util/common/app_responsive.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
-import '../../../widget/componets/restaurant/componets/Textform.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 import '../welcome_Admin.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 class RestaurantLogin extends StatefulWidget {
@@ -214,77 +214,46 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     SizedBox(height: AppResponsive.height(context, 0.02)),
                   ],
 
-                  // Username Label
-                  Container(
-                    width: width,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Username',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: AppResponsive.height(context, 0.01)),
-
                   // Username Field
-                  SizedBox(
-                    width: width,
-                    child: CommonTextForm(
-                      obsecureText: false,
-                      controller: _usernameController,
-                      hintText: 'Enter username',
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter username';
-                        }
-                        return null;
-                      },
-                      gesture: const Icon(Icons.person_outline),
-                    ),
+                  AppTextField(
+                    controller: _usernameController,
+                    label: 'Username',
+                    hint: 'Enter username',
+                    icon: Icons.person_outline_rounded,
+                    required: true,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter username';
+                      }
+                      return null;
+                    },
                   ),
 
                   SizedBox(height: AppResponsive.height(context, 0.02)),
 
-                  // Password Label
-                  Container(
-                    width: width,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Password',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: AppResponsive.height(context, 0.01)),
-
                   // Password Field
-                  SizedBox(
-                    width: width,
-                    child: CommonTextForm(
-                      obsecureText: _obscurePassword,
-                      controller: _passwordController,
-                      hintText: 'Enter password',
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'PIN is required';
-                        if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
-                        return null;
-                      },
-                      gesture: GestureDetector(
-                        onTap: () => setState(() => _obscurePassword = !_obscurePassword),
-                        child: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: AppColors.primary,
-                        ),
+                  AppTextField(
+                    controller: _passwordController,
+                    label: 'Password / PIN',
+                    hint: 'Enter password or PIN',
+                    icon: Icons.lock_outline_rounded,
+                    required: true,
+                    obscureText: _obscurePassword,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        size: 20,
+                        color: AppColors.textSecondary,
                       ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'PIN is required';
+                      if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
+                      return null;
+                    },
                   ),
 
                   SizedBox(height: AppResponsive.height(context, 0.04)),

@@ -18,6 +18,7 @@ class PartialRefundDialog extends StatefulWidget {
   final double orderTotalPrice; // Add the actual order total that was paid
   final double orderDiscount; // Order-level discount
   final double orderSubTotal; // Order subtotal
+  final bool isTaxInclusive; // Whether tax was inclusive when order was placed
 
   const PartialRefundDialog({
     Key? key,
@@ -27,6 +28,7 @@ class PartialRefundDialog extends StatefulWidget {
     required this.orderTotalPrice, // Add this parameter
     this.orderDiscount = 0.0,
     this.orderSubTotal = 0.0,
+    this.isTaxInclusive = false,
   }) : super(key: key);
 
   @override
@@ -63,26 +65,31 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
     // Check if discount is on items (item.discount > 0) or on bill (order.Discount > 0)
     if (itemDiscount > 0) {
       // Discount is applied to individual items
-      // Tax is calculated on discounted price
+      if (widget.isTaxInclusive) {
+        // Price already includes tax — do not add again
+        return priceAfterItemDiscount;
+      }
       final taxAmount = priceAfterItemDiscount * itemTaxRate;
       return priceAfterItemDiscount + taxAmount;
     } else {
       // Discount is on total bill - distribute proportionally
-      // Calculate total value of ALL ORIGINAL items (for proportional discount distribution)
       double totalItemsValue = 0.0;
       for (var orderItem in widget.allOrderItems) {
         totalItemsValue += orderItem.finalItemPrice * (orderItem.quantity ?? 0);
       }
 
-      // Calculate this item's proportional share of the order-level discount
       double itemDiscountShare = 0.0;
       if (totalItemsValue > 0 && widget.orderDiscount > 0) {
         final itemProportion = priceAfterItemDiscount / totalItemsValue;
         itemDiscountShare = widget.orderDiscount * itemProportion;
       }
 
-      // Apply order-level discount and tax
       final priceAfterOrderDiscount = priceAfterItemDiscount - itemDiscountShare;
+
+      if (widget.isTaxInclusive) {
+        // Price already includes tax — only apply the discount share, no tax addition
+        return priceAfterOrderDiscount;
+      }
       final taxAmount = priceAfterOrderDiscount * itemTaxRate;
       return priceAfterOrderDiscount + taxAmount;
     }

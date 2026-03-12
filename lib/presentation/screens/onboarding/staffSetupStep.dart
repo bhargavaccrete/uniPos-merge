@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'
-    show FilteringTextInputFormatter, TextInputFormatter;
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
@@ -14,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../util/color.dart';
+import '../../../presentation/widget/componets/common/app_text_field.dart';
 
 /// Staff Setup Step — Business Mode Aware
 class StaffSetupStep extends StatefulWidget {
@@ -52,6 +52,24 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   String _selectedRole = 'Cashier';
   final List<String> _retailRoles = ['Manager', 'Cashier', 'Sales', 'Inventory'];
   final List<String> _restaurantRoles = ['Manager', 'Waiter', 'Cashier', 'Chef'];
+
+  static const _roleIcons = {
+    'Manager':   Icons.manage_accounts_rounded,
+    'Cashier':   Icons.point_of_sale_rounded,
+    'Sales':     Icons.storefront_rounded,
+    'Inventory': Icons.inventory_2_rounded,
+    'Waiter':    Icons.restaurant_rounded,
+    'Chef':      Icons.soup_kitchen_rounded,
+  };
+
+  static const _roleColors = {
+    'Manager':   Color(0xFF7C3AED),
+    'Cashier':   Color(0xFF059669),
+    'Sales':     Color(0xFFD97706),
+    'Inventory': Color(0xFF0284C7),
+    'Waiter':    Color(0xFFDB2777),
+    'Chef':      Color(0xFFDC2626),
+  };
 
   // Retail-specific permissions
   bool _canGiveDiscounts = false;
@@ -369,28 +387,42 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
 
                 // First + Last name
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: _buildField(
-                        controller: _firstNameController,
-                        focusNode: _firstNameFocus,
-                        nextFocus: _lastNameFocus,
-                        label: 'First Name *',
-                        errorText: _firstNameError,
-                        onChanged: (_) {
-                          if (_firstNameError != null) {
-                            setState(() => _firstNameError = null);
-                          }
-                        },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppTextField(
+                            controller: _firstNameController,
+                            focusNode: _firstNameFocus,
+                            label: 'First Name',
+                            hint: 'e.g. John',
+                            icon: Icons.person_outline,
+                            required: true,
+                            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_lastNameFocus),
+                            onChanged: (_) {
+                              if (_firstNameError != null) setState(() => _firstNameError = null);
+                            },
+                          ),
+                          if (_firstNameError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(_firstNameError!,
+                                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.danger)),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _buildField(
+                      child: AppTextField(
                         controller: _lastNameController,
                         focusNode: _lastNameFocus,
-                        nextFocus: _emailFocus,
                         label: 'Last Name',
+                        hint: 'e.g. Doe',
+                        icon: Icons.person_outline,
+                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_emailFocus),
                       ),
                     ),
                   ],
@@ -401,25 +433,28 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildField(
+                      child: AppTextField(
                         controller: _emailController,
                         focusNode: _emailFocus,
-                        nextFocus: _phoneFocus,
-                        label: 'Email (Optional)',
+                        label: 'Email',
+                        hint: 'Optional',
+                        icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
+                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_phoneFocus),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _buildField(
+                      child: AppTextField(
                         controller: _phoneController,
                         focusNode: _phoneFocus,
-                        nextFocus: _usernameFocus,
-                        label: 'Phone (Optional)',
+                        label: 'Phone',
+                        hint: 'Optional, 10 digits',
+                        icon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
                         maxLength: 10,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        helperText: '10 digits',
+                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_usernameFocus),
                       ),
                     ),
                   ],
@@ -430,20 +465,24 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildField(
+                      child: AppTextField(
                         controller: _usernameController,
                         focusNode: _usernameFocus,
-                        nextFocus: _pinFocus,
-                        label: 'Username (Optional)',
+                        label: 'Username',
                         hint: 'Auto from first name',
+                        icon: Icons.alternate_email_rounded,
+                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_pinFocus),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _buildField(
+                      child: AppTextField(
                         controller: _pinController,
                         focusNode: _pinFocus,
-                        label: 'PIN * (4–6 digits)',
+                        label: 'PIN',
+                        hint: '4–6 digits',
+                        icon: Icons.lock_outline_rounded,
+                        required: true,
                         keyboardType: TextInputType.number,
                         maxLength: 6,
                         obscureText: !_isPinVisible,
@@ -454,8 +493,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                             size: 18,
                             color: AppColors.textSecondary,
                           ),
-                          onPressed: () =>
-                              setState(() => _isPinVisible = !_isPinVisible),
+                          onPressed: () => setState(() => _isPinVisible = !_isPinVisible),
                         ),
                       ),
                     ),
@@ -463,43 +501,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                 ),
                 const SizedBox(height: 12),
 
-                // Role dropdown — full width on mobile, half width on tablet
-                if (AppResponsive.isTablet(context) || AppResponsive.isDesktop(context))
-                  Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        _buildLabel('Role'),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String>(
-                          value: _selectedRole,
-                          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-                          decoration: _fieldDecoration(label: ''),
-                          items: roles.map((role) => DropdownMenuItem(value: role, child: Text(role, style: GoogleFonts.poppins(fontSize: 14)))).toList(),
-                          onChanged: (v) => _applyRoleDefaults(v!),
-                        ),
-                      ]),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(child: SizedBox()),
-                  ])
-                else ...[
-                _buildLabel('Role'),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  value: _selectedRole,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: AppColors.textPrimary),
-                  decoration: _fieldDecoration(label: ''),
-                  items: roles
-                      .map((role) => DropdownMenuItem(
-                            value: role,
-                            child: Text(role,
-                                style: GoogleFonts.poppins(fontSize: 14)),
-                          ))
-                      .toList(),
-                  onChanged: (v) => _applyRoleDefaults(v!),
-                ),
-                ], // end else (mobile role dropdown)
+                // Role selector — inline chips
+                _buildRoleSelector(roles),
                 const SizedBox(height: 12),
 
                 // Retail permissions
@@ -757,111 +760,67 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     );
   }
 
-  // ── Shared field builder ─────────────────────────────────────────────────
+  // ── Role selector ─────────────────────────────────────────────────────────
 
-  Widget _buildField({
-    required TextEditingController controller,
-    FocusNode? focusNode,
-    FocusNode? nextFocus,
-    required String label,
-    String? hint,
-    String? errorText,
-    String? helperText,
-    TextInputType? keyboardType,
-    int? maxLength,
-    bool obscureText = false,
-    List<TextInputFormatter>? inputFormatters,
-    Widget? suffixIcon,
-    ValueChanged<String>? onChanged,
-  }) {
+  Widget _buildRoleSelector(List<String> roles) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel(label),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          focusNode: focusNode,
-          keyboardType: keyboardType,
-          maxLength: maxLength,
-          obscureText: obscureText,
-          inputFormatters: inputFormatters,
-          style: GoogleFonts.poppins(
-              fontSize: 14, color: AppColors.textPrimary),
-          onChanged: onChanged,
-          onSubmitted: (_) {
-            if (nextFocus != null) {
-              FocusScope.of(context).requestFocus(nextFocus);
-            } else {
-              FocusScope.of(context).unfocus();
-            }
-          },
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.poppins(
-                fontSize: 13, color: AppColors.textSecondary),
-            errorText: errorText,
-            errorStyle: GoogleFonts.poppins(fontSize: 11),
-            helperText: helperText,
-            helperStyle: GoogleFonts.poppins(
-                fontSize: 11, color: AppColors.textSecondary),
-            counterText: '',
-            suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: AppColors.surfaceLight,
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.danger),
-            ),
-          ),
+        Text('Role',
+            style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary)),
+        const SizedBox(height: 8),
+        Row(
+          children: roles.map((role) {
+            final isSelected = _selectedRole == role;
+            final color = _roleColors[role] ?? AppColors.primary;
+            final icon = _roleIcons[role] ?? Icons.person_rounded;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: role != roles.last ? 8 : 0),
+                child: GestureDetector(
+                  onTap: () => _applyRoleDefaults(role),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? color.withValues(alpha: 0.1)
+                          : AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? color : AppColors.divider,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon,
+                            size: 22,
+                            color: isSelected ? color : AppColors.textSecondary),
+                        const SizedBox(height: 4),
+                        Text(role,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isSelected ? color : AppColors.textSecondary,
+                            ),
+                            textAlign: TextAlign.center),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
-  }
-
-  InputDecoration _fieldDecoration({required String label}) {
-    return InputDecoration(
-      labelText: label.isEmpty ? null : label,
-      filled: true,
-      fillColor: AppColors.surfaceLight,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.divider),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.divider),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text) {
-    return Text(text,
-        style: GoogleFonts.poppins(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary));
   }
 
   Widget _buildPermissionTile({

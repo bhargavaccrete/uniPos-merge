@@ -6,6 +6,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final RestaurantCustomer customer;
@@ -86,37 +87,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             ),
           ],
         ),
-        content: TextField(
+        content: AppTextField(
           controller: pointsController,
+          label: 'Points',
+          hint: 'Enter points to add',
+          icon: Icons.add_circle_outline_rounded,
           keyboardType: TextInputType.number,
-          style: GoogleFonts.poppins(fontSize: 15),
-          decoration: InputDecoration(
-            labelText: 'Points',
-            labelStyle: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
-            hintText: 'Enter points to add',
-            hintStyle: GoogleFonts.poppins(fontSize: 14),
-            prefixIcon: Icon(
-              Icons.add_circle_outline_rounded,
-              color: AppColors.primary,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 2),
-            ),
-            filled: true,
-            fillColor: Colors.grey.shade50,
-          ),
         ),
         actions: [
           TextButton(

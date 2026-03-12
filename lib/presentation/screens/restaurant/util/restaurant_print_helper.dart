@@ -436,6 +436,7 @@ class RestaurantPrintHelper {
         kotNumbers: order.kotNumbers, // Pass all KOT numbers for customer bill
         billNumber: billNumber, // Pass bill number for completed orders
         itemTotal: calculations.itemTotal, // ✅ Pass pre-calculated item total from CartCalculationService
+        isTaxInclusive: order.isTaxInclusive, // Use stored tax mode from order, not current app setting
       );
 
       // 6. Show Print Options

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb, compute;
+import 'package:universal_html/html.dart' as html;
 import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -34,6 +35,9 @@ import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
+import 'package:unipos/data/models/restaurant/db/shift_model.dart';
+import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
+import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 
 // Shared models
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
@@ -140,8 +144,7 @@ class UnifiedBackupService {
   /// Returns the file path or null if failed
   static Future<String?> exportToDownloads({bool includeImages = true}) async {
     if (kIsWeb) {
-      debugPrint("⚠️ Web platform detected - downloads not supported");
-      return null;
+      return await _exportForWeb();
     }
 
     try {
@@ -159,6 +162,56 @@ class UnifiedBackupService {
     }
   }
 
+  /// Web-only: serialize backup to JSON, zip it and trigger browser download.
+  static Future<String?> _exportForWeb() async {
+    try {
+      debugPrint("📦 Web backup: collecting data...");
+      final data = await _collectAllData();
+      final jsonString = jsonEncode(data);
+
+      final password = await BackupEncryptionService.getStoredPassword();
+      final isEncrypted = password != null && password.isNotEmpty;
+
+      final archive = Archive();
+      if (isEncrypted) {
+        final encResult = BackupEncryptionService.encryptData(jsonString, password);
+        final meta = jsonEncode({
+          'encrypted': true,
+          'salt': encResult['salt'],
+          'iv': encResult['iv'],
+          'version': '2.0.0',
+        });
+        final encBytes = utf8.encode(encResult['encryptedData']!);
+        final metaBytes = utf8.encode(meta);
+        archive.addFile(ArchiveFile('data.enc', encBytes.length, encBytes));
+        archive.addFile(ArchiveFile('backup_meta.json', metaBytes.length, metaBytes));
+      } else {
+        final jsonBytes = utf8.encode(jsonString);
+        archive.addFile(ArchiveFile('data.json', jsonBytes.length, jsonBytes));
+      }
+
+      final zipData = ZipEncoder().encode(archive);
+      if (zipData == null) throw Exception("ZIP creation failed");
+
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final suffix = isEncrypted ? 'encrypted' : 'backup';
+      final fileName = 'UniPOS_${suffix}_$timestamp.zip';
+
+      final blob = html.Blob([Uint8List.fromList(zipData)]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      debugPrint("✅ Web backup downloaded: $fileName");
+      return fileName;
+    } catch (e) {
+      debugPrint("❌ Web backup failed: $e");
+      return null;
+    }
+  }
+
   /// ---------------------------
   /// ✅ EXPORT TO CUSTOM FOLDER
   /// ---------------------------
@@ -166,8 +219,7 @@ class UnifiedBackupService {
   /// Returns the file path or null if failed
   static Future<String?> exportToCustomFolder(String folderPath) async {
     if (kIsWeb) {
-      debugPrint("⚠️ Web platform detected - custom folder not supported");
-      return null;
+      return await _exportForWeb();
     }
 
     try {
@@ -186,6 +238,25 @@ class UnifiedBackupService {
   }
 
   /// ---------------------------
+  /// ✅ EXPORT TO SHARE (share sheet / web download)
+  /// ---------------------------
+  /// Saves backup to app cache then shares it via the system share sheet.
+  /// On web, triggers a browser download instead.
+  static Future<String?> exportToShare() async {
+    if (kIsWeb) return await _exportForWeb();
+    try {
+      final data = await _collectAllData();
+      final appDir = await getApplicationDocumentsDirectory();
+      final cacheDir = Directory('${appDir.path}/backup_share_cache');
+      if (!cacheDir.existsSync()) cacheDir.createSync(recursive: true);
+      return await _createZipBackup(data, customPath: cacheDir.path);
+    } catch (e) {
+      debugPrint("❌ exportToShare failed: $e");
+      return null;
+    }
+  }
+
+  /// ---------------------------
   /// ✅ IMPORT/RESTORE FROM BACKUP
   /// ---------------------------
   /// Imports backup file and automatically detects mode.
@@ -197,6 +268,7 @@ class UnifiedBackupService {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'json'],
+        withData: kIsWeb, // need bytes on web (no file paths)
       );
 
       if (picked == null) {
@@ -204,11 +276,83 @@ class UnifiedBackupService {
         return false;
       }
 
+      if (kIsWeb) {
+        final bytes = picked.files.single.bytes;
+        if (bytes == null) {
+          debugPrint("❌ No file bytes on web");
+          return false;
+        }
+        return await _importFromRawBytes(context, bytes, picked.files.single.name);
+      }
+
       final file = File(picked.files.single.path!);
       return await importFromFilePath(context, file.path);
     } catch (e, stackTrace) {
       debugPrint("❌ Import failed: $e");
       debugPrint("Stack trace: $stackTrace");
+      return false;
+    }
+  }
+
+  /// Web-only import: parse backup directly from raw bytes (no filesystem access).
+  static Future<bool> importFromBytes(
+      BuildContext context, Uint8List rawBytes, String fileName) =>
+      _importFromRawBytes(context, rawBytes, fileName);
+
+  static Future<bool> _importFromRawBytes(
+      BuildContext context, Uint8List rawBytes, String fileName) async {
+    try {
+      Map<String, dynamic> data;
+
+      if (fileName.toLowerCase().endsWith('.json')) {
+        data = jsonDecode(utf8.decode(rawBytes));
+      } else {
+        // ZIP — decode synchronously (no background isolate on web)
+        final entries = _decodeZipInIsolate(rawBytes.toList());
+        debugPrint("📦 Web ZIP: ${entries.length} files");
+
+        List<int>? jsonBytes;
+        List<int>? encBytes;
+        List<int>? metaBytes;
+
+        for (final f in entries) {
+          final name = (f['name'] as String).toLowerCase();
+          if (name == 'data.json') jsonBytes = f['bytes'] as List<int>;
+          if (name == 'data.enc') encBytes = f['bytes'] as List<int>;
+          if (name == 'backup_meta.json') metaBytes = f['bytes'] as List<int>;
+        }
+
+        if (metaBytes != null && encBytes != null) {
+          debugPrint("🔐 Web: encrypted backup detected");
+          final meta = jsonDecode(utf8.decode(metaBytes)) as Map<String, dynamic>;
+          // Always prompt — stored password is for creating backups only.
+          if (!context.mounted) throw Exception("Context not mounted");
+          final String? password = await _showPasswordDialog(context);
+          if (password == null) throw Exception("Restore cancelled: no password");
+
+          final decrypted = BackupEncryptionService.decryptData(
+            encryptedBase64: utf8.decode(encBytes),
+            salt: meta['salt'] as String,
+            ivBase64: meta['iv'] as String,
+            password: password,
+          );
+          if (decrypted == null) throw Exception("Wrong password — cannot decrypt");
+          data = jsonDecode(decrypted);
+        } else if (jsonBytes != null) {
+          data = jsonDecode(utf8.decode(jsonBytes));
+        } else {
+          throw Exception("No data file found in ZIP");
+        }
+      }
+
+      final backupMode = _detectModeFromBackup(data);
+      debugPrint("📦 Web import: detected mode = $backupMode");
+      await _ensureBoxesOpened(backupMode);
+      await _restoreAllData(data, backupMode);
+      debugPrint("✅ Web import completed!");
+      return true;
+    } catch (e, st) {
+      debugPrint("❌ Web import failed: $e\n$st");
       return false;
     }
   }
@@ -497,6 +641,42 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Test Bill Box error: $e");
         exportMap["testBillBox"] = [];
+      }
+
+      // ✅ Shifts
+      try {
+        exportMap["shifts"] = Hive.box<ShiftModel>(HiveBoxNames.restaurantShift)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Shifts exported: ${exportMap["shifts"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Shifts box error: $e");
+        exportMap["shifts"] = [];
+      }
+
+      // ✅ Cash Movements
+      try {
+        exportMap["cashMovements"] = Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Cash Movements exported: ${exportMap["cashMovements"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Cash Movements box error: $e");
+        exportMap["cashMovements"] = [];
+      }
+
+      // ✅ Cash Handovers
+      try {
+        exportMap["cashHandovers"] = Hive.box<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Cash Handovers exported: ${exportMap["cashHandovers"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Cash Handovers box error: $e");
+        exportMap["cashHandovers"] = [];
       }
 
       // Past Orders (batched processing with safe serialization)
@@ -1067,17 +1247,13 @@ class UnifiedBackupService {
       final iv = meta['iv'] as String;
       final encryptedData = await encFile.readAsString();
 
-      // Try stored password first (for auto-restore scenarios)
-      String? password = await BackupEncryptionService.getStoredPassword();
-
-      // If no stored password or user wants to enter manually, prompt
-      if (password == null || password.isEmpty) {
-        if (passwordProvider == null) {
-          throw Exception("Backup is encrypted but no password provider was given");
-        }
-        password = await passwordProvider();
-        if (password == null) throw Exception("Restore cancelled: no password entered");
+      // Always prompt the user on restore — stored password is for creating backups only.
+      // This ensures the person restoring actually knows the password.
+      if (passwordProvider == null) {
+        throw Exception("Backup is encrypted but no password provider was given");
       }
+      final password = await passwordProvider();
+      if (password == null) throw Exception("Restore cancelled: no password entered");
 
       // Attempt decryption
       final jsonString = BackupEncryptionService.decryptData(
@@ -1505,6 +1681,42 @@ class UnifiedBackupService {
       await restoreBox("testBillBox", Hive.box<TestBillModel>(HiveBoxNames.testBillBox), (m) => TestBillModel.fromMap(m));
     } catch (e) {
       debugPrint("⚠️ Error restoring test bill box: $e");
+    }
+
+    // ✅ Restore Shifts
+    try {
+      await restoreBoxWithId(
+        "shifts",
+        Hive.box<ShiftModel>(HiveBoxNames.restaurantShift),
+        (m) => ShiftModel.fromMap(m),
+        (s) => s.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring shifts: $e");
+    }
+
+    // ✅ Restore Cash Movements
+    try {
+      await restoreBoxWithId(
+        "cashMovements",
+        Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements),
+        (m) => CashMovementModel.fromMap(m),
+        (cm) => cm.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring cash movements: $e");
+    }
+
+    // ✅ Restore Cash Handovers
+    try {
+      await restoreBoxWithId(
+        "cashHandovers",
+        Hive.box<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers),
+        (m) => CashHandoverModel.fromMap(m),
+        (ch) => ch.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring cash handovers: $e");
     }
   }
 

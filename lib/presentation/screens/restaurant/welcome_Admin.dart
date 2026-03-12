@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import '../../../core/routes/routes_name.dart';
 import '../../../domain/services/common/notification_service.dart';
-import '../../screens/restaurant/cash_drawer/cash_drawer_screen.dart';
 import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
 import '../../../domain/services/retail/store_settings_service.dart';
@@ -30,7 +29,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkDayStarted();
       await _startShiftIfNeeded();
-      await _checkPendingHandover();
+      // Always check backup prompt — has its own date guard so it's idempotent.
+      // Previously only ran inside _checkDayStarted → missed returning users.
+      if (mounted) await StartOfDayBackupPrompt.show(context);
     });
   }
 
@@ -68,9 +69,6 @@ class _AdminWelcomeState extends State<AdminWelcome> {
 
         // Save the opening balance to mark the day as started
         await DayManagementService.setOpeningBalance(balance);
-
-        // Ask about backup right after day is started
-        if (mounted) await StartOfDayBackupPrompt.show(context);
 
         if (mounted) {
           NotificationService.instance.showSuccess(
@@ -538,27 +536,6 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         ],
       ),
     );
-  }
-
-  /// Checks if a staff member left a PENDING cash handover.
-  /// Called on every login — if a PENDING handover exists, the incoming
-  /// staff must confirm receipt before they can use the app.
-  Future<void> _checkPendingHandover() async {
-    await cashHandoverStore.loadPendingHandover();
-    final pending = cashHandoverStore.pendingHandover;
-    if (pending != null && mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false, // Cannot skip — forces accountability
-        builder: (_) => HandoverReceiveDialog(
-          handoverId: pending.id,
-          closedBy: pending.closedBy,
-          closedAt: pending.closedAt,
-          closedAmount: pending.closedAmount,
-          closedNote: pending.closedNote,
-        ),
-      );
-    }
   }
 
   Future<void> _clearLoginState() async {

@@ -87,6 +87,42 @@ class CashHandoverModel extends HiveObject {
     this.variance,
   });
 
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'closedBy': closedBy,
+        'closedAt': closedAt.toIso8601String(),
+        'closedAmount': closedAmount,
+        'closedNote': closedNote,
+        'receivedBy': receivedBy,
+        'receivedAt': receivedAt?.toIso8601String(),
+        'receivedAmount': receivedAmount,
+        'receivedNote': receivedNote,
+        'status': status,
+        'variance': variance,
+      };
+
+  factory CashHandoverModel.fromMap(Map<String, dynamic> map) =>
+      CashHandoverModel(
+        id: map['id'] ?? '',
+        closedBy: map['closedBy'] ?? '',
+        closedAt:
+            DateTime.tryParse(map['closedAt'] ?? '') ?? DateTime.now(),
+        closedAmount: (map['closedAmount'] ?? 0).toDouble(),
+        closedNote: map['closedNote'] as String?,
+        receivedBy: map['receivedBy'] as String?,
+        receivedAt: map['receivedAt'] != null
+            ? DateTime.tryParse(map['receivedAt'] as String)
+            : null,
+        receivedAmount: map['receivedAmount'] != null
+            ? (map['receivedAmount'] as num).toDouble()
+            : null,
+        receivedNote: map['receivedNote'] as String?,
+        status: map['status'] ?? 'PENDING',
+        variance: map['variance'] != null
+            ? (map['variance'] as num).toDouble()
+            : null,
+      );
+
   bool get isPending     => status == 'PENDING';
   bool get isMatched     => status == 'MATCHED';
   bool get isDiscrepancy => status == 'DISCREPANCY';

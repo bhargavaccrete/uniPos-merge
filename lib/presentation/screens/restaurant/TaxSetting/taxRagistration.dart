@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class Taxragistration extends StatefulWidget {
   @override
@@ -25,42 +26,18 @@ class _TaxragistrationState extends State<Taxragistration> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            AppTextField(
               controller: nameController,
-              textCapitalization: TextCapitalization.words,
-              style: GoogleFonts.poppins(fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Tax Name',
-                labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.primary),
-                ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
+              label: 'Tax Name',
+              hint: 'e.g. GST',
+              icon: Icons.receipt_outlined,
             ),
             SizedBox(height: 12),
-            TextField(
+            AppTextField(
               controller: numberController,
-              keyboardType: TextInputType.text,
-              style: GoogleFonts.poppins(fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Registration Number',
-                labelStyle: GoogleFonts.poppins(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.primary),
-                ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
+              label: 'Registration Number',
+              hint: 'e.g. 27AAPFU0939F1ZV',
+              icon: Icons.tag_rounded,
             ),
           ],
         ),

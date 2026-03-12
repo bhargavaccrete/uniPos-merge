@@ -9,8 +9,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../util/common/currency_helper.dart';
@@ -245,48 +244,14 @@ class _AddexpenceState extends State<Addexpence> {
                       ),
                       SizedBox(width: 16),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Amount (${CurrencyHelper.currentSymbol})',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 10),
-                            TextField(
-                              controller: _amountController,
-                              keyboardType: TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                              ],
-                              style: GoogleFonts.poppins(fontSize: 15),
-                              decoration: InputDecoration(
-                                hintText: 'Enter amount',
-                                hintStyle: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade400,
-                                ),
-                                filled: true,
-                                fillColor: AppColors.surfaceLight,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: AppColors.divider),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: AppColors.divider),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                                ),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              ),
-                            ),
+                        child: AppTextField(
+                          controller: _amountController,
+                          label: 'Amount (${CurrencyHelper.currentSymbol})',
+                          hint: 'Enter amount',
+                          icon: Icons.attach_money_rounded,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                           ],
                         ),
                       ),
@@ -352,40 +317,11 @@ class _AddexpenceState extends State<Addexpence> {
                   SizedBox(height: 20),
 
                   // Reason
-                  Text(
-                    'Reason',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  TextField(
+                  AppTextField(
                     controller: _reasonController,
-                    style: GoogleFonts.poppins(fontSize: 15),
-                    decoration: InputDecoration(
-                      hintText: 'Enter reason (optional)',
-                      hintStyle: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey.shade400,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.surfaceLight,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.divider),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.divider),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.primary, width: 2),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    ),
+                    label: 'Reason',
+                    hint: 'Enter reason (optional)',
+                    icon: Icons.notes_rounded,
                   ),
 
                   SizedBox(height: 20),

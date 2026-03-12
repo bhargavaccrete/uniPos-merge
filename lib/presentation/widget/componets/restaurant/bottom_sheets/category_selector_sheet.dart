@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
-import '../componets/Button.dart';
 import 'package:unipos/util/color.dart';
+
 /// Result from category selection
 class CategorySelectionResult {
   final String id;
@@ -29,7 +28,6 @@ class CategorySelectorSheet extends StatefulWidget {
     required this.onAddCategory,
   });
 
-  /// Show the category selector and return the selected category
   static Future<CategorySelectionResult?> show(
     BuildContext context, {
     String? selectedCategoryId,
@@ -39,6 +37,11 @@ class CategorySelectorSheet extends StatefulWidget {
 
     await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (BuildContext context) {
         return CategorySelectorSheet(
           selectedCategoryId: selectedCategoryId,
@@ -62,47 +65,67 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   List<Category> _categories = [];
   List<Items> _items = [];
   bool _isLoading = true;
+  String _query = '';
+  final TextEditingController _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(() => setState(() => _query = _searchCtrl.text));
     _loadData();
   }
 
-  Future<void> _loadData() async {
-    final categories = categoryStore.categories.toList();
-    final items = itemStore.items.toList();
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
+  Future<void> _loadData() async {
     setState(() {
-      _categories = categories;
-      _items = items;
+      _categories = categoryStore.categories.toList();
+      _items = itemStore.items.toList();
       _isLoading = false;
     });
   }
 
-  int _getItemCount(String categoryId) {
-    return _items.where((item) => item.categoryOfItem == categoryId).length;
+  int _getItemCount(String categoryId) =>
+      _items.where((i) => i.categoryOfItem == categoryId).length;
+
+  List<Category> get _filtered {
+    if (_query.trim().isEmpty) return _categories;
+    final q = _query.toLowerCase();
+    return _categories.where((c) => c.name.toLowerCase().contains(q)).toList();
   }
 
   Future<void> _deleteCategory(Category category) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete Category?'),
-          content: Text('Are you sure you want to delete "${category.name}"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('No'),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Delete Category?',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        content: Text('Delete "${category.name}"? This cannot be undone.',
+            style: GoogleFonts.poppins(fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Yes'),
-            ),
-          ],
-        );
-      },
+            child: Text('Delete', style: GoogleFonts.poppins(fontSize: 13)),
+          ),
+        ],
+      ),
     );
 
     if (confirm == true) {
@@ -113,79 +136,188 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const SizedBox(
-        height: 300,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
+    final maxH = MediaQuery.of(context).size.height * 0.75;
 
-    if (_categories.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return _buildCategoryList();
-  }
-
-  Widget _buildEmptyState() {
     return Container(
-      padding: const EdgeInsets.all(30),
-      height: 300,
+      constraints: BoxConstraints(maxHeight: maxH),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'No Category added yet! Please add category for your items',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(fontSize: 14),
+          // Drag handle
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
-          const SizedBox(height: 20),
-          _buildAddCategoryButton(),
+
+          // ── Header ──────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.category_outlined,
+                      color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Select Category',
+                          style: GoogleFonts.poppins(
+                              fontSize: 16, fontWeight: FontWeight.w600)),
+                      Text('${_categories.length} categories available',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: Colors.grey.shade500)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close, color: Colors.grey.shade500),
+                  splashRadius: 20,
+                ),
+              ],
+            ),
+          ),
+
+          // ── Search ───────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                style: GoogleFonts.poppins(fontSize: 14),
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  hintText: 'Search categories...',
+                  hintStyle: GoogleFonts.poppins(
+                      color: Colors.grey.shade400, fontSize: 13),
+                  prefixIcon: const Icon(Icons.search,
+                      color: AppColors.primary, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear,
+                              size: 18, color: Colors.grey),
+                          onPressed: () => _searchCtrl.clear(),
+                        )
+                      : null,
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+          ),
+
+          Divider(height: 1, color: Colors.grey.shade100),
+
+          // ── List ─────────────────────────────────────────────────────────
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            )
+          else if (_categories.isEmpty)
+            _buildEmptyState()
+          else if (_filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(Icons.search_off, size: 40, color: Colors.grey.shade300),
+                  const SizedBox(height: 8),
+                  Text('No categories match "$_query"',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: Colors.grey.shade500),
+                      textAlign: TextAlign.center),
+                ],
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                itemCount: _filtered.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (_, i) =>
+                    _buildCategoryItem(_filtered[i], _getItemCount(_filtered[i].id)),
+              ),
+            ),
+
+          // ── Add New Category button ───────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: widget.onAddCategory,
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: Text('Add New Category',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryList() {
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
-      ),
-      child: Container(
-      padding: const EdgeInsets.all(20),
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Select a Category',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.cancel, color: Colors.grey),
-              )
-            ],
-          ),
-          const Divider(),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final itemCount = _getItemCount(category.id);
-                return _buildCategoryItem(category, itemCount);
-              },
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.07),
+              shape: BoxShape.circle,
             ),
+            child: const Icon(Icons.category_outlined,
+                size: 40, color: AppColors.primary),
           ),
-          _buildAddCategoryButton(),
+          const SizedBox(height: 16),
+          Text('No Categories Yet',
+              style: GoogleFonts.poppins(
+                  fontSize: 15, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text('Add a category to organise your menu items.',
+              style: GoogleFonts.poppins(
+                  fontSize: 13, color: Colors.grey.shade500),
+              textAlign: TextAlign.center),
         ],
       ),
-    ),
     );
   }
 
@@ -193,110 +325,115 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
     final isSelected = widget.selectedCategoryId == category.id;
 
     return InkWell(
-      onTap: () {
-        widget.onCategorySelected(
-          CategorySelectionResult(id: category.id, name: category.name),
-        );
-      },
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+      onTap: () => widget.onCategorySelected(
+        CategorySelectionResult(id: category.id, name: category.name),
+      ),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.07)
+              : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Leading icon or check
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                isSelected ? Icons.check_rounded : Icons.category_outlined,
+                size: 18,
+                color: isSelected ? Colors.white : AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Name + count
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (value) {
-                      widget.onCategorySelected(
-                        CategorySelectionResult(id: category.id, name: category.name),
-                      );
-                    },
+                  Text(
+                    category.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppColors.primary
+                          : Colors.black87,
+                    ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.name,
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        '$itemCount item${itemCount == 1 ? '' : 's'} Added',
-                        style: GoogleFonts.poppins(color: Colors.grey),
-                      )
-                    ],
+                  Text(
+                    '$itemCount item${itemCount == 1 ? '' : 's'}',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: Colors.grey.shade500),
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditCategory(category: category),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(5),
+            ),
+
+            // Edit / Delete actions
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _actionBtn(
+                  icon: Icons.edit_outlined,
+                  color: AppColors.primary,
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditCategory(category: category),
                       ),
-                      child: const Icon(Icons.edit, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  InkWell(
-                    onTap: () => _deleteCategory(category),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
-                  ),
-                ],
-              )
-            ],
-          ),
-          const Divider()
-        ],
+                    );
+                  },
+                ),
+                const SizedBox(width: 6),
+                _actionBtn(
+                  icon: Icons.delete_outline_rounded,
+                  color: Colors.red,
+                  onTap: () => _deleteCategory(category),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildAddCategoryButton() {
-    return CommonButton(
-      width: double.infinity,
-      height: 50,
-      onTap: widget.onAddCategory,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              color: Colors.white,
-            ),
-            child: const Icon(Icons.add),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'Add New Category',
-            style: GoogleFonts.poppins(color: Colors.white),
-          )
-        ],
+  Widget _actionBtn({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 16, color: color),
       ),
     );
   }

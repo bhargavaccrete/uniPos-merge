@@ -6,9 +6,8 @@ import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/restaurant/responsive_helper.dart';
 import '../../../../util/common/app_responsive.dart';
-import '../../../widget/componets/restaurant/componets/Textform.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
@@ -392,11 +391,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       ),
                     ),
                     SizedBox(height: 15),
-                    CommonTextForm(
+                    AppTextField(
                       controller: extraNameController,
-                      labelText: 'Category Name (e.g., Add-ons)',
-                      obsecureText: false,
-                      borderc: 8,
+                      label: 'Category Name',
+                      hint: 'e.g. Add-ons',
+                      icon: Icons.add_circle_outline,
                     ),
                     SizedBox(height: 20),
                     Text(
@@ -449,11 +448,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                               ],
                             ),
                             SizedBox(height: 8),
-                            CommonTextForm(
+                            AppTextField(
                               controller: data['nameController'],
-                              labelText: 'Topping Name',
-                              obsecureText: false,
-                              borderc: 8,
+                              label: 'Topping Name',
+                              hint: 'e.g. Extra Cheese',
+                              icon: Icons.local_pizza_outlined,
                             ),
                             SizedBox(height: 10),
                             // Veg/Non-Veg Selection
@@ -531,11 +530,14 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                             // Price Input (Show if NO size or used as base price)
                             if (!hasSize) ...[
                               SizedBox(height: 10),
-                              CommonTextForm(
+                              AppTextField(
                                 controller: data['priceController'],
-                                labelText: 'Price',
-                                obsecureText: false,
-                                borderc: 8,
+                                label: 'Price',
+                                hint: '0.00',
+                                prefixWidget: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                  child: Text('₹', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                ),
                                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                               ),
                             ] else ...[
@@ -592,8 +594,12 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                                   controller: variantControllers[variant.id],
                                                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                                                   decoration: InputDecoration(
-                                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                                    filled: true,
+                                                    fillColor: AppColors.surfaceLight,
+                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
+                                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
+                                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
                                                     prefixText: '₹',
                                                     hintText: '0',
                                                   ),
