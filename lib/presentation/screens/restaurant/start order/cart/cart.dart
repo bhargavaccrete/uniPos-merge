@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -89,16 +90,15 @@ class _CartScreenState extends State<CartScreen>
   }
   /// ------------------- CART INITIALIZATION ------------------- ///
   Future<void> _initializeCart() async {
-    // Add these lines for debugging
-    print("--- Placing Order ---");
-    print("Selected Table No: ${widget.selectedTableNo}");
-
-    // Priority 1: If widget has existing order
+    // Priority 1: If widget has existing order — items are already in memory
     if (widget.existingOrder != null) {
-      if(_isIntalizedLoad){
-        await restaurantCartStore.clearCart();
-        _isIntalizedLoad =false;
+      if (_isIntalizedLoad) {
+        restaurantCartStore.clearCart(); // fire-and-forget, no need to await
+        _isIntalizedLoad = false;
       }
+
+      // Load any newly added cart items in parallel (non-blocking)
+      final cartFuture = restaurantCartStore.loadCartItems();
 
       setState(() {
         _activeList = List.from(widget.existingOrder!.items);
@@ -106,7 +106,11 @@ class _CartScreenState extends State<CartScreen>
         selectedFilter = widget.existingOrder!.orderType;
         tableNo = widget.existingOrder!.tableNo;
       });
-      await loadCartItems();
+
+      await cartFuture;
+      if (mounted) {
+        setState(() => _newlyAddedList = restaurantCartStore.cartItems.toList());
+      }
       return;
     }
 
@@ -450,8 +454,11 @@ class _CartScreenState extends State<CartScreen>
             Column(
               children: [
                 Container(
-                  margin: const EdgeInsets.all(16.0),
-                  padding: const EdgeInsets.all(6),
+                  margin: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.getValue(context, mobile: 10.0, tablet: 16.0),
+                    vertical: AppResponsive.getValue(context, mobile: 8.0, tablet: 16.0),
+                  ),
+                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 4.0, tablet: 6.0)),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(15),
@@ -690,13 +697,19 @@ class _CartScreenState extends State<CartScreen>
     required VoidCallback onTap,
   }) {
     final Color deepBlue = Color(0xFF0D47A1);
+    final isMobile = AppResponsive.isMobile(context);
+    final iconSize = AppResponsive.getValue(context, mobile: 18.0, tablet: 22.0);
+    final fontSize = AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0);
+    final hPadding = AppResponsive.getValue(context, mobile: 6.0, tablet: 12.0);
+    final vPadding = AppResponsive.getValue(context, mobile: 10.0, tablet: 14.0);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: Duration(milliseconds: 250),
         curve: Curves.easeInOut,
-        margin: EdgeInsets.symmetric(horizontal: 4),
-        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        margin: EdgeInsets.symmetric(horizontal: isMobile ? 2 : 4),
+        padding: EdgeInsets.symmetric(vertical: vPadding, horizontal: hPadding),
         decoration: BoxDecoration(
           gradient: isSelected
               ? LinearGradient(
@@ -734,18 +747,18 @@ class _CartScreenState extends State<CartScreen>
             Icon(
               icon,
               color: isSelected ? Colors.white : deepBlue.withOpacity(0.7),
-              size: 22,
+              size: iconSize,
             ),
-            SizedBox(width: 8),
+            SizedBox(width: isMobile ? 4 : 8),
             Flexible(
               child: Text(
                 title,
                 style: GoogleFonts.poppins(
                   color: isSelected ? Colors.white : deepBlue.withOpacity(0.8),
-                  fontSize: 14,
+                  fontSize: fontSize,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                  letterSpacing: 0.3,
                 ),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),

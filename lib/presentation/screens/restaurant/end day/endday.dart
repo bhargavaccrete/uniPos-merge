@@ -488,31 +488,18 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                                   fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[800]),
                             ),
                             const SizedBox(height: 8),
-                            TextField(
+                            AppTextField(
                               controller: withdrawalController,
+                              hint: '0.00',
+                              icon: Icons.account_balance_wallet_outlined,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                               ],
-                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
                               onChanged: (_) => setDialogState(() => fieldError = null),
-                              decoration: InputDecoration(
-                                prefixText: 'Rs. ',
-                                prefixStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.teal.shade700),
-                                hintText: '0.00',
-                                errorText: fieldError,
-                                filled: true,
-                                fillColor: Colors.teal.shade50,
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.teal.shade200)),
-                                enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.teal.shade200)),
-                                focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.teal.shade600, width: 2)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                              prefixWidget: Padding(
+                                padding: const EdgeInsets.only(left: 12, right: 4),
+                                child: Text('Rs. ', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.primary)),
                               ),
                             ),
 

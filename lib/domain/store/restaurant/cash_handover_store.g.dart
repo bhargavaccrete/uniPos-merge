@@ -66,6 +66,22 @@ mixin _$CashHandoverStore on _CashHandoverStore, Store {
         .run(() => super.loadPendingHandover());
   }
 
+  late final _$recordShiftEndAsyncAction =
+      AsyncAction('_CashHandoverStore.recordShiftEnd', context: context);
+
+  @override
+  Future<bool> recordShiftEnd(
+      {required String closedBy,
+      required double countedAmount,
+      required double expectedAmount,
+      String? note}) {
+    return _$recordShiftEndAsyncAction.run(() => super.recordShiftEnd(
+        closedBy: closedBy,
+        countedAmount: countedAmount,
+        expectedAmount: expectedAmount,
+        note: note));
+  }
+
   late final _$createHandoverAsyncAction =
       AsyncAction('_CashHandoverStore.createHandover', context: context);
 

@@ -9,6 +9,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
 
 enum TimePeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -125,7 +126,6 @@ class _ExpenseReportState extends State<ExpenseReport> {
 
           Expanded(
             child: ExpenseDataView(
-              key: ValueKey(_selectedPeriod),
               period: _selectedPeriod,
             ),
           ),
@@ -179,14 +179,19 @@ class ExpenseDataView extends StatefulWidget {
 }
 
 class _ExpenseDataViewState extends State<ExpenseDataView> {
-  List<Expense> _allExpenses = [];
   List<Expense> _filteredExpenses = [];
   double _totalExpenses = 0.0;
   int _totalCount = 0;
   double _averageExpense = 0.0;
   bool _isLoading = true;
+  bool _isDataLoaded = false;
   DateTime? _startDate;
   DateTime? _endDate;
+  Map<String, String> _categoryNames = {};
+
+  // Pagination
+  int _currentPage = 0;
+  static const int _rowsPerPage = 50;
 
   @override
   void initState() {
@@ -197,91 +202,109 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
   @override
   void didUpdateWidget(covariant ExpenseDataView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadDataAndFilter();
-
     if (widget.period != oldWidget.period) {
       _startDate = null;
       _endDate = null;
+      _filterFromMemory();
     }
   }
 
   Future<void> _loadDataAndFilter() async {
+    if (_isDataLoaded) {
+      _filterFromMemory();
+      return;
+    }
+    setState(() => _isLoading = true);
     await expenseCategoryStore.loadCategories();
     await expenseStore.loadExpenses();
-    _allExpenses = expenseStore.expenses.toList();
-    _fetchAndFilterData();
+    _isDataLoaded = true;
+    _buildCategoryNames();
+    _filterFromMemory();
   }
 
-  Map<String, String> _getCategoryNames() {
+  void _buildCategoryNames() {
     final categoryMap = <String, String>{};
     for (var category in expenseCategoryStore.categories) {
       categoryMap[category.id] = category.name;
     }
-    return categoryMap;
+    _categoryNames = categoryMap;
   }
 
-  void _fetchAndFilterData() {
-    setState(() {
-      _isLoading = true;
-    });
-
-    List<Expense> resultingList = [];
+  void _filterFromMemory() {
     final now = DateTime.now();
+    final isCustom = widget.period == TimePeriod.Custom;
+    final hasCustomRange = _startDate != null && _endDate != null;
 
-    if (widget.period == TimePeriod.Custom) {
-      if (_startDate != null && _endDate != null) {
-        // FIX 2: Validate date range before filtering.
-        if (_startDate!.isAfter(_endDate!)) {
-          NotificationService.instance.showError('Start date must be before end date');
-          setState(() => _isLoading = false);
-          return;
-        }
-        resultingList = _allExpenses.where((expense) {
-          return !expense.dateandTime.isBefore(_startDate!) &&
-              expense.dateandTime.isBefore(_endDate!.add(const Duration(days: 1)));
-        }).toList();
+    if (isCustom && hasCustomRange && _startDate!.isAfter(_endDate!)) {
+      NotificationService.instance.showError('Start date must be before end date');
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    // Pre-compute date boundaries
+    late final DateTime startBound;
+    late final DateTime endBound;
+
+    if (isCustom) {
+      if (!hasCustomRange) {
+        setState(() {
+          _filteredExpenses = [];
+          _totalExpenses = 0.0;
+          _totalCount = 0;
+          _averageExpense = 0.0;
+          _currentPage = 0;
+          _isLoading = false;
+        });
+        return;
       }
+      startBound = _startDate!;
+      endBound = DateTime(_endDate!.year, _endDate!.month, _endDate!.day + 1);
     } else {
       switch (widget.period) {
         case TimePeriod.Today:
-          resultingList = _allExpenses.where((expense) {
-            return expense.dateandTime.year == now.year &&
-                expense.dateandTime.month == now.month &&
-                expense.dateandTime.day == now.day;
-          }).toList();
+          startBound = DateTime(now.year, now.month, now.day);
+          endBound = DateTime(now.year, now.month, now.day + 1);
           break;
         case TimePeriod.ThisWeek:
           final dayOfWeek = now.subtract(Duration(days: now.weekday - 1));
-          final startOfWeek = DateTime(dayOfWeek.year, dayOfWeek.month, dayOfWeek.day);
-          final endOfWeek = startOfWeek.add(const Duration(days: 7));
-
-          resultingList = _allExpenses.where((expense) {
-            return !expense.dateandTime.isBefore(startOfWeek) && expense.dateandTime.isBefore(endOfWeek);
-          }).toList();
+          startBound = DateTime(dayOfWeek.year, dayOfWeek.month, dayOfWeek.day);
+          endBound = startBound.add(const Duration(days: 7));
           break;
         case TimePeriod.Month:
-          resultingList = _allExpenses.where((expense) {
-            return expense.dateandTime.year == now.year && expense.dateandTime.month == now.month;
-          }).toList();
+          startBound = DateTime(now.year, now.month, 1);
+          endBound = DateTime(now.year, now.month + 1, 1);
           break;
         case TimePeriod.Year:
-          resultingList = _allExpenses.where((expense) {
-            return expense.dateandTime.year == now.year;
-          }).toList();
+          startBound = DateTime(now.year, 1, 1);
+          endBound = DateTime(now.year + 1, 1, 1);
           break;
         case TimePeriod.Custom:
+          startBound = now;
+          endBound = now;
           break;
       }
     }
 
-    // FIX 1: Sort newest-first so the most recent expense appears at the top.
-    resultingList.sort((a, b) => b.dateandTime.compareTo(a.dateandTime));
+    // Single-pass: filter + accumulate totals
+    final results = <Expense>[];
+    double totalAmount = 0.0;
+
+    for (final expense in expenseStore.expenses) {
+      if (expense.dateandTime.isBefore(startBound) || !expense.dateandTime.isBefore(endBound)) {
+        continue;
+      }
+      results.add(expense);
+      totalAmount += expense.amount;
+    }
+
+    results.sort((a, b) => b.dateandTime.compareTo(a.dateandTime));
 
     setState(() {
-      _filteredExpenses = resultingList;
-      _totalCount = _filteredExpenses.length;
-      _totalExpenses = _filteredExpenses.fold(0.0, (sum, expense) => sum + expense.amount);
+      _filteredExpenses = results;
+      _totalCount = results.length;
+      _totalExpenses = totalAmount;
       _averageExpense = _totalCount > 0 ? _totalExpenses / _totalCount : 0.0;
+      _currentPage = 0;
       _isLoading = false;
     });
   }
@@ -291,8 +314,6 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
       NotificationService.instance.showError('No data to export');
       return;
     }
-
-    final categoryNames = _getCategoryNames();
 
     final headers = [
       'Date & Time',
@@ -304,7 +325,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
 
     final data = _filteredExpenses.map((expense) => [
       ReportExportService.formatDateTime(expense.dateandTime),
-      categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
+      _categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
       expense.reason ?? '-',
       expense.paymentType ?? '-',
       ReportExportService.formatCurrency(expense.amount),
@@ -447,7 +468,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: (_startDate != null && _endDate != null) ? _fetchAndFilterData : null,
+                        onPressed: (_startDate != null && _endDate != null) ? _filterFromMemory : null,
                         icon: Icon(Icons.filter_list, size: isTablet ? 20 : 18),
                         label: Text(
                           'Apply Filter',
@@ -572,172 +593,41 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
         _buildExportButton(isTablet),
         SizedBox(height: 16),
         _buildDataTable(isTablet),
+        if (_filteredExpenses.length > _rowsPerPage) ...[
+          SizedBox(height: 16),
+          _buildPaginationControls(),
+        ],
       ],
     );
   }
 
   Widget _buildSummaryCards(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
-
     return Row(
       children: [
         Expanded(
-          flex: 1,
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider, width: 0.5),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Total Expenses',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.money_off, color: Colors.red, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isDesktop ? 16 : 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: ReportSummaryCard(
+            title: 'Total Expenses',
+            value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
+            icon: Icons.money_off,
+            color: Colors.red,
           ),
         ),
-        SizedBox(width: isDesktop ? 24 : 16),
+        AppResponsive.horizontalSpace(context),
         Expanded(
-          flex: 1,
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider, width: 0.5),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Total Count',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.receipt_long, color: Colors.orange, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isDesktop ? 16 : 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      _totalCount.toString(),
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: ReportSummaryCard(
+            title: 'Total Count',
+            value: _totalCount.toString(),
+            icon: Icons.receipt_long,
+            color: Colors.orange,
           ),
         ),
-        SizedBox(width: isDesktop ? 24 : 16),
+        AppResponsive.horizontalSpace(context),
         Expanded(
-          flex: 1,
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider, width: 0.5),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Average',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Container(
-                      padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.analytics, color: AppColors.primary, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
-                    ),
-                  ],
-                ),
-                SizedBox(height: isDesktop ? 16 : 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageExpense)}',
-                      style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: ReportSummaryCard(
+            title: 'Average',
+            value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageExpense)}',
+            icon: Icons.analytics,
+            color: AppColors.primary,
           ),
         ),
       ],
@@ -767,11 +657,37 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
     );
   }
 
+  Widget _buildPaginationControls() {
+    final totalPages = (_filteredExpenses.length / _rowsPerPage).ceil();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+          icon: Icon(Icons.chevron_left),
+          color: AppColors.primary,
+        ),
+        Text(
+          'Page ${_currentPage + 1} of $totalPages',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        IconButton(
+          onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+          icon: Icon(Icons.chevron_right),
+          color: AppColors.primary,
+        ),
+      ],
+    );
+  }
+
   Widget _buildDataTable(bool isTablet) {
     final screenWidth = AppResponsive.screenWidth(context);
     final cellFontSize = AppResponsive.smallFontSize(context);
     final headerFontSize = AppResponsive.bodyFontSize(context);
-    final categoryNames = _getCategoryNames();
 
     return Container(
       width: double.infinity,
@@ -804,7 +720,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                 DataColumn(label: Text('Payment', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
                 DataColumn(label: Text('Amount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
               ],
-              rows: _filteredExpenses.map((expense) {
+              rows: _filteredExpenses.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).map((expense) {
                 return DataRow(
                   cells: [
                     DataCell(Text(DateFormat('dd-MM-yy\nHH:mm').format(expense.dateandTime), style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
@@ -815,11 +731,11 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
                           vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
+                          _categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
                           style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context), color: AppColors.primary, fontWeight: FontWeight.w500),
                         ),
                       ),

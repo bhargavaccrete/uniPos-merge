@@ -5,6 +5,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
@@ -264,23 +265,24 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
   ];
 
   bool _isLoading = true;
+  bool _isDataLoaded = false;
+  int _currentPage = 0;
+  static const int _rowsPerPage = 50;
 
   @override
   void initState() {
     super.initState();
     _initializeYears();
-    _loadDataAndFilter();
+    _loadAndFilter();
   }
 
   @override
   void didUpdateWidget(covariant VoidOrderDataView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadDataAndFilter();
-
-    // Reset custom dates when switching periods
     if (widget.period != oldWidget.period) {
       _startDate = null;
       _endDate = null;
+      _filterFromMemory();
     }
   }
 
@@ -289,99 +291,80 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     _years = List.generate(10, (index) => currentYear - index);
   }
 
-  Future<void> _loadDataAndFilter() async {
-    setState(() => _isLoading = true);
-
-    try {
+  Future<void> _loadAndFilter() async {
+    if (!_isDataLoaded) {
+      setState(() => _isLoading = true);
       await pastOrderStore.loadPastOrders();
-      final allOrders = pastOrderStore.pastOrders
-          .where((order) {
-            final status = order.orderStatus?.toUpperCase() ?? '';
-            return status == 'VOID' || status == 'VOIDED';
-          })
-          .toList();
-
-      _filterOrdersByPeriod(allOrders);
-    } catch (e) {
-      debugPrint('Error loading void orders: $e');
-      setState(() {
-        _voidOrders = [];
-        _calculateSummary();
-        _isLoading = false;
-      });
+      _isDataLoaded = true;
     }
+    _filterFromMemory();
   }
 
-  void _filterOrdersByPeriod(List<PastOrderModel> orders) {
+  /// Single-pass filter: void status + date boundary in one loop.
+  void _filterFromMemory() {
     final now = DateTime.now();
-    List<PastOrderModel> filtered = [];
+    final results = <PastOrderModel>[];
+    double totalAmount = 0.0;
 
-    switch (widget.period) {
-      case VoidOrderPeriod.Today:
-        final today = DateTime(now.year, now.month, now.day);
-        // FIX 1: Guard orderAt null before force-unwrap.
-        filtered = orders.where((order) {
-          if (order.orderAt == null) return false;
-          final orderDate = order.orderAt!;
-          final orderDay = DateTime(orderDate.year, orderDate.month, orderDate.day);
-          return orderDay == today;
-        }).toList();
-        break;
+    // Pre-compute date boundaries
+    final isCustom = widget.period == VoidOrderPeriod.Custom;
+    final hasCustomRange = isCustom && _startDate != null && _endDate != null;
 
-      case VoidOrderPeriod.ThisWeek:
-        final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-        final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-        // FIX 1: Guard orderAt null; FIX 2: use !isBefore for inclusive Monday boundary.
-        filtered = orders.where((order) {
-          if (order.orderAt == null) return false;
-          return !order.orderAt!.isBefore(startOfWeekDate);
-        }).toList();
-        break;
+    late final DateTime startBound;
+    late final DateTime endBound;
 
-      case VoidOrderPeriod.Month:
-        // FIX 1: Guard orderAt null before force-unwrap.
-        filtered = orders.where((order) {
-          if (order.orderAt == null) return false;
-          final orderDate = order.orderAt!;
-          return orderDate.year == _selectedMonthYear && orderDate.month == _selectedMonth;
-        }).toList();
-        break;
-
-      case VoidOrderPeriod.Year:
-        // FIX 1: Guard orderAt null before force-unwrap.
-        filtered = orders.where((order) {
-          if (order.orderAt == null) return false;
-          return order.orderAt!.year == _selectedYear;
-        }).toList();
-        break;
-
-      case VoidOrderPeriod.Custom:
-        if (_startDate != null && _endDate != null) {
-          final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
-          final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
-
-          // FIX 1: Guard orderAt null before force-unwrap.
-          filtered = orders.where((order) {
-            if (order.orderAt == null) return false;
-            final orderDate = order.orderAt!;
-            return !orderDate.isBefore(start) && !orderDate.isAfter(end);
-          }).toList();
-        }
-        break;
+    if (!isCustom) {
+      switch (widget.period) {
+        case VoidOrderPeriod.Today:
+          startBound = DateTime(now.year, now.month, now.day);
+          endBound = startBound.add(const Duration(days: 1));
+          break;
+        case VoidOrderPeriod.ThisWeek:
+          final weekStart = now.subtract(Duration(days: now.weekday - 1));
+          startBound = DateTime(weekStart.year, weekStart.month, weekStart.day);
+          endBound = startBound.add(const Duration(days: 7));
+          break;
+        case VoidOrderPeriod.Month:
+          startBound = DateTime(_selectedMonthYear, _selectedMonth);
+          endBound = DateTime(_selectedMonthYear, _selectedMonth + 1);
+          break;
+        case VoidOrderPeriod.Year:
+          startBound = DateTime(_selectedYear);
+          endBound = DateTime(_selectedYear + 1);
+          break;
+        case VoidOrderPeriod.Custom:
+          break;
+      }
+    } else if (hasCustomRange) {
+      startBound = _startDate!;
+      endBound = _endDate!.add(const Duration(days: 1));
     }
+
+    for (final order in pastOrderStore.pastOrders) {
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status != 'VOID' && status != 'VOIDED') continue;
+      if (order.orderAt == null) continue;
+      if (isCustom && !hasCustomRange) continue;
+
+      if (order.orderAt!.isBefore(startBound) || !order.orderAt!.isBefore(endBound)) {
+        continue;
+      }
+
+      results.add(order);
+      totalAmount += order.totalPrice;
+    }
+
+    results.sort((a, b) =>
+        (b.orderAt ?? DateTime(2000)).compareTo(a.orderAt ?? DateTime(2000)));
 
     setState(() {
-      _voidOrders = filtered;
-      _calculateSummary();
+      _voidOrders = results;
+      _totalVoidCount = results.length;
+      _totalVoidAmount = totalAmount;
+      _averageVoidAmount = _totalVoidCount > 0 ? totalAmount / _totalVoidCount : 0.0;
+      _currentPage = 0;
       _isLoading = false;
     });
-  }
-
-  void _calculateSummary() {
-    _totalVoidCount = _voidOrders.length;
-    // FIX 3: totalPrice is non-nullable double — no need for tryParse.
-    _totalVoidAmount = _voidOrders.fold(0.0, (sum, order) => sum + order.totalPrice);
-    _averageVoidAmount = _totalVoidCount > 0 ? _totalVoidAmount / _totalVoidCount : 0.0;
   }
 
   @override
@@ -408,24 +391,13 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
               horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
               vertical: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
             ),
-            child: isDesktop
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
                     children: [
-                      Expanded(child: _buildSummaryCard(context, 'Total Voids', _totalVoidCount.toString(), Icons.cancel_outlined, Colors.red)),
-                      const SizedBox(width: 20),
-                      Expanded(child: _buildSummaryCard(context, 'Total Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalVoidAmount)}', Icons.attach_money, Colors.orange)),
-                      const SizedBox(width: 20),
-                      Expanded(child: _buildSummaryCard(context, 'Average', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageVoidAmount)}', Icons.analytics, AppColors.primary)),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      _buildSummaryCard(context, 'Total Voids', _totalVoidCount.toString(), Icons.cancel_outlined, Colors.red),
-                      const SizedBox(height: 16),
-                      _buildSummaryCard(context, 'Total Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalVoidAmount)}', Icons.attach_money, Colors.orange),
-                      const SizedBox(height: 16),
-                      _buildSummaryCard(context, 'Average', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageVoidAmount)}', Icons.analytics, AppColors.primary),
+                      Expanded(child: ReportSummaryCard(title: 'Total Voids', value: _totalVoidCount.toString(), icon: Icons.cancel_outlined, color: Colors.red)),
+                      AppResponsive.horizontalSpace(context),
+                      Expanded(child: ReportSummaryCard(title: 'Total Amount', value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalVoidAmount)}', icon: Icons.attach_money, color: Colors.orange)),
+                      AppResponsive.horizontalSpace(context),
+                      Expanded(child: ReportSummaryCard(title: 'Average', value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageVoidAmount)}', icon: Icons.analytics, color: AppColors.primary)),
                     ],
                   ),
           ),
@@ -477,6 +449,14 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
             _buildEmptyState(context)
           else
             _buildOrdersTable(context),
+
+          if (_voidOrders.length > _rowsPerPage)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
+              ),
+              child: _buildPaginationControls(),
+            ),
 
           SizedBox(height: AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0)),
         ],
@@ -555,7 +535,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: (_startDate != null && _endDate != null) ? _loadDataAndFilter : null,
+              onPressed: (_startDate != null && _endDate != null) ? _filterFromMemory : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.white,
@@ -767,7 +747,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _loadDataAndFilter,
+              onPressed: _filterFromMemory,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.white,
@@ -855,7 +835,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _loadDataAndFilter,
+              onPressed: _filterFromMemory,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.white,
@@ -880,78 +860,6 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context, String title, String value, IconData icon, Color iconColor) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = AppResponsive.isDesktop(context);
-    final isTablet = AppResponsive.isTablet(context);
-
-    return Container(
-      width: isDesktop ? (screenWidth - 88) / 3 : (screenWidth - 48),
-      padding: EdgeInsets.all(isTablet ? 24 : 16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: isDesktop ? 16 : (isTablet ? 14 : 12),
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              SizedBox(width: 4),
-              Container(
-                padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 6)),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: isDesktop ? 28 : (isTablet ? 22 : 16),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: isTablet ? 16 : 12),
-          SizedBox(
-            width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: isDesktop ? 32 : (isTablet ? 24 : 22),
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
@@ -1000,9 +908,64 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     );
   }
 
+  Widget _buildPaginationControls() {
+    final totalPages = (_voidOrders.length / _rowsPerPage).ceil();
+    final start = _currentPage * _rowsPerPage + 1;
+    final end = ((_currentPage + 1) * _rowsPerPage).clamp(1, _voidOrders.length);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Showing $start–$end of ${_voidOrders.length} orders',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                icon: const Icon(Icons.chevron_left),
+                iconSize: 24,
+                color: AppColors.primary,
+                disabledColor: AppColors.divider,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${_currentPage + 1} / $totalPages',
+                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                ),
+              ),
+              IconButton(
+                onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+                icon: const Icon(Icons.chevron_right),
+                iconSize: 24,
+                color: AppColors.primary,
+                disabledColor: AppColors.divider,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOrdersTable(BuildContext context) {
     final isDesktop = AppResponsive.isDesktop(context);
     final isTablet = AppResponsive.isTablet(context);
+    final pageOrders = _voidOrders.length <= _rowsPerPage
+        ? _voidOrders
+        : _voidOrders.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).toList();
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -1090,7 +1053,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                     ),
                   ),
                 ],
-                rows: _voidOrders.map((order) {
+                rows: pageOrders.map((order) {
                   // FIX 1 & 3: orderAt guarded; totalPrice used directly.
                   final orderDate = order.orderAt ?? DateTime.now();
                   final formattedDate = DateFormat('dd/MM/yyyy').format(orderDate);

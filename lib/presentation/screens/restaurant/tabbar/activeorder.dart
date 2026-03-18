@@ -642,23 +642,34 @@ class _ActiveorderState extends State<Activeorder> {
       backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
-          // Order Type Filter Row
+          // Order Type Filter + Search Row
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             color: AppColors.white,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Order Type',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
+                // Search field takes available space
+                Expanded(
+                  child: AppTextField(
+                    controller: _searchController,
+                    hint: 'Search customer, table, KOT…',
+                    icon: Icons.search_rounded,
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
                   ),
                 ),
+                SizedBox(width: 10),
+                // Compact dropdown
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(8),
@@ -666,10 +677,11 @@ class _ActiveorderState extends State<Activeorder> {
                   ),
                   child: DropdownButton<String>(
                     value: dropDownValue,
+                    isDense: true,
                     underline: SizedBox(),
-                    icon: Icon(Icons.keyboard_arrow_down, color: AppColors.textPrimary),
+                    icon: Icon(Icons.keyboard_arrow_down, size: 20, color: AppColors.textPrimary),
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
                     ),
@@ -687,26 +699,6 @@ class _ActiveorderState extends State<Activeorder> {
                   ),
                 ),
               ],
-            ),
-          ),
-
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: AppTextField(
-              controller: _searchController,
-              hint: 'Search by customer, table or KOT…',
-              icon: Icons.search_rounded,
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-              onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
             ),
           ),
 

@@ -8,7 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/dashboard.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
@@ -108,17 +108,19 @@ class _loginScreenState extends State<loginScreen> {
                     SizedBox(
                         height:
                             AppResponsive.height(context, 0.02)),
-                    CommonTextForm(
-                      obsecureText: false,
+                    AppTextField(
                       focusNode: emailFocus,
                       controller: emailController,
+                      hint: 'Enter Email',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return "please Enter Email";
                         }
+                        return null;
                       },
-                      hintText: 'Enter Email',
-                      onfieldsumbitted: (value) {
+                      onFieldSubmitted: (value) {
                         FocusScope.of(context).requestFocus(passwordFocus);
                       },
                     ),
@@ -152,12 +154,13 @@ class _loginScreenState extends State<loginScreen> {
                     ValueListenableBuilder(
                         valueListenable: obsecurepass,
                         builder: (context, value, child) {
-                          return CommonTextForm(
+                          return AppTextField(
                             controller: passwordController,
                             focusNode: passwordFocus,
-                            obsecureText: obsecurepass.value,
-                            hintText: 'Enter Password',
-                            gesture: GestureDetector(
+                            obscureText: obsecurepass.value,
+                            hint: 'Enter Password',
+                            icon: Icons.lock_outline,
+                            suffixIcon: GestureDetector(
                                 onTap: () {
                                   obsecurepass.value = !obsecurepass.value;
                                 },
@@ -172,6 +175,7 @@ class _loginScreenState extends State<loginScreen> {
                                     ? 'Please Enter Password'
                                     : 'minimum 6 six digit Required';
                               }
+                              return null;
                             },
                           );
                         }),

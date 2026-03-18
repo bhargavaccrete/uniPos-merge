@@ -7,6 +7,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
 
 enum ComparisonPeriod { Today, ThisWeek, MonthWise, YearWise }
 
@@ -475,34 +476,31 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildSummaryCard(
-                        context,
-                        'Total Products',
-                        totalProducts.toString(),
-                        Icons.inventory_2_outlined,
-                        Colors.blue,
+                      child: ReportSummaryCard(
+                        title: 'Total Products',
+                        value: totalProducts.toString(),
+                        icon: Icons.inventory_2_outlined,
+                        color: Colors.blue,
                       ),
                     ),
                     SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
-                      child: _buildSummaryCard(
-                        context,
-                        'Top Gainer',
-                        topGainer != null ? '+${topGainer.difference}' : 'N/A',
-                        Icons.trending_up,
-                        Colors.green,
+                      child: ReportSummaryCard(
+                        title: 'Top Gainer',
+                        value: topGainer != null ? '+${topGainer.difference}' : 'N/A',
+                        icon: Icons.trending_up,
+                        color: Colors.green,
                         subtitle: topGainer?.productName,
                       ),
                     ),
                   ],
                 ),
                 SizedBox(height: AppResponsive.smallSpacing(context)),
-                _buildSummaryCard(
-                  context,
-                  'Top Decliner',
-                  topDecliner != null ? '${topDecliner.difference}' : 'N/A',
-                  Icons.trending_down,
-                  Colors.red,
+                ReportSummaryCard(
+                  title: 'Top Decliner',
+                  value: topDecliner != null ? '${topDecliner.difference}' : 'N/A',
+                  icon: Icons.trending_down,
+                  color: Colors.red,
                   subtitle: topDecliner?.productName,
                 ),
 
@@ -745,79 +743,6 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     );
   }
 
-  Widget _buildSummaryCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-    Color color, {
-    String? subtitle,
-  }) {
-    return Container(
-      padding: AppResponsive.cardPadding(context),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: AppResponsive.iconSize(context),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: AppResponsive.smallSpacing(context)),
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.captionFontSize(context),
-              color: Colors.grey[600],
-            ),
-          ),
-          SizedBox(height: AppResponsive.smallSpacing(context) / 2),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.subheadingFontSize(context),
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          if (subtitle != null) ...[
-            SizedBox(height: AppResponsive.smallSpacing(context) / 2),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.captionFontSize(context),
-                color: Colors.grey[500],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildEmptyState(BuildContext context, String message) {
     return Container(

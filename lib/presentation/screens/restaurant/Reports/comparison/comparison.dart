@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
@@ -25,12 +23,6 @@ class _SalesComparisonState extends State<SalesComparison> {
   ComparisonPeriod _selectedPeriod = ComparisonPeriod.Month;
 
   @override
-  void initState() {
-    super.initState();
-    pastOrderStore.loadPastOrders();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -45,7 +37,7 @@ class _SalesComparisonState extends State<SalesComparison> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -61,7 +53,7 @@ class _SalesComparisonState extends State<SalesComparison> {
                         child: Container(
                           padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                           ),
                           child: Icon(
@@ -157,7 +149,6 @@ class _SalesComparisonState extends State<SalesComparison> {
             // Content
             Expanded(
               child: ComparisonReportView(
-                key: ValueKey(_selectedPeriod),
                 period: _selectedPeriod,
               ),
             ),
@@ -193,15 +184,31 @@ class ComparisonReportView extends StatefulWidget {
 }
 
 class _ComparisonReportViewState extends State<ComparisonReportView> {
+  bool _isLoading = true;
+  bool _isDataLoaded = false;
+  ComparisonData? _data;
+
   @override
   void initState() {
     super.initState();
     _loadData();
   }
 
+  @override
+  void didUpdateWidget(covariant ComparisonReportView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.period != oldWidget.period) {
+      _generateComparisonData();
+    }
+  }
+
   Future<void> _loadData() async {
-    await pastOrderStore.loadPastOrders();
-    if (mounted) setState(() {});
+    if (!_isDataLoaded) {
+      setState(() => _isLoading = true);
+      await pastOrderStore.loadPastOrders();
+      _isDataLoaded = true;
+    }
+    _generateComparisonData();
   }
 
   TrendCategory _getTrendCategory(double growthPercentage) {
@@ -247,64 +254,56 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     }
   }
 
-  ComparisonData _calculateComparisonData() {
-    final allOrders = pastOrderStore.pastOrders.toList();
+  /// Single-pass comparison with half-open intervals [start, end) and consistent amount formula.
+  void _generateComparisonData() {
     final now = DateTime.now();
 
-    DateTime currentStart, currentEnd, previousStart, previousEnd;
+    late final DateTime currentStart;
+    late final DateTime previousStart;
+    late final DateTime previousEnd; // half-open: previousEnd == currentStart for adjacent periods
     String currentLabel, previousLabel;
 
     switch (widget.period) {
       case ComparisonPeriod.Week:
-        final weekDay = now.weekday;
-        currentStart = now.subtract(Duration(days: weekDay - 1));
-        currentStart = DateTime(currentStart.year, currentStart.month, currentStart.day);
-        currentEnd = DateTime.now();
+        currentStart = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
         previousStart = currentStart.subtract(const Duration(days: 7));
-        previousEnd = currentStart.subtract(const Duration(seconds: 1));
+        previousEnd = currentStart;
         currentLabel = 'This Week';
         previousLabel = 'Last Week';
         break;
 
       case ComparisonPeriod.WeekYoY:
-        final weekDay = now.weekday;
-        currentStart = now.subtract(Duration(days: weekDay - 1));
-        currentStart = DateTime(currentStart.year, currentStart.month, currentStart.day);
-        currentEnd = DateTime.now();
-
+        currentStart = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
         final lastYearSameDate = DateTime(now.year - 1, now.month, now.day);
-        final lastYearWeekDay = lastYearSameDate.weekday;
-        previousStart = lastYearSameDate.subtract(Duration(days: lastYearWeekDay - 1));
-        previousStart = DateTime(previousStart.year, previousStart.month, previousStart.day);
-        previousEnd = previousStart.add(Duration(days: DateTime.now().difference(currentStart).inDays));
-
+        previousStart = DateTime(lastYearSameDate.year, lastYearSameDate.month, lastYearSameDate.day)
+            .subtract(Duration(days: lastYearSameDate.weekday - 1));
+        previousEnd = previousStart.add(const Duration(days: 7));
         currentLabel = 'This Week';
         previousLabel = 'Same Week Last Year';
         break;
 
       case ComparisonPeriod.Month:
         currentStart = DateTime(now.year, now.month, 1);
-        currentEnd = DateTime.now();
         previousStart = DateTime(now.year, now.month - 1, 1);
-        previousEnd = currentStart.subtract(const Duration(seconds: 1));
+        previousEnd = currentStart;
         currentLabel = DateFormat('MMMM yyyy').format(now);
-        previousLabel = DateFormat('MMMM yyyy').format(DateTime(now.year, now.month - 1, 1));
+        previousLabel = DateFormat('MMMM yyyy').format(previousStart);
         break;
 
       case ComparisonPeriod.MonthYoY:
         currentStart = DateTime(now.year, now.month, 1);
-        currentEnd = DateTime.now();
         previousStart = DateTime(now.year - 1, now.month, 1);
-        previousEnd = DateTime(now.year - 1, now.month, now.day, 23, 59, 59);
+        previousEnd = DateTime(now.year - 1, now.month + 1, 1);
         currentLabel = DateFormat('MMMM yyyy').format(now);
-        previousLabel = DateFormat('MMMM yyyy').format(DateTime(now.year - 1, now.month, 1));
+        previousLabel = DateFormat('MMMM yyyy').format(previousStart);
         break;
 
       case ComparisonPeriod.Year:
         currentStart = DateTime(now.year, 1, 1);
-        currentEnd = DateTime.now();
         previousStart = DateTime(now.year - 1, 1, 1);
-        previousEnd = DateTime(now.year - 1, 12, 31, 23, 59, 59);
+        previousEnd = currentStart;
         currentLabel = '${now.year}';
         previousLabel = '${now.year - 1}';
         break;
@@ -315,22 +314,20 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     int previousOrders = 0;
     double previousAmount = 0.0;
 
-    for (final order in allOrders) {
-      final status = (order.orderStatus ?? '').toUpperCase();
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
+    for (final order in pastOrderStore.pastOrders) {
+      final status = order.orderStatus ?? '';
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
-      final netAmount = (order.totalPrice ?? 0.0) - (order.refundAmount ?? 0.0);
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
 
-      // Current period
-      if (order.orderAt!.isAfter(currentStart.subtract(const Duration(seconds: 1))) &&
-          order.orderAt!.isBefore(currentEnd.add(const Duration(seconds: 1)))) {
+      // Current period [currentStart, now]
+      if (!order.orderAt!.isBefore(currentStart)) {
         currentOrders++;
         currentAmount += netAmount;
       }
-      // Previous period
-      else if (order.orderAt!.isAfter(previousStart.subtract(const Duration(seconds: 1))) &&
-          order.orderAt!.isBefore(previousEnd.add(const Duration(seconds: 1)))) {
+      // Previous period [previousStart, previousEnd)
+      else if (!order.orderAt!.isBefore(previousStart) && order.orderAt!.isBefore(previousEnd)) {
         previousOrders++;
         previousAmount += netAmount;
       }
@@ -351,38 +348,39 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       amountGrowth = 100.0;
     }
 
-    // Calculate average order value
     final currentAOV = currentOrders > 0 ? currentAmount / currentOrders : 0.0;
     final previousAOV = previousOrders > 0 ? previousAmount / previousOrders : 0.0;
 
-    // Calculate days in period
-    final currentDays = currentEnd.difference(currentStart).inDays + 1;
-    final previousDays = previousEnd.difference(previousStart).inDays + 1;
+    final currentDays = now.difference(currentStart).inDays + 1;
+    final previousDays = previousEnd.difference(previousStart).inDays;
 
-    // Calculate orders per day
     final currentOrdersPerDay = currentDays > 0 ? currentOrders / currentDays : 0.0;
     final previousOrdersPerDay = previousDays > 0 ? previousOrders / previousDays : 0.0;
 
-    return ComparisonData(
-      currentPeriod: currentLabel,
-      previousPeriod: previousLabel,
-      currentOrders: currentOrders,
-      currentAmount: currentAmount,
-      previousOrders: previousOrders,
-      previousAmount: previousAmount,
-      ordersGrowth: ordersGrowth,
-      amountGrowth: amountGrowth,
-      currentAOV: currentAOV,
-      previousAOV: previousAOV,
-      currentOrdersPerDay: currentOrdersPerDay,
-      previousOrdersPerDay: previousOrdersPerDay,
-      trendCategory: _getTrendCategory(amountGrowth),
-      trendArrow: _getTrendArrow(amountGrowth),
-    );
+    setState(() {
+      _data = ComparisonData(
+        currentPeriod: currentLabel,
+        previousPeriod: previousLabel,
+        currentOrders: currentOrders,
+        currentAmount: currentAmount,
+        previousOrders: previousOrders,
+        previousAmount: previousAmount,
+        ordersGrowth: ordersGrowth,
+        amountGrowth: amountGrowth,
+        currentAOV: currentAOV,
+        previousAOV: previousAOV,
+        currentOrdersPerDay: currentOrdersPerDay,
+        previousOrdersPerDay: previousOrdersPerDay,
+        trendCategory: _getTrendCategory(amountGrowth),
+        trendArrow: _getTrendArrow(amountGrowth),
+      );
+      _isLoading = false;
+    });
   }
 
   Future<void> _exportReport() async {
-    final data = _calculateComparisonData();
+    if (_data == null) return;
+    final data = _data!;
 
     final headers = ['Metric', data.previousPeriod, data.currentPeriod, 'Growth %'];
 
@@ -433,15 +431,15 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
 
   @override
   Widget build(BuildContext context) {
-    return Observer(
-      builder: (_) {
-        if (pastOrderStore.isLoading) {
-          return Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
-        }
+    if (_isLoading || _data == null) {
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
 
-        final data = _calculateComparisonData();
+    return Builder(
+      builder: (_) {
+        final data = _data!;
         final trendColor = _getTrendColor(data.trendCategory);
         final trendLabel = _getTrendLabel(data.trendCategory);
 
@@ -460,7 +458,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                     borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -587,7 +585,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                     borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -599,7 +597,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                       Container(
                         padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                         decoration: BoxDecoration(
-                          color: trendColor.withOpacity(0.1),
+                          color: trendColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                         ),
                         child: Icon(
@@ -676,7 +674,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                     borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -800,7 +798,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
         borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -814,7 +812,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
               Container(
                 padding: EdgeInsets.all(AppResponsive.smallSpacing(context) / 1.5),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                 ),
                 child: Icon(
@@ -860,7 +858,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: growthPercentage >= 0 ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                    color: growthPercentage >= 0 ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -925,8 +923,8 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                   ),
                   decoration: BoxDecoration(
                     color: growthPercentage >= 0
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.red.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(

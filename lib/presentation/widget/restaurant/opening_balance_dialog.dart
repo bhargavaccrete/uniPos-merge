@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 
 class OpeningBalanceDialog extends StatefulWidget {
@@ -178,86 +179,31 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
 
                     const SizedBox(height: 20),
 
-                    // Amount input card
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _errorText != null
-                              ? Colors.red
-                              : AppColors.primary.withValues(alpha: 0.2),
-                          width: 1.5,
+                    // Amount input
+                    AppTextField(
+                      controller: _openingBalanceController,
+                      label: 'Cash in Drawer',
+                      hint: '0.00',
+                      icon: Icons.account_balance_wallet_outlined,
+                      prefixWidget: Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: Text(
+                          '₹',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Cash in Drawer',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                '₹',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: IntrinsicWidth(
-                                  child: TextField(
-                                    controller: _openingBalanceController,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                                    ],
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    onChanged: (_) {
-                                      if (_errorText != null) setState(() => _errorText = null);
-                                    },
-                                    decoration: InputDecoration(
-                                      hintText: '0.00',
-                                      hintStyle: GoogleFonts.poppins(
-                                        fontSize: 30,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.divider,
-                                      ),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_errorText != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _errorText!,
-                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.red),
-                            ),
-                          ],
-                        ],
-                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                      ],
+                      validator: (_) => _errorText,
+                      onChanged: (_) {
+                        if (_errorText != null) setState(() => _errorText = null);
+                      },
                     ),
 
                     const SizedBox(height: 8),

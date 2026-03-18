@@ -10,6 +10,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/expensel_316.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 class ViewExpense extends StatefulWidget {
   const ViewExpense({super.key});
 
@@ -217,35 +218,14 @@ class _ViewExpenseState extends State<ViewExpense> {
                       ),
                     ),
                     SizedBox(height: 10),
-                    TextField(
+                    AppTextField(
                       controller: amountController,
+                      hint: 'Enter amount',
+                      icon: Icons.attach_money,
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                       ],
-                      style: GoogleFonts.poppins(fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: 'Enter amount',
-                        hintStyle: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey.shade400,
-                        ),
-                        filled: true,
-                        fillColor: AppColors.surfaceLight,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.divider),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.divider),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.primary, width: 2),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      ),
                     ),
                     SizedBox(height: 16),
                     Text(
@@ -310,31 +290,10 @@ class _ViewExpenseState extends State<ViewExpense> {
                       ),
                     ),
                     SizedBox(height: 10),
-                    TextField(
+                    AppTextField(
                       controller: reasonController,
-                      style: GoogleFonts.poppins(fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: 'Enter reason (optional)',
-                        hintStyle: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey.shade400,
-                        ),
-                        filled: true,
-                        fillColor: AppColors.surfaceLight,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.divider),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.divider),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.primary, width: 2),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      ),
+                      hint: 'Enter reason (optional)',
+                      icon: Icons.note_alt_outlined,
                     ),
                     SizedBox(height: 16),
                     Text(

@@ -6,6 +6,7 @@ import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 /// Full-detail item list opened from the Setup Wizard "View Added Items" banner.
 /// Shows every item in itemStore with variants, choices, extras, stock, tax.
@@ -90,44 +91,21 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
     return Container(
       color: AppColors.white,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: TextField(
+      child: AppTextField(
         controller: _searchController,
         focusNode: _searchFocus,
-        style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          hintText: 'Search by name or category…',
-          hintStyle: GoogleFonts.poppins(
-              fontSize: 13, color: AppColors.textSecondary),
-          prefixIcon:
-              const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
-          suffixIcon: _query.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    _searchController.clear();
-                    _searchFocus.unfocus();
-                  },
-                  child: const Icon(Icons.close,
-                      color: AppColors.textSecondary, size: 18),
-                )
-              : null,
-          filled: true,
-          fillColor: AppColors.surfaceLight,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.divider),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.divider),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.5),
-          ),
-        ),
+        hint: 'Search by name or category…',
+        icon: Icons.search,
+        suffixIcon: _query.isNotEmpty
+            ? GestureDetector(
+                onTap: () {
+                  _searchController.clear();
+                  _searchFocus.unfocus();
+                },
+                child: const Icon(Icons.close,
+                    color: AppColors.textSecondary, size: 18),
+              )
+            : null,
       ),
     );
   }

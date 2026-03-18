@@ -159,6 +159,15 @@ mixin _$PastOrderStore on _PastOrderStore, Store {
     return _$loadPastOrdersAsyncAction.run(() => super.loadPastOrders());
   }
 
+  late final _$loadOrdersByDateRangeAsyncAction =
+      AsyncAction('_PastOrderStore.loadOrdersByDateRange', context: context);
+
+  @override
+  Future<void> loadOrdersByDateRange(DateTime start, DateTime end) {
+    return _$loadOrdersByDateRangeAsyncAction
+        .run(() => super.loadOrdersByDateRange(start, end));
+  }
+
   late final _$refreshAsyncAction =
       AsyncAction('_PastOrderStore.refresh', context: context);
 

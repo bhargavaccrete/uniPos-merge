@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 class ExtraTabex extends StatefulWidget {
   const ExtraTabex({super.key});
 
@@ -381,29 +381,10 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                   SizedBox(
                                                     height: 10,
                                                   ),
-                                                  TextField(
-                                                    controller:
-                                                    ToppingController,
-                                                    decoration:
-                                                    InputDecoration(
-                                                      focusColor:
-                                                      Colors.red,
-                                                      focusedBorder: OutlineInputBorder(
-                                                          borderRadius:
-                                                          BorderRadius
-                                                              .circular(
-                                                              2)),
-                                                      labelStyle:
-                                                      GoogleFonts
-                                                          .poppins(
-                                                        color:
-                                                        Colors.grey,
-                                                      ),
-                                                      border:
-                                                      OutlineInputBorder(),
-                                                      labelText:
-                                                      "Extra Name ",
-                                                    ),
+                                                  AppTextField(
+                                                    controller: ToppingController,
+                                                    label: 'Extra Name',
+                                                    icon: Icons.restaurant_menu,
                                                   ),
                                                   SizedBox(
                                                     height: 10,
@@ -573,29 +554,11 @@ class _ExtraTabexState extends State<ExtraTabex> {
                                                     ],
                                                   ),
 
-                                                  TextField(
-                                                    controller:
-                                                    PriceController,
-                                                    decoration:
-                                                    InputDecoration(
-                                                      focusColor:
-                                                      Colors.red,
-                                                      focusedBorder: OutlineInputBorder(
-                                                          borderRadius:
-                                                          BorderRadius
-                                                              .circular(
-                                                              2)),
-                                                      labelStyle:
-                                                      GoogleFonts
-                                                          .poppins(
-                                                        color:
-                                                        Colors.grey,
-                                                      ),
-                                                      border:
-                                                      OutlineInputBorder(),
-                                                      labelText:
-                                                      "Add Price",
-                                                    ),
+                                                  AppTextField(
+                                                    controller: PriceController,
+                                                    label: 'Add Price',
+                                                    icon: Icons.attach_money,
+                                                    keyboardType: TextInputType.number,
                                                   ),
 
                                                   SizedBox(height: 20,),
@@ -689,20 +652,10 @@ class _ExtraTabexState extends State<ExtraTabex> {
             SizedBox(
               height: 20,
             ),
-            Container(
-              height: height * 0.06,
-              child: TextField(
-                controller: ExtrasController,
-                decoration: InputDecoration(
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(2)),
-                  labelStyle: GoogleFonts.poppins(
-                    color: Colors.grey,
-                  ),
-                  border: OutlineInputBorder(),
-                  labelText: "Extra Category Name (English)",
-                ),
-              ),
+            AppTextField(
+              controller: ExtrasController,
+              label: "Extra Category Name (English)",
+              icon: Icons.category_outlined,
             ),
             SizedBox(
               height: 20,

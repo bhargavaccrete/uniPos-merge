@@ -6,6 +6,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
@@ -125,7 +126,6 @@ class _DiscountOrderReportState extends State<DiscountOrderReport> {
 
           Expanded(
             child: DiscountDataView(
-              key: ValueKey(_selectedPeriod),
               period: _selectedPeriod,
             ),
           ),
@@ -179,113 +179,123 @@ class DiscountDataView extends StatefulWidget {
 }
 
 class _DiscountDataViewState extends State<DiscountDataView> {
-  List<PastOrderModel> _allOrders = [];
   List<PastOrderModel> _filteredOrders = [];
   double _totalDiscountAmount = 0.0;
+  double _totalSubtotal = 0.0;
+  double _totalNetAmount = 0.0;
   int _totalOrdersCount = 0;
   double _averageDiscount = 0.0;
   bool _isLoading = true;
+  bool _isDataLoaded = false;
+  int _currentPage = 0;
+  static const int _rowsPerPage = 50;
   DateTime? _startDate;
   DateTime? _endDate;
 
   @override
   void initState() {
     super.initState();
-    _loadDataAndFilter();
+    _loadAndFilter();
   }
 
   @override
   void didUpdateWidget(covariant DiscountDataView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _loadDataAndFilter();
-
     if (widget.period != oldWidget.period) {
       _startDate = null;
       _endDate = null;
+      _filterFromMemory();
     }
   }
 
-  Future<void> _loadDataAndFilter() async {
-    await pastOrderStore.loadPastOrders();
-    _allOrders = pastOrderStore.pastOrders
-        .where((order) {
-          // Filter orders with discount > 0
-          if ((order.Discount ?? 0) <= 0) return false;
-
-          // FIX 1: Exclude all voided/refunded orders ('VOIDED' variant was missing).
-          final status = order.orderStatus?.toUpperCase() ?? '';
-          if (status == 'FULLY_REFUNDED' || status == 'VOID' || status == 'VOIDED') return false;
-
-          return true;
-        })
-        .toList();
-    _fetchAndFilterData();
+  Future<void> _loadAndFilter() async {
+    if (!_isDataLoaded) {
+      await pastOrderStore.loadPastOrders();
+      _isDataLoaded = true;
+    }
+    _filterFromMemory();
   }
 
-  void _fetchAndFilterData() {
+  void _filterFromMemory() {
     setState(() {
       _isLoading = true;
     });
 
-    List<PastOrderModel> resultingList = [];
     final now = DateTime.now();
+    late DateTime rangeStart;
+    late DateTime rangeEnd;
 
     if (widget.period == DiscountPeriod.Custom) {
-      if (_startDate != null && _endDate != null) {
-        resultingList = _allOrders.where((order) {
-          final orderDate = order.orderAt;
-          if (orderDate == null) return false;
-          return orderDate.isAfter(_startDate!.subtract(const Duration(seconds: 1))) &&
-              orderDate.isBefore(_endDate!.add(const Duration(days: 1)));
-        }).toList();
+      if (_startDate == null || _endDate == null) {
+        setState(() {
+          _filteredOrders = [];
+          _totalOrdersCount = 0;
+          _totalDiscountAmount = 0.0;
+          _totalSubtotal = 0.0;
+          _totalNetAmount = 0.0;
+          _averageDiscount = 0.0;
+          _currentPage = 0;
+          _isLoading = false;
+        });
+        return;
       }
+      rangeStart = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+      rangeEnd = DateTime(_endDate!.year, _endDate!.month, _endDate!.day + 1);
     } else {
       switch (widget.period) {
         case DiscountPeriod.Today:
-          resultingList = _allOrders.where((order) {
-            final orderDate = order.orderAt;
-            if (orderDate == null) return false;
-            return orderDate.year == now.year &&
-                orderDate.month == now.month &&
-                orderDate.day == now.day;
-          }).toList();
+          rangeStart = DateTime(now.year, now.month, now.day);
+          rangeEnd = DateTime(now.year, now.month, now.day + 1);
           break;
         case DiscountPeriod.ThisWeek:
-          final dayOfWeek = now.subtract(Duration(days: now.weekday - 1));
-          final startOfWeek = DateTime(dayOfWeek.year, dayOfWeek.month, dayOfWeek.day);
-          final endOfWeek = startOfWeek.add(const Duration(days: 7));
-
-          resultingList = _allOrders.where((order) {
-            final orderDate = order.orderAt;
-            if (orderDate == null) return false;
-            return !orderDate.isBefore(startOfWeek) && orderDate.isBefore(endOfWeek);
-          }).toList();
+          final weekDay = now.subtract(Duration(days: now.weekday - 1));
+          rangeStart = DateTime(weekDay.year, weekDay.month, weekDay.day);
+          rangeEnd = rangeStart.add(const Duration(days: 7));
           break;
         case DiscountPeriod.Month:
-          resultingList = _allOrders.where((order) {
-            final orderDate = order.orderAt;
-            if (orderDate == null) return false;
-            return orderDate.year == now.year && orderDate.month == now.month;
-          }).toList();
+          rangeStart = DateTime(now.year, now.month, 1);
+          rangeEnd = DateTime(now.year, now.month + 1, 1);
           break;
         case DiscountPeriod.Year:
-          resultingList = _allOrders.where((order) {
-            final orderDate = order.orderAt;
-            if (orderDate == null) return false;
-            return orderDate.year == now.year;
-          }).toList();
+          rangeStart = DateTime(now.year, 1, 1);
+          rangeEnd = DateTime(now.year + 1, 1, 1);
           break;
         case DiscountPeriod.Custom:
           break;
       }
     }
 
+    final List<PastOrderModel> results = [];
+    double discountSum = 0.0;
+    double subtotalSum = 0.0;
+    double netAmountSum = 0.0;
+
+    for (final order in pastOrderStore.pastOrders) {
+      if ((order.Discount ?? 0) <= 0) continue;
+
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
+
+      final orderDate = order.orderAt;
+      if (orderDate == null) continue;
+      if (orderDate.isBefore(rangeStart) || !orderDate.isBefore(rangeEnd)) continue;
+
+      results.add(order);
+      discountSum += order.Discount ?? 0.0;
+      subtotalSum += order.subTotal ?? 0.0;
+      netAmountSum += order.totalPrice - (order.refundAmount ?? 0.0);
+    }
+
+    results.sort((a, b) => (b.orderAt ?? DateTime(0)).compareTo(a.orderAt ?? DateTime(0)));
+
     setState(() {
-      _filteredOrders = resultingList;
-      _totalOrdersCount = _filteredOrders.length;
-      _totalDiscountAmount = _filteredOrders.fold(0.0, (sum, order) => sum + (order.Discount ?? 0.0));
-      // FIX 2: Use net amount (totalPrice - refundAmount) so PARTIALLY_REFUNDED orders don't inflate totals.
-      _averageDiscount = _totalOrdersCount > 0 ? _totalDiscountAmount / _totalOrdersCount : 0.0;
+      _filteredOrders = results;
+      _totalOrdersCount = results.length;
+      _totalDiscountAmount = discountSum;
+      _totalSubtotal = subtotalSum;
+      _totalNetAmount = netAmountSum;
+      _averageDiscount = _totalOrdersCount > 0 ? discountSum / _totalOrdersCount : 0.0;
+      _currentPage = 0;
       _isLoading = false;
     });
   }
@@ -319,18 +329,14 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       ReportExportService.formatCurrency(order.totalPrice - (order.refundAmount ?? 0.0)),
     ]).toList();
 
-    final totalSubtotal = _filteredOrders.fold<double>(0, (sum, o) => sum + (o.subTotal ?? 0.0));
-    // FIX 2: totalAmount uses net amounts to exclude partial refunds.
-    final totalAmount = _filteredOrders.fold<double>(0, (sum, o) => sum + o.totalPrice - (o.refundAmount ?? 0.0));
-
     final periodDisplay = _getPeriodDisplayName();
 
     final summary = {
       'Report Period': periodDisplay,
       'Total Orders': _totalOrdersCount.toString(),
-      'Total Subtotal': ReportExportService.formatCurrency(totalSubtotal),
+      'Total Subtotal': ReportExportService.formatCurrency(_totalSubtotal),
       'Total Discount': ReportExportService.formatCurrency(_totalDiscountAmount),
-      'Total Amount': ReportExportService.formatCurrency(totalAmount),
+      'Total Amount': ReportExportService.formatCurrency(_totalNetAmount),
       'Average Discount': ReportExportService.formatCurrency(_averageDiscount),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
     };
@@ -462,7 +468,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: (_startDate != null && _endDate != null) ? _fetchAndFilterData : null,
+                        onPressed: (_startDate != null && _endDate != null) ? _filterFromMemory : null,
                         icon: Icon(Icons.filter_list, size: isTablet ? 20 : 18),
                         label: Text(
                           'Apply Filter',
@@ -480,9 +486,23 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                   ],
                 ),
               ),
-              if (_filteredOrders.isNotEmpty) ...[
+              if (_startDate != null && _endDate != null) ...[
                 SizedBox(height: 16),
-                _buildReportContent(isTablet),
+                _filteredOrders.isNotEmpty
+                    ? _buildReportContent(isTablet)
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            'No discount orders found for this period',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
               ],
             ],
           ),
@@ -587,102 +607,92 @@ class _DiscountDataViewState extends State<DiscountDataView> {
         _buildExportButton(isTablet),
         SizedBox(height: 16),
         _buildDataTable(isTablet),
+        if (_filteredOrders.length > _rowsPerPage) _buildPaginationControls(),
       ],
     );
   }
 
-  Widget _buildSummaryCards(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
+  Widget _buildPaginationControls() {
+    final totalPages = (_filteredOrders.length / _rowsPerPage).ceil();
+    final start = _currentPage * _rowsPerPage + 1;
+    final end = ((_currentPage + 1) * _rowsPerPage).clamp(1, _filteredOrders.length);
 
-    return IntrinsicHeight(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: _buildCard(
-              label: 'Total Orders',
-              value: _totalOrdersCount.toString(),
-              icon: Icons.shopping_cart,
-              color: AppColors.primary,
-              isTablet: isTablet,
-              isDesktop: isDesktop,
+          Text(
+            'Showing $start\u2013$end of ${_filteredOrders.length} orders',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          SizedBox(width: isDesktop ? 24 : 16),
-          Expanded(
-            child: _buildCard(
-              label: 'Total Discount',
-              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscountAmount)}',
-              icon: Icons.discount,
-              color: Colors.orange,
-              isTablet: isTablet,
-              isDesktop: isDesktop,
-            ),
-          ),
-          SizedBox(width: isDesktop ? 24 : 16),
-          Expanded(
-            child: _buildCard(
-              label: 'Avg Discount',
-              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageDiscount)}',
-              icon: Icons.analytics,
-              color: Colors.green,
-              isTablet: isTablet,
-              isDesktop: isDesktop,
-            ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                icon: const Icon(Icons.chevron_left),
+                iconSize: 24,
+                color: AppColors.primary,
+                disabledColor: AppColors.divider,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${_currentPage + 1} / $totalPages',
+                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                ),
+              ),
+              IconButton(
+                onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+                icon: const Icon(Icons.chevron_right),
+                iconSize: 24,
+                color: AppColors.primary,
+                disabledColor: AppColors.divider,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCard({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required bool isTablet,
-    required bool isDesktop,
-  }) {
-    return Container(
-      padding: EdgeInsets.all(isTablet ? 24 : 16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSummaryCards(bool isTablet) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(fontSize: isDesktop ? 16 : (isTablet ? 14 : 11), fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                ),
-              ),
-              SizedBox(width: 4),
-              Container(
-                padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: color, size: isDesktop ? 28 : (isTablet ? 22 : 14)),
-              ),
-            ],
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Total Orders',
+              value: _totalOrdersCount.toString(),
+              icon: Icons.shopping_cart,
+              color: AppColors.primary,
+            ),
           ),
-          SizedBox(height: isDesktop ? 16 : 12),
-          SizedBox(
-            width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: GoogleFonts.poppins(fontSize: isDesktop ? 32 : (isTablet ? 24 : 20), fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              ),
+          AppResponsive.horizontalSpace(context),
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Total Discount',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscountAmount)}',
+              icon: Icons.discount,
+              color: Colors.orange,
+            ),
+          ),
+          AppResponsive.horizontalSpace(context),
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Avg Discount',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageDiscount)}',
+              icon: Icons.analytics,
+              color: Colors.green,
             ),
           ),
         ],
@@ -714,6 +724,9 @@ class _DiscountDataViewState extends State<DiscountDataView> {
   }
 
   Widget _buildDataTable(bool isTablet) {
+    final pageOrders = _filteredOrders.length <= _rowsPerPage
+        ? _filteredOrders
+        : _filteredOrders.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).toList();
     final screenWidth = AppResponsive.screenWidth(context);
     final cellFontSize = AppResponsive.smallFontSize(context);
     final headerFontSize = AppResponsive.bodyFontSize(context);
@@ -751,7 +764,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                 DataColumn(label: Text('Discount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Total', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
               ],
-              rows: _filteredOrders.map((order) {
+              rows: pageOrders.map((order) {
                 final discount = order.Discount ?? 0.0;
                 // FIX 2: Net amount deducts any partial refund from totalPrice.
                 final netTotal = order.totalPrice - (order.refundAmount ?? 0.0);
@@ -767,7 +780,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                           vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(order.paymentmode ?? 'N/A', style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context), color: AppColors.primary, fontWeight: FontWeight.w500)),

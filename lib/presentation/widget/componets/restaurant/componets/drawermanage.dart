@@ -14,6 +14,7 @@ import '../../../../screens/restaurant/welcome_Admin.dart';
 import '../../../../screens/restaurant/AuthSelectionScreen.dart';
 import '../../../../screens/restaurant/need help/needhelp.dart';
 import '../../../../screens/retail/reports_screen.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class DrawerManage extends StatelessWidget {
   final bool issync;
@@ -516,20 +517,12 @@ class DrawerManage extends StatelessWidget {
                           style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
                               color: Colors.grey.shade700)),
                       const SizedBox(height: 6),
-                      TextField(
+                      AppTextField(
                         controller: amountCtrl,
-                        autofocus: true,
+                        hint: '0.00',
+                        icon: Icons.attach_money,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-                        decoration: InputDecoration(
-                          prefixText: '$currency ',
-                          hintText: '0.00',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: Colors.orange.shade700, width: 2),
-                          ),
-                        ),
                       ),
 
                       // Live difference panel
@@ -593,12 +586,10 @@ class DrawerManage extends StatelessWidget {
                           style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
                               color: Colors.grey.shade700)),
                       const SizedBox(height: 6),
-                      TextField(
+                      AppTextField(
                         controller: noteCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'e.g. "All good" or explain any difference',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+                        hint: 'e.g. "All good" or explain any difference',
+                        icon: Icons.note_alt_outlined,
                       ),
                     ]),
                   ),
@@ -808,27 +799,23 @@ class DrawerManage extends StatelessWidget {
                     child: Text(errorMsg!,
                         style: GoogleFonts.poppins(fontSize: 13, color: Colors.red.shade700)),
                   ),
-                TextFormField(
+                AppTextField(
                   controller: currentPinCtrl,
+                  label: 'Current PIN',
+                  icon: Icons.lock_outline,
                   obscureText: true,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: 'Current PIN',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
                   validator: (v) => (v == null || v.isEmpty) ? 'Enter current PIN' : null,
                 ),
                 SizedBox(height: 12),
-                TextFormField(
+                AppTextField(
                   controller: newPinCtrl,
+                  label: 'New PIN (4–6 digits)',
+                  icon: Icons.lock_outline,
                   obscureText: true,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: 'New PIN (4–6 digits)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Enter new PIN';
                     if (!RegExp(r'^\d{4,6}$').hasMatch(v)) return 'PIN must be 4–6 digits';
@@ -836,15 +823,13 @@ class DrawerManage extends StatelessWidget {
                   },
                 ),
                 SizedBox(height: 12),
-                TextFormField(
+                AppTextField(
                   controller: confirmPinCtrl,
+                  label: 'Confirm New PIN',
+                  icon: Icons.lock_outline,
                   obscureText: true,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: 'Confirm New PIN',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Confirm your new PIN';
                     if (v != newPinCtrl.text) return 'PINs do not match';

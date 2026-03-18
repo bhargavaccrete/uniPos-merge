@@ -6,6 +6,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/stores/payment_method_store.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 /// Payment entry for split payment
 class PaymentEntry {
@@ -474,41 +475,26 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
               // Amount Input
               Expanded(
                 flex: 2,
-                child: TextField(
+                child: AppTextField(
                   controller: payment.amountController,
+                  hint: '0.00',
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                   ],
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  decoration: InputDecoration(
-                    prefixText: '${CurrencyHelper.currentSymbol} ',
-                    hintText: '0.00',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 1),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    suffixIcon: _remaining > 0 && payment.amount < widget.billTotal
-                        ? IconButton(
-                            icon: const Icon(Icons.add_circle, color: Color(0xFF4CAF50), size: 20),
-                            tooltip: 'Fill remaining',
-                            onPressed: () => _fillRemaining(index),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          )
-                        : null,
+                  prefixWidget: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 4),
+                    child: Text('${CurrencyHelper.currentSymbol} ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
+                  suffixIcon: _remaining > 0 && payment.amount < widget.billTotal
+                      ? IconButton(
+                          icon: const Icon(Icons.add_circle, color: Color(0xFF4CAF50), size: 20),
+                          tooltip: 'Fill remaining',
+                          onPressed: () => _fillRemaining(index),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        )
+                      : null,
                   onChanged: (value) => _updatePaymentAmount(index, value),
                 ),
               ),
@@ -529,29 +515,10 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           // Reference ID Field (for UPI/Card)
           if (_needsReference(payment.method)) ...[
             const SizedBox(height: 8),
-            TextField(
+            AppTextField(
               controller: payment.referenceController,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'Reference ID (Optional)',
-                hintStyle: const TextStyle(color: Color(0xFFB0B0B0), fontSize: 13),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 1),
-                ),
-                prefixIcon: const Icon(Icons.tag, size: 18, color: Color(0xFF6B6B6B)),
-                filled: true,
-                fillColor: const Color(0xFFFAFAFA),
-              ),
+              hint: 'Reference ID (Optional)',
+              icon: Icons.tag,
               onChanged: (value) => _updatePaymentReference(index, value),
             ),
           ],
@@ -631,48 +598,23 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
               ),
               Expanded(
                 flex: 3,
-                child: TextField(
+                child: AppTextField(
                   controller: payment.cashReceivedController,
+                  hint: '0.00',
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                   ],
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.right,
-                  decoration: InputDecoration(
-                    prefixText: '${CurrencyHelper.currentSymbol} ',
-                    hintText: '0.00',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isInsufficient ? Colors.red : const Color(0xFFE8E8E8),
-                        width: isInsufficient ? 1 : 0.5,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isInsufficient ? Colors.red : const Color(0xFFE8E8E8),
-                        width: isInsufficient ? 1 : 0.5,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(
-                        color: isInsufficient ? Colors.red : const Color(0xFF4CAF50),
-                        width: 1,
-                      ),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.check_circle_outline, color: Color(0xFF4CAF50), size: 20),
-                      tooltip: 'Fill exact amount',
-                      onPressed: () => _fillExactAmount(index),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
+                  prefixWidget: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 4),
+                    child: Text('${CurrencyHelper.currentSymbol} ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  ),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.check_circle_outline, color: Color(0xFF4CAF50), size: 20),
+                    tooltip: 'Fill exact amount',
+                    onPressed: () => _fillExactAmount(index),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                   onChanged: (value) => _updateCashReceived(index, value),
                 ),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // Import your utilities
 import '../../../util/color.dart';
+import '../../../util/common/app_responsive.dart';
 import '../../../util/responsive.dart';
 
 class WalkthroughScreen extends StatefulWidget {
@@ -28,7 +29,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
       description: 'Manage sales, inventory, and customers from a single unified platform designed for all business types',
       icon: Icons.dashboard_customize,
       color: AppColors.primary,
-      features: ['Retail', 'Restaurant', 'Services'],
+      features: ['Retail', 'Restaurant'],
     ),
     WalkthroughItem(
       title: 'Smart Inventory Management',
@@ -325,16 +326,17 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
   }
 
   Widget _buildPageContent(WalkthroughItem item, {bool isMobile = false}) {
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 20.0 : 40.0),
+    final illustrationSize = isMobile
+        ? AppResponsive.height(context, 0.22).clamp(120.0, 200.0)
+        : 300.0;
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isMobile ? 16.0 : 40.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icon/Illustration
-          _buildIllustration(item, size: isMobile ? 200 : 300),
-          SizedBox(height: isMobile ? 40 : 60),
-
-          // Text content
+          _buildIllustration(item, size: illustrationSize),
+          SizedBox(height: isMobile ? 20 : 60),
           _buildTextContent(item),
         ],
       ),
@@ -402,34 +404,37 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
   }
 
   Widget _buildTextContent(WalkthroughItem item) {
+    final isMobile = AppResponsive.isMobile(context);
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 40),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 20 : 60,
+          vertical: isMobile ? 16 : 40,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               item.title,
               style: TextStyle(
-                fontSize: Responsive.isMobile(context) ? 24 : 32,
+                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 28.0, desktop: 32.0),
                 fontWeight: FontWeight.bold,
-                // color: AppColors.darkNeutral,
                 color: item.color,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isMobile ? 12 : 20),
             Text(
               item.description,
               style: TextStyle(
-                fontSize: Responsive.isMobile(context) ? 14 : 16,
+                fontSize: AppResponsive.bodyFontSize(context),
                 color: Colors.grey[600],
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 30),
+            SizedBox(height: isMobile ? 16 : 30),
             // Feature chips
             Wrap(
               alignment: WrapAlignment.center,
@@ -479,7 +484,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
 
   Widget _buildBottomNavigation() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(AppResponsive.isMobile(context) ? 12 : 20),
       child: Column(
         children: [
           // Page indicators
@@ -490,7 +495,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                   (index) => _buildPageIndicator(index == _currentPage),
             ),
           ),
-          const SizedBox(height: 30),
+          SizedBox(height: AppResponsive.isMobile(context) ? 16 : 30),
 
           // Action buttons
           Row(
@@ -554,43 +559,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
             ],
           ),
 
-          // "Don't show again" checkbox (only show on last page)
-  /*        if (_currentPage == _walkthroughItems.length - 1) ...[
-            const SizedBox(height: 16),
-            InkWell(
-              onTap: () {
-                setState(() {
-                  _dontShowAgain = !_dontShowAgain;
-                });
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: _dontShowAgain,
-                      onChanged: (value) {
-                        setState(() {
-                          _dontShowAgain = value ?? false;
-                        });
-                      },
-                      activeColor: _walkthroughItems[_currentPage].color,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Don't show this walkthrough again",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],*/
+
         ],
       ),
     );

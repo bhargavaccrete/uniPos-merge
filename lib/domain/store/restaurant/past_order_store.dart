@@ -35,29 +35,32 @@ abstract class _PastOrderStore with Store {
   DateTime? endDate;
 
   // Computed properties
+
+  /// Single-pass filter — builds one lazy Iterable pipeline instead of
+  /// creating a new List copy at every .where().toList() step.
   @computed
   List<PastOrderModel> get filteredPastOrders {
-    var result = pastOrders.toList();
+    Iterable<PastOrderModel> result = pastOrders;
 
     if (searchQuery.isNotEmpty) {
       final lowercaseQuery = searchQuery.toLowerCase();
-      result = result
-          .where((order) => order.customerName.toLowerCase().contains(lowercaseQuery))
-          .toList();
+      result = result.where(
+          (order) => order.customerName.toLowerCase().contains(lowercaseQuery));
     }
 
     if (selectedOrderType != null && selectedOrderType!.isNotEmpty) {
-      result = result.where((order) => order.orderType == selectedOrderType).toList();
+      result = result.where((order) => order.orderType == selectedOrderType);
     }
 
     if (startDate != null && endDate != null) {
-      result = result
-          .where((order) =>
-              order.orderAt!.isAfter(startDate!) && order.orderAt!.isBefore(endDate!))
-          .toList();
+      result = result.where((order) =>
+          order.orderAt != null &&
+          order.orderAt!.isAfter(startDate!) &&
+          order.orderAt!.isBefore(endDate!));
     }
 
-    return result;
+    // Single .toList() at the end — one pass through the chain
+    return result.toList();
   }
 
   @computed
@@ -72,15 +75,42 @@ abstract class _PastOrderStore with Store {
       totalOrderCount > 0 ? totalRevenue / totalOrderCount : 0.0;
 
   // Actions
+
+  /// Loads ALL orders from Hive. Use for screens that need the full list
+  /// (e.g. past orders tab, cash drawer). For reports, prefer
+  /// [loadOrdersByDateRange] to avoid loading 30k+ orders.
   @action
   Future<void> loadPastOrders() async {
     try {
       isLoading = true;
       errorMessage = null;
       final loadedOrders = await _repository.getAllPastOrders();
-      pastOrders = ObservableList.of(loadedOrders);
+      // Reuse the same ObservableList instance — prevents MobX from
+      // firing a "list replaced" reaction on every observer.
+      pastOrders
+        ..clear()
+        ..addAll(loadedOrders);
     } catch (e) {
       errorMessage = 'Failed to load past orders: $e';
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  /// Loads only orders within [start, end] from Hive.
+  /// Report screens should use this instead of [loadPastOrders] —
+  /// for "Today" on a 30k database, this loads ~100 orders vs 30k.
+  @action
+  Future<void> loadOrdersByDateRange(DateTime start, DateTime end) async {
+    try {
+      isLoading = true;
+      errorMessage = null;
+      final loadedOrders = await _repository.getOrdersByDateRange(start, end);
+      pastOrders
+        ..clear()
+        ..addAll(loadedOrders);
+    } catch (e) {
+      errorMessage = 'Failed to load orders by date range: $e';
     } finally {
       isLoading = false;
     }

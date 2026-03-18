@@ -854,47 +854,14 @@ class _ExtraTabState extends State<ExtraTab> {
                 const SizedBox(width: 10),
                 Expanded(
                   flex: 2,
-                  child: TextField(
+                  child: AppTextField(
                     controller: controller,
                     enabled: isSelected,
+                    hint: '0.00',
                     keyboardType: TextInputType.number,
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, color: Colors.black87),
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 10),
-                      hintText: '0.00',
-                      hintStyle: GoogleFonts.poppins(
-                          fontSize: 12, color: Colors.grey.shade400),
-                      prefixText: CurrencyHelper.currentSymbol,
-                      prefixStyle: GoogleFonts.poppins(
-                          fontSize: 13, color: Colors.black87),
-                      filled: true,
-                      fillColor: isSelected
-                          ? Colors.white
-                          : Colors.grey.shade100,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(
-                            color: isSelected
-                                ? AppColors.divider
-                                : Colors.transparent),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: AppColors.divider),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(
-                            color: AppColors.primary, width: 1.5),
-                      ),
-                      disabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(
-                            color: Colors.transparent),
-                      ),
+                    prefixWidget: Padding(
+                      padding: const EdgeInsets.only(left: 10, right: 4),
+                      child: Text(CurrencyHelper.currentSymbol, style: GoogleFonts.poppins(fontSize: 13, color: Colors.black87)),
                     ),
                   ),
                 ),

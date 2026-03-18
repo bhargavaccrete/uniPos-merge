@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 import '../../../../domain/services/restaurant/comprehensive_data_generator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
@@ -563,41 +564,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
+      child: AppTextField(
         controller: controller,
         keyboardType: TextInputType.number,
-        style: GoogleFonts.poppins(fontSize: 14),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: GoogleFonts.poppins(fontSize: 14),
-          prefixIcon: Icon(
-            icon,
-            color: highlight ? Colors.orange : AppColors.primary,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(
-              color: highlight ? Colors.orange : Colors.grey.shade300,
-              width: 1,
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(
-              color: highlight ? Colors.orange.shade200 : Colors.grey.shade300,
-              width: 1,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(
-              color: highlight ? Colors.orange : AppColors.primary,
-              width: 2,
-            ),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-        ),
+        label: label,
+        icon: icon,
       ),
     );
   }

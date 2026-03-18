@@ -15,6 +15,7 @@ import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:unipos/core/init/hive_init.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
 
 // Conditional import for web file download
@@ -1098,29 +1099,23 @@ class CategoryImportExport {
             children: [
               const Text('Enter a password to protect your backup:'),
               const SizedBox(height: 16),
-              TextField(
+              AppTextField(
                 controller: passwordController,
                 obscureText: obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                  ),
+                label: 'Password',
+                suffixIcon: IconButton(
+                  icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => obscurePassword = !obscurePassword),
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
+              AppTextField(
                 controller: confirmPasswordController,
                 obscureText: obscureConfirm,
-                decoration: InputDecoration(
-                  labelText: 'Confirm Password',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureConfirm ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
-                  ),
+                label: 'Confirm Password',
+                suffixIcon: IconButton(
+                  icon: Icon(obscureConfirm ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
                 ),
               ),
             ],
@@ -1200,16 +1195,13 @@ class CategoryImportExport {
                 children: [
                   const Text('This backup is password-protected. Please enter the password:'),
                   const SizedBox(height: 16),
-                  TextField(
+                  AppTextField(
                     controller: passwordController,
                     obscureText: obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                      ),
+                    label: 'Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => obscurePassword = !obscurePassword),
                     ),
                   ),
                 ],

@@ -81,6 +81,7 @@ class CashDrawerHistoryScreen extends StatefulWidget {
 
 class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   bool _isLoading = true;
+  bool _isDataLoaded = false;
 
   List<_HistoryRow> _allRows = [];
   List<_HistoryRow> _filteredRows = [];
@@ -91,9 +92,10 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
 
   static const _typeOptions = ['All', 'Opening', 'Sale', 'Expense', 'Cash In', 'Cash Out', 'Withdrawal', 'Adjustment', 'Shift End'];
 
-  double get _totalIn  => _filteredRows.fold(0.0, (s, r) => s + r.inAmount);
-  double get _totalOut => _filteredRows.fold(0.0, (s, r) => s + r.outAmount);
-  double get _net      => _totalIn - _totalOut;
+  // Pre-computed summary totals
+  double _totalIn  = 0.0;
+  double _totalOut = 0.0;
+  double _net      = 0.0;
 
   // ── Init ────────────────────────────────────────────────────────────────────
 
@@ -105,7 +107,11 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
 
   // ── Data ────────────────────────────────────────────────────────────────────
 
-  Future<void> _loadHistory() async {
+  Future<void> _loadHistory({bool forceReload = false}) async {
+    if (_isDataLoaded && !forceReload) {
+      _applyFilter();
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final drafts = <_RowDraft>[];
@@ -181,8 +187,8 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
       String staffAtTime(DateTime time) {
         for (final s in shiftStore.shifts) {
           final end = s.endTime ?? DateTime.now();
-          if (time.isAfter(s.startTime.subtract(const Duration(seconds: 1))) &&
-              time.isBefore(end.add(const Duration(seconds: 1)))) {
+          // Half-open: [startTime, end]
+          if (!time.isBefore(s.startTime) && !time.isAfter(end)) {
             return s.staffName;
           }
         }
@@ -316,6 +322,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
       }
 
       _allRows = rows.reversed.toList(); // newest first
+      _isDataLoaded = true;
       _applyFilter();
     } catch (e) {
       debugPrint('Cash drawer history load error: $e');
@@ -345,20 +352,34 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   }
 
   void _applyFilter() {
+    // Half-open: [from, toExclusive)
     final from = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
-    final to   = DateTime(_toDate.year,   _toDate.month,   _toDate.day, 23, 59, 59);
+    final toExclusive = DateTime(_toDate.year, _toDate.month, _toDate.day + 1);
 
-    _filteredRows = _allRows.where((r) {
-      final inRange = !r.timestamp.isBefore(from) && !r.timestamp.isAfter(to);
-      if (!inRange) return false;
-      if (_typeFilter == 'All') return true;
-      if (_typeFilter == 'Adjustment') {
-        return r.typeName == 'Adjustment' || r.typeName == 'Discrepancy';
+    final results = <_HistoryRow>[];
+    double inSum = 0.0;
+    double outSum = 0.0;
+
+    for (final r in _allRows) {
+      if (r.timestamp.isBefore(from) || !r.timestamp.isBefore(toExclusive)) continue;
+      if (_typeFilter != 'All') {
+        if (_typeFilter == 'Adjustment') {
+          if (r.typeName != 'Adjustment' && r.typeName != 'Discrepancy') continue;
+        } else if (r.typeName != _typeFilter) {
+          continue;
+        }
       }
-      return r.typeName == _typeFilter;
-    }).toList();
+      results.add(r);
+      inSum += r.inAmount;
+      outSum += r.outAmount;
+    }
 
-    setState(() {});
+    setState(() {
+      _filteredRows = results;
+      _totalIn = inSum;
+      _totalOut = outSum;
+      _net = inSum - outSum;
+    });
   }
 
   Future<void> _showDateOptions() async {

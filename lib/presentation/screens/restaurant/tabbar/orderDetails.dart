@@ -13,6 +13,7 @@ import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 class Orderdetails extends StatefulWidget {
   final PastOrderModel? Order;
@@ -795,14 +796,11 @@ class _OrderdetailsState extends State<Orderdetails> {
               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
             ),
             SizedBox(height: 8),
-            TextField(
+            AppTextField(
               controller: reasonController,
               maxLines: 3,
-              decoration: InputDecoration(
-                hintText: "Enter reason (optional)",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: EdgeInsets.all(12),
-              ),
+              hint: "Enter reason (optional)",
+              icon: Icons.note_alt_outlined,
             ),
           ],
         ),

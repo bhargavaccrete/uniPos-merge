@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/login.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:unipos/util/color.dart';
 import 'package:mobx/mobx.dart';
@@ -100,17 +100,18 @@ class _signUpState extends State<Signup> {
                           SizedBox(
                             height: 5,
                           ),
-                          CommonTextForm(
-                            obsecureText: false,
+                          AppTextField(
                             focusNode: nameFocus,
                             controller: fullnameController,
+                            hint: "Enter the Full Name",
+                            icon: Icons.person_outline,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return "  Plase Provide A Name";
                               }
+                              return null;
                             },
-                            hintText: "Enter the Full Name",
-                            onfieldsumbitted: (value) {
+                            onFieldSubmitted: (value) {
                               FocusScope.of(context).requestFocus(nameFocus);
                             },
                           ),
@@ -129,10 +130,12 @@ class _signUpState extends State<Signup> {
                           SizedBox(
                             height: 5,
                           ),
-                          CommonTextForm(
-                            obsecureText: false,
+                          AppTextField(
                             focusNode: emailFocus,
                             controller: emailController,
+                            hint: "Enter the Email",
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return "plase Enter the Email";
@@ -141,9 +144,9 @@ class _signUpState extends State<Signup> {
                                   .hasMatch(value)) {
                                 return "enter the valid email address";
                               }
+                              return null;
                             },
-                            hintText: "Enter the Email ",
-                            onfieldsumbitted: (value) {
+                            onFieldSubmitted: (value) {
                               FocusScope.of(context).requestFocus(emailFocus);
                             },
                           ),
@@ -161,16 +164,17 @@ class _signUpState extends State<Signup> {
                           SizedBox(
                             height: 5,
                           ),
-                          CommonTextForm(
-                            obsecureText: false,
+                          AppTextField(
                             focusNode: restaurantFocus,
                             controller: restaurantController,
+                            hint: "Enter the Restaurant Name",
+                            icon: Icons.restaurant_outlined,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return "Please Enter the Restorunt Name";
+                                return "Please Enter the Restaurant Name";
                               }
+                              return null;
                             },
-                            hintText: "Enter the Retaurant Name",
                           ),
                           Center(
                             child: Container(
@@ -238,10 +242,9 @@ class _signUpState extends State<Signup> {
                           SizedBox(
                             height: 5,
                           ),
-                          CommonTextForm(
-                            hintText: "Enter the Promo Code",
-
-                            obsecureText: false,
+                          AppTextField(
+                            hint: "Enter the Promo Code",
+                            icon: Icons.card_giftcard_outlined,
                           ),
                           SizedBox(
                             height: 10,

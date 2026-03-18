@@ -9,7 +9,7 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 class ManageCustomersScreen extends StatefulWidget {
@@ -80,18 +80,16 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           // Search Bar
           Padding(
             padding: EdgeInsets.all(width * 0.02),
-            child: CommonTextForm(
+            child: AppTextField(
               controller: _searchController,
-              hintText: 'Search by name, phone, or email',
-              obsecureText: false,
-              BorderColor: AppColors.primary,
-              icon: Icon(Icons.search, color: AppColors.primary),
+              hint: 'Search by name, phone, or email',
+              icon: Icons.search,
               onChanged: (value) {
                 setState(() {
                   _searchQuery = value.toLowerCase();
                 });
               },
-              gesture: _searchQuery.isNotEmpty
+              suffixIcon: _searchQuery.isNotEmpty
                   ? GestureDetector(
                       onTap: () {
                         setState(() {
@@ -102,7 +100,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                       child: Icon(Icons.clear, color: Colors.grey),
                     )
                   : null,
-              onfieldsumbitted: (value) {
+              onFieldSubmitted: (value) {
                 setState(() {
                   _searchQuery = value.toLowerCase();
                 });
@@ -334,12 +332,10 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CommonTextForm(
+                AppTextField(
                   controller: nameController,
-                  hintText: 'Customer Name',
-                  obsecureText: false,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.person, color: AppColors.primary),
+                  hint: 'Customer Name',
+                  icon: Icons.person,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Name is required';
@@ -348,15 +344,12 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   },
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: phoneController,
-                  hintText: 'Phone Number',
-                  obsecureText: false,
+                  hint: 'Phone Number',
+                  icon: Icons.phone,
                   keyboardType: TextInputType.phone,
-                  // FIX 7: Restrict input to digits only.
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
                     if (value != null && value.trim().isNotEmpty) {
                       if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
@@ -367,13 +360,11 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   },
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: emailController,
-                  hintText: 'Email (Optional)',
-                  obsecureText: false,
+                  hint: 'Email (Optional)',
+                  icon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.email, color: AppColors.primary),
                   // FIX 6: Validate email format when provided.
                   validator: (v) {
                     if (v != null && v.trim().isNotEmpty) {
@@ -385,22 +376,18 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   },
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: addressController,
-                  hintText: 'Address (Optional)',
-                  obsecureText: false,
-                  maxline: 2,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.location_on, color: AppColors.primary),
+                  hint: 'Address (Optional)',
+                  icon: Icons.location_on,
+                  maxLines: 2,
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: notesController,
-                  hintText: 'Notes (Optional)',
-                  obsecureText: false,
-                  maxline: 2,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.note, color: AppColors.primary),
+                  hint: 'Notes (Optional)',
+                  icon: Icons.note,
+                  maxLines: 2,
                 ),
               ],
             ),
@@ -477,12 +464,10 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CommonTextForm(
+                AppTextField(
                   controller: nameController,
-                  hintText: 'Customer Name',
-                  obsecureText: false,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.person, color: AppColors.primary),
+                  hint: 'Customer Name',
+                  icon: Icons.person,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Name is required';
@@ -491,14 +476,12 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   },
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: phoneController,
-                  hintText: 'Phone Number',
-                  obsecureText: false,
+                  hint: 'Phone Number',
+                  icon: Icons.phone,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.phone, color: AppColors.primary),
                   validator: (value) {
                     if (value != null && value.trim().isNotEmpty) {
                       if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
@@ -509,13 +492,11 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   },
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: emailController,
-                  hintText: 'Email (Optional)',
-                  obsecureText: false,
+                  hint: 'Email (Optional)',
+                  icon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.email, color: AppColors.primary),
                   validator: (v) {
                     if (v != null && v.trim().isNotEmpty) {
                       if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
@@ -526,22 +507,18 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   },
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: addressController,
-                  hintText: 'Address (Optional)',
-                  obsecureText: false,
-                  maxline: 2,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.location_on, color: AppColors.primary),
+                  hint: 'Address (Optional)',
+                  icon: Icons.location_on,
+                  maxLines: 2,
                 ),
                 SizedBox(height: 15),
-                CommonTextForm(
+                AppTextField(
                   controller: notesController,
-                  hintText: 'Notes (Optional)',
-                  obsecureText: false,
-                  maxline: 2,
-                  BorderColor: AppColors.primary,
-                  icon: Icon(Icons.note, color: AppColors.primary),
+                  hint: 'Notes (Optional)',
+                  icon: Icons.note,
+                  maxLines: 2,
                 ),
               ],
             ),

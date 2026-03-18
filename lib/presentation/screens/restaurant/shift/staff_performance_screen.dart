@@ -59,12 +59,18 @@ class StaffPerformanceScreen extends StatefulWidget {
 
 class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
   bool _isLoading = true;
+  bool _isDataLoaded = false;
   String _filterPeriod = 'Week'; // All | Today | Week | Month | Custom
   DateTime? _customFrom;
   DateTime? _customTo;
   String _sortBy = 'sales'; // 'sales' | 'orders' | 'hours'
 
   List<_StaffPerformance> _perfList = [];
+
+  // Pre-computed summary totals
+  double _totalRevenue = 0.0;
+  int _totalOrders = 0;
+  int _totalShifts = 0;
 
   @override
   void initState() {
@@ -74,18 +80,23 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
 
   // ── Data loading ────────────────────────────────────────────────────────────
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceReload = false}) async {
+    if (_isDataLoaded && !forceReload) {
+      _compute();
+      return;
+    }
     setState(() => _isLoading = true);
     await shiftStore.loadShifts();
     await pastOrderStore.loadPastOrders();
-    await staffStore.loadStaff(); // needed for role lookup in _compute
+    await staffStore.loadStaff();
     await expenseStore.loadExpenses();
+    _isDataLoaded = true;
     _compute();
   }
 
   void _compute() {
-    final allShifts = shiftStore.shifts.toList();
-    final allOrders = pastOrderStore.pastOrders.toList();
+    final allShifts = shiftStore.shifts;
+    final allOrders = pastOrderStore.pastOrders;
 
     // 1. Filter shifts by date period
     final now = DateTime.now();
@@ -144,7 +155,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     }
 
     // 5. Compute metrics per staff
-    final allExpenses = expenseStore.expenses.toList();
+    final allExpenses = expenseStore.expenses;
     final raw = byStaff.entries.map((entry) {
       final name = entry.key;
       final shifts = entry.value;
@@ -251,8 +262,21 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
       ),
     );
 
+    // Pre-compute summary totals
+    double revSum = 0.0;
+    int ordSum = 0;
+    int shiftSum = 0;
+    for (final p in ranked) {
+      revSum += p.totalSales;
+      ordSum += p.totalOrders;
+      shiftSum += p.totalShifts;
+    }
+
     setState(() {
       _perfList = ranked;
+      _totalRevenue = revSum;
+      _totalOrders = ordSum;
+      _totalShifts = shiftSum;
       _isLoading = false;
     });
   }
@@ -411,7 +435,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
           ),
           // Refresh button
           GestureDetector(
-            onTap: _load,
+            onTap: () => _load(forceReload: true),
             child: Container(
               padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
@@ -623,13 +647,6 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
   // ── Body ──────────────────────────────────────────────────────────────────
 
   Widget _buildBody(BuildContext context, String currency) {
-    // Summary totals across all filtered staff
-    final totalRevenue =
-        _perfList.fold<double>(0.0, (s, p) => s + p.totalSales);
-    final totalOrders =
-        _perfList.fold<int>(0, (s, p) => s + p.totalOrders);
-    final totalShifts =
-        _perfList.fold<int>(0, (s, p) => s + p.totalShifts);
 
     return Column(children: [
       // ── Team summary bar ──────────────────────────────────────────────────
@@ -662,14 +679,13 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
               children: [
                 _summaryTile(context, '${_perfList.length}', 'Staff',
                     Icons.people_outline, Colors.white),
-                _summaryTile(context, '$totalShifts', 'Shifts',
+                _summaryTile(context, '$_totalShifts', 'Shifts',
                     Icons.badge_outlined, Colors.white),
-                _summaryTile(context, '$totalOrders', 'Orders',
+                _summaryTile(context, '$_totalOrders', 'Orders',
                     Icons.receipt_long, Colors.white),
                 _summaryTile(
                     context,
-                    // FIX 5: Use DecimalSettings for consistent currency formatting.
-                    '$currency${DecimalSettings.formatAmount(totalRevenue)}',
+                    '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
                     'Revenue',
                     Icons.attach_money,
                     Colors.white),

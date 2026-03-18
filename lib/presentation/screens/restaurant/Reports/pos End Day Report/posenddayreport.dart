@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -10,6 +9,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
 
 class Posenddayreport extends StatefulWidget {
   const Posenddayreport({super.key});
@@ -21,6 +21,16 @@ class Posenddayreport extends StatefulWidget {
 class _PosenddayreportState extends State<Posenddayreport> {
   DateTime? _selectedDate;
   bool _isLoading = true;
+  bool _isDataLoaded = false;
+
+  // Pre-computed state
+  List<EndOfDayReport> _filteredReports = [];
+  double _totalOpeningBalance = 0.0;
+  double _totalClosingBalance = 0.0;
+
+  // Pagination
+  int _currentPage = 0;
+  static const int _rowsPerPage = 50;
 
   @override
   void initState() {
@@ -28,22 +38,42 @@ class _PosenddayreportState extends State<Posenddayreport> {
     _loadAllReports();
   }
 
-  Future<void> _loadAllReports() async {
+  Future<void> _loadAllReports({bool forceReload = false}) async {
+    if (_isDataLoaded && !forceReload) {
+      _filterReports();
+      return;
+    }
     setState(() => _isLoading = true);
     await eodStore.loadEODReports();
-    setState(() => _isLoading = false);
+    _isDataLoaded = true;
+    _filterReports();
   }
 
-  List<EndOfDayReport> _getFilteredReports() {
-    if (_selectedDate == null) {
-      return eodStore.eodReports;
+  void _filterReports() {
+    final results = <EndOfDayReport>[];
+    double openingSum = 0.0;
+    double closingSum = 0.0;
+
+    for (final report in eodStore.eodReports) {
+      if (_selectedDate != null) {
+        if (report.date.year != _selectedDate!.year ||
+            report.date.month != _selectedDate!.month ||
+            report.date.day != _selectedDate!.day) {
+          continue;
+        }
+      }
+      results.add(report);
+      openingSum += report.openingBalance;
+      closingSum += report.closingBalance;
     }
 
-    return eodStore.eodReports.where((report) {
-      return report.date.year == _selectedDate!.year &&
-          report.date.month == _selectedDate!.month &&
-          report.date.day == _selectedDate!.day;
-    }).toList();
+    setState(() {
+      _filteredReports = results;
+      _totalOpeningBalance = openingSum;
+      _totalClosingBalance = closingSum;
+      _currentPage = 0;
+      _isLoading = false;
+    });
   }
 
   Future<void> _selectDate(BuildContext context) {
@@ -66,15 +96,14 @@ class _PosenddayreportState extends State<Posenddayreport> {
       },
     ).then((picked) {
       if (picked != null) {
-        setState(() {
-          _selectedDate = picked;
-        });
+        _selectedDate = picked;
+        _filterReports();
       }
     });
   }
 
   Future<void> _exportReport() async {
-    final filteredReports = _getFilteredReports();
+    final filteredReports = _filteredReports;
 
     if (filteredReports.isEmpty) {
       NotificationService.instance.showError('No data to export');
@@ -122,8 +151,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
       ];
     }).toList();
 
-    final totalOpening = filteredReports.fold<double>(0, (sum, r) => sum + r.openingBalance);
-    final totalClosing = filteredReports.fold<double>(0, (sum, r) => sum + r.closingBalance);
+    final totalOpening = _totalOpeningBalance;
+    final totalClosing = _totalClosingBalance;
 
     String periodDisplay = _selectedDate != null
         ? DateFormat('dd MMM yyyy').format(_selectedDate!)
@@ -208,7 +237,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                   Container(
                     padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -286,7 +315,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                         ),
                       ),
                       IconButton(
-                        onPressed: _loadAllReports,
+                        onPressed: () => _loadAllReports(forceReload: true),
                         icon: Icon(Icons.refresh),
                         color: AppColors.primary,
                         tooltip: 'Refresh',
@@ -329,9 +358,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
                         SizedBox(width: 12),
                         ElevatedButton(
                           onPressed: () {
-                            setState(() {
-                              _selectedDate = null;
-                            });
+                            _selectedDate = null;
+                            _filterReports();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.surfaceLight,
@@ -363,35 +391,26 @@ class _PosenddayreportState extends State<Posenddayreport> {
 
             SizedBox(height: 16),
 
-            // Observer for reactive updates
-            Observer(
-              builder: (_) {
-                if (_isLoading || eodStore.isLoading) {
-                  return Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(50),
-                      child: CircularProgressIndicator(color: AppColors.primary),
-                    ),
-                  );
-                }
-
-                final filteredReports = _getFilteredReports();
-
-                if (filteredReports.isEmpty) {
-                  return _buildEmptyState(context);
-                }
-
-                return Column(
-                  children: [
-                    _buildSummaryCards(context, filteredReports, isTablet, isDesktop),
-                    SizedBox(height: 16),
-                    _buildExportButton(context, isTablet, isDesktop),
-                    SizedBox(height: 16),
-                    _buildReportsTable(context, filteredReports, isTablet),
-                  ],
-                );
-              },
-            ),
+            if (_isLoading)
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.all(50),
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              )
+            else if (_filteredReports.isEmpty)
+              _buildEmptyState(context)
+            else ...[
+              _buildSummaryCards(context),
+              SizedBox(height: 16),
+              _buildExportButton(context, isTablet, isDesktop),
+              SizedBox(height: 16),
+              _buildReportsTable(context, isTablet),
+              if (_filteredReports.length > _rowsPerPage) ...[
+                SizedBox(height: 16),
+                _buildPaginationControls(),
+              ],
+            ],
           ],
         ),
       ),
@@ -444,128 +463,35 @@ class _PosenddayreportState extends State<Posenddayreport> {
     );
   }
 
-  Widget _buildSummaryCards(BuildContext context, List<EndOfDayReport> reports, bool isTablet, bool isDesktop) {
-    double totalOpeningBalance = 0.0;
-    double totalClosingBalance = 0.0;
-
-    for (var report in reports) {
-      totalOpeningBalance += report.openingBalance;
-      totalClosingBalance += report.closingBalance;
-    }
-
+  Widget _buildSummaryCards(BuildContext context) {
     return IntrinsicHeight(
       child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: _buildSummaryCard(
-            context,
-            'Reports',
-            reports.length.toString(),
-            Icons.event_note,
-            AppColors.primary,
-            isTablet,
-            isDesktop,
-          ),
-        ),
-        SizedBox(width: isDesktop ? 24 : 16),
-        Expanded(
-          child: _buildSummaryCard(
-            context,
-            'Opening Balance',
-            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalOpeningBalance)}',
-            Icons.account_balance_wallet,
-            Colors.blue,
-            isTablet,
-            isDesktop,
-          ),
-        ),
-        SizedBox(width: isDesktop ? 24 : 16),
-        Expanded(
-          child: _buildSummaryCard(
-            context,
-            'Closing Balance',
-            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalClosingBalance)}',
-            Icons.monetization_on,
-            Colors.green,
-            isTablet,
-            isDesktop,
-          ),
-        ),
-      ],
-    ),
-    );
-  }
-
-  Widget _buildSummaryCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-    Color iconColor,
-    bool isTablet,
-    bool isDesktop,
-  ) {
-    return Container(
-      padding: EdgeInsets.all(isTablet ? 24 : 16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: isDesktop ? 16 : (isTablet ? 14 : 11),
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              SizedBox(width: 4),
-              Container(
-                padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: isDesktop ? 28 : (isTablet ? 22 : 14),
-                ),
-              ),
-            ],
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Reports',
+              value: _filteredReports.length.toString(),
+              icon: Icons.event_note,
+              color: AppColors.primary,
+            ),
           ),
-          SizedBox(height: isDesktop ? 16 : 12),
-          SizedBox(
-            width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: isDesktop ? 32 : (isTablet ? 24 : 20),
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+          AppResponsive.horizontalSpace(context),
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Opening Bal.',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalOpeningBalance)}',
+              icon: Icons.account_balance_wallet,
+              color: Colors.blue,
+            ),
+          ),
+          AppResponsive.horizontalSpace(context),
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Closing Bal.',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalClosingBalance)}',
+              icon: Icons.monetization_on,
+              color: Colors.green,
             ),
           ),
         ],
@@ -596,7 +522,34 @@ class _PosenddayreportState extends State<Posenddayreport> {
     );
   }
 
-  Widget _buildReportsTable(BuildContext context, List<EndOfDayReport> reports, bool isTablet) {
+  Widget _buildPaginationControls() {
+    final totalPages = (_filteredReports.length / _rowsPerPage).ceil();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+          icon: Icon(Icons.chevron_left),
+          color: AppColors.primary,
+        ),
+        Text(
+          'Page ${_currentPage + 1} of $totalPages',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        IconButton(
+          onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+          icon: Icon(Icons.chevron_right),
+          color: AppColors.primary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportsTable(BuildContext context, bool isTablet) {
     final screenWidth = AppResponsive.screenWidth(context);
     final cellFontSize = AppResponsive.smallFontSize(context);
     final headerFontSize = AppResponsive.bodyFontSize(context);
@@ -640,7 +593,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                 DataColumn(label: Text('Card', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Online', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
               ],
-              rows: reports.map((report) {
+              rows: _filteredReports.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).map((report) {
                 final dateFormatter = DateFormat('dd/MM/yyyy');
                 final timeFormatter = DateFormat('HH:mm');
 

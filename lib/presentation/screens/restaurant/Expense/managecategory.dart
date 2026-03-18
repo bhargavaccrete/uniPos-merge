@@ -7,6 +7,7 @@ import 'package:unipos/util/common/app_responsive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class ManageCategory extends StatefulWidget {
   const ManageCategory({super.key});
@@ -222,31 +223,10 @@ class _ManageCategoryState extends State<ManageCategory> {
                                 ),
                               ),
                               SizedBox(height: 10),
-                              TextField(
+                              AppTextField(
                                 controller: categoryController,
-                                style: GoogleFonts.poppins(fontSize: 15),
-                                decoration: InputDecoration(
-                                  hintText: 'Enter category name',
-                                  hintStyle: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                  filled: true,
-                                  fillColor: AppColors.surfaceLight,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.divider),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.divider),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
-                                  ),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                ),
+                                hint: 'Enter category name',
+                                icon: Icons.category_outlined,
                               ),
 
                               SizedBox(height: 24),

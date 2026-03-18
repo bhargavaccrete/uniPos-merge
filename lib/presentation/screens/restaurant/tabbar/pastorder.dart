@@ -10,6 +10,7 @@ import '../util/restaurant_print_helper.dart';
 import 'orderDetails.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 class Pastorder extends StatefulWidget {
   const Pastorder({super.key});
 
@@ -126,18 +127,10 @@ class _PastorderState extends State<Pastorder> {
               // Search
               Expanded(
                 flex: 1,
-                child: TextField(
+                child: AppTextField(
                   controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Search name / KOT / bill no',
-                    prefixIcon: Icon(Icons.search, color: AppColors.primary),
-                    isDense: true,
-                    border: inputBorder,
-                    enabledBorder: inputBorder,
-                    focusedBorder: inputBorder,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  ),
-                  style: GoogleFonts.poppins(fontSize: 14),
+                  hint: 'Search name / KOT / bill no',
+                  icon: Icons.search,
                 ),
               ),
             ],
@@ -479,8 +472,6 @@ class _PastorderState extends State<Pastorder> {
     'Dine In',
   ];
 
-  final outr = OutlineInputBorder(borderRadius: BorderRadius.circular(12));
-
   TextEditingController searchbar = TextEditingController();
 
 
@@ -534,22 +525,11 @@ class _PastorderState extends State<Pastorder> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
+                  SizedBox(
                     width: width * 0.6,
-                    height: height * 0.06,
-                    child: TextFormField(
-                      decoration: InputDecoration(
-                        hintText: 'Search Here',
-                        hintStyle:
-                            GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: AppColors.primary,
-                          size: 30,
-                        ),
-                        focusedBorder: outr,
-                        enabledBorder: outr,
-                      ),
+                    child: AppTextField(
+                      hint: 'Search Here',
+                      icon: Icons.search,
                     ),
                   ),
                   SizedBox(

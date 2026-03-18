@@ -4,13 +4,13 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
-import 'package:unipos/screen/productManagementScreen.dart';
 import 'package:unipos/presentation/screens/onboarding/storeDetailsScreen.dart';
 import 'package:unipos/presentation/screens/onboarding/taxSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/paymentSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/staffSetupStep.dart';
 
 import '../../../util/color.dart';
+import '../../../util/common/app_responsive.dart';
 import '../../../util/responsive.dart';
 import '../../../core/config/app_config.dart';
 import '../restaurant/welcome_Admin.dart';
@@ -37,17 +37,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  final int _totalSteps = 8;
-  final Map<int, bool> _stepsCompleted = {
-    0: false,
-    1: false,
-    2: false,
-    3: false,
-    4: false,
-    5: false,
-    6: false,
-    7: false,
-  };
+  final int _totalSteps = SetupStep.getSteps().length;
 
   @override
   void initState() {
@@ -90,9 +80,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     FocusScope.of(context).unfocus();
 
     if (_store.currentStep < _totalSteps - 1) {
-      setState(() {
-        _stepsCompleted[_store.currentStep] = true;
-      });
       _store.nextStep();
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -141,9 +128,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
       // Complete setup (this registers business dependencies)
       await _store.completeSetup();
-
-      // Wait a bit to ensure all dependencies are fully registered
-      await Future.delayed(const Duration(milliseconds: 500));
 
       if (mounted) {
         // Close loading indicator
@@ -249,9 +233,10 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-              // Show confirmation snackbar
+              Navigator.pop(context); // close dialog
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context); // exit setup
+              }
               NotificationService.instance.showSuccess('Progress saved ($progress% complete)');
             },
             style: ElevatedButton.styleFrom(
@@ -267,14 +252,20 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: Observer(
-          builder: (_) => Responsive(
-            mobile: _buildMobileLayout(),
-            tablet: _buildTabletLayout(),
-            desktop: _buildDesktopLayout(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _showExitDialog();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: SafeArea(
+          child: Observer(
+            builder: (_) => Responsive(
+              mobile: _buildMobileLayout(),
+              tablet: _buildTabletLayout(),
+              desktop: _buildDesktopLayout(),
+            ),
           ),
         ),
       ),
@@ -325,7 +316,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
           builder: (_) => SetupSidebar(
             currentStep: _store.currentStep,
             totalSteps: _totalSteps,
-            stepsCompleted: _stepsCompleted,
             onStepTap: _jumpToStep,
             onGetHelp: _showHelpDialog,
             onExit: _showExitDialog,
@@ -418,7 +408,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(AppResponsive.isMobile(context) ? 14 : 20),
       child: Row(
         children: [
           if (_store.currentStep > 0)
@@ -434,21 +424,21 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                 Text(
                   'Setup Wizard',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: AppColors.darkNeutral,
                   ),
                 ),
                 Text(
                   'Step ${_store.currentStep + 1} of $_totalSteps',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600]),
                 ),
               ],
             ),
           ),
           IconButton(
             icon: Icon(Icons.close, color: AppColors.darkNeutral),
-            onPressed: () => Navigator.pop(context),
+            onPressed: _showExitDialog,
           ),
         ],
       ),
@@ -595,62 +585,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     ];
   }
 
-  Widget _buildPlaceholderStep(String title, IconData icon, Color color, String description) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(icon, size: 80, color: color),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkNeutral,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              description,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton(
-                  onPressed: _previousStep,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                    side: BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Back'),
-                ),
-                const SizedBox(width: 15),
-                ElevatedButton(
-                  onPressed: _nextStep,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Skip for Now'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ==================== SUPPORTING WIDGETS ====================
@@ -658,20 +592,18 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 class SetupSidebar extends StatelessWidget {
   final int currentStep;
   final int totalSteps;
-  final Map<int, bool> stepsCompleted;
   final Function(int) onStepTap;
   final VoidCallback onGetHelp;
   final VoidCallback onExit;
 
   const SetupSidebar({
-    Key? key,
+    super.key,
     required this.currentStep,
     required this.totalSteps,
-    required this.stepsCompleted,
     required this.onStepTap,
     required this.onGetHelp,
     required this.onExit,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -806,7 +738,7 @@ class SetupSidebar extends StatelessWidget {
       itemBuilder: (context, index) {
         final step = steps[index];
         final isActive = currentStep == index;
-        final isCompleted = stepsCompleted[index] ?? false;
+        final isCompleted = index < currentStep;
         final isUpcoming = index > currentStep;
 
         return Container(
@@ -1069,56 +1001,62 @@ class SidebarPatternPainter extends CustomPainter {
 class WelcomeStep extends StatelessWidget {
   final VoidCallback onNext;
 
-  const WelcomeStep({Key? key, required this.onNext}) : super(key: key);
+  const WelcomeStep({super.key, required this.onNext});
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = AppResponsive.isMobile(context);
+    final iconSize = isMobile ? 100.0 : 120.0;
+
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(30),
+        padding: EdgeInsets.all(isMobile ? 20 : 30),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 120,
-              height: 120,
+              width: iconSize,
+              height: iconSize,
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.rocket_launch, size: 60, color: AppColors.primary),
+              child: Icon(Icons.rocket_launch, size: iconSize * 0.5, color: AppColors.primary),
             ),
-            const SizedBox(height: 30),
+            SizedBox(height: isMobile ? 20 : 30),
             Text(
               'Welcome to UniPOS Setup',
               style: TextStyle(
-                fontSize: Responsive.isMobile(context) ? 24 : 28,
+                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 28.0),
                 fontWeight: FontWeight.bold,
                 color: AppColors.darkNeutral,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 15),
+            SizedBox(height: isMobile ? 10 : 15),
             Text(
               "Let's get your store up and running in just a few minutes",
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 40),
-            _buildFeatureItem(Icons.timer, 'Quick Setup', 'Complete setup in under 10 minutes'),
-            _buildFeatureItem(Icons.security, 'Secure & Private', 'Your data is encrypted and stored locally'),
-            _buildFeatureItem(Icons.support_agent, 'Support Available', 'Get help anytime during setup'),
-            const SizedBox(height: 50),
+            SizedBox(height: isMobile ? 24 : 40),
+            _buildFeatureItem(context, Icons.timer, 'Quick Setup', 'Complete setup in under 10 minutes'),
+            _buildFeatureItem(context, Icons.security, 'Secure & Private', 'Your data is encrypted and stored locally'),
+            _buildFeatureItem(context, Icons.support_agent, 'Support Available', 'Get help anytime during setup'),
+            SizedBox(height: isMobile ? 30 : 50),
             ElevatedButton(
               onPressed: onNext,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 36 : 50,
+                  vertical: isMobile ? 12 : 15,
+                ),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
+              child: Text(
                 "Let's Start",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,color: Colors.white),
+                style: TextStyle(fontSize: AppResponsive.buttonFontSize(context), fontWeight: FontWeight.w600, color: Colors.white),
               ),
             ),
           ],
@@ -1127,34 +1065,37 @@ class WelcomeStep extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureItem(IconData icon, String title, String description) {
+  Widget _buildFeatureItem(BuildContext context, IconData icon, String title, String description) {
+    final isMobile = AppResponsive.isMobile(context);
+    final boxSize = isMobile ? 42.0 : 50.0;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: EdgeInsets.only(bottom: isMobile ? 14 : 20),
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: boxSize,
+            height: boxSize,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 24),
+            child: Icon(icon, color: AppColors.primary, size: AppResponsive.iconSize(context)),
           ),
-          const SizedBox(width: 15),
+          SizedBox(width: isMobile ? 12 : 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 16,
+                  style: TextStyle(
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.darkNeutral,
                   ),
                 ),
-                Text(description, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                Text(description, style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600])),
               ],
             ),
           ),
@@ -1172,47 +1113,50 @@ class ReviewStep extends StatelessWidget {
   final VoidCallback onComplete;
 
   const ReviewStep({
-    Key? key,
+    super.key,
     this.selectedBusinessType,
     required this.storeName,
     required this.ownerName,
     required this.phone,
     required this.onComplete,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = AppResponsive.isMobile(context);
+    final iconSize = isMobile ? 80.0 : 100.0;
+
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
         child: Column(
           children: [
             Container(
-              width: 100,
-              height: 100,
+              width: iconSize,
+              height: iconSize,
               decoration: BoxDecoration(
                 color: AppColors.success.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle, size: 60, color: AppColors.success),
+              child: Icon(Icons.check_circle, size: iconSize * 0.6, color: AppColors.success),
             ),
-            const SizedBox(height: 30),
-            const Text(
+            SizedBox(height: isMobile ? 20 : 30),
+            Text(
               'Setup Complete!',
               style: TextStyle(
-                fontSize: 28,
+                fontSize: AppResponsive.getValue(context, mobile: 24.0, tablet: 26.0, desktop: 28.0),
                 fontWeight: FontWeight.bold,
                 color: AppColors.darkNeutral,
               ),
             ),
-            const SizedBox(height: 15),
+            SizedBox(height: isMobile ? 10 : 15),
             Text(
               'Your store is ready to use',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Colors.grey[600]),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: isMobile ? 24 : 40),
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isMobile ? 16 : 20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -1226,24 +1170,27 @@ class ReviewStep extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildSummaryItem('Business Type', selectedBusinessType ?? 'Not Set'),
-                  _buildSummaryItem('Store Name', storeName.isEmpty ? 'Not Set' : storeName),
-                  _buildSummaryItem('Owner', ownerName.isEmpty ? 'Not Set' : ownerName),
-                  _buildSummaryItem('Phone', phone.isEmpty ? 'Not Set' : phone),
+                  _buildSummaryItem(context, 'Business Type', selectedBusinessType ?? 'Not Set'),
+                  _buildSummaryItem(context, 'Store Name', storeName.isEmpty ? 'Not Set' : storeName),
+                  _buildSummaryItem(context, 'Owner', ownerName.isEmpty ? 'Not Set' : ownerName),
+                  _buildSummaryItem(context, 'Phone', phone.isEmpty ? 'Not Set' : phone),
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: isMobile ? 24 : 40),
             ElevatedButton(
               onPressed: onComplete,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 36 : 50,
+                  vertical: isMobile ? 12 : 15,
+                ),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
+              child: Text(
                 'Go to Dashboard',
-                style: TextStyle(color: AppColors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(color: AppColors.white, fontSize: AppResponsive.buttonFontSize(context), fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -1252,17 +1199,17 @@ class ReviewStep extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryItem(String label, String value) {
+  Widget _buildSummaryItem(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+          Text(label, style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600])),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
+            style: TextStyle(
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
               color: AppColors.darkNeutral,
             ),

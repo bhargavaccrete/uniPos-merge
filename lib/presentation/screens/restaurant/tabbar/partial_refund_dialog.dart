@@ -7,6 +7,7 @@ import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/refund_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 // Export PartialRefundResult so UI screens can use it
 export '../../../../domain/services/restaurant/refund_service.dart' show PartialRefundResult;
@@ -291,37 +292,18 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              TextField(
+              AppTextField(
                 controller: _refundReasonController,
+                hint: 'e.g., Customer complaint, wrong order, quality issue...',
+                icon: Icons.note_alt_outlined,
+                maxLines: 3,
+                minLines: 2,
                 onChanged: (value) {
-                  // Clear error when user starts typing
                   if (_showReasonError && value.trim().isNotEmpty) {
                     setState(() => _showReasonError = false);
                   }
                 },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: _showReasonError ? Colors.red : Colors.grey.shade400),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: _showReasonError ? Colors.red : Colors.grey.shade400),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: _showReasonError ? Colors.red : Colors.orange, width: 2),
-                  ),
-                  hintText: 'e.g., Customer complaint, wrong order, quality issue...',
-                  hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade500),
-                  filled: true,
-                  fillColor: _showReasonError ? Colors.red.shade50 : Colors.grey.shade50,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  errorText: _showReasonError ? 'This field is required' : null,
-                  errorStyle: GoogleFonts.poppins(fontSize: 12, color: Colors.red),
-                ),
-                maxLines: 3,
-                minLines: 2,
+                validator: (_) => _showReasonError ? 'This field is required' : null,
               ),
               const SizedBox(height: 16),
               Text(

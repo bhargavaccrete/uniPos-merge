@@ -12,6 +12,7 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 
 class ManageInventory extends StatefulWidget {
@@ -473,39 +474,15 @@ class _ManageInventoryState extends State<ManageInventory> {
         SizedBox(width: 8),
         Expanded(
           flex: 4, // Adjusted flex
-          child: TextField(
+          child: AppTextField(
             controller: controller,
+            hint: 'Enter qty',
             keyboardType: isWeightBased
                 ? TextInputType.numberWithOptions(decimal: true)
                 : TextInputType.number,
             inputFormatters: isWeightBased
-                ? [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-            ]
-                : [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
-            decoration: InputDecoration(
-              hintText: 'Enter qty',
-              hintStyle: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade400),
-              filled: true,
-              fillColor: AppColors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: AppColors.divider),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: AppColors.primary, width: 2),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: AppColors.divider),
-              ),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              isDense: true,
-            ),
-            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
+                ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
+                : [FilteringTextInputFormatter.digitsOnly],
           ),
         ),
         SizedBox(width: 8),
@@ -681,39 +658,20 @@ class _ManageInventoryState extends State<ManageInventory> {
                 SizedBox(height: 12),
 
                 // Search Bar
-                TextField(
+                AppTextField(
                   controller: _searchController,
                   onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
-                  style: GoogleFonts.poppins(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search items...',
-                    hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textSecondary),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.close_rounded, size: 18, color: AppColors.textSecondary),
-                            onPressed: () => setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            }),
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: AppColors.surfaceLight,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.divider),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.divider),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
-                    ),
-                  ),
+                  hint: 'Search items...',
+                  icon: Icons.search_rounded,
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.close_rounded, size: 18, color: AppColors.textSecondary),
+                          onPressed: () => setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          }),
+                        )
+                      : null,
                 ),
                 SizedBox(height: 12),
 

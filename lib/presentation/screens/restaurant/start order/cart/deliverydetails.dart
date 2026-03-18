@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
-import '../../../../widget/componets/restaurant/componets/Textform.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+
 class DeliveryDetails extends StatefulWidget {
   const DeliveryDetails({super.key});
 
@@ -65,106 +65,64 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
             children: [
               Text('Customer Details ',style: GoogleFonts.poppins(fontWeight: FontWeight.w500),),
               SizedBox(height: 10,),
-              CommonTextForm(
-                obsecureText: false,
-                borderc: 10,
-                BorderColor: AppColors.primary,
+              AppTextField(
                 controller: nameController,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'Name',
-                LabelColor: AppColors.primary,
+                label: 'Name',
+                icon: Icons.person_outline,
               ),
               SizedBox(height: 10,),
 
-              CommonTextForm(
-                obsecureText: false,
+              AppTextField(
                 controller: emailController,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'Email ID (optional)',
-                LabelColor: AppColors.primary,
+                label: 'Email ID (optional)',
+                icon: Icons.mail_outline,
+                keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 10,),
 
-              CommonTextForm(
-                obsecureText: false,
+              AppTextField(
                 controller: numberController,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'Mobile No',
-                LabelColor: AppColors.primary,
+                label: 'Mobile No',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
               ),
               SizedBox(height: 25,),
 
-              CommonTextForm(
-                obsecureText: false,
+              AppTextField(
                 controller: remarkController,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'Remarks',
-                LabelColor: AppColors.primary,
+                label: 'Remarks',
+                icon: Icons.note_alt_outlined,
               ),
               Divider(),
 
               Text('Address',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.w600),),
               Divider(),
-              CommonTextForm(
-                obsecureText: false,
+              AppTextField(
                 controller: houseController,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'House NO',
-                LabelColor: AppColors.primary,
+                label: 'House NO',
+                icon: Icons.home_outlined,
               ),
               SizedBox(height: 10,),
-              CommonTextForm(
-                obsecureText: false,
+              AppTextField(
                 controller: stateController,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'State',
-                LabelColor: AppColors.primary,
+                label: 'State',
+                icon: Icons.location_on_outlined,
               ),
               SizedBox(height: 10,),
-              CommonTextForm(
-                obsecureText: false,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'City',
-                LabelColor: AppColors.primary,
+              AppTextField(
+                label: 'City',
+                icon: Icons.location_city_outlined,
               ),
               SizedBox(height: 10,),
-              CommonTextForm(
-                obsecureText: false,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'Area',
-                LabelColor: AppColors.primary,
+              AppTextField(
+                label: 'Area',
+                icon: Icons.map_outlined,
               ),
               SizedBox(height: 10,),
-              CommonTextForm(
-                obsecureText: false,
-                borderc: 10,
-                BorderColor: AppColors.primary,
-                // HintColor: AppColors.primary,
-                // hintText: 'Name',
-                labelText: 'Post Code',
-                LabelColor: AppColors.primary,
+              AppTextField(
+                label: 'Post Code',
+                icon: Icons.local_post_office_outlined,
+                keyboardType: TextInputType.number,
               ),
               SizedBox(height: 10,),
               Divider(),
@@ -175,12 +133,11 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                 children: [
                   Container(
                     width: width * 0.6,
-                    child: CommonTextForm(
+                    child: AppTextField(
                       controller: deliveryController,
-                      BorderColor: Colors.grey,
-                      obsecureText: false,
-                      labelText: 'Delivery Charge',
-                      LabelColor: Colors.grey,
+                      label: 'Delivery Charge',
+                      icon: Icons.delivery_dining_outlined,
+                      keyboardType: TextInputType.number,
                     ),
                   ),
 

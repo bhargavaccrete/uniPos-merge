@@ -13,6 +13,7 @@ import '../start order/startorder.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class TableScreen extends StatefulWidget {
   final bool? isfromcart;
@@ -43,22 +44,10 @@ class _TableScreenState extends State<TableScreen> {
         ),
         content: SizedBox(
           width: 300,
-          child: TextField(
+          child: AppTextField(
             controller: controller,
-            autofocus: true,
-            style: GoogleFonts.poppins(),
-            decoration: InputDecoration(
-              hintText: 'Enter Table Name',
-              hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.divider),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 2),
-              ),
-            ),
+            hint: 'Enter Table Name',
+            icon: Icons.table_restaurant_outlined,
           ),
         ),
         actions: [
@@ -229,22 +218,10 @@ class _TableScreenState extends State<TableScreen> {
         title: Text('Rename Table', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
         content: SizedBox(
           width: 300,
-          child: TextField(
+          child: AppTextField(
             controller: controller,
-            autofocus: true,
-            style: GoogleFonts.poppins(),
-            decoration: InputDecoration(
-              hintText: 'Enter new table name',
-              hintStyle: GoogleFonts.poppins(color: AppColors.textSecondary),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.divider),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 2),
-              ),
-            ),
+            hint: 'Enter new table name',
+            icon: Icons.table_restaurant_outlined,
           ),
         ),
         actions: [
@@ -343,54 +320,155 @@ class _TableScreenState extends State<TableScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: AppColors.surfaceLight,
+        appBar: widget.isfromcart == true
+            ? AppBar(
+                backgroundColor: AppColors.white,
+                surfaceTintColor: AppColors.white,
+                elevation: 0.5,
+                leading: IconButton(
+                  icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                title: Text(
+                  'Select Table',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                centerTitle: false,
+              )
+            : null,
         body: Column(
           children: [
-            // Header: Add Table + Legend
+            // Header: Title + Add Table + Legend
             Container(
               padding: AppResponsive.padding(context),
               color: AppColors.white,
               child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: _addTable,
-                    child: Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(
-                        vertical: AppResponsive.getValue(context, mobile: 16, tablet: 18),
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.tablesTab,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.tablesTab.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+                  // Title row with table count and Add button
+                  if (widget.isfromcart != true)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: AppResponsive.getValue(context, mobile: 12, tablet: 16),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.add,
-                            color: AppColors.white,
-                            size: AppResponsive.getValue(context, mobile: 20, tablet: 22),
+                            Icons.table_restaurant,
+                            color: AppColors.tablesTab,
+                            size: AppResponsive.getValue(context, mobile: 22, tablet: 26),
                           ),
                           AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                           Text(
-                            'Add Table',
+                            'Tables',
                             style: GoogleFonts.poppins(
-                              color: AppColors.white,
-                              fontSize: AppResponsive.getValue(context, mobile: 16, tablet: 17),
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 22),
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                          Observer(
+                            builder: (_) => Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.tablesTab.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${tableStore.tables.length}',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: AppResponsive.smallFontSize(context),
+                                  color: AppColors.tablesTab,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Spacer(),
+                          GestureDetector(
+                            onTap: _addTable,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: AppResponsive.getValue(context, mobile: 14, tablet: 18),
+                                vertical: AppResponsive.getValue(context, mobile: 8, tablet: 10),
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.tablesTab,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.tablesTab.withOpacity(0.3),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.add, color: AppColors.white, size: 18),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Add Table',
+                                    style: GoogleFonts.poppins(
+                                      color: AppColors.white,
+                                      fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 14),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+                  // Full-width Add Table button when opened from cart (no title row)
+                  if (widget.isfromcart == true)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        bottom: AppResponsive.getValue(context, mobile: 12, tablet: 16),
+                      ),
+                      child: GestureDetector(
+                        onTap: _addTable,
+                        child: Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppResponsive.getValue(context, mobile: 14, tablet: 16),
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.tablesTab,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.tablesTab.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add, color: AppColors.white, size: 20),
+                              SizedBox(width: 6),
+                              Text(
+                                'Add Table',
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.white,
+                                  fontSize: AppResponsive.getValue(context, mobile: 15, tablet: 16),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [

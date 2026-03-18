@@ -15,6 +15,7 @@ import 'package:unipos/domain/services/common/backup_encryption_service.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/core/init/hive_init.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/common/business_type.dart';
 import 'package:unipos/data/models/common/business_details.dart';
 import 'package:unipos/models/tax_details.dart';
@@ -427,17 +428,14 @@ class UnifiedBackupService {
             children: [
               const Text('This backup is encrypted. Enter your backup password to restore.'),
               const SizedBox(height: 16),
-              TextField(
+              AppTextField(
                 controller: controller,
                 obscureText: obscure,
                 autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Backup Password',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => obscure = !obscure),
-                  ),
+                label: 'Backup Password',
+                suffixIcon: IconButton(
+                  icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => obscure = !obscure),
                 ),
               ),
             ],

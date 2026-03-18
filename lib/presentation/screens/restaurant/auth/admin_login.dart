@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/dashboard.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
@@ -84,10 +84,11 @@ class _AdminLoginState extends State<AdminLogin> {
                   child: ValueListenableBuilder(
                     valueListenable: obsecurepass,
                     builder: (context, value, child) {
-                      return CommonTextForm(
-                        obsecureText: value,
+                      return AppTextField(
+                        obscureText: value,
                         controller: PasswordController,
-                        hintText: 'Enter Passwordd',
+                        hint: 'Enter Password',
+                        icon: Icons.lock_outline,
                         keyboardType: TextInputType.phone,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
@@ -95,7 +96,7 @@ class _AdminLoginState extends State<AdminLogin> {
                           if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
                           return null;
                         },
-                        gesture: GestureDetector(
+                        suffixIcon: GestureDetector(
                             onTap: () {
                               obsecurepass.value = !obsecurepass.value;
                             },

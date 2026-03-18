@@ -590,20 +590,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                               flex: 3,
                                               child: SizedBox(
                                                 height: 40,
-                                                child: TextField(
+                                                child: AppTextField(
                                                   controller: variantControllers[variant.id],
                                                   keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                                  decoration: InputDecoration(
-                                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                                                    filled: true,
-                                                    fillColor: AppColors.surfaceLight,
-                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-                                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-                                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-                                                    prefixText: '₹',
-                                                    hintText: '0',
-                                                  ),
-                                                  style: GoogleFonts.poppins(fontSize: 12),
+                                                  hint: '0',
+                                                  prefixWidget: Text('₹'),
                                                 ),
                                               ),
                                             ),

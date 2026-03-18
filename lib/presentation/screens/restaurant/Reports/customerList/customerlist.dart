@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
@@ -9,6 +8,8 @@ import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class CustomerListReport extends StatefulWidget {
   const CustomerListReport({super.key});
@@ -20,6 +21,18 @@ class CustomerListReport extends StatefulWidget {
 class _CustomerListReportState extends State<CustomerListReport> {
   String _searchQuery = '';
   String _sortBy = 'name'; // name, orders, spent, date
+  bool _isLoading = true;
+  int _currentPage = 0;
+  static const int _rowsPerPage = 50;
+
+  // Cached data — computed once after load, re-filtered on search/sort
+  List<CustomerReportData> _allCustomerData = [];
+  List<CustomerReportData> _filteredData = [];
+
+  // Pre-computed summary totals
+  int _totalCustomers = 0;
+  int _activeCustomers = 0;
+  double _totalRevenue = 0.0;
 
   @override
   void initState() {
@@ -28,75 +41,75 @@ class _CustomerListReportState extends State<CustomerListReport> {
   }
 
   Future<void> _loadData() async {
+    setState(() => _isLoading = true);
     await Future.wait([
       restaurantCustomerStore.loadCustomers(),
       pastOrderStore.loadPastOrders(),
     ]);
-    if (mounted) setState(() {});
+    _buildCustomerData();
   }
 
-  List<CustomerReportData> _calculateCustomerData() {
-    final customers = restaurantCustomerStore.customers.toList();
-    final allOrders = pastOrderStore.pastOrders.toList();
+  /// Build order lookup map once, then compute customer data in single pass.
+  /// O(orders + customers) instead of O(customers × orders).
+  void _buildCustomerData() {
+    // Step 1: Build indexed lookup — O(orders)
+    final ordersByName = <String, List<_OrderStats>>{};
+    for (final order in pastOrderStore.pastOrders) {
+      final status = order.orderStatus ?? '';
+      // Skip VOID/VOIDED — not valid sales
+      if (status == 'VOID' || status == 'VOIDED') continue;
 
-    List<CustomerReportData> customerDataList = [];
+      final key = order.customerName.trim().toLowerCase();
+      if (key.isEmpty) continue;
 
-    for (int i = 0; i < customers.length; i++) {
-      final customer = customers[i];
+      final spent = status == 'FULLY_REFUNDED'
+          ? 0.0
+          : order.totalPrice - (order.refundAmount ?? 0.0);
 
-      // Find all orders for this customer
-      final customerOrders = allOrders.where((order) {
-        final orderCustomerName = order.customerName.trim().toLowerCase();
-        final customerName = (customer.name ?? '').trim().toLowerCase();
-        final customerPhone = customer.phone?.trim() ?? '';
+      ordersByName.putIfAbsent(key, () => []).add(_OrderStats(
+        spent: spent,
+        orderAt: order.orderAt,
+      ));
+    }
 
-        // Match by name or phone
-        return orderCustomerName == customerName ||
-               (customerPhone.isNotEmpty && order.customerName.contains(customerPhone));
-      }).toList();
+    // Step 2: Map customers to report data — O(customers)
+    final customers = restaurantCustomerStore.customers;
+    final result = <CustomerReportData>[];
 
-      // FIX 1 & 2: Exclude VOID/VOIDED orders — they were never completed sales.
-      final validOrders = customerOrders.where((order) {
-        final status = order.orderStatus ?? '';
-        return status != 'VOID' && status != 'VOIDED';
-      }).toList();
+    for (final customer in customers) {
+      final customerName = (customer.name ?? '').trim().toLowerCase();
+      final customerPhone = customer.phone?.trim() ?? '';
 
-      // Calculate order statistics
-      final totalOrders = validOrders.length;
+      // Lookup by name
+      var stats = ordersByName[customerName];
 
-      // FIX 3: FULLY_REFUNDED orders contribute 0 to spent; others net off refund amount.
-      final totalSpent = validOrders.fold<double>(0.0, (sum, order) {
-        final status = order.orderStatus ?? '';
-        if (status == 'FULLY_REFUNDED') return sum;
-        return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
-      });
-
-      // FIX 5: Last order date only from valid (non-voided) orders.
-      DateTime? lastOrderDate;
-      if (validOrders.isNotEmpty) {
-        validOrders.sort((a, b) {
-          if (a.orderAt == null && b.orderAt == null) return 0;
-          if (a.orderAt == null) return 1;
-          if (b.orderAt == null) return -1;
-          return b.orderAt!.compareTo(a.orderAt!);
-        });
-        lastOrderDate = validOrders.first.orderAt;
-      }
-
-      // Apply search filter
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        final matchesName = (customer.name ?? '').toLowerCase().contains(query);
-        final matchesPhone = (customer.phone ?? '').contains(query);
-
-        if (!matchesName && !matchesPhone) {
-          continue;
+      // Fallback: check if phone matches any order customer name
+      if (stats == null && customerPhone.isNotEmpty) {
+        for (final entry in ordersByName.entries) {
+          if (entry.key.contains(customerPhone)) {
+            stats = entry.value;
+            break;
+          }
         }
       }
 
-      // FIX 4: srNo based on current list size — no gaps when search filters rows.
-      customerDataList.add(CustomerReportData(
-        srNo: customerDataList.length + 1,
+      final totalOrders = stats?.length ?? 0;
+      double totalSpent = 0.0;
+      DateTime? lastOrderDate;
+
+      if (stats != null) {
+        for (final s in stats) {
+          totalSpent += s.spent;
+          if (s.orderAt != null) {
+            if (lastOrderDate == null || s.orderAt!.isAfter(lastOrderDate)) {
+              lastOrderDate = s.orderAt;
+            }
+          }
+        }
+      }
+
+      result.add(CustomerReportData(
+        srNo: 0, // assigned after filtering
         name: customer.name ?? 'Unknown',
         phone: customer.phone ?? '-',
         totalOrders: totalOrders,
@@ -106,19 +119,49 @@ class _CustomerListReportState extends State<CustomerListReport> {
       ));
     }
 
-    // Apply sorting
+    _allCustomerData = result;
+
+    // Compute summary totals once
+    int active = 0;
+    double revenue = 0.0;
+    for (final c in result) {
+      if (c.totalOrders > 0) active++;
+      revenue += c.totalSpent;
+    }
+
+    _totalCustomers = result.length;
+    _activeCustomers = active;
+    _totalRevenue = revenue;
+
+    _applyFilterAndSort();
+  }
+
+  /// Filter by search query + sort — runs on search/sort change only.
+  void _applyFilterAndSort() {
+    var data = _allCustomerData.toList();
+
+    // Search filter
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      data = data.where((c) {
+        return c.name.toLowerCase().contains(query) ||
+               c.phone.contains(query);
+      }).toList();
+    }
+
+    // Sort
     switch (_sortBy) {
       case 'name':
-        customerDataList.sort((a, b) => a.name.compareTo(b.name));
+        data.sort((a, b) => a.name.compareTo(b.name));
         break;
       case 'orders':
-        customerDataList.sort((a, b) => b.totalOrders.compareTo(a.totalOrders));
+        data.sort((a, b) => b.totalOrders.compareTo(a.totalOrders));
         break;
       case 'spent':
-        customerDataList.sort((a, b) => b.totalSpent.compareTo(a.totalSpent));
+        data.sort((a, b) => b.totalSpent.compareTo(a.totalSpent));
         break;
       case 'date':
-        customerDataList.sort((a, b) {
+        data.sort((a, b) {
           if (a.lastOrderDate == null && b.lastOrderDate == null) return 0;
           if (a.lastOrderDate == null) return 1;
           if (b.lastOrderDate == null) return -1;
@@ -127,19 +170,32 @@ class _CustomerListReportState extends State<CustomerListReport> {
         break;
     }
 
-    return customerDataList;
+    // Assign srNo after filter
+    for (int i = 0; i < data.length; i++) {
+      data[i] = CustomerReportData(
+        srNo: i + 1,
+        name: data[i].name,
+        phone: data[i].phone,
+        totalOrders: data[i].totalOrders,
+        totalSpent: data[i].totalSpent,
+        lastOrderDate: data[i].lastOrderDate,
+        registrationDate: data[i].registrationDate,
+      );
+    }
+
+    setState(() {
+      _filteredData = data;
+      _currentPage = 0;
+      _isLoading = false;
+    });
   }
 
   Future<void> _exportReport() async {
-    final customerData = _calculateCustomerData();
-
-    if (customerData.isEmpty) {
-      if (!mounted) return;
+    if (_filteredData.isEmpty) {
       NotificationService.instance.showError('No customers to export');
       return;
     }
 
-    // Prepare headers
     final headers = [
       'Sr No',
       'Customer Name',
@@ -150,8 +206,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
       'Registration Date'
     ];
 
-    // Prepare data rows
-    final data = customerData.map((customer) => [
+    final data = _filteredData.map((customer) => [
       customer.srNo.toString(),
       customer.name,
       customer.phone,
@@ -165,22 +220,16 @@ class _CustomerListReportState extends State<CustomerListReport> {
           : '-',
     ]).toList();
 
-    // Calculate summary
-    final totalCustomers = customerData.length;
-    final activeCustomers = customerData.where((c) => c.totalOrders > 0).length;
-    final totalRevenue = customerData.fold<double>(0, (sum, c) => sum + c.totalSpent);
-    final avgSpentPerCustomer = totalCustomers > 0 ? totalRevenue / totalCustomers : 0.0;
+    final avgSpent = _totalCustomers > 0 ? _totalRevenue / _totalCustomers : 0.0;
 
-    // Prepare summary
     final summary = {
-      'Total Customers': totalCustomers.toString(),
-      'Active Customers': '$activeCustomers (${((activeCustomers / totalCustomers) * 100).toStringAsFixed(1)}%)',
-      'Total Revenue': ReportExportService.formatCurrency(totalRevenue),
-      'Avg Spent/Customer': ReportExportService.formatCurrency(avgSpentPerCustomer),
+      'Total Customers': _totalCustomers.toString(),
+      'Active Customers': '$_activeCustomers (${((_activeCustomers / _totalCustomers) * 100).toStringAsFixed(1)}%)',
+      'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
+      'Avg Spent/Customer': ReportExportService.formatCurrency(avgSpent),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
     };
 
-    // Show export dialog
     await ReportExportService.showExportDialog(
       context: context,
       fileName: 'customer_list_${DateFormat('yyyyMMdd').format(DateTime.now())}',
@@ -194,7 +243,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.surfaceLight,
       body: SafeArea(
         child: Column(
           children: [
@@ -206,478 +255,217 @@ class _CustomerListReportState extends State<CustomerListReport> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                          ),
-                          child: Icon(
-                            Icons.arrow_back_ios_new,
-                            size: AppResponsive.iconSize(context),
-                            color: AppColors.primary,
-                          ),
-                        ),
+                  InkWell(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                       ),
-                      SizedBox(width: AppResponsive.mediumSpacing(context)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Customer List Report',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.headingFontSize(context),
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            Text(
-                              'View all registered customers',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: Icon(
+                        Icons.arrow_back_ios_new,
+                        size: AppResponsive.iconSize(context),
+                        color: AppColors.primary,
                       ),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.mediumSpacing(context),
-                          vertical: AppResponsive.smallSpacing(context),
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                        ),
-                        child: Text(
-                          'ADMIN',
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Customer List Report',
                           style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
+                            fontSize: AppResponsive.headingFontSize(context),
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
+                        Text(
+                          'View all registered customers',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.mediumSpacing(context),
+                      vertical: AppResponsive.smallSpacing(context),
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                    ),
+                    child: Text(
+                      'ADMIN',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
             ),
             // Content
             Expanded(
-              child: Observer(
-                builder: (_) {
-                  if (restaurantCustomerStore.isLoading || pastOrderStore.isLoading) {
-                    return Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
-                    );
-                  }
-
-                  final customerData = _calculateCustomerData();
-                  final totalCustomers = restaurantCustomerStore.customers.length;
-                  final activeCustomers = customerData.where((c) => c.totalOrders > 0).length;
-                  final totalRevenue = customerData.fold<double>(0, (sum, c) => sum + c.totalSpent);
-
-                  return SingleChildScrollView(
-                    child: Padding(
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator(color: AppColors.primary))
+                  : SingleChildScrollView(
                       padding: AppResponsive.padding(context),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Summary Cards
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildSummaryCard(
-                                  context,
-                                  'Total Customers',
-                                  totalCustomers.toString(),
-                                  Icons.people_outline,
-                                  Colors.blue,
-                                ),
-                              ),
-                              SizedBox(width: AppResponsive.smallSpacing(context)),
-                              Expanded(
-                                child: _buildSummaryCard(
-                                  context,
-                                  'Active Customers',
-                                  activeCustomers.toString(),
-                                  Icons.shopping_bag_outlined,
-                                  Colors.green,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: AppResponsive.smallSpacing(context)),
-                          _buildSummaryCard(
-                            context,
-                            'Total Revenue',
-                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalRevenue)}',
-                            Icons.monetization_on_outlined,
-                            Colors.orange,
-                          ),
-
-                          SizedBox(height: AppResponsive.mediumSpacing(context)),
-
-                          // Search and Sort Bar
-                          Container(
-                            padding: AppResponsive.cardPadding(context),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
+                      child: AppResponsive.constrainedContent(
+                        context: context,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Summary Cards
+                            Row(
                               children: [
-                                // Search Field
-                                TextField(
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _searchQuery = value;
-                                    });
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText: 'Search by name or phone',
-                                    hintStyle: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.bodyFontSize(context),
-                                      color: Colors.grey,
-                                    ),
-                                    prefixIcon: Icon(Icons.search, color: AppColors.primary),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                                      borderSide: BorderSide(color: Colors.grey[300]!),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                                      borderSide: BorderSide(color: Colors.grey[300]!),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                                      borderSide: BorderSide(color: AppColors.primary),
-                                    ),
-                                    contentPadding: AppResponsive.cardPadding(context),
-                                  ),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.bodyFontSize(context),
+                                Expanded(
+                                  child: ReportSummaryCard(
+                                    title: 'Total Customers',
+                                    value: _totalCustomers.toString(),
+                                    icon: Icons.people_outline,
+                                    color: Colors.blue,
                                   ),
                                 ),
-                                SizedBox(height: AppResponsive.smallSpacing(context)),
-                                // Sort Options
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Sort by:',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: AppResponsive.bodyFontSize(context),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    SizedBox(width: AppResponsive.smallSpacing(context)),
-                                    Expanded(
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        child: Row(
-                                          children: [
-                                            _buildSortChip('Name', 'name'),
-                                            _buildSortChip('Orders', 'orders'),
-                                            _buildSortChip('Spent', 'spent'),
-                                            _buildSortChip('Last Order', 'date'),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                SizedBox(width: AppResponsive.smallSpacing(context)),
+                                Expanded(
+                                  child: ReportSummaryCard(
+                                    title: 'Active Customers',
+                                    value: _activeCustomers.toString(),
+                                    icon: Icons.shopping_bag_outlined,
+                                    color: Colors.green,
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-
-                          SizedBox(height: AppResponsive.mediumSpacing(context)),
-
-                          // Export Button
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: customerData.isNotEmpty ? _exportReport : null,
-                              icon: const Icon(Icons.file_download_outlined),
-                              label: Text(
-                                'Export to Excel',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.buttonFontSize(context),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: AppResponsive.mediumSpacing(context),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                                ),
-                                elevation: 0,
-                              ),
+                            SizedBox(height: AppResponsive.smallSpacing(context)),
+                            ReportSummaryCard(
+                              title: 'Total Revenue',
+                              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
+                              icon: Icons.monetization_on_outlined,
+                              color: Colors.orange,
                             ),
-                          ),
 
-                          SizedBox(height: AppResponsive.mediumSpacing(context)),
+                            SizedBox(height: AppResponsive.mediumSpacing(context)),
 
-                          // Data Table or Empty State
-                          if (customerData.isEmpty)
-                            _buildEmptyState(
-                              context,
-                              _searchQuery.isNotEmpty
-                                  ? 'No customers found matching "$_searchQuery"'
-                                  : 'No customers registered yet',
-                            )
-                          else
+                            // Search and Sort Bar
                             Container(
+                              padding: AppResponsive.cardPadding(context),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Colors.black.withValues(alpha: 0.05),
                                     blurRadius: 10,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Padding(
-                                    padding: AppResponsive.cardPadding(context),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Customer Details',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.subheadingFontSize(context),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: AppResponsive.smallSpacing(context),
-                                            vertical: AppResponsive.smallSpacing(context) / 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                                          ),
-                                          child: Text(
-                                            '${customerData.length} customers',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: AppResponsive.captionFontSize(context),
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.primary,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                  AppTextField(
+                                    onChanged: (value) {
+                                      _searchQuery = value;
+                                      _applyFilterAndSort();
+                                    },
+                                    hint: 'Search by name or phone',
+                                    icon: Icons.search,
                                   ),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          minWidth: AppResponsive.screenWidth(context) - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-                                        ),
-                                        child: DataTable(
-                                          columnSpacing: AppResponsive.tableColumnSpacing(context),
-                                          headingRowHeight: AppResponsive.tableHeadingHeight(context),
-                                          dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
-                                          dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-                                          headingRowColor: WidgetStateProperty.all(Colors.grey[100]),
-                                          columns: [
-                                            DataColumn(
-                                              label: SizedBox(
-                                                width: AppResponsive.getValue(context, mobile: 30.0, tablet: 40.0, desktop: 50.0),
-                                                child: Text(
-                                                  'Sr',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.bodyFontSize(context),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            DataColumn(
-                                              label: SizedBox(
-                                                width: AppResponsive.getValue(context, mobile: 100.0, tablet: 120.0, desktop: 150.0),
-                                                child: Text(
-                                                  'Name',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.bodyFontSize(context),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            DataColumn(
-                                              label: SizedBox(
-                                                width: AppResponsive.getValue(context, mobile: 100.0, tablet: 110.0, desktop: 120.0),
-                                                child: Text(
-                                                  'Mobile',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.bodyFontSize(context),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            DataColumn(
-                                              label: SizedBox(
-                                                width: AppResponsive.getValue(context, mobile: 60.0, tablet: 70.0, desktop: 80.0),
-                                                child: Text(
-                                                  'Orders',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.bodyFontSize(context),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            DataColumn(
-                                              label: SizedBox(
-                                                width: AppResponsive.getValue(context, mobile: 80.0, tablet: 100.0, desktop: 120.0),
-                                                child: Text(
-                                                  'Spent (${CurrencyHelper.currentSymbol})',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.bodyFontSize(context),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            DataColumn(
-                                              label: SizedBox(
-                                                width: AppResponsive.getValue(context, mobile: 80.0, tablet: 90.0, desktop: 100.0),
-                                                child: Text(
-                                                  'Last Order',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.bodyFontSize(context),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        rows: customerData.map((customer) {
-                                          return DataRow(
-                                            cells: [
-                                              DataCell(
-                                                Text(
-                                                  customer.srNo.toString(),
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.smallFontSize(context),
-                                                  ),
-                                                ),
-                                              ),
-                                              DataCell(
-                                                Text(
-                                                  customer.name,
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.smallFontSize(context),
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ),
-                                              DataCell(
-                                                Text(
-                                                  customer.phone,
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.smallFontSize(context),
-                                                  ),
-                                                ),
-                                              ),
-                                              DataCell(
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: AppResponsive.smallSpacing(context),
-                                                    vertical: AppResponsive.smallSpacing(context) / 2,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: customer.totalOrders > 0
-                                                        ? Colors.blue.withOpacity(0.1)
-                                                        : Colors.grey.withOpacity(0.1),
-                                                    borderRadius: BorderRadius.circular(12),
-                                                  ),
-                                                  child: Text(
-                                                    customer.totalOrders.toString(),
-                                                    style: GoogleFonts.poppins(
-                                                      fontSize: AppResponsive.smallFontSize(context),
-                                                      fontWeight: FontWeight.w600,
-                                                      color: customer.totalOrders > 0 ? Colors.blue : Colors.grey,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                              DataCell(
-                                                Text(
-                                                  DecimalSettings.formatAmount(customer.totalSpent),
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.smallFontSize(context),
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Colors.green,
-                                                  ),
-                                                ),
-                                              ),
-                                              DataCell(
-                                                Text(
-                                                  customer.lastOrderDate != null
-                                                      ? DateFormat('dd/MM/yy').format(customer.lastOrderDate!)
-                                                      : 'Never',
-                                                  style: GoogleFonts.poppins(
-                                                    fontSize: AppResponsive.smallFontSize(context),
-                                                    color: customer.lastOrderDate != null
-                                                        ? Colors.black87
-                                                        : Colors.grey,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        }).toList(),
+                                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Sort by:',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.bodyFontSize(context),
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                    ),
+                                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                                      Expanded(
+                                        child: SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: Row(
+                                            children: [
+                                              _buildSortChip('Name', 'name'),
+                                              _buildSortChip('Orders', 'orders'),
+                                              _buildSortChip('Spent', 'spent'),
+                                              _buildSortChip('Last Order', 'date'),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
-                        ],
+
+                            SizedBox(height: AppResponsive.mediumSpacing(context)),
+
+                            // Export Button
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _filteredData.isNotEmpty ? _exportReport : null,
+                                icon: const Icon(Icons.file_download_outlined),
+                                label: Text(
+                                  'Export Report',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.buttonFontSize(context),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(height: AppResponsive.mediumSpacing(context)),
+
+                            // Data Table or Empty State
+                            if (_filteredData.isEmpty)
+                              _buildEmptyState(
+                                context,
+                                _searchQuery.isNotEmpty
+                                    ? 'No customers found matching "$_searchQuery"'
+                                    : 'No customers registered yet',
+                              )
+                            else
+                              _buildCustomerTable(),
+
+                            if (_filteredData.length > _rowsPerPage)
+                              _buildPaginationControls(),
+                          ],
+                        ),
                       ),
                     ),
-                  );
-                },
-              ),
             ),
           ],
         ),
@@ -685,21 +473,18 @@ class _CustomerListReportState extends State<CustomerListReport> {
     );
   }
 
-  Widget _buildSummaryCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildCustomerTable() {
+    final pageData = _filteredData.length <= _rowsPerPage
+        ? _filteredData
+        : _filteredData.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).toList();
+
     return Container(
-      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -708,43 +493,158 @@ class _CustomerListReportState extends State<CustomerListReport> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+          Padding(
+            padding: AppResponsive.cardPadding(context),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Customer Details',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: AppResponsive.iconSize(context),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context) / 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                  ),
+                  child: Text(
+                    '${_filteredData.length} customers',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: AppResponsive.smallSpacing(context)),
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.captionFontSize(context),
-              color: Colors.grey[600],
+              ],
             ),
           ),
-          SizedBox(height: AppResponsive.smallSpacing(context) / 2),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.subheadingFontSize(context),
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: AppResponsive.screenWidth(context) - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
+                ),
+                child: DataTable(
+                  columnSpacing: AppResponsive.tableColumnSpacing(context),
+                  headingRowHeight: AppResponsive.tableHeadingHeight(context),
+                  dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
+                  dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
+                  headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
+                  columns: [
+                    DataColumn(label: Text('Sr', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    DataColumn(label: Text('Name', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    DataColumn(label: Text('Mobile', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    DataColumn(label: Text('Orders', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    DataColumn(label: Text('Spent (${CurrencyHelper.currentSymbol})', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    DataColumn(label: Text('Last Order', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                  ],
+                  rows: pageData.map((customer) {
+                    return DataRow(
+                      cells: [
+                        DataCell(Text(customer.srNo.toString(), style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context)))),
+                        DataCell(Text(customer.name, style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w500))),
+                        DataCell(Text(customer.phone, style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context)))),
+                        DataCell(
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
+                              vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
+                            ),
+                            decoration: BoxDecoration(
+                              color: customer.totalOrders > 0
+                                  ? Colors.blue.withValues(alpha: 0.1)
+                                  : Colors.grey.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              customer.totalOrders.toString(),
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.captionFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: customer.totalOrders > 0 ? Colors.blue : Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                        DataCell(Text(DecimalSettings.formatAmount(customer.totalSpent), style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w600, color: Colors.green))),
+                        DataCell(Text(
+                          customer.lastOrderDate != null ? DateFormat('dd/MM/yy').format(customer.lastOrderDate!) : 'Never',
+                          style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: customer.lastOrderDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                        )),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildPaginationControls() {
+    final totalPages = (_filteredData.length / _rowsPerPage).ceil();
+    final start = _currentPage * _rowsPerPage + 1;
+    final end = ((_currentPage + 1) * _rowsPerPage).clamp(1, _filteredData.length);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Showing $start–$end of ${_filteredData.length} customers',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                icon: const Icon(Icons.chevron_left),
+                iconSize: 24,
+                color: AppColors.primary,
+                disabledColor: AppColors.divider,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${_currentPage + 1} / $totalPages',
+                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                ),
+              ),
+              IconButton(
+                onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+                icon: const Icon(Icons.chevron_right),
+                iconSize: 24,
+                color: AppColors.primary,
+                disabledColor: AppColors.divider,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildSortChip(String label, String value) {
     final isSelected = _sortBy == value;
@@ -765,9 +665,8 @@ class _CustomerListReportState extends State<CustomerListReport> {
         side: BorderSide(color: AppColors.primary),
         onSelected: (selected) {
           if (selected) {
-            setState(() {
-              _sortBy = value;
-            });
+            _sortBy = value;
+            _applyFilterAndSort();
           }
         },
       ),
@@ -783,7 +682,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
         borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -809,6 +708,12 @@ class _CustomerListReportState extends State<CustomerListReport> {
       ),
     );
   }
+}
+
+class _OrderStats {
+  final double spent;
+  final DateTime? orderAt;
+  const _OrderStats({required this.spent, this.orderAt});
 }
 
 class CustomerReportData {

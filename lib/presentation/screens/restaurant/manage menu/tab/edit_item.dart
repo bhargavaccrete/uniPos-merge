@@ -12,6 +12,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/filter
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -344,19 +345,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
           // Basic Information Section
           _buildSectionHeader('Basic Information', Icons.info_outline),
           const SizedBox(height: 15),
-          TextField(
+          AppTextField(
             controller: _nameController,
-            style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              labelText: 'Item Name',
-              labelStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-              prefixIcon: const Icon(Icons.label_outline, color: AppColors.primary),
-              filled: true,
-              fillColor: AppColors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-            ),
+            label: 'Item Name',
+            icon: Icons.label_outline,
           ),
           const SizedBox(height: 25),
 
@@ -423,20 +415,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: AppTextField(
                   controller: _itemPriceController,
+                  label: 'Item Price',
+                  icon: Icons.currency_rupee,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: 'Item Price',
-                    labelStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-                    prefixIcon: const Icon(Icons.currency_rupee, color: AppColors.primary),
-                    filled: true,
-                    fillColor: AppColors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -665,23 +648,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
           const SizedBox(height: 10),
 
-          TextField(
+          AppTextField(
             controller: _descController,
             maxLines: 3,
-            style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Description (Optional)',
-              hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-              prefixIcon: const Padding(
-                padding: EdgeInsets.only(bottom: 42),
-                child: Icon(Icons.notes_outlined, color: AppColors.primary),
-              ),
-              filled: true,
-              fillColor: AppColors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.divider)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-            ),
+            hint: 'Description (Optional)',
+            icon: Icons.notes_outlined,
           ),
           const SizedBox(height: 25),
 
@@ -788,18 +759,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     Expanded(child: Text(variants[index].name)),
                     SizedBox(
                       width: 120,
-                      child: TextField(
+                      child: AppTextField(
                         controller: _variantPriceControllers[index],
+                        hint: 'Price',
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        style: GoogleFonts.poppins(fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: 'Price',
-                          hintStyle: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
-                        ),
                       ),
                     ),
                   ],
@@ -932,14 +895,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
                                 child: Row(
                                   children: [
                                     Expanded(
-                                      child: TextField(
+                                      child: AppTextField(
                                         controller: _extraConstraintControllers[extraItem.Id]?['min'],
-                                        decoration: const InputDecoration(
-                                          labelText: 'Minimum',
-                                          hintText: '0',
-                                          border: OutlineInputBorder(),
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        ),
+                                        label: 'Minimum',
+                                        hint: '0',
                                         keyboardType: TextInputType.number,
                                         inputFormatters: [
                                           FilteringTextInputFormatter.digitsOnly,
@@ -948,14 +907,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
                                     ),
                                     const SizedBox(width: 16),
                                     Expanded(
-                                      child: TextField(
+                                      child: AppTextField(
                                         controller: _extraConstraintControllers[extraItem.Id]?['max'],
-                                        decoration: const InputDecoration(
-                                          labelText: 'Maximum',
-                                          hintText: '0',
-                                          border: OutlineInputBorder(),
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        ),
+                                        label: 'Maximum',
+                                        hint: '0',
                                         keyboardType: TextInputType.number,
                                         inputFormatters: [
                                           FilteringTextInputFormatter.digitsOnly,

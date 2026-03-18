@@ -442,152 +442,135 @@ class _TakeawayState extends State<Takeaway> {
             ],
           ),
 
-            if (item.variantName != null)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.blue.shade50, Colors.blue.shade100.withOpacity(0.5)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.blue.shade200, width: 1),
-                ),
-                child: Row(
+            // ── Variant / Choice / Extra details ──────────────
+            if (item.variantName != null ||
+                (item.choiceNames != null && item.choiceNames!.isNotEmpty) ||
+                (item.extras != null && item.extras!.isNotEmpty))
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.straighten, size: 14, color: Colors.blue.shade700),
-                    SizedBox(width: 6),
-                    Text(
-                      'Size: ${item.variantName}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade900,
-                      ),
-                    ),
-                    Spacer(),
-                    Text(
-                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variantPrice ?? 0)}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            if (item.choiceNames != null && item.choiceNames!.isNotEmpty)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.orange.shade50, Colors.orange.shade100.withOpacity(0.5)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.shade200, width: 1),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.add_circle_outline, size: 14, color: Colors.orange.shade700),
-                    SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Choices: ${item.choiceNames!.join(', ')}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade900,
+                    // Size / Variant
+                    if (item.variantName != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            Icon(Icons.straighten, size: 11, color: Colors.blue.shade400),
+                            const SizedBox(width: 4),
+                            Text(
+                              item.variantName!,
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variantPrice ?? 0)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue.shade500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
+
+                    // Choices
+                    if (item.choiceNames != null && item.choiceNames!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Icon(Icons.tune, size: 11, color: Colors.orange.shade400),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                item.choiceNames!.join(', '),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.orange.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Extras
+                    if (item.extras != null && item.extras!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Builder(
+                          builder: (context) {
+                            Map<String, Map<String, dynamic>> groupedExtras = {};
+                            for (var extra in item.extras!) {
+                              String displayName;
+                              if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
+                                displayName = extra['displayName'];
+                              } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
+                                displayName = '${extra['categoryName']} - ${extra['name']}';
+                              } else {
+                                displayName = extra['name'] ?? 'Unknown';
+                              }
+                              final double price = extra['price']?.toDouble() ?? 0.0;
+                              final int itemQuantity = extra['quantity']?.toInt() ?? 1;
+                              String key = '$displayName-${price.toStringAsFixed(2)}';
+                              if (groupedExtras.containsKey(key)) {
+                                groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + itemQuantity;
+                              } else {
+                                groupedExtras[key] = {
+                                  'displayName': displayName,
+                                  'price': price,
+                                  'quantity': itemQuantity,
+                                };
+                              }
+                            }
+                            String extrasText = groupedExtras.entries.map((entry) {
+                              final data = entry.value;
+                              final int qty = data['quantity'] as int;
+                              final String name = data['displayName'] as String;
+                              final double price = data['price'] as double;
+                              if (qty > 1) {
+                                return '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
+                              } else {
+                                return '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
+                              }
+                            }).join(', ');
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Icon(Icons.add_circle_outline, size: 11, color: Colors.green.shade400),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    extrasText,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
                   ],
-                ),
-              ),
-
-            if (item.extras != null && item.extras!.isNotEmpty)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green.shade50, Colors.green.shade100.withOpacity(0.5)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.green.shade200, width: 1),
-                ),
-                child: Builder(
-                  builder: (context) {
-                    // Group extras by name and count them
-                    Map<String, Map<String, dynamic>> groupedExtras = {};
-
-                    for (var extra in item.extras!) {
-                      // Debug: Print what data we have
-                      print('=== EXTRA DEBUG ===');
-                      print('Extra data: $extra');
-                      print('Extra keys: ${extra.keys}');
-                      print('name: ${extra['name']}');
-                      print('displayName: ${extra['displayName']}');
-                      print('categoryName: ${extra['categoryName']}');
-                      print('quantity: ${extra['quantity']}');
-                      print('===================');
-
-                      // Try multiple ways to get the display name
-                      String displayName;
-                      if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
-                        displayName = extra['displayName'];
-                      } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
-                        displayName = '${extra['categoryName']} - ${extra['name']}';
-                      } else {
-                        displayName = extra['name'] ?? 'Unknown';
-                      }
-
-                      final double price = extra['price']?.toDouble() ?? 0.0;
-                      final int itemQuantity = extra['quantity']?.toInt() ?? 1;
-
-                      // Create a unique key for grouping
-                      String key = '$displayName-${price.toStringAsFixed(2)}';
-
-                      if (groupedExtras.containsKey(key)) {
-                        // If extra already exists, increment quantity
-                        groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + itemQuantity;
-                      } else {
-                        // Add new extra
-                        groupedExtras[key] = {
-                          'displayName': displayName,
-                          'price': price,
-                          'quantity': itemQuantity,
-                        };
-                      }
-                    }
-
-                    // Build the display string
-                    String extrasText = groupedExtras.entries.map((entry) {
-                      final data = entry.value;
-                      final int qty = data['quantity'] as int;
-                      final String name = data['displayName'] as String;
-                      final double price = data['price'] as double;
-
-                      if (qty > 1) {
-                        return '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
-                      } else {
-                        return '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
-                      }
-                    }).join(', ');
-
-                    return Text('Extra : $extrasText');
-                  },
                 ),
               ),
           ],

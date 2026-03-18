@@ -94,6 +94,22 @@ mixin _$CashMovementStore on _CashMovementStore, Store {
         .addMovement(type: type, amount: amount, reason: reason, note: note));
   }
 
+  late final _$addAdjustmentAsyncAction =
+      AsyncAction('_CashMovementStore.addAdjustment', context: context);
+
+  @override
+  Future<void> addAdjustment(
+      {required double signedAmount,
+      required String reason,
+      required String note,
+      required String staffName}) {
+    return _$addAdjustmentAsyncAction.run(() => super.addAdjustment(
+        signedAmount: signedAmount,
+        reason: reason,
+        note: note,
+        staffName: staffName));
+  }
+
   @override
   String toString() {
     return '''

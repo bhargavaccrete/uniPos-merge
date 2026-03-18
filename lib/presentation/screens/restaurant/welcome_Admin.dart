@@ -77,22 +77,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           );
 
 
-        //   ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(
-        //     content: Row(
-        //       children: [
-        //         Icon(Icons.check_circle, color: Colors.white),
-        //         SizedBox(width: 12),
-        //         Text(
-        //           'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
-        //           style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-        //         ),
-        //       ],
-        //     ),
-        //     backgroundColor: Colors.green,
-        //     behavior: SnackBarBehavior.floating,
-        //   ),
-        // );
+
         }
       }
     }
@@ -247,62 +232,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Welcome Section
-      /*            Container(
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(isTablet ? 16 : 14),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.waving_hand_rounded,
-                            size: isTablet ? 32 : 28,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Welcome Back!',
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 20 : 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Ready to manage your restaurant',
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 14 : 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),*/
+
 
                   SizedBox(height: isTablet ? 24 : 20),
                   // Menu Grid
@@ -433,107 +363,165 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        contentPadding: EdgeInsets.zero,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.logout_rounded,
-                      color: Colors.red,
-                      size: 28,
-                    ),
+      builder: (BuildContext dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 36, vertical: 40),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 380),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Gradient Header ─────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.red.shade700,
+                      Colors.red.shade400,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.logout_rounded,
+                        size: 32,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
                       'Logout',
                       style: GoogleFonts.poppins(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: AppColors.divider),
-
-            // Content
-            Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'Are you sure you want to logout?',
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
+                    const SizedBox(height: 4),
+                    Text(
+                      'End your current session',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+
+              // ── Body ────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.06),
+                        border: Border.all(color: Colors.red.withOpacity(0.2)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Are you sure you want to logout? You will need to sign in again to continue.',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12.5,
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w500,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(color: AppColors.divider),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              Navigator.of(dialogContext).pop();
+                              await _clearLoginState();
+                              if (context.mounted) {
+                                Navigator.pushNamedAndRemoveUntil(
+                                  context,
+                                  RouteNames.restaurantLogin,
+                                  (route) => false,
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade700,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'Logout',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-            child: Text(
-              "Cancel",
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(dialogContext).pop();
-              await _clearLoginState();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  RouteNames.restaurantLogin,
-                  (route) => false,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              elevation: 0,
-            ),
-            child: Text(
-              "Logout",
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

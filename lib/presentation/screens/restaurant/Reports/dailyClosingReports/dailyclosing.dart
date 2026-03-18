@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -10,6 +9,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
 
 enum ClosingPeriod { DayWise, MonthWise, Custom }
 
@@ -122,7 +122,6 @@ class _DailyClosingReportState extends State<DailyClosingReport> {
 
           Expanded(
             child: ClosingReportView(
-              key: ValueKey(_selectedPeriod),
               period: _selectedPeriod,
             ),
           ),
@@ -177,6 +176,7 @@ class ClosingReportView extends StatefulWidget {
 
 class _ClosingReportViewState extends State<ClosingReportView> {
   bool _isLoading = true;
+  bool _isDataLoaded = false;
   DateTime? _selectedDate;
   String? _selectedMonth;
   int? _selectedYear;
@@ -209,7 +209,6 @@ class _ClosingReportViewState extends State<ClosingReportView> {
   }
 
   void _initializeYears() {
-    // Generate years dynamically: current year, down to 10 years ago
     final currentYear = DateTime.now().year;
     _years = List.generate(11, (index) => currentYear - index);
   }
@@ -221,7 +220,6 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     _selectedYear = now.year;
   }
 
-  // Check if a month is valid (not in the future)
   bool _isMonthValid(String month, int year) {
     final now = DateTime.now();
     final monthIndex = _months.indexOf(month) + 1;
@@ -229,7 +227,6 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     if (year > now.year) return false;
     if (year < now.year) return true;
 
-    // Same year: check if month is not in future
     return monthIndex <= now.month;
   }
 
@@ -237,98 +234,100 @@ class _ClosingReportViewState extends State<ClosingReportView> {
   void didUpdateWidget(covariant ClosingReportView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.period != oldWidget.period) {
-      _loadDataAndFilter();
+      // Data already in memory — just re-filter, no Hive read
+      _generateReport();
     }
   }
 
+  /// First call: loads EOD reports from Hive via store (once).
+  /// Subsequent calls: skips the load, filters from memory (instant).
   Future<void> _loadDataAndFilter() async {
-    setState(() => _isLoading = true);
-    await eodStore.loadEODReports();
+    if (!_isDataLoaded) {
+      setState(() => _isLoading = true);
+      await eodStore.loadEODReports();
+      _isDataLoaded = true;
+    }
     _generateReport();
   }
 
+  /// Single-pass filter + aggregation with pre-computed date boundaries.
   void _generateReport() {
-    final reports = _getFilteredReports();
-    _aggregateReports(reports);
-    setState(() => _isLoading = false);
-  }
+    // Pre-compute date boundaries based on period
+    late final DateTime startBound;
+    late final DateTime endBound;
+    bool hasRange = true;
 
-  List<EndOfDayReport> _getFilteredReports() {
     switch (widget.period) {
       case ClosingPeriod.DayWise:
-        return _getDayReports();
+        if (_selectedDate == null) { hasRange = false; break; }
+        startBound = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
+        endBound = startBound.add(const Duration(days: 1));
+        break;
       case ClosingPeriod.MonthWise:
-        return _getMonthReports();
+        if (_selectedMonth == null || _selectedYear == null) { hasRange = false; break; }
+        final monthIndex = _months.indexOf(_selectedMonth!) + 1;
+        startBound = DateTime(_selectedYear!, monthIndex);
+        endBound = DateTime(_selectedYear!, monthIndex + 1);
+        break;
       case ClosingPeriod.Custom:
-        return _getCustomReports();
-    }
-  }
-
-  List<EndOfDayReport> _getDayReports() {
-    if (_selectedDate == null) return [];
-    return eodStore.eodReports.where((report) {
-      return report.date.year == _selectedDate!.year &&
-          report.date.month == _selectedDate!.month &&
-          report.date.day == _selectedDate!.day;
-    }).toList();
-  }
-
-  List<EndOfDayReport> _getMonthReports() {
-    if (_selectedMonth == null || _selectedYear == null) return [];
-    final monthIndex = _months.indexOf(_selectedMonth!) + 1;
-    return eodStore.eodReports.where((report) {
-      return report.date.year == _selectedYear! &&
-          report.date.month == monthIndex;
-    }).toList();
-  }
-
-  List<EndOfDayReport> _getCustomReports() {
-    if (_fromDate == null || _toDate == null) return [];
-    return eodStore.eodReports.where((report) {
-      final reportDate = DateTime(report.date.year, report.date.month, report.date.day);
-      final fromDate = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-      final toDate = DateTime(_toDate!.year, _toDate!.month, _toDate!.day);
-      return (reportDate.isAfter(fromDate) || reportDate.isAtSameMomentAs(fromDate)) &&
-          (reportDate.isBefore(toDate) || reportDate.isAtSameMomentAs(toDate));
-    }).toList();
-  }
-
-  void _aggregateReports(List<EndOfDayReport> reports) {
-    _orderTypeTotals.clear();
-    _orderTypeCounts.clear();
-    _paymentTypeTotals.clear();
-    _totalSales = 0.0;
-    _totalExpenses = 0.0;
-    _totalOpeningBalance = 0.0;
-    _totalClosingBalance = 0.0;
-    _reportCount = reports.length;
-
-    // For opening/closing balance: use the first day's opening and last day's closing.
-    // Summing across days would inflate these figures incorrectly.
-    if (reports.isNotEmpty) {
-      final sorted = reports.toList()..sort((a, b) => a.date.compareTo(b.date));
-      _totalOpeningBalance = sorted.first.openingBalance;
-      _totalClosingBalance = sorted.last.closingBalance;
+        if (_fromDate == null || _toDate == null) { hasRange = false; break; }
+        startBound = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+        endBound = DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(const Duration(days: 1));
+        break;
     }
 
-    for (final report in reports) {
-      // Aggregate order types
-      for (final order in report.orderSummaries) {
-        _orderTypeTotals[order.orderType] =
-            (_orderTypeTotals[order.orderType] ?? 0.0) + order.totalAmount;
-        _orderTypeCounts[order.orderType] =
-            (_orderTypeCounts[order.orderType] ?? 0) + order.orderCount;
+    // Single pass: filter + aggregate
+    final orderTypeTotals = <String, double>{};
+    final orderTypeCounts = <String, int>{};
+    final paymentTypeTotals = <String, double>{};
+    double totalSales = 0.0;
+    double totalExpenses = 0.0;
+    final matchedReports = <EndOfDayReport>[];
+
+    if (hasRange) {
+      for (final report in eodStore.eodReports) {
+        final reportDate = DateTime(report.date.year, report.date.month, report.date.day);
+        if (reportDate.isBefore(startBound) || !reportDate.isBefore(endBound)) continue;
+
+        matchedReports.add(report);
+
+        for (final order in report.orderSummaries) {
+          orderTypeTotals[order.orderType] =
+              (orderTypeTotals[order.orderType] ?? 0.0) + order.totalAmount;
+          orderTypeCounts[order.orderType] =
+              (orderTypeCounts[order.orderType] ?? 0) + order.orderCount;
+        }
+
+        for (final payment in report.paymentSummaries) {
+          paymentTypeTotals[payment.paymentType] =
+              (paymentTypeTotals[payment.paymentType] ?? 0.0) + payment.totalAmount;
+        }
+
+        totalSales += report.totalSales;
+        totalExpenses += report.totalExpenses;
       }
-
-      // Aggregate payment types
-      for (final payment in report.paymentSummaries) {
-        _paymentTypeTotals[payment.paymentType] =
-            (_paymentTypeTotals[payment.paymentType] ?? 0.0) + payment.totalAmount;
-      }
-
-      _totalSales += report.totalSales;
-      _totalExpenses += report.totalExpenses;
     }
+
+    // Opening/closing balance: first day's opening, last day's closing
+    double openingBalance = 0.0;
+    double closingBalance = 0.0;
+    if (matchedReports.isNotEmpty) {
+      matchedReports.sort((a, b) => a.date.compareTo(b.date));
+      openingBalance = matchedReports.first.openingBalance;
+      closingBalance = matchedReports.last.closingBalance;
+    }
+
+    setState(() {
+      _orderTypeTotals = orderTypeTotals;
+      _orderTypeCounts = orderTypeCounts;
+      _paymentTypeTotals = paymentTypeTotals;
+      _totalSales = totalSales;
+      _totalExpenses = totalExpenses;
+      _totalOpeningBalance = openingBalance;
+      _totalClosingBalance = closingBalance;
+      _reportCount = matchedReports.length;
+      _isLoading = false;
+    });
   }
 
   Future<void> _exportReport() async {
@@ -498,23 +497,19 @@ class _ClosingReportViewState extends State<ClosingReportView> {
 
   @override
   Widget build(BuildContext context) {
-    return Observer(
-      builder: (_) {
-        if (_isLoading || eodStore.isLoading) {
-          return Center(child: CircularProgressIndicator(color: AppColors.primary));
-        }
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
 
-        if (widget.period == ClosingPeriod.MonthWise) {
-          return _buildMonthWiseSelector();
-        }
+    if (widget.period == ClosingPeriod.MonthWise) {
+      return _buildMonthWiseSelector();
+    }
 
-        if (widget.period == ClosingPeriod.Custom) {
-          return _buildCustomSelector();
-        }
+    if (widget.period == ClosingPeriod.Custom) {
+      return _buildCustomSelector();
+    }
 
-        return _buildDayWiseView();
-      },
-    );
+    return _buildDayWiseView();
   }
 
   Widget _buildDayWiseView() {
@@ -938,64 +933,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
   }
 
   Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: AppResponsive.cardPadding(context),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.captionFontSize(context),
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 6.0, desktop: 8.0)),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1 * color.a),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: AppResponsive.smallIconSize(context),
-                ),
-              ),
-            ],
-          ),
-          AppResponsive.verticalSpace(context, size: SpacingSize.small),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 22.0),
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
+    return ReportSummaryCard(title: title, value: value, icon: icon, color: color);
   }
 
   Widget _buildExportButton() {

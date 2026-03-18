@@ -6,6 +6,7 @@ import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 /// Result from category selection
 class CategorySelectionResult {
@@ -206,26 +207,17 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.divider),
               ),
-              child: TextField(
+              child: AppTextField(
                 controller: _searchCtrl,
-                style: GoogleFonts.poppins(fontSize: 14),
-                decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                  hintText: 'Search categories...',
-                  hintStyle: GoogleFonts.poppins(
-                      color: Colors.grey.shade400, fontSize: 13),
-                  prefixIcon: const Icon(Icons.search,
-                      color: AppColors.primary, size: 20),
-                  suffixIcon: _query.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear,
-                              size: 18, color: Colors.grey),
-                          onPressed: () => _searchCtrl.clear(),
-                        )
-                      : null,
-                  border: InputBorder.none,
-                ),
+                hint: 'Search categories...',
+                icon: Icons.search,
+                suffixIcon: _query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear,
+                            size: 18, color: Colors.grey),
+                        onPressed: () => _searchCtrl.clear(),
+                      )
+                    : null,
               ),
             ),
           ),

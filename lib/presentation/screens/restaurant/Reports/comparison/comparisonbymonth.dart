@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -17,6 +16,10 @@ class ComparisonByMonth extends StatefulWidget {
 }
 
 class _ComparisonByMonthState extends State<ComparisonByMonth> {
+  bool _isLoading = true;
+  bool _isDataLoaded = false;
+  ComparisonData? _data;
+
   @override
   void initState() {
     super.initState();
@@ -24,83 +27,64 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
   }
 
   Future<void> _loadComparisonData() async {
-    // Load from pastOrderStore instead of direct Hive access
-    await pastOrderStore.loadPastOrders();
+    if (!_isDataLoaded) {
+      setState(() => _isLoading = true);
+      await pastOrderStore.loadPastOrders();
+      _isDataLoaded = true;
+    }
+    _generateComparisonData();
   }
 
-  ComparisonData _calculateComparisonData() {
-    // Get all past orders from store
-    final allOrders = pastOrderStore.pastOrders.toList();
-
+  /// Single-pass comparison with half-open intervals and consistent amount formula.
+  void _generateComparisonData() {
     final now = DateTime.now();
 
-    // Current month start
+    // Half-open: [previousMonthStart, currentMonthStart) and [currentMonthStart, now]
     final currentMonthStart = DateTime(now.year, now.month, 1);
-
-    // Previous month start and end
     final previousMonthStart = DateTime(now.year, now.month - 1, 1);
-    final previousMonthEnd = currentMonthStart.subtract(Duration(seconds: 1));
 
     int currentOrders = 0;
     double currentAmount = 0.0;
     int previousOrders = 0;
     double previousAmount = 0.0;
 
-    for (final order in allOrders) {
-      // FIX 1: Skip voided and fully refunded orders.
+    for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
-      // Compute net amount from items (consistent with salesbycategory report):
-      // itemsTotal = sum of per-item prices after item-level discounts
-      // subtract bill-level discount and add exclusive GST
-      // This correctly handles both old orders (where totalPrice may be pre-discount)
-      // and new orders (where totalPrice is already post-discount).
-      final itemsTotal = order.items.fold(0.0, (s, i) => s + i.finalItemPrice * i.quantity);
-      final billDiscount = order.Discount ?? 0.0;
-      final gst = order.isTaxInclusive == true ? 0.0 : (order.gstAmount ?? 0.0);
-      final netAmount = (itemsTotal - billDiscount + gst) - (order.refundAmount ?? 0.0);
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
 
-      // Current month
+      // Current month [currentMonthStart, now]
       if (!order.orderAt!.isBefore(currentMonthStart)) {
         currentOrders++;
         currentAmount += netAmount;
       }
-      // FIX 2: Previous month start uses !isBefore (inclusive) to catch midnight orders.
-      else if (!order.orderAt!.isBefore(previousMonthStart) &&
-          !order.orderAt!.isAfter(previousMonthEnd)) {
+      // Previous month [previousMonthStart, currentMonthStart)
+      else if (!order.orderAt!.isBefore(previousMonthStart)) {
         previousOrders++;
         previousAmount += netAmount;
       }
     }
 
-    return ComparisonData(
-      currentPeriod: _getMonthName(now.month),
-      previousPeriod: _getMonthName(now.month - 1),
-      currentOrders: currentOrders,
-      currentAmount: currentAmount,
-      previousOrders: previousOrders,
-      previousAmount: previousAmount,
-    );
+    setState(() {
+      _data = ComparisonData(
+        currentPeriod: _getMonthName(now.month),
+        previousPeriod: _getMonthName(now.month - 1),
+        currentOrders: currentOrders,
+        currentAmount: currentAmount,
+        previousOrders: previousOrders,
+        previousAmount: previousAmount,
+      );
+      _isLoading = false;
+    });
   }
 
   String _getMonthName(int month) {
     const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December'
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    // Handle month wrap-around
     if (month <= 0) month += 12;
     if (month > 12) month -= 12;
     return months[month - 1];
@@ -184,12 +168,10 @@ class _ComparisonByMonthState extends State<ComparisonByMonth> {
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
 
           Expanded(
-            child: Observer(builder: (_){
-              if(pastOrderStore.isLoading){
-                return Center(child: CircularProgressIndicator(color: AppColors.primary));
-              }
-
-              final data = _calculateComparisonData();
+            child: _isLoading || _data == null
+                ? Center(child: CircularProgressIndicator(color: AppColors.primary))
+                : Builder(builder: (_) {
+              final data = _data!;
 
               return SingleChildScrollView(
                 padding: AppResponsive.padding(context),

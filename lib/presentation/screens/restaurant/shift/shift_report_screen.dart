@@ -10,6 +10,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class ShiftReportScreen extends StatefulWidget {
   const ShiftReportScreen({super.key});
@@ -21,6 +22,8 @@ class ShiftReportScreen extends StatefulWidget {
 class _ShiftReportScreenState extends State<ShiftReportScreen> {
   final _searchController = TextEditingController();
   Timer? _debounce;
+  bool _isDataLoaded = false;
+  List<Expense> _cachedExpenses = [];
 
   // Custom date range state (local — drives store via setFilter)
   DateTime? _customFrom;
@@ -29,9 +32,20 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   @override
   void initState() {
     super.initState();
-    shiftStore.loadShifts();
-    expenseStore.loadExpenses();
+    _loadData();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _loadData({bool forceReload = false}) async {
+    if (_isDataLoaded && !forceReload) return;
+    await shiftStore.loadShifts();
+    await expenseStore.loadExpenses();
+    _isDataLoaded = true;
+    if (mounted) {
+      setState(() {
+        _cachedExpenses = expenseStore.expenses.toList();
+      });
+    }
   }
 
   @override
@@ -145,7 +159,6 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                 final filtered = shiftStore.filteredShifts;
                 final closed = filtered.where((s) => !s.isOpen).toList();
                 final open = filtered.where((s) => s.isOpen).toList();
-                final expenses = expenseStore.expenses.toList();
 
                 return Column(
                   children: [
@@ -153,7 +166,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                     Expanded(
                       child: filtered.isEmpty
                           ? _buildEmptyState(context)
-                          : _buildGroupedList(context, currency, open, closed, expenses),
+                          : _buildGroupedList(context, currency, open, closed, _cachedExpenses),
                     ),
                   ],
                 );
@@ -242,47 +255,23 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
         AppResponsive.largeSpacing(context),
         0,
       ),
-      child: TextField(
+      child: AppTextField(
         controller: _searchController,
-        style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-        decoration: InputDecoration(
-          hintText: 'Search staff name...',
-          hintStyle: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: AppColors.textSecondary),
-          prefixIcon: Icon(Icons.search,
-              color: AppColors.textSecondary, size: AppResponsive.iconSize(context)),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _searchController,
-            builder: (_, val, __) => val.text.isNotEmpty
-                ? GestureDetector(
-                    onTap: () {
-                      _searchController.clear();
-                      shiftStore.setSearch('');
-                    },
-                    child: Icon(Icons.close,
-                        color: AppColors.textSecondary,
-                        size: AppResponsive.iconSize(context)),
-                  )
-                : const SizedBox.shrink(),
-          ),
-          filled: true,
-          fillColor: AppColors.white,
-          contentPadding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.largeSpacing(context),
-              vertical: AppResponsive.mediumSpacing(context)),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-            borderSide: BorderSide(color: AppColors.divider),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-            borderSide: BorderSide(color: AppColors.divider),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-            borderSide: BorderSide(color: AppColors.primary, width: 2),
-          ),
+        hint: 'Search staff name...',
+        icon: Icons.search,
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _searchController,
+          builder: (_, val, __) => val.text.isNotEmpty
+              ? GestureDetector(
+                  onTap: () {
+                    _searchController.clear();
+                    shiftStore.setSearch('');
+                  },
+                  child: Icon(Icons.close,
+                      color: AppColors.textSecondary,
+                      size: AppResponsive.iconSize(context)),
+                )
+              : const SizedBox.shrink(),
         ),
       ),
     );

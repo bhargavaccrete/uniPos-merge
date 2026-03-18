@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+
 class ComparisonByYear extends StatefulWidget {
   const ComparisonByYear({super.key});
 
@@ -16,6 +15,10 @@ class ComparisonByYear extends StatefulWidget {
 }
 
 class _ComparisonByYearState extends State<ComparisonByYear> {
+  bool _isLoading = true;
+  bool _isDataLoaded = false;
+  ComparisonData? _data;
+
   @override
   void initState() {
     super.initState();
@@ -23,8 +26,12 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
   }
 
   Future<void> _loadComparisonData() async {
-    // Load from pastOrderStore instead of direct Hive access
-    await pastOrderStore.loadPastOrders();
+    if (!_isDataLoaded) {
+      setState(() => _isLoading = true);
+      await pastOrderStore.loadPastOrders();
+      _isDataLoaded = true;
+    }
+    _generateComparisonData();
   }
 
   Future<void> _exportReport(ComparisonData data) async {
@@ -80,56 +87,49 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
     );
   }
 
-  ComparisonData _calculateComparisonData() {
-    // Get all past orders from store
-    final allOrders = pastOrderStore.pastOrders.toList();
+  /// Single-pass comparison with half-open intervals and consistent amount formula.
+  void _generateComparisonData() {
     final now = DateTime.now();
 
-    // Current year start
+    // Half-open: [previousYearStart, currentYearStart) and [currentYearStart, now]
     final currentYearStart = DateTime(now.year, 1, 1);
-
-    // Previous year start and end
     final previousYearStart = DateTime(now.year - 1, 1, 1);
-    final previousYearEnd = currentYearStart.subtract(Duration(seconds: 1));
 
     int currentOrders = 0;
     double currentAmount = 0.0;
     int previousOrders = 0;
     double previousAmount = 0.0;
 
-    for (final order in allOrders) {
-      // FIX 1: Skip voided and fully refunded orders.
+    for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
 
-      // Compute net amount from items (consistent with salesbycategory report):
-      final itemsTotal = order.items.fold(0.0, (s, i) => s + i.finalItemPrice * i.quantity);
-      final billDiscount = order.Discount ?? 0.0;
-      final gst = order.isTaxInclusive == true ? 0.0 : (order.gstAmount ?? 0.0);
-      final netAmount = (itemsTotal - billDiscount + gst) - (order.refundAmount ?? 0.0);
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
 
-      // Current year
+      // Current year [currentYearStart, now]
       if (!order.orderAt!.isBefore(currentYearStart)) {
         currentOrders++;
         currentAmount += netAmount;
       }
-      // FIX 2: Previous year start uses !isBefore (inclusive) to catch midnight orders.
-      else if (!order.orderAt!.isBefore(previousYearStart) &&
-          !order.orderAt!.isAfter(previousYearEnd)) {
+      // Previous year [previousYearStart, currentYearStart)
+      else if (!order.orderAt!.isBefore(previousYearStart)) {
         previousOrders++;
         previousAmount += netAmount;
       }
     }
 
-    return ComparisonData(
-      currentPeriod: now.year.toString(),
-      previousPeriod: (now.year - 1).toString(),
-      currentOrders: currentOrders,
-      currentAmount: currentAmount,
-      previousOrders: previousOrders,
-      previousAmount: previousAmount,
-    );
+    setState(() {
+      _data = ComparisonData(
+        currentPeriod: now.year.toString(),
+        previousPeriod: (now.year - 1).toString(),
+        currentOrders: currentOrders,
+        currentAmount: currentAmount,
+        previousOrders: previousOrders,
+        previousAmount: previousAmount,
+      );
+      _isLoading = false;
+    });
   }
 
   @override
@@ -193,7 +193,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
                   Container(
                     padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -210,12 +210,10 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
 
           Expanded(
-            child: Observer(builder: (_){
-              if(pastOrderStore.isLoading){
-                return Center(child: CircularProgressIndicator(color: AppColors.primary));
-              }
-
-              final data = _calculateComparisonData();
+            child: _isLoading || _data == null
+                ? Center(child: CircularProgressIndicator(color: AppColors.primary))
+                : Builder(builder: (_) {
+              final data = _data!;
 
               return SingleChildScrollView(
                 padding: AppResponsive.padding(context),

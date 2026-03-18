@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -9,6 +8,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import '../../../../widget/componets/common/report_summary_card.dart';
 
 class CustomerListByRevenue extends StatefulWidget {
   const CustomerListByRevenue({super.key});
@@ -19,6 +19,16 @@ class CustomerListByRevenue extends StatefulWidget {
 
 class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
   bool _isLoading = true;
+  bool _isDataLoaded = false;
+
+  // Pre-computed state
+  List<CustomerRevenueData> _customers = [];
+  double _totalRevenue = 0.0;
+  int _totalOrders = 0;
+
+  // Pagination
+  int _currentPage = 0;
+  static const int _rowsPerPage = 50;
 
   @override
   void initState() {
@@ -26,34 +36,34 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     _loadCustomerRevenue();
   }
 
-  Future<void> _loadCustomerRevenue() async {
+  Future<void> _loadCustomerRevenue({bool forceReload = false}) async {
+    if (_isDataLoaded && !forceReload) return;
     setState(() => _isLoading = true);
     await pastOrderStore.loadPastOrders();
-    setState(() => _isLoading = false);
+    _isDataLoaded = true;
+    _buildCustomerData();
   }
 
-  List<CustomerRevenueData> _calculateCustomerRevenue() {
-    final allOrders = pastOrderStore.pastOrders.toList();
+  void _buildCustomerData() {
     final Map<String, CustomerRevenueData> customerMap = {};
+    double revenueSum = 0.0;
+    int orderSum = 0;
 
-    for (final order in allOrders) {
-      // Skip fully refunded and voided orders
+    for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
+      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
 
-      // Get customer name, use "Walk-in Customer" if empty
       String customerName = order.customerName.trim();
       if (customerName.isEmpty) {
         customerName = 'Walk-in Customer';
       }
 
-      // Calculate net revenue (total - refund)
       final netRevenue = order.totalPrice - (order.refundAmount ?? 0.0);
-
-      // Skip if net revenue is 0 or negative
       if (netRevenue <= 0) continue;
 
-      // FIX 1: Use lowercase key so "John" and "JOHN" map to the same customer.
+      revenueSum += netRevenue;
+      orderSum++;
+
       final mapKey = customerName.toLowerCase();
       if (customerMap.containsKey(mapKey)) {
         customerMap[mapKey]!.revenue += netRevenue;
@@ -61,36 +71,30 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       } else {
         customerMap[mapKey] = CustomerRevenueData(
           srNo: 0,
-          name: customerName, // preserve display casing from first occurrence
+          name: customerName,
           revenue: netRevenue,
           orderCount: 1,
         );
       }
     }
 
-    // Convert to list and sort by revenue (descending)
-    final List<CustomerRevenueData> customers = customerMap.values.toList();
+    final customers = customerMap.values.toList();
     customers.sort((a, b) => b.revenue.compareTo(a.revenue));
-
-    // Assign serial numbers
     for (int i = 0; i < customers.length; i++) {
       customers[i].srNo = i + 1;
     }
 
-    return customers;
+    setState(() {
+      _customers = customers;
+      _totalRevenue = revenueSum;
+      _totalOrders = orderSum;
+      _currentPage = 0;
+      _isLoading = false;
+    });
   }
 
-  double _calculateTotalRevenue(List<CustomerRevenueData> customers) {
-    return customers.fold(0.0, (sum, customer) => sum + customer.revenue);
-  }
-
-  double _calculateAverageRevenue(List<CustomerRevenueData> customers) {
-    if (customers.isEmpty) return 0.0;
-    return _calculateTotalRevenue(customers) / customers.length;
-  }
-
-  Future<void> _exportReport(List<CustomerRevenueData> customers) async {
-    if (customers.isEmpty) {
+  Future<void> _exportReport() async {
+    if (_customers.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
@@ -102,21 +106,19 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       'Total Revenue',
     ];
 
-    final data = customers.map((customer) => [
+    final data = _customers.map((customer) => [
       customer.srNo.toString(),
       customer.name,
       customer.orderCount.toString(),
       ReportExportService.formatCurrency(customer.revenue),
     ]).toList();
 
-    final totalRevenue = _calculateTotalRevenue(customers);
-    final averageRevenue = _calculateAverageRevenue(customers);
-    final totalOrders = customers.fold<int>(0, (sum, c) => sum + c.orderCount);
+    final averageRevenue = _customers.isNotEmpty ? _totalRevenue / _customers.length : 0.0;
 
     final summary = {
-      'Total Customers': customers.length.toString(),
-      'Total Orders': totalOrders.toString(),
-      'Total Revenue': ReportExportService.formatCurrency(totalRevenue),
+      'Total Customers': _customers.length.toString(),
+      'Total Orders': _totalOrders.toString(),
+      'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
       'Average Revenue per Customer': ReportExportService.formatCurrency(averageRevenue),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
     };
@@ -221,41 +223,39 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
 
-    return Observer(
-      builder: (_) {
-        if (_isLoading || pastOrderStore.isLoading) {
-          return Center(
-            child: Padding(
-              padding: EdgeInsets.all(50),
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
-          );
-        }
+    if (_isLoading) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(50),
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
 
-        final customers = _calculateCustomerRevenue();
+    if (_customers.isEmpty) {
+      return _buildEmptyState(context);
+    }
 
-        if (customers.isEmpty) {
-          return _buildEmptyState(context);
-        }
-
-        return SingleChildScrollView(
-          padding: AppResponsive.padding(context),
-          child: AppResponsive.constrainedContent(
-            context: context,
-            child: Column(
-              children: [
-                _buildSummaryCards(context, customers, isTablet),
-                SizedBox(height: 16),
-                _buildRefreshButton(context, isTablet),
-                SizedBox(height: 16),
-                _buildExportButton(context, customers, isTablet),
-                SizedBox(height: 16),
-                _buildCustomersTable(context, customers, isTablet),
-              ],
-            ),
-          ),
-        );
-      },
+    return SingleChildScrollView(
+      padding: AppResponsive.padding(context),
+      child: AppResponsive.constrainedContent(
+        context: context,
+        child: Column(
+          children: [
+            _buildSummaryCards(context),
+            SizedBox(height: 16),
+            _buildRefreshButton(context, isTablet),
+            SizedBox(height: 16),
+            _buildExportButton(context, isTablet),
+            SizedBox(height: 16),
+            _buildCustomersTable(context, isTablet),
+            if (_customers.length > _rowsPerPage) ...[
+              SizedBox(height: 16),
+              _buildPaginationControls(),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -303,126 +303,37 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     );
   }
 
-  Widget _buildSummaryCards(BuildContext context, List<CustomerRevenueData> customers, bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
-
-    final totalRevenue = _calculateTotalRevenue(customers);
-    final averageRevenue = _calculateAverageRevenue(customers);
+  Widget _buildSummaryCards(BuildContext context) {
+    final averageRevenue = _customers.isNotEmpty ? _totalRevenue / _customers.length : 0.0;
 
     return IntrinsicHeight(
       child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: _buildSummaryCard(
-            context,
-            'Total Customers',
-            customers.length.toString(),
-            Icons.people,
-            AppColors.primary,
-            isTablet,
-            isDesktop,
-          ),
-        ),
-        SizedBox(width: isDesktop ? 24 : 16),
-        Expanded(
-          child: _buildSummaryCard(
-            context,
-            'Total Revenue',
-            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalRevenue)}',
-            Icons.attach_money,
-            Colors.green,
-            isTablet,
-            isDesktop,
-          ),
-        ),
-        SizedBox(width: isDesktop ? 24 : 16),
-        Expanded(
-          child: _buildSummaryCard(
-            context,
-            'Average Revenue',
-            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(averageRevenue)}',
-            Icons.analytics,
-            Colors.orange,
-            isTablet,
-            isDesktop,
-          ),
-        ),
-      ],
-    ),
-    );
-  }
-
-  Widget _buildSummaryCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-    Color iconColor,
-    bool isTablet,
-    bool isDesktop,
-  ) {
-    return Container(
-      padding: EdgeInsets.all(isTablet ? 24 : 16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: isDesktop ? 16 : (isTablet ? 14 : 11),
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              SizedBox(width: 4),
-              Container(
-                padding: EdgeInsets.all(isDesktop ? 12 : (isTablet ? 8 : 5)),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: isDesktop ? 28 : (isTablet ? 22 : 14),
-                ),
-              ),
-            ],
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Total Customers',
+              value: _customers.length.toString(),
+              icon: Icons.people,
+              color: AppColors.primary,
+            ),
           ),
-          SizedBox(height: isDesktop ? 16 : 12),
-          SizedBox(
-            width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: isDesktop ? 32 : (isTablet ? 24 : 20),
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+          AppResponsive.horizontalSpace(context),
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Total Revenue',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
+              icon: Icons.attach_money,
+              color: Colors.green,
+            ),
+          ),
+          AppResponsive.horizontalSpace(context),
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Avg Revenue',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(averageRevenue)}',
+              icon: Icons.analytics,
+              color: Colors.orange,
             ),
           ),
         ],
@@ -436,7 +347,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _loadCustomerRevenue,
+        onPressed: () => _loadCustomerRevenue(forceReload: true),
         icon: Icon(Icons.refresh, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
           'Refresh Data',
@@ -455,13 +366,13 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     );
   }
 
-  Widget _buildExportButton(BuildContext context, List<CustomerRevenueData> customers, bool isTablet) {
+  Widget _buildExportButton(BuildContext context, bool isTablet) {
     final isDesktop = MediaQuery.of(context).size.width > 1200;
 
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () => _exportReport(customers),
+        onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
           'Export to Excel',
@@ -480,7 +391,34 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     );
   }
 
-  Widget _buildCustomersTable(BuildContext context, List<CustomerRevenueData> customers, bool isTablet) {
+  Widget _buildPaginationControls() {
+    final totalPages = (_customers.length / _rowsPerPage).ceil();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+          icon: Icon(Icons.chevron_left),
+          color: AppColors.primary,
+        ),
+        Text(
+          'Page ${_currentPage + 1} of $totalPages',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        IconButton(
+          onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+          icon: Icon(Icons.chevron_right),
+          color: AppColors.primary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCustomersTable(BuildContext context, bool isTablet) {
     final screenWidth = AppResponsive.screenWidth(context);
     final cellFontSize = AppResponsive.smallFontSize(context);
     final headerFontSize = AppResponsive.bodyFontSize(context);
@@ -558,7 +496,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                   numeric: true,
                 ),
               ],
-              rows: customers.map((customer) {
+              rows: _customers.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).map((customer) {
                 // Medal colors for top 3
                 Color? rankColor;
                 IconData? medalIcon;
@@ -611,7 +549,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
                           vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
