@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
@@ -15,6 +16,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 // ─── Draft model (pre-sort, no running balance yet) ──────────────────────────
 
@@ -502,16 +504,22 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     final fmt      = DateFormat('dd MMM yyyy  HH:mm');
     final dateFmt  = DateFormat('dd MMM yyyy');
 
+    // Load cached Poppins fonts (supports ₹ and other currency symbols)
+    final fontBytes = await ReportExportService.loadFontBytes();
+    final boldFontBytes = await ReportExportService.loadBoldFontBytes();
+    final font = pw.Font.ttf(ByteData.sublistView(fontBytes));
+    final fontBold = pw.Font.ttf(ByteData.sublistView(boldFontBytes));
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
         margin: const pw.EdgeInsets.all(24),
         build: (ctx) => [
           pw.Text('Cash Drawer History',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              style: pw.TextStyle(font: fontBold, fontSize: 18, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 4),
           pw.Text('${dateFmt.format(_fromDate)}  –  ${dateFmt.format(_toDate)}',
-              style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
+              style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey700)),
           pw.SizedBox(height: 14),
 
           // Summary
@@ -521,13 +529,13 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                 color: PdfColors.grey100, borderRadius: pw.BorderRadius.circular(6)),
             child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
               _pdfSummaryCol('Total In',
-                  '$currency${DecimalSettings.formatAmount(_totalIn)}', PdfColors.green700),
+                  '$currency${DecimalSettings.formatAmount(_totalIn)}', PdfColors.green700, font: font, fontBold: fontBold),
               _pdfSummaryCol('Total Out',
-                  '$currency${DecimalSettings.formatAmount(_totalOut)}', PdfColors.red700),
+                  '$currency${DecimalSettings.formatAmount(_totalOut)}', PdfColors.red700, font: font, fontBold: fontBold),
               _pdfSummaryCol('Net',
                   '$currency${DecimalSettings.formatAmount(_net)}',
-                  _net >= 0 ? PdfColors.green700 : PdfColors.red700),
-              _pdfSummaryCol('Entries', '${_filteredRows.length}', PdfColors.grey800),
+                  _net >= 0 ? PdfColors.green700 : PdfColors.red700, font: font, fontBold: fontBold),
+              _pdfSummaryCol('Entries', '${_filteredRows.length}', PdfColors.grey800, font: font, fontBold: fontBold),
             ]),
           ),
           pw.SizedBox(height: 14),
@@ -556,7 +564,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                           padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
                           child: pw.Text(h,
                               style: pw.TextStyle(
-                                  fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                                  font: fontBold, fontSize: 9, fontWeight: pw.FontWeight.bold)),
                         ))
                     .toList(),
               ),
@@ -565,14 +573,14 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                   fmt.format(r.timestamp),
                   r.typeName,
                   r.staffName,
-                  r.inAmount  > 0 ? DecimalSettings.formatAmount(r.inAmount)  : '—',
-                  r.outAmount > 0 ? DecimalSettings.formatAmount(r.outAmount) : '—',
-                  DecimalSettings.formatAmount(r.runningBalance),
+                  r.inAmount  > 0 ? '$currency${DecimalSettings.formatAmount(r.inAmount)}'  : '—',
+                  r.outAmount > 0 ? '$currency${DecimalSettings.formatAmount(r.outAmount)}' : '—',
+                  '$currency${DecimalSettings.formatAmount(r.runningBalance)}',
                   r.note != null ? '${r.reason} — ${r.note}' : r.reason,
                 ]
                     .map((cell) => pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-                          child: pw.Text(cell, style: const pw.TextStyle(fontSize: 8)),
+                          child: pw.Text(cell, style: pw.TextStyle(font: font, fontSize: 8)),
                         ))
                     .toList(),
               )),
@@ -585,14 +593,14 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     await Printing.layoutPdf(onLayout: (_) => pdf.save());
   }
 
-  pw.Widget _pdfSummaryCol(String label, String value, PdfColor color) => pw.Column(
+  pw.Widget _pdfSummaryCol(String label, String value, PdfColor color, {pw.Font? font, pw.Font? fontBold}) => pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
       pw.Text(label,
-          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+          style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey600)),
       pw.Text(value,
           style: pw.TextStyle(
-              fontSize: 12, fontWeight: pw.FontWeight.bold, color: color)),
+              font: fontBold, fontSize: 12, fontWeight: pw.FontWeight.bold, color: color)),
     ],
   );
 

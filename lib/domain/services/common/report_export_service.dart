@@ -301,7 +301,7 @@ class ReportExportService {
   static Uint8List? _fontBytes;
   static Uint8List? _fontBoldBytes;
 
-  static Future<Uint8List> _loadFontBytes() async {
+  static Future<Uint8List> loadFontBytes() async {
     if (_fontBytes == null) {
       final data = await rootBundle.load('assets/fonts/Poppins-Regular.ttf');
       _fontBytes = data.buffer.asUint8List(
@@ -312,7 +312,7 @@ class ReportExportService {
     return _fontBytes!;
   }
 
-  static Future<Uint8List> _loadBoldFontBytes() async {
+  static Future<Uint8List> loadBoldFontBytes() async {
     if (_fontBoldBytes == null) {
       final data = await rootBundle.load('assets/fonts/Poppins-Bold.ttf');
       _fontBoldBytes = data.buffer.asUint8List(
@@ -458,8 +458,8 @@ class ReportExportService {
           .map((row) => row.map((cell) => cell?.toString() ?? '').toList())
           .toList();
 
-      final fontBytes = await _loadFontBytes();
-      final fontBoldBytes = await _loadBoldFontBytes();
+      final fontBytes = await loadFontBytes();
+      final fontBoldBytes = await loadBoldFontBytes();
 
       Map<String, String>? summaryMap;
       if (summary != null) {

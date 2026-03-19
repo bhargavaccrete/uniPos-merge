@@ -54,7 +54,7 @@ class EODService {
     // Separate fully refunded and voided orders from active orders for reporting
     final activeDayOrders = allDayOrders.where((order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      return status != 'FULLY_REFUNDED' && status != 'VOIDED';
+      return status != 'FULLY_REFUNDED' && !status.contains('VOID');
     }).toList();
 
     // Use activeDayOrders for count-based statistics (excludes fully refunded orders)
@@ -63,9 +63,18 @@ class EODService {
     final paymentSummaries = _calculatePaymentSummaries(activeDayOrders);
     final taxSummaries = _calculateTaxSummaries(allDayOrders);
 
-    // Calculate totals with refunds properly deducted (use all orders for accurate totals)
-    final totalSales = allDayOrders.fold<double>(0.0, (sum, order) => sum + (order.totalPrice - (order.refundAmount ?? 0.0)));
-    final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) => sum + (order.Discount ?? 0.0));
+    // Calculate totals with refunds properly deducted
+    // Use allDayOrders but skip VOID orders (never paid, should not count)
+    final totalSales = allDayOrders.fold<double>(0.0, (sum, order) {
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status.contains('VOID')) return sum;
+      return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
+    });
+    final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) {
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status.contains('VOID')) return sum;
+      return sum + (order.Discount ?? 0.0);
+    });
 
     // Calculate proportional tax amount (subtract tax on refunded and voided amounts)
     final totalTax = allDayOrders.fold<double>(0.0, (sum, order) {
@@ -79,7 +88,11 @@ class EODService {
       return sum + effectiveTax;
     });
 
-    final totalRefunds = allDayOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+    final totalRefunds = allDayOrders.fold<double>(0.0, (sum, order) {
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status.contains('VOID')) return sum;
+      return sum + (order.refundAmount ?? 0.0);
+    });
     final totalOrderCount = activeDayOrders.length; // Count only active orders
 
     // Calculate expenses for the day using expense store
@@ -220,9 +233,9 @@ class EODService {
     double grandTotal = 0.0;
 
     for (final order in orders) {
-      // Skip voided orders completely
+      // Skip voided orders completely (covers both 'VOID' and 'VOIDED')
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'VOIDED') continue;
+      if (status.contains('VOID')) continue;
 
       final netOrderAmount = order.totalPrice - (order.refundAmount ?? 0.0);
       grandTotal += netOrderAmount;
@@ -264,9 +277,9 @@ class EODService {
     double grandTotal = 0.0;
 
     for (final order in orders) {
-      // Skip voided orders
+      // Skip voided orders (covers both 'VOID' and 'VOIDED')
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'VOIDED') continue;
+      if (status.contains('VOID')) continue;
 
       final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
 

@@ -39,6 +39,7 @@ import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
 import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
+import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 
 // Shared models
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
@@ -675,6 +676,18 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Cash Handovers box error: $e");
         exportMap["cashHandovers"] = [];
+      }
+
+      // Restaurant Customers
+      try {
+        exportMap["restaurantCustomers"] = Hive.box<RestaurantCustomer>(HiveBoxNames.restaurantCustomer)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Restaurant Customers exported: ${exportMap["restaurantCustomers"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Customers box error: $e");
+        exportMap["restaurantCustomers"] = [];
       }
 
       // Past Orders (batched processing with safe serialization)
@@ -1715,6 +1728,18 @@ class UnifiedBackupService {
       );
     } catch (e) {
       debugPrint("⚠️ Error restoring cash handovers: $e");
+    }
+
+    // ✅ Restore Restaurant Customers
+    try {
+      await restoreBoxWithId(
+        "restaurantCustomers",
+        Hive.box<RestaurantCustomer>(HiveBoxNames.restaurantCustomer),
+        (m) => RestaurantCustomer.fromMap(m),
+        (c) => c.customerId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant customers: $e");
     }
   }
 

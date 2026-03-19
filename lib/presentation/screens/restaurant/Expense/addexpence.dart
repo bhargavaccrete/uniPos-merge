@@ -23,6 +23,7 @@ class Addexpence extends StatefulWidget {
 
 class _AddexpenceState extends State<Addexpence> {
   DateTime? _dateselect;
+  final TextEditingController _dateController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
   bool _isSaving = false;
@@ -35,6 +36,7 @@ class _AddexpenceState extends State<Addexpence> {
 
   @override
   void dispose() {
+    _dateController.dispose();
     _amountController.dispose();
     _reasonController.dispose();
     super.dispose();
@@ -50,6 +52,7 @@ class _AddexpenceState extends State<Addexpence> {
     if (_pickedDate != null) {
       setState(() {
         _dateselect = _pickedDate;
+        _dateController.text = DateFormat('dd/MM/yyyy').format(_pickedDate);
       });
     }
   }
@@ -124,6 +127,7 @@ class _AddexpenceState extends State<Addexpence> {
       selectedCategoryId = null;
       Dropvalue2 = 'Cash';
     });
+    _dateController.clear();
     _amountController.clear();
     _reasonController.clear();
   }
@@ -189,57 +193,16 @@ class _AddexpenceState extends State<Addexpence> {
                 children: [
                   // Date and Amount Row
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Date',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 10),
-                            GestureDetector(
-                              onTap: () => _pickedDate(context),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceLight,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _dateselect != null ? AppColors.primary : AppColors.divider,
-                                    width: _dateselect != null ? 2 : 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_today,
-                                      size: 18,
-                                      color: _dateselect != null ? AppColors.primary : AppColors.textSecondary,
-                                    ),
-                                    SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        _dateselect == null
-                                            ? "Select Date"
-                                            : DateFormat('dd/MM/yyyy').format(_dateselect!),
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color: _dateselect != null ? AppColors.textPrimary : AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: AppTextField(
+                          controller: _dateController,
+                          label: 'Date',
+                          hint: 'Select Date',
+                          icon: Icons.calendar_today,
+                          readOnly: true,
+                          onTap: () => _pickedDate(context),
                         ),
                       ),
                       SizedBox(width: 16),
