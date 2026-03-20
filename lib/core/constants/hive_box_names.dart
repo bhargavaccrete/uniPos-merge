@@ -190,6 +190,9 @@ class HiveBoxNames {
   /// Cash handover records (2-step shift handover between staff)
   static const String restaurantCashHandovers = 'cashHandoversBox';
 
+  /// Saved thermal printers (Bluetooth/WiFi configuration)
+  static const String restaurantPrinters = 'restaurantPrintersBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode
@@ -273,6 +276,7 @@ class HiveBoxNames {
     restaurantShift,
     restaurantCashMovements,
     restaurantCashHandovers,
+    restaurantPrinters,
   ];
 
   /// All common box names (shared between retail and restaurant)

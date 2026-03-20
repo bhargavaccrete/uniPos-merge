@@ -77,6 +77,7 @@ dependencies:
   country_state_city_picker: ^1.2.8
   csv: ^5.1.1           # To create the CSV (Excel) file
   permission_handler: ^11.3.1  # For storage permissions
+  flutter_thermal_printer: 1.2.1+1  # BT + WiFi + USB thermal printer support
 
 
 

@@ -61,6 +61,7 @@ import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
+import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
 
 /// Hive Initialization Class
 /// Handles all adapter registrations and box openings
@@ -549,6 +550,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashHandover)) {
       Hive.registerAdapter(CashHandoverModelAdapter());
     }
+    // SavedPrinterModel - 130: BT/WiFi thermal printer configuration
+    if (!Hive.isAdapterRegistered(HiveTypeIds.savedPrinter)) {
+      Hive.registerAdapter(SavedPrinterModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -603,6 +608,9 @@ class HiveInit {
     // Cash Management — movements (Cash In/Out) and handovers (shift transfers)
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
     await Hive.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
+
+    // Saved thermal printers (Bluetooth/WiFi configuration)
+    await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
 
     _areRestaurantBoxesOpen = true;
     print('✅ All restaurant boxes opened successfully with correct names and guard flag set');

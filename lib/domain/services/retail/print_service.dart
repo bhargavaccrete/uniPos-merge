@@ -13,6 +13,8 @@ import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/domain/services/retail/retail_printer_settings_service.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/restaurant/esc_pos_receipt_builder.dart';
 
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
@@ -408,6 +410,53 @@ class PrintService {
               ),
             ),
             const SizedBox(height: 16),
+
+            // Direct Thermal Printer — only shown when a receipt printer is saved.
+            // This is the fastest path: one tap → ESC/POS bytes → printer.
+            // No PDF rendering, no system dialog.
+            if (AppConfig.isRestaurant &&
+                printerStore.hasDefaultReceiptPrinter)
+              _buildOptionTile(
+                icon: Icons.print,
+                title: 'Print to ${printerStore.defaultReceiptPrinter!.name}',
+                subtitle: 'Direct thermal print (${printerStore.defaultReceiptPrinter!.type.toUpperCase()})',
+                onTap: () async {
+                  Navigator.pop(context);
+                  // Build the ReceiptData needed by the ESC/POS builder
+                  final receiptData = ReceiptData(
+                    sale: sale,
+                    items: items,
+                    customer: customer,
+                    storeName: storeName,
+                    storeAddress: storeAddress,
+                    storePhone: storePhone,
+                    storeEmail: storeEmail,
+                    gstNumber: gstNumber,
+                    billNumber: billNumber,
+                    kotNumbers: kotNumbers,
+                    itemTotal: itemTotal,
+                    loyaltyPointsDiscount: loyaltyPointsDiscount,
+                  );
+                  final printer = printerStore.defaultReceiptPrinter!;
+                  final bytes = EscPosReceiptBuilder.buildReceiptTicket(
+                    receiptData: receiptData,
+                    paperWidth: printer.paperSize,
+                  );
+                  final success = await printerStore.sendBytes(bytes, printer);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(success
+                            ? 'Receipt sent to ${printer.name}'
+                            : 'Print failed: ${printerStore.errorMessage ?? "Unknown error"}'),
+                        backgroundColor: success
+                            ? const Color(0xFF4CAF50)
+                            : const Color(0xFFC62828),
+                      ),
+                    );
+                  }
+                },
+              ),
 
             // Print A4 Invoice
             _buildOptionTile(

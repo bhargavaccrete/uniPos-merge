@@ -16,6 +16,7 @@ import 'package:unipos/presentation/screens/restaurant/start%20order/cart/custom
 import 'package:unipos/util/restaurant/staticswitch.dart'; // Import for AppSettings
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/domain/services/restaurant/esc_pos_receipt_builder.dart';
 
 class RestaurantPrintHelper {
 
@@ -156,11 +157,39 @@ class RestaurantPrintHelper {
         isAddonKot: isAddonKot,
       );
 
-      // 7. Print or show preview based on autoPrint flag
+      // 7. DIRECT THERMAL PATH — zero taps if a KOT printer is saved.
+      //    Check PrinterStore for a default KOT printer. If found, build
+      //    ESC/POS bytes and send directly via BT/WiFi. No dialog, no PDF.
+      //    If no printer saved, fall through to existing PDF path.
+      final kotPrinter = printerStore.defaultKotPrinter;
+      if (kotPrinter != null && autoPrint) {
+        final bytes = EscPosReceiptBuilder.buildKotTicket(
+          receiptData: receiptData,
+          paperWidth: kotPrinter.paperSize,
+        );
+        final success = await printerStore.sendBytes(bytes, kotPrinter);
+        if (context.mounted) {
+          if (success) {
+            NotificationService.instance.showSuccess(
+              'KOT #$kotNumber printed to ${kotPrinter.name}',
+            );
+          } else {
+            // Thermal print failed — fall through to PDF as backup
+            NotificationService.instance.showError(
+              'Thermal print failed: ${printerStore.errorMessage ?? "Unknown error"}. Falling back to PDF...',
+            );
+            // Don't return — let it fall through to PDF path below
+          }
+          if (success) return; // Only return on success
+        }
+      }
+
+      // 8. EXISTING PDF PATH — fallback when no thermal printer is saved,
+      //    or when thermal print fails, or when autoPrint is false (preview).
       final printService = locator<PrintService>();
 
       if (autoPrint) {
-        // Auto-print directly to thermal printer
+        // Auto-print via system print dialog (PDF)
         await printService.printReceipt(
           context: context,
           sale: receiptData.sale,
@@ -439,10 +468,11 @@ class RestaurantPrintHelper {
         isTaxInclusive: order.isTaxInclusive, // Use stored tax mode from order, not current app setting
       );
 
-      // 6. Show Print Options
+      // 6. Show Print Options — with thermal printer option if available
       final printService = locator<PrintService>();
 
-      // Fixed: Pass individual parameters instead of ReceiptData object
+      // Pass the receipt printer reference so showPrintOptionsDialog can
+      // offer a "Print to Thermal" option at the top of the bottom sheet
       await printService.showPrintOptionsDialog(
         context: context,
         sale: receiptData.sale,

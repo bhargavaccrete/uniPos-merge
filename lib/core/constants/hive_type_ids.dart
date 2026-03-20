@@ -56,6 +56,9 @@ class HiveTypeIds {
   static const int restaurantCashMovement = 128; // CashMovementModel — Cash In/Out events
   static const int restaurantCashHandover  = 129; // CashHandoverModel — 2-step shift handover
 
+  // Printer Management (130)
+  static const int savedPrinter = 130; // SavedPrinterModel — BT/WiFi printer config
+
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
   static const int retailVariant = 151;
@@ -159,5 +162,6 @@ class HiveTypeIds {
     restaurantShift,
     restaurantCashMovement,
     restaurantCashHandover,
+    savedPrinter,
   ];
 }

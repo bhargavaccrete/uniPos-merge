@@ -1184,6 +1184,27 @@ class _CustomerdetailsState extends State<Customerdetails> {
       final newlyAddedItems = itemsToSettle.skip(previousItemCount).toList();
       await InventoryService.deductStockForOrder(newlyAddedItems);
       print('✅ Stock deducted for ${newlyAddedItems.length} newly added items during settlement');
+
+      // Print KOT for the new items — kitchen needs to know what was added.
+      // Build a temporary OrderModel containing only the new items for this KOT.
+      if (mounted && AppSettings.generateKOT) {
+        try {
+          final kotOrder = widget.existingModel!.copyWith(
+            items: newlyAddedItems, // Only the new items for this KOT
+            kotNumbers: [newKotNumber],
+            kotBoundaries: [newlyAddedItems.length],
+            itemCountAtLastKot: newlyAddedItems.length,
+          );
+          await RestaurantPrintHelper.printKOT(
+            context: context,
+            order: kotOrder,
+            kotNumber: newKotNumber,
+            autoPrint: true,
+          );
+        } catch (e) {
+          print("⚠️ KOT print failed for new items during settle: $e");
+        }
+      }
     }
 
     final OrderModel completedOrder = widget.existingModel!.copyWith(
@@ -1384,6 +1405,39 @@ class _CustomerdetailsState extends State<Customerdetails> {
         }
 
         await restaurantCartStore.clearCart();
+
+        // Auto-print KOT to kitchen — the kitchen needs to know what to
+        // make even for direct-settle orders (e.g., takeaway paid upfront).
+        // Uses the same thermal path as regular orders.
+        if (mounted && AppSettings.generateKOT) {
+          try {
+            // Build a temporary OrderModel for KOT printing (printKOT needs OrderModel)
+            final kotOrder = OrderModel(
+              id: newId,
+              customerName: _nameController.text.trim(),
+              customerNumber: _mobileController.text.trim(),
+              customerEmail: _emailController.text.trim(),
+              items: orderItems,
+              status: 'Processing',
+              timeStamp: DateTime.now(),
+              orderType: widget.orderType ?? 'Take Away',
+              tableNo: widget.tableid ?? '',
+              totalPrice: calculations.grandTotal,
+              kotNumbers: [newKotNumber],
+              itemCountAtLastKot: orderItems.length,
+              kotBoundaries: [orderItems.length],
+              orderNumber: null,
+            );
+            await RestaurantPrintHelper.printKOT(
+              context: context,
+              order: kotOrder,
+              kotNumber: newKotNumber,
+              autoPrint: true,
+            );
+          } catch (e) {
+            print("⚠️ KOT print failed for direct settle: $e");
+          }
+        }
 
         NotificationService.instance.showSuccess(
           'Order Settled Successfully',
