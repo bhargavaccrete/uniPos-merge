@@ -271,7 +271,6 @@ class RestaurantPrintHelper {
             id: existing.id,
             productId: existing.productId,
             title: existing.title,
-            imagePath: existing.imagePath,
             price: existing.price, // Keep unit price same
             quantity: existing.quantity + item.quantity, // Add quantities
             variantName: existing.variantName,
@@ -466,6 +465,8 @@ class RestaurantPrintHelper {
         billNumber: billNumber, // Pass bill number for completed orders
         itemTotal: calculations.itemTotal, // ✅ Pass pre-calculated item total from CartCalculationService
         isTaxInclusive: order.isTaxInclusive, // Use stored tax mode from order, not current app setting
+        serviceCharge: calculations.serviceChargeAmount,
+        isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
       );
 
       // 6. Show Print Options — with thermal printer option if available
@@ -488,8 +489,11 @@ class RestaurantPrintHelper {
         itemTotal: receiptData.itemTotal,
         paymentBreakdown: paymentBreakdown,
         loyaltyPointsDiscount: loyaltyPointsDiscount, // show Points Redeemed line on bill
+        serviceCharge: calculations.serviceChargeAmount,
+        isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
+        isTaxInclusive: order.isTaxInclusive,
       );
-      
+
     } catch (e) {
       debugPrint('Error preparing receipt: $e');
       NotificationService.instance.showError('Error preparing receipt: $e');

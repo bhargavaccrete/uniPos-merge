@@ -512,7 +512,6 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         variant: _selectedVariants,
         choiceIds: _selectedChoiceIds,
         extraId: _selectedExtraIds,
-        taxIds: _selectedTaxId != null ? [_selectedTaxId!] : null, // Single tax ID as list
         taxRate: taxRate > 0 ? taxRate : null, // Apply calculated tax rate
         isEnabled: true,
         createdTime: DateTime.now(),

@@ -1529,50 +1529,135 @@ class _CustomerdetailsState extends State<Customerdetails> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Column(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            const SizedBox(height: 10),
-            Text(
-              'Order Successful',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Text(
-          'Order has been placed successfully.\nDo you want to print the receipt?',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          OutlinedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              _navigateToHome(); // Go to home
-            },
-            child: const Text('Close'),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success icon with gradient background
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade400, Colors.green.shade600],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Order Placed!',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (billNumber != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      'Bill #INV$billNumber',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              Text(
+                'Would you like to print the receipt?',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 28),
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _navigateToHome();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        'Skip',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        await RestaurantPrintHelper.printOrderReceipt(
+                          context: context,
+                          order: order,
+                          calculations: calculations,
+                          billNumber: billNumber,
+                          loyaltyPointsDiscount: pointsUsed,
+                        );
+                      },
+                      icon: const Icon(Icons.print_rounded, size: 20),
+                      label: Text(
+                        'Print Receipt',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await RestaurantPrintHelper.printOrderReceipt(
-                context: context,
-                order: order,
-                calculations: calculations,
-                billNumber: billNumber,
-                loyaltyPointsDiscount: pointsUsed,
-              );
-              // We don't close the dialog automatically after print,
-              // allowing user to print again or close manually
-            },
-            icon: const Icon(Icons.print, size: 18),
-            label: const Text('Print Receipt'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1615,50 +1700,133 @@ class _CustomerdetailsState extends State<Customerdetails> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Column(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            const SizedBox(height: 10),
-            Text(
-              'Order Settled',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Text(
-          'Bill #INV${billNumber} generated successfully.\nDo you want to print the bill?',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          OutlinedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              _navigateToHome(); // Go to home
-            },
-            child: const Text('Close'),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success icon with gradient background
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade400, Colors.green.shade600],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Order Settled!',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Bill number chip
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Text(
+                  'Bill #INV$billNumber',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Would you like to print the bill?',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 28),
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _navigateToHome();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        'Skip',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        await RestaurantPrintHelper.printOrderReceipt(
+                          context: context,
+                          order: orderForPrint,
+                          calculations: calculations,
+                          billNumber: billNumber,
+                          loyaltyPointsDiscount: pointsUsed,
+                        );
+                      },
+                      icon: const Icon(Icons.print_rounded, size: 20),
+                      label: Text(
+                        'Print Bill',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await RestaurantPrintHelper.printOrderReceipt(
-                context: context,
-                order: orderForPrint,
-                calculations: calculations,
-                billNumber: billNumber,
-                loyaltyPointsDiscount: pointsUsed,
-              );
-              // We don't close the dialog automatically after print,
-              // allowing user to print again or close manually
-            },
-            icon: const Icon(Icons.print, size: 18),
-            label: const Text('Print Bill'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

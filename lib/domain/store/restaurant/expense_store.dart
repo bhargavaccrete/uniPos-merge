@@ -52,11 +52,14 @@ abstract class _ExpenseStore with Store {
     }
 
     if (startDate != null && endDate != null) {
-      result = result
-          .where((expense) =>
-              expense.dateandTime.isAfter(startDate!.subtract(Duration(days: 1))) &&
-              expense.dateandTime.isBefore(endDate!.add(Duration(days: 1))))
-          .toList();
+      // Compare date-only (ignore time) to avoid off-by-one with timestamps
+      final startDay = DateTime(startDate!.year, startDate!.month, startDate!.day);
+      final endDay = DateTime(endDate!.year, endDate!.month, endDate!.day);
+      result = result.where((expense) {
+        final d = expense.dateandTime;
+        final expDay = DateTime(d.year, d.month, d.day);
+        return !expDay.isBefore(startDay) && !expDay.isAfter(endDay);
+      }).toList();
     }
 
     return result;

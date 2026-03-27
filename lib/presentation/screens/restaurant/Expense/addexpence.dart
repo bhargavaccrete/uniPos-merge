@@ -23,10 +23,12 @@ class Addexpence extends StatefulWidget {
 
 class _AddexpenceState extends State<Addexpence> {
   DateTime? _dateselect;
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
   bool _isSaving = false;
+  String? _categoryError;
 
   @override
   void initState() {
@@ -64,24 +66,15 @@ class _AddexpenceState extends State<Addexpence> {
   Future<void> _addExpense() async {
     if (_isSaving) return;
 
-    if (_dateselect == null) {
-      NotificationService.instance.showError('Please select a date');
-      return;
-    }
-    if (_amountController.text.trim().isEmpty) {
-      NotificationService.instance.showError('Please enter amount');
-      return;
-    }
-    if (selectedCategoryId == null) {
-      NotificationService.instance.showError('Please select a category');
-      return;
-    }
+    // Validate category separately (not an AppTextField)
+    setState(() {
+      _categoryError = selectedCategoryId == null ? 'Please select a category' : null;
+    });
 
-    final amount = double.tryParse(_amountController.text.trim());
-    if (amount == null || amount <= 0) {
-      NotificationService.instance.showError('Please enter a valid amount greater than 0');
-      return;
-    }
+    final formValid = _formKey.currentState!.validate();
+    if (!formValid || _categoryError != null) return;
+
+    final amount = double.parse(_amountController.text.trim());
 
     setState(() => _isSaving = true);
     try {
@@ -126,7 +119,9 @@ class _AddexpenceState extends State<Addexpence> {
       _dateselect = null;
       selectedCategoryId = null;
       Dropvalue2 = 'Cash';
+      _categoryError = null;
     });
+    _formKey.currentState?.reset();
     _dateController.clear();
     _amountController.clear();
     _reasonController.clear();
@@ -188,7 +183,9 @@ class _AddexpenceState extends State<Addexpence> {
                   ),
                 ],
               ),
-              child: Column(
+              child: Form(
+                key: _formKey,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Date and Amount Row
@@ -203,6 +200,10 @@ class _AddexpenceState extends State<Addexpence> {
                           icon: Icons.calendar_today,
                           readOnly: true,
                           onTap: () => _pickedDate(context),
+                          validator: (value) {
+                            if (_dateselect == null) return 'Please select a date';
+                            return null;
+                          },
                         ),
                       ),
                       SizedBox(width: 16),
@@ -216,6 +217,12 @@ class _AddexpenceState extends State<Addexpence> {
                           inputFormatters: [
                             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                           ],
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) return 'Please enter amount';
+                            final amount = double.tryParse(value.trim());
+                            if (amount == null || amount <= 0) return 'Enter a valid amount greater than 0';
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -269,6 +276,7 @@ class _AddexpenceState extends State<Addexpence> {
                             onChanged: (String? value) {
                               setState(() {
                                 selectedCategoryId = value;
+                                _categoryError = null;
                               });
                             },
                           ),
@@ -276,6 +284,14 @@ class _AddexpenceState extends State<Addexpence> {
                       );
                     },
                   ),
+                  if (_categoryError != null)
+                    Padding(
+                      padding: EdgeInsets.only(left: 12, top: 6),
+                      child: Text(
+                        _categoryError!,
+                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.red),
+                      ),
+                    ),
 
                   SizedBox(height: 20),
 
@@ -363,6 +379,7 @@ class _AddexpenceState extends State<Addexpence> {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
 

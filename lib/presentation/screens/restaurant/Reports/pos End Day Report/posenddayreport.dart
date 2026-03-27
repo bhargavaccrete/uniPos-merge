@@ -116,6 +116,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
       'Opening Balance',
       'Closing Balance',
       'Actual Cash',
+      'Difference',
       'Cash Payment',
       'Card Payment',
       'Online Payment',
@@ -145,6 +146,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
         ReportExportService.formatCurrency(report.openingBalance),
         ReportExportService.formatCurrency(report.closingBalance),
         ReportExportService.formatCurrency(report.cashReconciliation.actualCash),
+        ReportExportService.formatCurrency(report.cashReconciliation.difference),
         ReportExportService.formatCurrency(cashAmount),
         ReportExportService.formatCurrency(cardAmount),
         ReportExportService.formatCurrency(onlineAmount),
@@ -589,6 +591,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                 DataColumn(label: Text('Opening', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Closing', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Actual Cash', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
+                DataColumn(label: Text('Difference', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Cash', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Card', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
                 DataColumn(label: Text('Online', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
@@ -645,6 +648,32 @@ class _PosenddayreportState extends State<Posenddayreport> {
                         '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.cashReconciliation.actualCash)}',
                         style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                       ),
+                    ),
+                    // Difference (discrepancy)
+                    DataCell(
+                      () {
+                        final diff = report.cashReconciliation.difference;
+                        final isShortage = diff < -0.01;
+                        final isOverage = diff > 0.01;
+                        final color = isShortage ? Colors.red.shade700 : (isOverage ? Colors.green.shade700 : AppColors.textPrimary);
+                        final prefix = isOverage ? '+' : '';
+                        return Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppResponsive.getValue(context, mobile: 6.0, desktop: 10.0),
+                            vertical: AppResponsive.getValue(context, mobile: 3.0, desktop: 5.0),
+                          ),
+                          decoration: BoxDecoration(
+                            color: isShortage
+                                ? Colors.red.withValues(alpha: 0.1)
+                                : (isOverage ? Colors.green.withValues(alpha: 0.1) : Colors.transparent),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$prefix${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(diff.abs())}',
+                            style: GoogleFonts.poppins(fontSize: cellFontSize, color: color, fontWeight: FontWeight.w600),
+                          ),
+                        );
+                      }(),
                     ),
                     DataCell(
                       Container(

@@ -53,11 +53,12 @@ class InventoryService {
           double quantityToDeduct = cartItem.quantity.toDouble();
 
           if (item.isSoldByWeight && cartItem.weightDisplay != null) {
-            // Parse the weight from weightDisplay (e.g., "500GM" -> 500, "1.5KG" -> 1500)
-            final singleWeight = _parseWeightFromDisplay(cartItem.weightDisplay!);
-            // ✅ FIX: Multiply by quantity (e.g., 3 qty × 5kg = 15kg)
+            // Parse the weight from weightDisplay and convert to the item's stock unit
+            final stockUnit = item.unit ?? 'kg';
+            final singleWeight = _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
+            // Multiply by quantity (e.g., 3 qty × 5kg = 15kg)
             quantityToDeduct = cartItem.quantity * singleWeight;
-            print('🔍 Weight-based item detected. Single weight: $singleWeight, Quantity: ${cartItem.quantity}, Total: $quantityToDeduct');
+            print('🔍 Weight-based item. Single: $singleWeight $stockUnit, Qty: ${cartItem.quantity}, Total: $quantityToDeduct $stockUnit');
           }
 
           print('🔍 Deducting $quantityToDeduct from item ${item.name}');
@@ -302,7 +303,26 @@ class InventoryService {
     }
   }
 
-  // Parse weight from display string to grams for stock deduction
+  /// Parse weight from display string and convert to the item's stock unit.
+  /// e.g., weightDisplay="10KG", stockUnit="kg" → returns 10
+  ///        weightDisplay="500GM", stockUnit="kg" → returns 0.5
+  ///        weightDisplay="2KG", stockUnit="gm" → returns 2000
+  static double _parseWeightToStockUnit(String weightDisplay, String stockUnit) {
+    final grams = _parseWeightFromDisplay(weightDisplay);
+    final normalizedStockUnit = stockUnit.toUpperCase().replaceAll(' ', '');
+    // Convert grams to the stock unit
+    if (normalizedStockUnit.contains('KG')) {
+      return grams / 1000; // grams → kg
+    } else if (normalizedStockUnit.contains('G') || normalizedStockUnit.contains('GM') || normalizedStockUnit.contains('GRAM')) {
+      return grams; // already in grams
+    } else if (normalizedStockUnit.contains('LB') || normalizedStockUnit.contains('POUND')) {
+      return grams / 453.592; // grams → pounds
+    }
+    // Default: assume grams
+    return grams;
+  }
+
+  // Parse weight from display string to grams (internal)
   static double _parseWeightFromDisplay(String weightDisplay) {
     // Remove spaces and convert to uppercase for consistent parsing
     String normalizedWeight = weightDisplay.replaceAll(' ', '').toUpperCase();
@@ -392,10 +412,11 @@ class InventoryService {
           // Handle regular items (non-variant)
           double quantityToRestore = restockQuantity.toDouble();
 
-          // For weight-based items, parse the weight from weightDisplay
+          // For weight-based items, parse the weight and convert to stock unit
           if (existingItem.isSoldByWeight && cartItem.weightDisplay != null) {
-            quantityToRestore = _parseWeightFromDisplay(cartItem.weightDisplay!);
-            print('🔍 Weight-based item detected. Parsed weight: $quantityToRestore');
+            final stockUnit = existingItem.unit ?? 'kg';
+            quantityToRestore = _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
+            print('🔍 Weight-based restock. Parsed: $quantityToRestore $stockUnit');
           }
 
           await _restoreItemStock(existingItem, quantityToRestore);

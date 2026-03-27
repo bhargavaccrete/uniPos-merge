@@ -1,4 +1,4 @@
-import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -73,7 +73,7 @@ class _CategoryTabState extends State<CategoryTab> {
         children: [
           // Modern Search Bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(10),
             child: AppTextField(
               controller: _searchController,
               hint: 'Search categories…',
@@ -228,19 +228,10 @@ class _CategoryTabState extends State<CategoryTab> {
                       width: 2,
                     ),
                   ),
-                  child: category.imagePath != null &&
-                          File(category.imagePath!).existsSync()
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            File(category.imagePath!),
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : Icon(
-                          Icons.category,
+                  child: Icon(
+                          Icons.category_rounded,
                           color: AppColors.primary,
-                          size: isGrid ? 25 : 30,
+                          size: isGrid ? 20 : 28,
                         ),
                 ),
                 SizedBox(width: isGrid ? 12 : 16),
@@ -296,90 +287,75 @@ class _CategoryTabState extends State<CategoryTab> {
               ],
             ),
 
-            if (!isGrid) SizedBox(height: 12),
+            SizedBox(height: isGrid ? 10 : 8),
 
-            // Action Buttons
-            Padding(
-              padding: EdgeInsets.only(top: isGrid ? 12 : 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditCategory(category: category),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
+            // Compact action row — Edit, Delete, Toggle in one line
+            Row(
+              children: [
+                // Edit
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditCategory(category: category),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.edit_outlined, size: 18, color: Colors.blue),
-                            if (!isGrid) ...[
-                              SizedBox(width: 6),
-                              Text(
-                                'Edit',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.blue,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: Icon(Icons.edit_rounded, size: 18, color: Colors.blue),
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () {
-                        _showDeleteDialog(category);
-                      },
-                      child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                            if (!isGrid) ...[
-                              SizedBox(width: 6),
-                              Text(
-                                'Delete',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.red,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                ),
+                SizedBox(width: 6),
+                // Delete
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _showDeleteDialog(category),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: Icon(Icons.delete_rounded, size: 18, color: Colors.red),
                     ),
+                  ),
+                ),
+                // Bulk Enable/Disable
+                if (items.isNotEmpty) ...[
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Builder(builder: (_) {
+                      final allEnabled = items.every((i) => i.isEnabled);
+                      final fg = allEnabled ? Colors.orange.shade700 : Colors.green.shade700;
+                      final bg = allEnabled ? Colors.orange.shade50 : Colors.green.shade50;
+                      final icon = allEnabled ? Icons.visibility_off_rounded : Icons.visibility_rounded;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => _bulkToggleCategory(category.id, items),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 7),
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(icon, size: 18, color: fg),
+                        ),
+                      );
+                    }),
                   ),
                 ],
-              ),
+              ],
             ),
-
-            // Bulk Enable / Disable
-            if (items.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _buildBulkToggle(category, items, isGrid: isGrid),
-            ],
 
             // Audit Trail (only in mobile view)
             if (!isGrid &&
@@ -452,46 +428,6 @@ class _CategoryTabState extends State<CategoryTab> {
     }
   }
 
-  Widget _buildBulkToggle(Category category, List<Items> items,
-      {required bool isGrid}) {
-    final allEnabled = items.every((i) => i.isEnabled);
-    final label = allEnabled ? 'Disable All' : 'Enable All';
-    final bg = allEnabled ? Colors.orange.shade50 : Colors.green.shade50;
-    final border =
-        allEnabled ? Colors.orange.shade200 : Colors.green.shade200;
-    final icon = allEnabled
-        ? Icons.visibility_off_outlined
-        : Icons.visibility_outlined;
-    final fg =
-        allEnabled ? Colors.orange.shade700 : Colors.green.shade700;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => _bulkToggleCategory(category.id, items),
-      child: Container(
-        width: double.infinity,
-        padding:
-            EdgeInsets.symmetric(vertical: isGrid ? 6 : 9),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: border),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: fg),
-            const SizedBox(width: 6),
-            Text(label,
-                style: GoogleFonts.poppins(
-                    fontSize: isGrid ? 11 : 12,
-                    fontWeight: FontWeight.w600,
-                    color: fg)),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showDeleteDialog(Category category) {
     showDialog(

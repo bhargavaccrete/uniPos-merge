@@ -51,6 +51,13 @@ class ReceiptData {
   // Tax mode stored at order creation time (use this instead of live AppSettings)
   final bool? isTaxInclusive;
 
+  // Service / Delivery charge (pre-calculated by CartCalculationService)
+  final double? serviceCharge;
+  final bool? isDeliveryOrder;
+
+  // Split payment breakdown (e.g., "cash: ₹500, card: ₹300")
+  final String? paymentBreakdown;
+
   ReceiptData({
     required this.sale,
     required this.items,
@@ -72,6 +79,9 @@ class ReceiptData {
     this.itemTotal,
     this.loyaltyPointsDiscount,
     this.isTaxInclusive,
+    this.serviceCharge,
+    this.isDeliveryOrder,
+    this.paymentBreakdown,
   });
 }
 
@@ -89,6 +99,7 @@ class ReceiptPdfService {
     }
     return null;
   }
+
 
   /// Get paper format based on retail settings or default
   PdfPageFormat _getPaperFormat() {
@@ -455,21 +466,21 @@ class ReceiptPdfService {
             // totalAmount: From CartCalculationService.grandTotal (mapped to sale.totalAmount)
 
             if (isRestaurantInclusive) {
-              // TAX INCLUSIVE MODE
+              // TAX INCLUSIVE MODE — no GST line, footer note instead
               return pw.Column(
                 children: [
-                  // Sub Total (includes tax)
                   if (showSubtotal)
-                    _buildThermalTotalRow('Sub Total (Incl. Tax)', data.itemTotal ?? data.sale.subtotal),
-                  // Discount
+                    _buildThermalTotalRow('Sub Total', data.itemTotal ?? data.sale.subtotal),
                   if (data.sale.discountAmount > 0 && showSubtotal)
                     _buildThermalTotalRow('Discount', -data.sale.discountAmount),
-                  // Points Redeemed
                   if ((data.loyaltyPointsDiscount ?? 0) > 0)
                     _buildThermalTotalRow('Points Redeemed', -(data.loyaltyPointsDiscount!.toDouble())),
-                  // GST extracted from price (not added on top)
-                  if (showTax && data.sale.taxAmount > 0)
-                    _buildThermalTotalRow('GST (Included)', data.sale.taxAmount),
+                  // Service / Delivery Charge
+                  if ((data.serviceCharge ?? 0) > 0.009)
+                    _buildThermalTotalRow(
+                      (data.isDeliveryOrder ?? false) ? 'Delivery Charge' : 'Service Charge',
+                      data.serviceCharge!,
+                    ),
                 ],
               );
             } else {
@@ -488,6 +499,12 @@ class ReceiptPdfService {
                   // GST added on top
                   if (showTax && data.sale.taxAmount > 0)
                     _buildThermalTotalRow('GST', data.sale.taxAmount),
+                  // Service / Delivery Charge
+                  if ((data.serviceCharge ?? 0) > 0.009)
+                    _buildThermalTotalRow(
+                      (data.isDeliveryOrder ?? false) ? 'Delivery Charge' : 'Service Charge',
+                      data.serviceCharge!,
+                    ),
                 ],
               );
             }
@@ -545,6 +562,12 @@ class ReceiptPdfService {
 
           // Footer
           if (showFooter) ...[
+            if (AppConfig.isRestaurant && (data.isTaxInclusive ?? false))
+              pw.Text(
+                'All prices include GST',
+                style: const pw.TextStyle(fontSize: 10),
+                textAlign: pw.TextAlign.center,
+              ),
             if (isRetail && footerText.isNotEmpty) ...[
               pw.Text(
                 footerText,
@@ -882,17 +905,17 @@ class ReceiptPdfService {
                     // First Separator
                     if (showSubtotal) pw.Divider(thickness: 0.5),
 
-                    // Taxable Amount / Sub Total - Pre-calculated (mode-aware label only)
-                    if (showSubtotal)
+                    // Sub Total / Taxable Amount — only for tax-exclusive
+                    if (!isRestaurantInclusive && showSubtotal)
+                      _buildInvoiceTotalRow('Sub Total (Before Tax)', data.sale.subtotal),
+                    // GST — only for tax-exclusive
+                    if (!isRestaurantInclusive && showTax && data.sale.taxAmount > 0)
+                      _buildInvoiceTotalRow('GST', data.sale.taxAmount),
+                    // Service / Delivery Charge
+                    if ((data.serviceCharge ?? 0) > 0.009)
                       _buildInvoiceTotalRow(
-                          isRestaurantInclusive ? 'Taxable Amount' : 'Sub Total (Before Tax)',
-                          data.sale.subtotal
-                      ),
-                    // GST - Pre-calculated (mode-aware label only)
-                    if (showTax && data.sale.taxAmount > 0)
-                      _buildInvoiceTotalRow(
-                          isRestaurantInclusive ? 'GST (Included)' : 'GST',
-                          data.sale.taxAmount
+                        (data.isDeliveryOrder ?? false) ? 'Delivery Charge' : 'Service Charge',
+                        data.serviceCharge!,
                       ),
 
                     // Second Separator
@@ -990,6 +1013,11 @@ class ReceiptPdfService {
                 ),
               ),
               pw.SizedBox(height: 4),
+              if (AppConfig.isRestaurant && (data.isTaxInclusive ?? false))
+                pw.Text(
+                  'All prices include GST',
+                  style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                ),
               pw.Text(
                 'This is a computer-generated invoice.',
                 style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),

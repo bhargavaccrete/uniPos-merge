@@ -48,6 +48,7 @@ class NotificationService {
   List<AppNotification> get notifications => _notifications;
 
   // Method to add a new notification
+  // Prevents spam — if same message already showing, skip it
   void show(
       String message, {
         Color? color,
@@ -57,6 +58,14 @@ class NotificationService {
         VoidCallback? onTap,
         bool dismissible = true,
       }) {
+    // Prevent duplicate: if same message is already visible, skip
+    if (_notifications.any((n) => n.message == message)) return;
+
+    // Max 2 notifications at a time — dismiss oldest if full
+    while (_notifications.length >= 2) {
+      _dismiss(_notifications.last.id);
+    }
+
     // Determine color based on type if not provided
     color ??= _getColorForType(type);
     icon ??= _getIconForType(type);
@@ -73,7 +82,7 @@ class NotificationService {
 
     // Add to the list and insert into the AnimatedList
     _notifications.insert(0, notification);
-    listKey.currentState?.insertItem(0, duration: const Duration(milliseconds: 500));
+    listKey.currentState?.insertItem(0, duration: const Duration(milliseconds: 300));
 
     // Set a timer to automatically remove the notification
     if (dismissible) {
@@ -86,7 +95,7 @@ class NotificationService {
     show(
       message,
       type: NotificationType.success,
-      duration: duration ?? const Duration(seconds: 2),
+      duration: duration ?? const Duration(milliseconds: 1500),
       onTap: onTap,
     );
   }
@@ -95,7 +104,7 @@ class NotificationService {
     show(
       message,
       type: NotificationType.error,
-      duration: duration ?? const Duration(seconds: 4),
+      duration: duration ?? const Duration(seconds: 3),
       onTap: onTap,
     );
   }
@@ -104,7 +113,7 @@ class NotificationService {
     show(
       message,
       type: NotificationType.warning,
-      duration: duration ?? const Duration(seconds: 3),
+      duration: duration ?? const Duration(seconds: 2),
       onTap: onTap,
     );
   }
@@ -113,7 +122,7 @@ class NotificationService {
     show(
       message,
       type: NotificationType.info,
-      duration: duration ?? const Duration(seconds: 3),
+      duration: duration ?? const Duration(seconds: 2),
       onTap: onTap,
     );
   }
@@ -200,7 +209,7 @@ class NotificationService {
   }
 }
 
-// A modern widget to display the notification content
+// Compact notification banner
 class NotificationBanner extends StatelessWidget {
   final AppNotification notification;
   const NotificationBanner({super.key, required this.notification});
@@ -211,68 +220,42 @@ class NotificationBanner extends StatelessWidget {
       child: GestureDetector(
         onTap: notification.onTap,
         child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: notification.color,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _getBorderColor(notification.type),
-              width: 2,
-            ),
+            color: _bgColor(notification.type),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 8,
+                color: _bgColor(notification.type).withValues(alpha: 0.3),
+                blurRadius: 10,
                 offset: const Offset(0, 3),
-                spreadRadius: 1,
               ),
             ],
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              if (notification.icon != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: _getIconBackgroundColor(notification.type),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    notification.icon,
-                    size: 18,
-                    color: _getIconColor(notification.type),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
+              Icon(
+                notification.icon,
+                size: 18,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 10),
+              Flexible(
                 child: Text(
                   notification.message,
                   style: GoogleFonts.poppins(
-                    color: _getTextColor(notification.type),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    height: 1.2,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    height: 1.3,
                     decoration: TextDecoration.none,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (notification.dismissible)
-                GestureDetector(
-                  onTap: () {
-                    NotificationService.instance.dismiss(notification.id);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.close,
-                      size: 18,
-                      color: _getTextColor(notification.type).withOpacity(0.8),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -280,55 +263,16 @@ class NotificationBanner extends StatelessWidget {
     );
   }
 
-  Color _getBorderColor(NotificationType type) {
+  Color _bgColor(NotificationType type) {
     switch (type) {
       case NotificationType.success:
-        return Colors.green.shade300;
+        return const Color(0xFF388E3C); // green 700
       case NotificationType.error:
-        return Colors.red.shade300;
+        return const Color(0xFFD32F2F); // red 700
       case NotificationType.warning:
-        return Colors.orange.shade300;
+        return const Color(0xFFF57C00); // orange 700
       case NotificationType.info:
-        return Colors.blue.shade600;
-    }
-  }
-
-  Color _getIconBackgroundColor(NotificationType type) {
-    switch (type) {
-      case NotificationType.success:
-        return Colors.green.shade50;
-      case NotificationType.error:
-        return Colors.red.shade50;
-      case NotificationType.warning:
-        return Colors.orange.shade50;
-      case NotificationType.info:
-        return Colors.blue.shade50;
-    }
-  }
-
-  Color _getIconColor(NotificationType type) {
-    switch (type) {
-      case NotificationType.success:
-        return Colors.green.shade600;
-      case NotificationType.error:
-        return Colors.red.shade600;
-      case NotificationType.warning:
-        return Colors.orange.shade600;
-      case NotificationType.info:
-        return Colors.blue.shade600;
-    }
-  }
-
-  Color _getTextColor(NotificationType type) {
-    switch (type) {
-      case NotificationType.success:
-        return Colors.green.shade800;
-      case NotificationType.error:
-        return Colors.red.shade800;
-      case NotificationType.warning:
-        return Colors.orange.shade800;
-      case NotificationType.info:
-        return Colors.blue.shade800;
+        return const Color(0xFF1976D2); // blue 700
     }
   }
 }

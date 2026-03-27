@@ -34,22 +34,31 @@ class RefundService {
       print('Total refund amount: ${refundResult.totalRefundAmount}');
       print('Items to restock: ${refundResult.itemsToRestock.length}');
 
-      // Update refunded quantities for each item
+      // Update refunded quantities for each item.
+      // Items may be grouped in the refund dialog (same product across KOTs),
+      // so distribute refund quantity across all matching original items.
       final List<CartItem> updatedItems = List<CartItem>.from(order.items ?? []);
 
       refundResult.itemsToRefund.forEach((itemToRefund, quantityToRefund) {
-        final index = updatedItems.indexWhere((item) =>
-            item.id == itemToRefund.id &&
-            item.productId == itemToRefund.productId &&
-            item.variantName == itemToRefund.variantName);
+        final groupKey = _itemGroupKey(itemToRefund);
+        int remaining = quantityToRefund;
 
-        if (index != -1) {
-          final currentItem = updatedItems[index];
-          final newRefundedQuantity = (currentItem.refundedQuantity ?? 0) + quantityToRefund;
-          updatedItems[index] = currentItem.copyWith(refundedQuantity: newRefundedQuantity);
-          print('✅ Updated refund quantity for ${currentItem.title}: $newRefundedQuantity');
-        } else {
-          print('⚠️ Could not find item to update: ${itemToRefund.title}');
+        for (int i = 0; i < updatedItems.length && remaining > 0; i++) {
+          final item = updatedItems[i];
+          if (_itemGroupKey(item) == groupKey) {
+            final available = (item.quantity ?? 0) - (item.refundedQuantity ?? 0);
+            if (available > 0) {
+              final toRefund = available < remaining ? available : remaining;
+              updatedItems[i] = item.copyWith(
+                refundedQuantity: (item.refundedQuantity ?? 0) + toRefund,
+              );
+              remaining -= toRefund;
+              print('✅ Updated refund for ${item.title} (id:${item.id}): +$toRefund');
+            }
+          }
+        }
+        if (remaining > 0) {
+          print('⚠️ Could not fully distribute refund for ${itemToRefund.title}: $remaining left');
         }
       });
 
@@ -130,13 +139,42 @@ class RefundService {
     return null; // Eligible for refund
   }
 
-  /// Get list of items that can be refunded from an order
+  /// Get list of items that can be refunded from an order.
+  /// Groups identical items (same product, variant, extras, choices) that were
+  /// split across different KOTs into a single entry with combined quantities.
   static List<CartItem> getRefundableItems(PastOrderModel order) {
-    return order.items?.where((item) {
-      final originalQty = item.quantity ?? 0;
-      final alreadyRefunded = item.refundedQuantity ?? 0;
-      return originalQty > alreadyRefunded;
-    }).toList() ?? [];
+    final items = order.items ?? [];
+    if (items.isEmpty) return [];
+
+    // Group identical items by product+variant+extras+choices
+    final Map<String, CartItem> grouped = {};
+    for (final item in items) {
+      final key = _itemGroupKey(item);
+      if (grouped.containsKey(key)) {
+        final existing = grouped[key]!;
+        grouped[key] = existing.copyWith(
+          quantity: existing.quantity + (item.quantity ?? 0),
+          refundedQuantity: (existing.refundedQuantity ?? 0) + (item.refundedQuantity ?? 0),
+        );
+      } else {
+        grouped[key] = item.copyWith(
+          quantity: item.quantity ?? 0,
+          refundedQuantity: item.refundedQuantity ?? 0,
+        );
+      }
+    }
+
+    // Filter to only items with remaining refundable quantity
+    return grouped.values.where((item) {
+      return item.quantity > (item.refundedQuantity ?? 0);
+    }).toList();
+  }
+
+  /// Unique key for grouping identical items (same as print helper logic)
+  static String _itemGroupKey(CartItem item) {
+    final extrasKey = item.extras?.map((e) => '${e['name']}_${e['price']}_${e['quantity']}').join('|') ?? '';
+    final choicesKey = item.choiceNames?.join('|') ?? '';
+    return '${item.productId}_${item.variantName ?? ''}_${extrasKey}_${choicesKey}';
   }
 
   /// Calculate remaining refundable amount

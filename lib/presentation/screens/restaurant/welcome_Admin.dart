@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
@@ -20,6 +21,7 @@ class AdminWelcome extends StatefulWidget {
 }
 
 class _AdminWelcomeState extends State<AdminWelcome> {
+  DateTime? _lastBackPress;
   String _storeName = '';
 
   @override
@@ -43,6 +45,22 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   }
 
   Future<void> _checkDayStarted() async {
+    // Check if there's a pending EOD from yesterday (midnight crossed without completing EOD)
+    final pendingEOD = await DayManagementService.hasPendingEOD();
+    if (pendingEOD && mounted) {
+      NotificationService.instance.showError(
+        'Previous day was not closed! Redirecting to End of Day...',
+      );
+      // Auto-navigate to End Day screen so user can complete it
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        await Navigator.pushNamed(context, RouteNames.restaurantEndDay);
+        // After returning from End Day, re-check day status
+        if (mounted) _checkDayStarted();
+      }
+      return;
+    }
+
     final isDayStarted = await DayManagementService.isDayStarted();
     if (!isDayStarted && mounted) {
       final balance = await showDialog<double>(
@@ -114,7 +132,38 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     final isTablet = size.width > 600;
     final isDesktop = size.width > 1200;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPress != null &&
+            now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPress = now;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 10),
+                Text('Press back again to exit',textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.primary,
+            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      },
+      child: Scaffold(
       backgroundColor: AppColors.surfaceLight,
       drawer: DrawerManage(islogout: true, isDelete: false, issync: false),
       body: Column(
@@ -270,6 +319,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ),
         ],
       ),
+      ), // PopScope closing
     );
   }
 

@@ -178,6 +178,25 @@ class _ActiveorderState extends State<Activeorder> {
 
   // In _ActiveorderState class
 
+// Status flow order for stepper
+  static const _statusFlow = ['Processing', 'Cooking', 'Ready', 'Served'];
+
+  static const _statusColors = {
+    'Processing': Colors.grey,
+    'Cooking': Colors.orange,
+    'Ready': Colors.blue,
+    'Served': Colors.green,
+  };
+
+  static const _statusIcons = {
+    'Processing': Icons.hourglass_empty_rounded,
+    'Cooking': Icons.local_fire_department_rounded,
+    'Ready': Icons.room_service_rounded,
+    'Served': Icons.check_circle_rounded,
+  };
+
+  int _statusIndex(String status) => _statusFlow.indexOf(status).clamp(0, 3);
+
 // This function shows the main dialog with KOT-level status updates
   void _showStatusUpdateDialog(OrderModel order, bool istakeaway) {
     // Local mutable copy of KOT statuses — updated optimistically inside the dialog
@@ -211,7 +230,6 @@ class _ActiveorderState extends State<Activeorder> {
               for (final k in order.kotNumbers) {
                 setDialogState(() => kotStatuses[k] = newStatus);
               }
-              // Run all updates in parallel
               await Future.wait(
                 order.kotNumbers.map((k) => _updateKotStatus(order, k, newStatus)),
               );
@@ -225,168 +243,387 @@ class _ActiveorderState extends State<Activeorder> {
               }
             }
 
-            // ── UI ─────────────────────────────────────────────────────
-            return AlertDialog(
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Update Order Status',
-                      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => Navigator.pop(dialogContext),
-                    child: Icon(Icons.cancel, color: Colors.grey),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: SizedBox(
-                  width: 400,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Order Info
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              (order.tableNo != null && order.tableNo!.isNotEmpty)
-                                  ? 'Table ${order.tableNo}'
-                                  : order.orderType,
-                              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Overall Status: ${order.status}',
-                              style: GoogleFonts.poppins(color: Colors.grey.shade700),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 12),
+            // ── derived state ──────────────────────────────────────────
+            final allServed = order.kotNumbers.every((k) => kotStatuses[k] == 'Served');
+            final overallStatus = _calculateOverallStatus(kotStatuses, order.kotNumbers);
+            final hasMultipleKots = order.kotNumbers.length > 1;
 
-                      // ── Bulk action row ──────────────────────────────
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade100),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Mark All KOTs as:',
-                              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blue.shade800),
+            // ── UI ─────────────────────────────────────────────────────
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ── Header ────────────────────────────────────────
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.05),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            SizedBox(height: 6),
-                            Row(
+                            child: Icon(
+                              Icons.receipt_long_rounded,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(child: _buildStatusButton('Cooking', Colors.orange, () => updateAll('Cooking'))),
-                                SizedBox(width: 6),
-                                Expanded(child: _buildStatusButton('Ready', Colors.blue, () => updateAll('Ready'))),
-                                SizedBox(width: 6),
-                                Expanded(child: _buildStatusButton('Served', Colors.green, () => updateAll('Served'))),
+                                Text(
+                                  (order.tableNo != null && order.tableNo!.isNotEmpty)
+                                      ? 'Table ${order.tableNo}'
+                                      : order.orderType,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: _statusColors[overallStatus] ?? Colors.grey,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      overallStatus,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: _statusColors[overallStatus] ?? Colors.grey,
+                                      ),
+                                    ),
+                                    Text(
+                                      '  •  ${order.kotNumbers.length} KOT${order.kotNumbers.length > 1 ? 's' : ''}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            icon: Icon(Icons.close_rounded, color: Colors.grey.shade500, size: 22),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ── Content ───────────────────────────────────────
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // ── All Served banner ──────────────────────
+                            if (allServed)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: Colors.green.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade100,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(Icons.check_rounded, color: Colors.green.shade700, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'All KOTs Served',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.green.shade800,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Order is ready for settlement',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 12,
+                                              color: Colors.green.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            // ── Bulk actions (multi-KOT, not all served) ──
+                            if (hasMultipleKots && !allServed) ...[
+                              Text(
+                                'Quick Actions',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  _buildBulkChip('All Cooking', Colors.orange, Icons.local_fire_department_rounded, () => updateAll('Cooking')),
+                                  const SizedBox(width: 8),
+                                  _buildBulkChip('All Ready', Colors.blue, Icons.room_service_rounded, () => updateAll('Ready')),
+                                  const SizedBox(width: 8),
+                                  _buildBulkChip('All Served', Colors.green, Icons.check_circle_rounded, () => updateAll('Served')),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+
+                            // ── KOT cards ─────────────────────────────
+                            ...order.kotNumbers.map((kotNum) {
+                              final currentStatus = kotStatuses[kotNum] ?? order.status;
+                              final currentIdx = _statusIndex(currentStatus);
+                              final kotIndex = order.kotNumbers.indexOf(kotNum);
+                              final startIndex = kotIndex == 0 ? 0 : order.kotBoundaries[kotIndex - 1];
+                              final endIndex = order.kotBoundaries[kotIndex];
+                              final itemCount = endIndex - startIndex;
+                              final isServed = currentStatus == 'Served';
+                              final statusColor = _statusColors[currentStatus] ?? Colors.grey;
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isServed ? Colors.green.shade200 : Colors.grey.shade200,
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.03),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    // KOT header
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              _statusIcons[currentStatus] ?? Icons.receipt,
+                                              color: statusColor,
+                                              size: 18,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'KOT #$kotNum',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '$itemCount item${itemCount > 1 ? 's' : ''}',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 12,
+                                                    color: Colors.grey.shade500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          // Status badge
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (isServed) ...[
+                                                  Icon(Icons.check_rounded, size: 13, color: statusColor),
+                                                  const SizedBox(width: 4),
+                                                ],
+                                                Text(
+                                                  currentStatus,
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: statusColor,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Progress dots + next action (only if not served)
+                                    if (!isServed)
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                                        child: Row(
+                                          children: [
+                                            // Compact dot progress indicator
+                                            ...List.generate(_statusFlow.length, (i) {
+                                              final dotColor = _statusColors[_statusFlow[i]]!;
+                                              final isPast = i < currentIdx;
+                                              final isCurrent = i == currentIdx;
+                                              final isLast = i == _statusFlow.length - 1;
+
+                                              return Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Container(
+                                                    width: isCurrent ? 22 : 14,
+                                                    height: 14,
+                                                    decoration: BoxDecoration(
+                                                      color: (isPast || isCurrent)
+                                                          ? dotColor
+                                                          : Colors.grey.shade200,
+                                                      borderRadius: BorderRadius.circular(7),
+                                                    ),
+                                                    child: (isPast || isCurrent)
+                                                        ? Icon(
+                                                            isPast ? Icons.check_rounded : _statusIcons[_statusFlow[i]]!,
+                                                            size: 10,
+                                                            color: Colors.white,
+                                                          )
+                                                        : null,
+                                                  ),
+                                                  if (!isLast)
+                                                    Container(
+                                                      width: 8,
+                                                      height: 2,
+                                                      color: isPast
+                                                          ? dotColor.withValues(alpha: 0.5)
+                                                          : Colors.grey.shade200,
+                                                    ),
+                                                ],
+                                              );
+                                            }),
+
+                                            const Spacer(),
+
+                                            // Next step button
+                                            if (currentIdx < _statusFlow.length - 1)
+                                              () {
+                                                final nextStatus = _statusFlow[currentIdx + 1];
+                                                final nextColor = _statusColors[nextStatus]!;
+                                                return SizedBox(
+                                                  height: 32,
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () => updateOne(kotNum, nextStatus),
+                                                    icon: Icon(_statusIcons[nextStatus]!, size: 14),
+                                                    label: Text(
+                                                      nextStatus,
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: nextColor,
+                                                      foregroundColor: Colors.white,
+                                                      elevation: 0,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              }(),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
                           ],
                         ),
                       ),
-                      SizedBox(height: 16),
+                    ),
 
-                      // KOT Status Updates
-                      Text(
-                        'Update Individual KOT:',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14),
+                    // ── Close button ──────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          child: Text(
+                            'Close',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
                       ),
-                      SizedBox(height: 12),
-
-                      // List all KOTs with status buttons
-                      ...order.kotNumbers.map((kotNum) {
-                        final currentStatus = kotStatuses[kotNum] ?? order.status;
-                        final kotIndex = order.kotNumbers.indexOf(kotNum);
-                        final startIndex = kotIndex == 0 ? 0 : order.kotBoundaries[kotIndex - 1];
-                        final endIndex = order.kotBoundaries[kotIndex];
-                        final itemCount = endIndex - startIndex;
-
-                        return Container(
-                          margin: EdgeInsets.only(bottom: 12),
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: _getColorForStatus(currentStatus)),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'KOT #$kotNum',
-                                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    '$itemCount item${itemCount > 1 ? 's' : ''}',
-                                    style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Status: $currentStatus',
-                                style: GoogleFonts.poppins(
-                                  color: _getColorForStatus(currentStatus),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: currentStatus == 'Cooking'
-                                        ? _buildStatusButtonDisabled('Cooking', Colors.orange)
-                                        : _buildStatusButton('Cooking', Colors.orange, () => updateOne(kotNum, 'Cooking')),
-                                  ),
-                                  SizedBox(width: 6),
-                                  Expanded(
-                                    child: currentStatus == 'Ready'
-                                        ? _buildStatusButtonDisabled('Ready', Colors.blue)
-                                        : _buildStatusButton('Ready', Colors.blue, () => updateOne(kotNum, 'Ready')),
-                                  ),
-                                  SizedBox(width: 6),
-                                  Expanded(
-                                    child: currentStatus == 'Served'
-                                        ? _buildStatusButtonDisabled('Served', Colors.green)
-                                        : _buildStatusButton('Served', Colors.green, () => updateOne(kotNum, 'Served')),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text('Close', style: GoogleFonts.poppins(color: Colors.grey.shade700)),
-                ),
-              ],
             );
           },
         );
@@ -394,38 +631,35 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 
-  // Helper to build status button
-  Widget _buildStatusButton(String status, Color color, VoidCallback onTap) {
-    return SizedBox(
-      height: 34,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        child: Text(
-          status,
-          style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusButtonDisabled(String status, Color color) {
-    return SizedBox(
-      height: 34,
-      child: ElevatedButton(
-        onPressed: null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color.withValues(alpha: 0.25),
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        child: Text(
-          status,
-          style: GoogleFonts.poppins(color: color.withValues(alpha: 0.6), fontSize: 12),
+  // Quick action chip for bulk updates
+  Widget _buildBulkChip(String label, Color color, IconData icon, VoidCallback onTap) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

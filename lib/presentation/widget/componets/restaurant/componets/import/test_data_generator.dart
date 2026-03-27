@@ -285,7 +285,6 @@ class TestDataGenerator {
       final category = Category(
         id: _generateId(),
         name: categoryName,
-        imagePath: null,
         createdTime: DateTime.now(),
         editCount: 0,
       );

@@ -204,7 +204,6 @@ class ComprehensiveDataGenerator {
         cartItems.add(CartItem(
           id: _generateId(),
           title: item.name,
-          imagePath: '', // Items now use imageBytes instead of imagePath
           price: price,
           quantity: qty,
           categoryName: 'Food',
@@ -292,7 +291,6 @@ class ComprehensiveDataGenerator {
         cartItems.add(CartItem(
           id: _generateId(),
           title: item.name,
-          imagePath: '', // Items now use imageBytes instead of imagePath
           price: price,
           quantity: qty,
           categoryName: 'Food',
@@ -549,7 +547,6 @@ class ComprehensiveDataGenerator {
       await box.add(Category(
         id: _generateId(),
         name: name,
-        imagePath: null,
         createdTime: DateTime.now(),
         editCount: 0,
       ));

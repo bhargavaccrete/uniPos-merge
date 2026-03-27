@@ -1,11 +1,10 @@
-import 'dart:io';
+import 'dart:async';
 import 'dart:typed_data';
-import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
-import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/models/restaurant/db/saved_printer_model.dart';
 import '../../../data/repositories/restaurant/printer_repository.dart';
+import '../../services/restaurant/thermal_printer_service.dart';
 
 part 'printer_store.g.dart';
 
@@ -14,9 +13,10 @@ class PrinterStore = _PrinterStore with _$PrinterStore;
 
 abstract class _PrinterStore with Store {
   final PrinterRepository _repository;
+  final ThermalPrinterService _thermalService;
 
-  /// Repository is injected via constructor — same pattern as ShiftStore, OrderStore, etc.
-  _PrinterStore(this._repository);
+  /// Repository + service are injected via constructor.
+  _PrinterStore(this._repository, this._thermalService);
 
   // ══════════════════════════════════════════════════════════════════════════
   // SAVED PRINTERS — persisted in Hive, survive app restarts
@@ -28,24 +28,23 @@ abstract class _PrinterStore with Store {
       ObservableList<SavedPrinterModel>();
 
   /// The printer assigned for KOT printing (kitchen ticket)
-  /// Loaded from Hive where isDefault=true AND role='kot' or 'both'
   @observable
   SavedPrinterModel? defaultKotPrinter;
 
   /// The printer assigned for receipt/bill printing
-  /// Loaded from Hive where isDefault=true AND role='receipt' or 'both'
   @observable
   SavedPrinterModel? defaultReceiptPrinter;
 
   // ══════════════════════════════════════════════════════════════════════════
-  // BLUETOOTH DISCOVERY — transient state, not persisted
+  // BLUETOOTH/USB DISCOVERY — transient state, not persisted
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Devices found during Bluetooth scan (live, cleared on each new scan)
+  /// Devices found during scan (live, cleared on each new scan)
   @observable
-  ObservableList<Printer> discoveredDevices = ObservableList<Printer>();
+  ObservableList<DiscoveredPrinter> discoveredDevices =
+      ObservableList<DiscoveredPrinter>();
 
-  /// True while BLE scan is active — drives the scanning indicator in UI
+  /// True while BLE/USB scan is active
   @observable
   bool isScanning = false;
 
@@ -62,22 +61,22 @@ abstract class _PrinterStore with Store {
   @observable
   String? errorMessage;
 
-  /// True while bytes are being sent to a printer — shows loading indicator
+  /// True while bytes are being sent to a printer
   @observable
   bool isPrinting = false;
 
+  StreamSubscription<List<DiscoveredPrinter>>? _scanSubscription;
+
   // ══════════════════════════════════════════════════════════════════════════
-  // COMPUTED — derived from observables, auto-update when source changes
+  // COMPUTED
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Used by RestaurantPrintHelper to decide: direct thermal or PDF fallback?
   @computed
   bool get hasDefaultKotPrinter => defaultKotPrinter != null;
 
   @computed
   bool get hasDefaultReceiptPrinter => defaultReceiptPrinter != null;
 
-  /// Filtered lists for the printer settings UI tabs
   @computed
   List<SavedPrinterModel> get bluetoothPrinters =>
       savedPrinters.where((p) => p.isBluetooth).toList();
@@ -86,28 +85,24 @@ abstract class _PrinterStore with Store {
   List<SavedPrinterModel> get wifiPrinters =>
       savedPrinters.where((p) => p.isWifi).toList();
 
+  /// Whether thermal printing is supported on this platform
+  bool get isPrintingSupported => _thermalService.isSupported;
+
   // ══════════════════════════════════════════════════════════════════════════
   // ACTIONS — Persistence (Hive CRUD)
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Load all saved printers + resolve defaults from SharedPreferences.
-  /// Called on app startup and after any save/delete operation.
-  ///
-  /// Default assignments are stored in SharedPreferences (not on the model)
-  /// so KOT default and Receipt default are truly independent.
   @action
   Future<void> loadSavedPrinters() async {
     try {
       final printers = await _repository.getAllPrinters();
       savedPrinters = ObservableList.of(printers);
 
-      // Resolve KOT and Receipt defaults independently from SharedPreferences.
-      // A printer with role='both' CAN be default for both simultaneously.
       defaultKotPrinter = await _repository.getDefaultPrinterForRole('kot');
       defaultReceiptPrinter =
           await _repository.getDefaultPrinterForRole('receipt');
 
-      print('🖨️ PrinterStore loaded: ${printers.length} printers, '
+      print('PrinterStore loaded: ${printers.length} printers, '
           'KOT default=${defaultKotPrinter?.name ?? "none"}, '
           'Receipt default=${defaultReceiptPrinter?.name ?? "none"}');
     } catch (e) {
@@ -115,7 +110,6 @@ abstract class _PrinterStore with Store {
     }
   }
 
-  /// Save a printer to Hive then reload the list
   @action
   Future<void> savePrinter(SavedPrinterModel printer) async {
     try {
@@ -136,8 +130,6 @@ abstract class _PrinterStore with Store {
     }
   }
 
-  /// Mark a printer as default for its role, un-default others.
-  /// e.g., setDefaultForRole('abc-123', 'kot') makes it the KOT printer.
   @action
   Future<void> setDefaultForRole(String printerId, String role) async {
     try {
@@ -152,9 +144,6 @@ abstract class _PrinterStore with Store {
   // ACTIONS — WiFi Printer Management
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Add a WiFi/LAN printer by IP and port.
-  /// WiFi printers don't need discovery — staff enters IP manually.
-  /// Port 9100 is the standard raw printing port for thermal printers.
   @action
   Future<void> addWifiPrinter({
     required String name,
@@ -170,30 +159,20 @@ abstract class _PrinterStore with Store {
       address: '$ip:$port',
       paperSize: paperSize,
       role: role,
-      isDefault: savedPrinters.isEmpty, // First printer auto-becomes default
+      isDefault: savedPrinters.isEmpty,
     );
     await savePrinter(printer);
   }
 
-  /// Test if a WiFi printer is reachable (TCP connect test, no data sent)
   @action
   Future<bool> testWifiConnection(String ip, int port) async {
-    try {
-      final socket = await Socket.connect(ip, port,
-          timeout: const Duration(seconds: 3));
-      await socket.close();
-      return true;
-    } catch (_) {
-      return false;
-    }
+    return _thermalService.testWifiConnection(ip, port);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ACTIONS — Bluetooth Discovery & Save
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Start scanning for nearby Bluetooth (BLE) printers.
-  /// Results stream into discoveredDevices via listener.
   @action
   Future<void> startBluetoothScan() async {
     if (isScanning) return;
@@ -202,15 +181,11 @@ abstract class _PrinterStore with Store {
     discoveredDevices.clear();
 
     try {
-      // Step 1: Start the scan — this is async, populates an internal list
-      await FlutterThermalPrinter.instance.getPrinters(
-        connectionTypes: [ConnectionType.BLE],
-      );
+      await _thermalService.startBleScan();
 
-      // Step 2: Listen to devicesStream — emits updated device lists
-      // as new BLE devices are discovered nearby
-      FlutterThermalPrinter.instance.devicesStream.listen(
-        (List<Printer> printers) {
+      _scanSubscription?.cancel();
+      _scanSubscription = _thermalService.devicesStream.listen(
+        (List<DiscoveredPrinter> printers) {
           discoveredDevices = ObservableList.of(printers);
         },
         onError: (e) {
@@ -226,12 +201,12 @@ abstract class _PrinterStore with Store {
 
   @action
   void stopScan() {
-    FlutterThermalPrinter.instance.stopScan();
+    _thermalService.stopScan();
+    _scanSubscription?.cancel();
+    _scanSubscription = null;
     isScanning = false;
   }
 
-  /// Start scanning for USB printers.
-  /// USB discovery uses the platform's USB API — no permissions needed.
   @action
   Future<void> startUsbScan() async {
     if (isScanning) return;
@@ -240,12 +215,11 @@ abstract class _PrinterStore with Store {
     discoveredDevices.clear();
 
     try {
-      await FlutterThermalPrinter.instance.getPrinters(
-        connectionTypes: [ConnectionType.USB],
-      );
+      await _thermalService.startUsbScan();
 
-      FlutterThermalPrinter.instance.devicesStream.listen(
-        (List<Printer> printers) {
+      _scanSubscription?.cancel();
+      _scanSubscription = _thermalService.devicesStream.listen(
+        (List<DiscoveredPrinter> printers) {
           discoveredDevices = ObservableList.of(printers);
         },
         onError: (e) {
@@ -259,10 +233,9 @@ abstract class _PrinterStore with Store {
     }
   }
 
-  /// Save a discovered USB device with a custom name and settings
   @action
   Future<void> saveUsbPrinter({
-    required Printer device,
+    required DiscoveredPrinter device,
     required String name,
     int paperSize = 80,
     String role = 'both',
@@ -278,10 +251,9 @@ abstract class _PrinterStore with Store {
     await savePrinter(printer);
   }
 
-  /// Save a discovered Bluetooth device with a custom name and settings
   @action
   Future<void> saveBluetoothPrinter({
-    required Printer device,
+    required DiscoveredPrinter device,
     required String name,
     int paperSize = 80,
     String role = 'both',
@@ -302,9 +274,6 @@ abstract class _PrinterStore with Store {
   // ACTIONS — Sending Bytes to Printer
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Main entry point for printing. Takes raw ESC/POS bytes + target printer.
-  /// Returns true if print succeeded, false otherwise.
-  /// Called by RestaurantPrintHelper and EscPosReceiptBuilder.
   @action
   Future<bool> sendBytes(List<int> bytes, SavedPrinterModel printer) async {
     isPrinting = true;
@@ -328,45 +297,26 @@ abstract class _PrinterStore with Store {
     }
   }
 
-  /// WiFi: Open TCP socket → dump bytes → close.
-  /// Stateless — no persistent connection needed.
-  /// Port 9100 is the industry standard for raw thermal printing.
   Future<bool> _sendViaWifi(List<int> bytes, String address) async {
-    // Parse "192.168.1.100:9100" → ip + port
     final parts = address.split(':');
     final ip = parts[0];
     final port = parts.length > 1 ? int.tryParse(parts[1]) ?? 9100 : 9100;
 
-    Socket? socket;
     try {
-      socket = await Socket.connect(ip, port,
-          timeout: const Duration(seconds: 5));
-      socket.add(Uint8List.fromList(bytes));
-      await socket.flush();
-      return true;
+      return await _thermalService.sendViaWifi(bytes, ip, port);
     } catch (e) {
       errorMessage = 'WiFi print failed ($ip:$port): $e';
       return false;
-    } finally {
-      await socket?.close();
     }
   }
 
-  /// Bluetooth: Connect via flutter_thermal_printer → send bytes.
-  /// Keeps connection alive for 30s to handle rapid consecutive prints
-  /// (e.g., KOT + immediate bill print).
   Future<bool> _sendViaBluetooth(List<int> bytes, String address) async {
     try {
-      final printer = Printer(address: address);
-      await FlutterThermalPrinter.instance.connect(printer);
-      await FlutterThermalPrinter.instance.printData(
-        printer,
-        bytes,
-        longData: true, // Handles large receipts by chunking
-      );
+      final device = DiscoveredPrinter(address: address, connectionType: 'BLE');
+      await _thermalService.printData(device, bytes);
       // Delayed disconnect — keeps BLE link alive for follow-up prints
       Future.delayed(const Duration(seconds: 30), () {
-        FlutterThermalPrinter.instance.disconnect(printer);
+        _thermalService.disconnect(device);
       });
       return true;
     } catch (e) {
@@ -375,22 +325,15 @@ abstract class _PrinterStore with Store {
     }
   }
 
-  /// USB: Connect via flutter_thermal_printer platform channel → send bytes.
-  /// Uses the same connect/printData API as Bluetooth, but with USB transport.
-  Future<bool> _sendViaUsb(List<int> bytes, String address, String name) async {
+  Future<bool> _sendViaUsb(
+      List<int> bytes, String address, String name) async {
     try {
-      final printer = Printer(
+      final device = DiscoveredPrinter(
         address: address,
         name: name,
-        connectionType: ConnectionType.USB,
+        connectionType: 'USB',
       );
-      await FlutterThermalPrinter.instance.connect(printer);
-      await FlutterThermalPrinter.instance.printData(
-        printer,
-        bytes,
-        longData: true,
-      );
-      return true;
+      return await _thermalService.printData(device, bytes);
     } catch (e) {
       errorMessage = 'USB print failed: $e';
       return false;
@@ -401,17 +344,14 @@ abstract class _PrinterStore with Store {
   // ACTIONS — Test Print
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Sends a simple test ticket to verify the printer is working.
-  /// Uses raw ESC/POS commands (no ReceiptBuilder needed).
   @action
   Future<bool> testPrint(SavedPrinterModel printer) async {
-    // Raw ESC/POS byte commands for a simple test ticket
     final List<int> bytes = [
-      0x1B, 0x40, // ESC @ — Initialize/reset printer
-      0x1B, 0x61, 0x01, // ESC a 1 — Center alignment
-      0x1B, 0x21, 0x30, // ESC ! 0x30 — Double height + double width
+      0x1B, 0x40,
+      0x1B, 0x61, 0x01,
+      0x1B, 0x21, 0x30,
       ...'UniPOS\n'.codeUnits,
-      0x1B, 0x21, 0x00, // ESC ! 0x00 — Normal text size
+      0x1B, 0x21, 0x00,
       ...'Test Print\n'.codeUnits,
       ...'-'.padRight(32, '-').codeUnits,
       ...'\n'.codeUnits,
@@ -422,7 +362,7 @@ abstract class _PrinterStore with Store {
       ...'Status: Connected OK\n'.codeUnits,
       ...'-'.padRight(32, '-').codeUnits,
       ...'\n\n\n'.codeUnits,
-      0x1D, 0x56, 0x01, // GS V 1 — Partial paper cut
+      0x1D, 0x56, 0x01,
     ];
 
     return await sendBytes(bytes, printer);

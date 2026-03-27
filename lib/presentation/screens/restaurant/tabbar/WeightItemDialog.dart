@@ -297,7 +297,6 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
                       productId: widget.item.id,
                       id: widget.item.id,
                       title: widget.item.name,
-                      imagePath: '',
                       price: _displayAmount,
                       quantity: 1,
                       taxRate: widget.item.taxRate,

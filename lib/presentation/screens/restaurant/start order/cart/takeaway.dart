@@ -14,7 +14,7 @@ import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
-import '../../../../../util/restaurant/order_settings.dart';
+
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
@@ -1455,21 +1455,6 @@ class _TakeawayState extends State<Takeaway> {
               width: width * 0.40,
               height: height * 0.05,
               onTap: () {
-                // Check if dialog should be shown based on order type and settings
-                bool shouldShowDialog = false;
-
-                if (widget.isDineIn && OrderSettings.showDineInDialog) {
-                  shouldShowDialog = true;
-                } else if (!widget.isDineIn && !widget.isdelivery && OrderSettings.showTakeAwayDialog) {
-                  shouldShowDialog = true;
-                }
-
-                // If dialog is disabled, directly place order
-                if (!shouldShowDialog) {
-                  _placeOrder(calculations);
-                  return;
-                }
-
                 // Clear suggestions before showing dialog
                 nameSuggestions = [];
                 phoneSuggestions = [];

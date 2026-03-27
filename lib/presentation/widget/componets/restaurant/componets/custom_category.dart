@@ -1,11 +1,10 @@
-import 'dart:io';
+
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 
 class CustomCategory extends StatefulWidget {
-  final String? imagePath;
   final String title;
   final String itemCount;
   final bool isActive;
@@ -25,7 +24,6 @@ class CustomCategory extends StatefulWidget {
     required this.onEdit,
     required this.onDelet,
     required this.onToggle,
-    this.imagePath,
     this.createdTime,
     this.lastEditedTime,
     this.editedBy,
@@ -57,9 +55,7 @@ class _CustomCategoryState extends State<CustomCategory> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child:   widget.imagePath != null
-                      ? Image.file(File(widget.imagePath!), fit: BoxFit.cover)
-                     : Icon(Icons.image, size: 70, color: Colors.grey),
+                  child: Icon(Icons.category_rounded, size: 40, color: Colors.grey),
                   // Icon(Icons.image,size: 50,color: Colors.grey,)
               ),
                 SizedBox(width: 5,),

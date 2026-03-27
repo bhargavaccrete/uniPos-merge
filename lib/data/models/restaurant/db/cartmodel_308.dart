@@ -11,9 +11,6 @@ class CartItem extends HiveObject {
   @HiveField(1)
   final String title;
 
-  @HiveField(2)
-  final String imagePath;
-
   @HiveField(3)
   final double price;
 
@@ -61,7 +58,6 @@ class CartItem extends HiveObject {
   CartItem({
     required this.id,
     required this.title,
-    required this.imagePath,
     required this.price,
     required this.productId,
     this.isStockManaged,
@@ -120,7 +116,6 @@ class CartItem extends HiveObject {
     String? id,
     String? title,
     String? productId,
-    String? imagePath,
     double? price,
 
     bool? isStockManaged,
@@ -141,7 +136,6 @@ class CartItem extends HiveObject {
       id: id ?? this.id,
       productId: productId ?? this.productId,
       title: title ?? this.title,
-      imagePath: imagePath ?? this.imagePath,
       price: price ?? this.price,
 
       isStockManaged: isStockManaged ?? this.isStockManaged,
@@ -165,7 +159,6 @@ class CartItem extends HiveObject {
     return {
       'id': id,
       'title': title,
-      'imagePath': imagePath,
       'price': price,
       'quantity': quantity,
       'variantName': variantName,
@@ -188,7 +181,6 @@ class CartItem extends HiveObject {
     return CartItem(
       id: map['id'] ?? '',
       title: map['title'] ?? '',
-      imagePath: map['imagePath'] ?? '',
       price: (map['price'] ?? 0).toDouble(),
       quantity: map['quantity'] ?? 1,
       variantName: map['variantName'],

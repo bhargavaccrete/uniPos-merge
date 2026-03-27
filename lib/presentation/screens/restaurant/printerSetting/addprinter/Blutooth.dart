@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
-import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/restaurant/thermal_printer_service.dart';
 import 'package:unipos/util/color.dart';
 
 /// Bluetooth Printer discovery and setup screen.
@@ -184,7 +183,7 @@ class _BluthoothhState extends State<Bluthooth> {
             // Cast each device explicitly — ObservableList iteration
             // can lose type info in some MobX versions
             ...devices.map((d) {
-              final Printer device = d as Printer;
+              final DiscoveredPrinter device = d as DiscoveredPrinter;
               return Card(
                 elevation: 1,
                 margin: const EdgeInsets.only(bottom: 8),
@@ -349,7 +348,7 @@ class _BluthoothhState extends State<Bluthooth> {
 
   /// Show save dialog — staff enters a name, picks paper size and role.
   /// Called when staff taps "Save" on a discovered device.
-  Future<void> _showSaveDialog(Printer device) async {
+  Future<void> _showSaveDialog(DiscoveredPrinter device) async {
     final nameController =
         TextEditingController(text: device.name ?? 'BT Printer');
     int paperSize = 80;

@@ -571,6 +571,31 @@ class _OrderdetailsState extends State<Orderdetails> {
                       _money((currentOrder.totalPrice ?? 0) - (currentOrder.refundAmount ?? 0)),
                       isStrong: true,
                     ),
+
+                    // Payment method / Split payment breakdown
+                    const Divider(height: 20),
+                    if (currentOrder.isSplitPayment == true) ...[
+                      // Split payment — show each method
+                      ...currentOrder.paymentList.map((p) {
+                        final method = (p['method'] as String? ?? 'Unknown').toUpperCase();
+                        final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: _totalRow(
+                            method,
+                            _money(amount),
+                            color: Colors.blue.shade700,
+                          ),
+                        );
+                      }),
+                    ] else ...[
+                      // Single payment
+                      _totalRow(
+                        'Paid by',
+                        (currentOrder.paymentmode ?? 'Cash').toUpperCase(),
+                        color: Colors.blue.shade700,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -601,9 +626,11 @@ class _OrderdetailsState extends State<Orderdetails> {
         discount: currentOrder.Discount,
         serviceCharge: 0, // pastOrderModel doesn't store service charge separately
         paymentMethod: currentOrder.paymentmode,
-        paymentStatus: 'PAID', // Mark as paid since it's in past orders
-        isPaid: true, // Mark as paid since it's in past orders
-        completedAt: currentOrder.orderAt, // Use order time as completion time
+        paymentStatus: 'PAID',
+        isPaid: true,
+        isSplitPayment: currentOrder.isSplitPayment,
+        paymentListJson: currentOrder.paymentListJson,
+        completedAt: currentOrder.orderAt,
         subTotal: currentOrder.subTotal,
         gstAmount: currentOrder.gstAmount,
         kotNumbers: currentOrder.kotNumbers,

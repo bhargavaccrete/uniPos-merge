@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../util/color.dart';
+import '../../../../util/restaurant/order_settings.dart';
 import '../../../widget/componets/restaurant/componets/drawer.dart';
 import '../../../../domain/services/common/auto_backup_service.dart';
 import '../tabbar/menu.dart';
@@ -19,6 +21,7 @@ class Startorder extends StatefulWidget {
     this.isForAddingItem,
     this.existingOrder, this.newOrderForTableId});
 
+
   @override
   State<Startorder> createState() => _StartorderState();
 }
@@ -27,11 +30,13 @@ class _StartorderState extends State<Startorder>
     with SingleTickerProviderStateMixin {
   late TabController tabController;
   String? _tableIdForCurrentSession;
+  late final int _tabCount = OrderSettings.enableDineIn ? 3 : 2;
+  DateTime? _lastBackPress;
 
   @override
   void initState() {
     super.initState();
-    tabController = TabController(length: 3, vsync: this);
+    tabController = TabController(length: _tabCount, vsync: this);
 
     // Initialize state based on what was passed to the widget
     if (widget.existingOrder != null) {
@@ -49,7 +54,9 @@ class _StartorderState extends State<Startorder>
       }
     });
 
-    // Initial load
+    // Initial
+
+
     _refreshCurrentTab();
   }
 
@@ -65,8 +72,8 @@ class _StartorderState extends State<Startorder>
     else if (tabController.index == 1) {
       orderStore.loadOrders();
     }
-    // Refresh tables when switching to tables tab
-    else if (tabController.index == 2) {
+    // Refresh tables when switching to tables tab (only if dine-in enabled)
+    else if (tabController.index == 2 && OrderSettings.enableDineIn) {
       tableStore.loadTables();
       orderStore.loadOrders(); // CRITICAL: Need orders to find active order for table
     }
@@ -385,6 +392,7 @@ class _StartorderState extends State<Startorder>
                   SizedBox(width: 16),
                   Expanded(child: _buildTabButton(1, Icons.receipt_long, 'Orders', isTablet)),
                   SizedBox(width: 16),
+                  if (OrderSettings.enableDineIn)
                   Expanded(child: _buildTabButton(2, Icons.table_restaurant, 'Tables', isTablet)),
                 ],
               ),
@@ -400,7 +408,8 @@ class _StartorderState extends State<Startorder>
                   isForAddingItem: widget.isForAddingItem ?? false,
                 ),
                 Order(),
-                const TableScreen()
+                if (OrderSettings.enableDineIn)
+                  const TableScreen(),
               ],
             ),
           ),
@@ -443,6 +452,7 @@ class _StartorderState extends State<Startorder>
                   icon: Icon(Icons.receipt_long, size: 24),
                   text: 'Orders',
                 ),
+                if (OrderSettings.enableDineIn)
                 Tab(
                   icon: Icon(Icons.table_restaurant, size: 24),
                   text: 'Tables',
@@ -450,10 +460,7 @@ class _StartorderState extends State<Startorder>
               ],
             ),
           ),
-        ),
-      ),
-    );
-
-
+        ))
+      ) ;
   }
 }

@@ -51,35 +51,34 @@ class _ViewExpenseState extends State<ViewExpense> {
   }
 
 
-  Future<void> _pickFromDate(BuildContext context) async {
-    DateTime? pickedDate = await showDatePicker(
-        context: context,
-        initialDate: _fromDatee??DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2100));
-
-    if (pickedDate != null) {
+  Future<void> _pickDateRange(BuildContext context) async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      initialDateRange: _fromDatee != null
+          ? DateTimeRange(
+              start: _fromDatee!,
+              end: _toDate ?? _fromDatee!,
+            )
+          : null,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
       setState(() {
-        _fromDatee = pickedDate;
-        if (_toDate != null && _toDate!.isBefore(_fromDatee!)) {
-          _toDate = null;
-        }
-      });
-      _filterExpenses();
-    }
-  }
-
-  // Function to pick To Date
-
-  Future<void> _pickToDate(BuildContext context) async {
-    DateTime? pickedDate = await showDatePicker(
-        context: context,
-        initialDate: _toDate ?? _fromDatee ?? DateTime.now(),
-        firstDate: _fromDatee ?? DateTime(2000),
-        lastDate: DateTime(2100));
-    if (pickedDate != null) {
-      setState(() {
-        _toDate = pickedDate;
+        _fromDatee = picked.start;
+        _toDate = picked.end;
       });
       _filterExpenses();
     }
@@ -514,14 +513,13 @@ class _ViewExpenseState extends State<ViewExpense> {
       backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
-          // Header
+          // Compact Header + Filter
           Container(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
             decoration: BoxDecoration(
               color: AppColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: Offset(0, 2),
                 ),
@@ -529,208 +527,117 @@ class _ViewExpenseState extends State<ViewExpense> {
             ),
             child: SafeArea(
               bottom: false,
-              child: Row(
-                children: [
-                  // GestureDetector(
-                  //   onTap: () => Navigator.pop(context),
-                  //   child: Container(
-                  //     padding: EdgeInsets.all(12),
-                  //     decoration: BoxDecoration(
-                  //       color: AppColors.primary,
-                  //       borderRadius: BorderRadius.circular(12),
-                  //     ),
-                  //     child: Icon(Icons.arrow_back, color: AppColors.white, size: 24),
-                  //   ),
-                  // ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Title row with total
+                    Row(
                       children: [
                         Text(
                           'Expenses',
                           style: GoogleFonts.poppins(
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),
                         ),
+                        const Spacer(),
                         Observer(
                           builder: (context) {
                             final total = expenseStore.filteredExpenses.fold<double>(
-                              0,
-                              (sum, expense) => sum + expense.amount,
+                              0, (sum, expense) => sum + expense.amount,
                             );
-                            return Text(
-                              'Total: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(total)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
+                            return Container(
+                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(total)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.red.shade700,
+                                ),
                               ),
                             );
                           },
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    SizedBox(height: 10),
+                    // Date filter row — single tap opens range calendar
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => _pickDateRange(context),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _fromDatee != null ? AppColors.primary : AppColors.divider,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.date_range_rounded, size: 18,
+                                    color: _fromDatee != null ? AppColors.primary : AppColors.textSecondary),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _fromDatee == null
+                                          ? 'Select date range'
+                                          : _fromDatee == _toDate || _toDate == null
+                                              ? DateFormat('dd MMM yyyy').format(_fromDatee!)
+                                              : '${DateFormat('dd MMM').format(_fromDatee!)} — ${DateFormat('dd MMM yyyy').format(_toDate!)}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: _fromDatee != null ? AppColors.textPrimary : AppColors.textSecondary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (_fromDatee != null) ...[
+                          SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _fromDatee = null;
+                                _toDate = null;
+                              });
+                              expenseStore.clearDateFilter();
+                            },
+                            child: Container(
+                              padding: EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(Icons.close, size: 18, color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Filters Section
-          Container(
-            color: AppColors.white,
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Filter by Date',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _pickFromDate(context),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _fromDatee != null ? AppColors.primary : AppColors.divider,
-                              width: _fromDatee != null ? 2 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today,
-                                size: 18,
-                                color: _fromDatee != null ? AppColors.primary : AppColors.textSecondary,
-                              ),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _fromDatee == null
-                                      ? 'Start Date'
-                                      : DateFormat('dd MMM yyyy').format(_fromDatee!),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: _fromDatee != null ? AppColors.textPrimary : AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _fromDatee == null ? null : () => _pickToDate(context),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: _fromDatee == null ? Colors.grey.shade100 : AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _toDate != null ? AppColors.primary : AppColors.divider,
-                              width: _toDate != null ? 2 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today,
-                                size: 18,
-                                color: _fromDatee == null
-                                    ? Colors.grey.shade400
-                                    : (_toDate != null ? AppColors.primary : AppColors.textSecondary),
-                              ),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _toDate == null
-                                      ? 'End Date'
-                                      : DateFormat('dd MMM yyyy').format(_toDate!),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: _fromDatee == null
-                                        ? Colors.grey.shade400
-                                        : (_toDate != null ? AppColors.textPrimary : AppColors.textSecondary),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _filterExpenses,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Apply Filter',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _fromDatee = null;
-                          _toDate = null;
-                        });
-                        expenseStore.clearDateFilter();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.surfaceMedium,
-                        foregroundColor: AppColors.textPrimary,
-                        elevation: 0,
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Icon(Icons.clear, size: 20),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(height: 8),
+          SizedBox(height: 4),
           // Expense List
           Expanded(
             child: Observer(

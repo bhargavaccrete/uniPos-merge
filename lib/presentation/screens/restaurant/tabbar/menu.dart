@@ -40,6 +40,7 @@ class _MenuScreenState extends State<MenuScreen> {
   final FocusNode _searchFocusNode = FocusNode();
 
   final Map<String, GlobalKey> _categoryKeys = {};
+  final Map<String, ExpansibleController> _expansionControllers = {};
   bool _isLoadingData = false;
 
 
@@ -146,7 +147,6 @@ class _MenuScreenState extends State<MenuScreen> {
         isStockManaged: item.trackInventory,
         id: const Uuid().v4(),
         title: item.name,
-        imagePath: '',
         price: item.price ?? 0,
         quantity: 1,
         taxRate: item.taxRate,
@@ -231,19 +231,24 @@ class _MenuScreenState extends State<MenuScreen> {
     }
 
     if (item.isSoldByWeight) {
-      if (unit.toUpperCase().contains('GM') || unit.toUpperCase().contains('GRAM')) {
-        return '${stock.toStringAsFixed(stock == stock.toInt() ? 0 : 1)}${unit}';
-      } else if (unit.toUpperCase().contains('KG')) {
-        if (stock >= 1000) {
-          double kg = stock / 1000;
-          return '${kg.toStringAsFixed(kg == kg.toInt() ? 0 : 1)}KG';
-        } else {
-          return '${stock.toStringAsFixed(0)}GM';
-        }
+      final upperUnit = unit.toUpperCase();
+      final isGm = upperUnit.contains('GM') || upperUnit.contains('GRAM') || upperUnit == 'G';
+      final isKg = upperUnit.contains('KG');
+
+      if (isGm && stock >= 1000) {
+        // Stock in grams but large enough to show as kg
+        final kg = stock / 1000;
+        return '${kg.toStringAsFixed(kg == kg.roundToDouble() ? 0 : 1)} kg';
+      } else if (isKg || isGm) {
+        // Show in item's own unit
+        final formatted = stock == stock.roundToDouble()
+            ? stock.toStringAsFixed(0)
+            : stock.toStringAsFixed(2);
+        return '$formatted $unit';
       }
-      return '${stock.toStringAsFixed(2)}${unit}';
+      return '${stock.toStringAsFixed(2)} $unit';
     } else {
-      return '${stock.toStringAsFixed(0)} ${unit}';
+      return '${stock.toStringAsFixed(0)} $unit';
     }
   }
 
@@ -319,7 +324,7 @@ class _MenuScreenState extends State<MenuScreen> {
                         children: [
                           Expanded(
                             child: SizedBox(
-                                height: height * 0.04,
+                                // height: height * 0.05,
                                 child: AppTextField(
                                   controller: _searchController,
                                   focusNode: _searchFocusNode,
@@ -373,13 +378,23 @@ class _MenuScreenState extends State<MenuScreen> {
                               final cat = cats[i];
                               return GestureDetector(
                                 onTap: () {
+                                  // Expand the category tile first
+                                  final controller = _expansionControllers[cat.id];
+                                  if (controller != null) {
+                                    try { controller.expand(); } catch (_) {}
+                                  }
+                                  // Scroll to the category after a short delay to let it expand
                                   final key = _categoryKeys[cat.id];
                                   if (key?.currentContext != null) {
-                                    Scrollable.ensureVisible(
-                                      key!.currentContext!,
-                                      duration: const Duration(milliseconds: 400),
-                                      curve: Curves.easeInOut,
-                                    );
+                                    Future.delayed(const Duration(milliseconds: 150), () {
+                                      if (key?.currentContext != null) {
+                                        Scrollable.ensureVisible(
+                                          key!.currentContext!,
+                                          duration: const Duration(milliseconds: 400),
+                                          curve: Curves.easeInOut,
+                                        );
+                                      }
+                                    });
                                   }
                                 },
                                 child: Container(
@@ -461,6 +476,9 @@ class _MenuScreenState extends State<MenuScreen> {
                               if (!_categoryKeys.containsKey(category.id)) {
                                 _categoryKeys[category.id] = GlobalKey();
                               }
+                              if (!_expansionControllers.containsKey(category.id)) {
+                                _expansionControllers[category.id] = ExpansibleController();
+                              }
 
                               final categoryItems = visibleItems.where((item) => item.categoryOfItem == category.id).toList();
 
@@ -486,6 +504,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                 child: Theme(
                                   data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                                   child: ExpansionTile(
+                                    controller: _expansionControllers[category.id],
                                     initiallyExpanded: query.isNotEmpty,
                                     leading: Container(
                                       padding: EdgeInsets.all(10),

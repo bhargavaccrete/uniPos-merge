@@ -103,7 +103,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       }
 
       final dayStarted = await DayManagementService.isDayStarted();
-      print('🔍 Day started: $dayStarted');
+      final pendingEOD = await DayManagementService.hasPendingEOD();
+      print('🔍 Day started: $dayStarted, Pending EOD: $pendingEOD');
 
       if (!dayStarted) {
         print('ℹ️ Day not started - showing empty state');
@@ -115,6 +116,12 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           _isLoading = false;
         });
         return;
+      }
+
+      // If midnight crossed without EOD, use the original day start date for reporting
+      if (pendingEOD && dayStartTimestamp != null) {
+        selectedDate = dayStartTimestamp;
+        print('⚠️ Pending EOD from ${dayStartTimestamp.toIso8601String()} — using that date');
       }
 
       print('📦 Fetching past orders...');
@@ -662,33 +669,148 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   Future<bool> _showConfirmationDialog() async {
     return await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          title: Text('Confirm End of Day', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-          content: Text(
-            'This will:\n\n• Save the End of Day report\n• Clear cart and active orders\n• Keep past orders for reports\n• Keep expenses for reports\n• Mark day as completed\n• Return to home screen\n\nContinue?',
-            style: GoogleFonts.poppins(fontSize: 14),
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.nightlight_round,
+                    color: Colors.orange,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                Text(
+                  'End of Day',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Are you sure you want to close the day?',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Info items
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _confirmInfoRow(Icons.save_rounded, 'Save EOD report', Colors.green),
+                      const SizedBox(height: 10),
+                      _confirmInfoRow(Icons.delete_sweep_rounded, 'Clear cart & active orders', Colors.red),
+                      const SizedBox(height: 10),
+                      _confirmInfoRow(Icons.history_rounded, 'Keep past orders & expenses', Colors.blue),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Confirm',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: Text('Confirm', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-            ),
-          ],
         );
       },
     ) ?? false;
+  }
+
+  Widget _confirmInfoRow(IconData icon, String text, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _markDayCompleted() async {
@@ -1116,28 +1238,40 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           ),
         ));
       }
+    }
 
-      children.add(Divider(height: 1, color: AppColors.divider));
-      children.add(Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
+    // Total Tax — always show regardless of tax breakdown availability
+    children.add(Divider(height: 1, color: AppColors.divider));
+    children.add(Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.percent_rounded,
+                  size: 16, color: Colors.blue),
+            ),
+            const SizedBox(width: 12),
             Text('Total Tax',
                 style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary)),
-            Text(
-                '$currency ${_currentReport?.totalTax.toStringAsFixed(2) ?? '0.00'}',
-                style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.blue.shade700)),
-          ],
-        ),
-      ));
-    }
+          ]),
+          Text(
+              '$currency ${_currentReport?.totalTax.toStringAsFixed(2) ?? '0.00'}',
+              style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.blue.shade700)),
+        ],
+      ),
+    ));
 
     return _sectionCard(children);
   }

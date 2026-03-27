@@ -426,6 +426,34 @@ class _ManageInventoryState extends State<ManageInventory> {
 
 // Replace your existing _buildStockRow method with this one
 
+  /// Format stock for display with smart unit conversion
+  String _formatStock(double stock, String unit, bool isWeightBased) {
+    if (!isWeightBased) return '${stock.toStringAsFixed(0)} $unit';
+    final upperUnit = unit.toUpperCase();
+    if (upperUnit.contains('GM') || upperUnit.contains('GRAM') || upperUnit == 'G') {
+      if (stock >= 1000) {
+        final kg = stock / 1000;
+        return '${kg.toStringAsFixed(kg == kg.roundToDouble() ? 0 : 2)} kg';
+      }
+      return '${stock.toStringAsFixed(stock == stock.roundToDouble() ? 0 : 2)} $unit';
+    }
+    return '${stock.toStringAsFixed(stock == stock.roundToDouble() ? 0 : 2)} $unit';
+  }
+
+  /// Conversion hint for input — e.g. user types 2000 in a gm item → shows "= 2 kg"
+  String? _conversionHint(String input, String unit) {
+    if (input.isEmpty) return null;
+    final val = double.tryParse(input);
+    if (val == null || val <= 0) return null;
+    final upperUnit = unit.toUpperCase();
+    if (upperUnit.contains('GM') || upperUnit.contains('GRAM') || upperUnit == 'G') {
+      if (val >= 1000) return '= ${(val / 1000).toStringAsFixed(2)} kg';
+    } else if (upperUnit.contains('KG')) {
+      if (val >= 1) return '= ${(val * 1000).toStringAsFixed(0)} gm';
+    }
+    return null;
+  }
+
   Widget _buildStockRow({required Items item, ItemVariante? variant}) {
     final currentStock = variant?.stockQuantity ?? item.stockQuantity;
     final controllerKey =
@@ -434,106 +462,118 @@ class _ManageInventoryState extends State<ManageInventory> {
     final isWeightBased = item.isSoldByWeight;
     final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 3, // Adjusted flex
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Current Stock:',
+        Row(
+          children: [
+            // Current Stock
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Stock:',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    _formatStock(currentStock, unit, isWeightBased),
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: currentStock > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 8),
+            // Input with unit hint
+            Expanded(
+              flex: 4,
+              child: AppTextField(
+                controller: controller,
+                hint: 'Qty ($unit)',
+                keyboardType: isWeightBased
+                    ? TextInputType.numberWithOptions(decimal: true)
+                    : TextInputType.number,
+                inputFormatters: isWeightBased
+                    ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
+                    : [FilteringTextInputFormatter.digitsOnly],
+                onChanged: isWeightBased ? (_) => setState(() {}) : null,
+              ),
+            ),
+            SizedBox(width: 8),
+            // Action Buttons
+            Expanded(
+              flex: 3,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: () => _removeStock(item, variant: variant),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Icon(Icons.remove_rounded, size: 18),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: () => _addStock(item, variant: variant),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Icon(Icons.add_rounded, size: 18),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        // Live conversion hint for weight-based items
+        if (isWeightBased && controller.text.isNotEmpty)
+          Builder(builder: (_) {
+            final hint = _conversionHint(controller.text, unit);
+            if (hint == null) return SizedBox.shrink();
+            return Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                hint,
                 style: GoogleFonts.poppins(
                   fontSize: 11,
-                  color: AppColors.textSecondary,
+                  color: Colors.blue.shade600,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              SizedBox(height: 2),
-              Text(
-                isWeightBased
-                    ? currentStock.toStringAsFixed(2)
-                    : currentStock.toStringAsFixed(0),
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: currentStock > 0 ? Colors.green.shade700 : Colors.red.shade700,
-                ),
-              ),
-              Text(
-                unit,
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          flex: 4, // Adjusted flex
-          child: AppTextField(
-            controller: controller,
-            hint: 'Enter qty',
-            keyboardType: isWeightBased
-                ? TextInputType.numberWithOptions(decimal: true)
-                : TextInputType.number,
-            inputFormatters: isWeightBased
-                ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
-                : [FilteringTextInputFormatter.digitsOnly],
-          ),
-        ),
-        SizedBox(width: 8),
-
-        // Action Buttons
-        Expanded(
-          flex: 3,
-          child: Row(
-            children: [
-              // REMOVE BUTTON
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: () => _removeStock(item, variant: variant),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Icon(Icons.remove_rounded, size: 18),
-                  ),
-                ),
-              ),
-              SizedBox(width: 6),
-              // ADD BUTTON
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: () => _addStock(item, variant: variant),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Icon(Icons.add_rounded, size: 18),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        )
+            );
+          }),
       ],
     );
   }

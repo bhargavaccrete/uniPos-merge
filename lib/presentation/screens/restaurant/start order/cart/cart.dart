@@ -65,16 +65,9 @@ class _CartScreenState extends State<CartScreen>
     _initializeCart();
   }
 
-  // Set default order type based on enabled settings
+  // Set default order type — Take Away is always available
   void _setDefaultOrderType() {
-    // Use the first enabled order type as default
-    if (OrderSettings.enableTakeAway) {
-      selectedFilter = "Take Away";
-    } else if (OrderSettings.enableDineIn) {
-      selectedFilter = "Dine In";
-    } else if (OrderSettings.enableDelivery) {
-      selectedFilter = "Delivery";
-    }
+    selectedFilter = "Take Away";
   }
   void _navigateAndAddMoreItems() async {
     // Navigate to the menu to add more items
@@ -472,8 +465,7 @@ class _CartScreenState extends State<CartScreen>
                   ),
                   child: Row(
                     children: [
-                      // Take Away button - only show if enabled
-                      if (OrderSettings.enableTakeAway)
+                      // Take Away button - always available
                         Expanded(
                           child: _buildModernFilterButton(
                             icon: Icons.shopping_bag_outlined,

@@ -671,7 +671,6 @@ class RestaurantBulkImportServiceV3 {
     final newCategory = Category(
       id: const Uuid().v4(),
       name: categoryName.trim(), // Use trimmed name for consistency
-      imagePath: null,
       createdTime: DateTime.now(),
       editCount: 0,
     );
@@ -781,7 +780,6 @@ class RestaurantBulkImportServiceV3 {
         Category category = Category(
           id: id,
           name: name,
-          imagePath: _getValue(row, 2).isEmpty ? null : _getValue(row, 2),
           createdTime: DateTime.now(),
           editCount: 0,
         );
@@ -1167,7 +1165,6 @@ class RestaurantBulkImportServiceV3 {
           stockQuantity: hasVariants ? 0 : _getDoubleFromValue(rowData['StockQuantity']),
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
           taxRate: taxRateValue,
-          taxIds: taxId != null ? [taxId] : null,
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
           variant: [],
           choiceIds: choiceIds,

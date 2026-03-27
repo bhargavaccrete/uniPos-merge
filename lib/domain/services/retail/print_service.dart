@@ -121,6 +121,9 @@ class PrintService {
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown
     int? loyaltyPointsDiscount, // Loyalty points redeemed
+    double? serviceCharge, // Service or delivery charge amount
+    bool? isDeliveryOrder,
+    bool? isTaxInclusive,
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -145,6 +148,10 @@ class PrintService {
       logoBytes: logoBytes,
       itemTotal: itemTotal,
       loyaltyPointsDiscount: loyaltyPointsDiscount,
+      serviceCharge: serviceCharge,
+      isDeliveryOrder: isDeliveryOrder,
+      paymentBreakdown: paymentBreakdown,
+      isTaxInclusive: isTaxInclusive,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -204,6 +211,9 @@ class PrintService {
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown
     int? loyaltyPointsDiscount, // Loyalty points redeemed
+    double? serviceCharge,
+    bool? isDeliveryOrder,
+    bool? isTaxInclusive,
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -225,6 +235,10 @@ class PrintService {
       logoBytes: logoBytes,
       itemTotal: itemTotal,
       loyaltyPointsDiscount: loyaltyPointsDiscount,
+      serviceCharge: serviceCharge,
+      isDeliveryOrder: isDeliveryOrder,
+      paymentBreakdown: paymentBreakdown,
+      isTaxInclusive: isTaxInclusive,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -270,6 +284,9 @@ class PrintService {
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown
     int? loyaltyPointsDiscount, // Loyalty points redeemed
+    double? serviceCharge,
+    bool? isDeliveryOrder,
+    bool? isTaxInclusive,
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -287,6 +304,10 @@ class PrintService {
       logoBytes: logoBytes,
       itemTotal: itemTotal,
       loyaltyPointsDiscount: loyaltyPointsDiscount,
+      serviceCharge: serviceCharge,
+      isDeliveryOrder: isDeliveryOrder,
+      paymentBreakdown: paymentBreakdown,
+      isTaxInclusive: isTaxInclusive,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -374,6 +395,9 @@ class PrintService {
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown (e.g., "cash: ₹100, card: ₹200")
     int? loyaltyPointsDiscount, // Loyalty points redeemed
+    double? serviceCharge, // Service or delivery charge amount
+    bool? isDeliveryOrder, // True if delivery order
+    bool? isTaxInclusive, // Tax inclusive mode
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -436,6 +460,10 @@ class PrintService {
                     kotNumbers: kotNumbers,
                     itemTotal: itemTotal,
                     loyaltyPointsDiscount: loyaltyPointsDiscount,
+                    serviceCharge: serviceCharge,
+                    isDeliveryOrder: isDeliveryOrder,
+                    paymentBreakdown: paymentBreakdown,
+                    isTaxInclusive: isTaxInclusive,
                   );
                   final printer = printerStore.defaultReceiptPrinter!;
                   final bytes = EscPosReceiptBuilder.buildReceiptTicket(
@@ -481,6 +509,9 @@ class PrintService {
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                   loyaltyPointsDiscount: loyaltyPointsDiscount,
+                  serviceCharge: serviceCharge,
+                  isDeliveryOrder: isDeliveryOrder,
+                  isTaxInclusive: isTaxInclusive,
                 );
               },
             ),
@@ -508,6 +539,9 @@ class PrintService {
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                   loyaltyPointsDiscount: loyaltyPointsDiscount,
+                  serviceCharge: serviceCharge,
+                  isDeliveryOrder: isDeliveryOrder,
+                  isTaxInclusive: isTaxInclusive,
                 );
               },
             ),
@@ -533,6 +567,9 @@ class PrintService {
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                   loyaltyPointsDiscount: loyaltyPointsDiscount,
+                  serviceCharge: serviceCharge,
+                  isDeliveryOrder: isDeliveryOrder,
+                  isTaxInclusive: isTaxInclusive,
                 );
               },
             ),
@@ -558,6 +595,9 @@ class PrintService {
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
                   loyaltyPointsDiscount: loyaltyPointsDiscount,
+                  serviceCharge: serviceCharge,
+                  isDeliveryOrder: isDeliveryOrder,
+                  isTaxInclusive: isTaxInclusive,
                 );
                 if (context.mounted && path != null) {
                   ScaffoldMessenger.of(context).showSnackBar(

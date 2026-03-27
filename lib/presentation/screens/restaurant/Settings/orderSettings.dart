@@ -161,25 +161,18 @@ class _orderSettingsState extends State<Ordersettings>
 
   Widget _takeAwayTab() {
     return SingleChildScrollView(
-      child: _sectionCard([
-        _settingRow(
-          icon: Icons.takeout_dining_rounded,
-          iconColor: Colors.blue,
-          title: 'Enable Take Away',
-          subtitle: 'Allow customers to place take-away orders',
-          notifier: OrderSettings.enableTakeAwayNotifier,
-          onSave: OrderSettings.setEnableTakeAway,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'Take Away is always enabled',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ),
-        _divider(),
-        _settingRow(
-          icon: Icons.receipt_long_rounded,
-          iconColor: Colors.green,
-          title: 'Place Order Dialog',
-          subtitle: 'Show confirmation dialog before placing order',
-          notifier: OrderSettings.showTakeAwayDialogNotifier,
-          onSave: OrderSettings.setShowTakeAwayDialog,
-        ),
-      ]),
+      ),
     );
   }
 
@@ -193,15 +186,6 @@ class _orderSettingsState extends State<Ordersettings>
           subtitle: 'Allow customers to dine in at the restaurant',
           notifier: OrderSettings.enableDineInNotifier,
           onSave: OrderSettings.setEnableDineIn,
-        ),
-        _divider(),
-        _settingRow(
-          icon: Icons.receipt_long_rounded,
-          iconColor: Colors.green,
-          title: 'Place Order Dialog',
-          subtitle: 'Show confirmation dialog before placing order',
-          notifier: OrderSettings.showDineInDialogNotifier,
-          onSave: OrderSettings.setShowDineInDialog,
         ),
       ]),
     );

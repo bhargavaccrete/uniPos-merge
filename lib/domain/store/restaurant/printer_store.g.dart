@@ -92,13 +92,13 @@ mixin _$PrinterStore on _PrinterStore, Store {
       Atom(name: '_PrinterStore.discoveredDevices', context: context);
 
   @override
-  ObservableList<Printer> get discoveredDevices {
+  ObservableList<DiscoveredPrinter> get discoveredDevices {
     _$discoveredDevicesAtom.reportRead();
     return super.discoveredDevices;
   }
 
   @override
-  set discoveredDevices(ObservableList<Printer> value) {
+  set discoveredDevices(ObservableList<DiscoveredPrinter> value) {
     _$discoveredDevicesAtom.reportWrite(value, super.discoveredDevices, () {
       super.discoveredDevices = value;
     });
@@ -262,7 +262,7 @@ mixin _$PrinterStore on _PrinterStore, Store {
 
   @override
   Future<void> saveUsbPrinter(
-      {required Printer device,
+      {required DiscoveredPrinter device,
       required String name,
       int paperSize = 80,
       String role = 'both'}) {
@@ -275,7 +275,7 @@ mixin _$PrinterStore on _PrinterStore, Store {
 
   @override
   Future<void> saveBluetoothPrinter(
-      {required Printer device,
+      {required DiscoveredPrinter device,
       required String name,
       int paperSize = 80,
       String role = 'both'}) {

@@ -28,7 +28,8 @@ class EODService {
     // - If day was started with a timestamp, use that exact time
     // - Otherwise, fall back to start of day (00:00:00)
     final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
-    final endTime = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    // Use current time as end — handles midnight crossing (EOD run after midnight for yesterday's session)
+    final endTime = DateTime.now();
 
     print('📅 EOD Report Date Range: $startTime to $endTime');
     print('📅 Day Start Timestamp: $dayStartTimestamp');
@@ -395,7 +396,8 @@ class EODService {
     // - If day was started with a timestamp, use that exact time
     // - Otherwise, fall back to start of day (00:00:00)
     final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
-    final endTime = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    // Use current time as end — handles midnight crossing (EOD run after midnight for yesterday's session)
+    final endTime = DateTime.now();
 
     print('📊 Filtering sales from $startTime to $endTime');
 

@@ -314,10 +314,8 @@ class EscPosReceiptBuilder {
 
     // Sub Total
     if (PrintSettings.showSubtotal) {
-      final subLabel = isTaxInclusive ? 'Sub Total (Incl. Tax)' : 'Sub Total';
-      // Use itemTotal if available (pre-calculated), otherwise use sale.subtotal
       final subValue = receiptData.itemTotal ?? sale.subtotal ?? 0;
-      bytes.addAll(_text(_formatTotalRow(subLabel, _fmt(subValue), cols)));
+      bytes.addAll(_text(_formatTotalRow('Sub Total', _fmt(subValue), cols)));
     }
 
     // Discount (only show if > 0)
@@ -335,11 +333,19 @@ class EscPosReceiptBuilder {
           cols)));
     }
 
-    // Tax (GST)
-    if (PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
-      final taxLabel = isTaxInclusive ? 'GST (Included)' : 'GST';
+    // Tax (GST) — only show when tax-exclusive (tax-inclusive shows footer note instead)
+    if (!isTaxInclusive && PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
       bytes.addAll(
-          _text(_formatTotalRow(taxLabel, _fmt(sale.totalGstAmount ?? 0), cols)));
+          _text(_formatTotalRow('GST', _fmt(sale.totalGstAmount ?? 0), cols)));
+    }
+
+    // Service / Delivery Charge (only show if > 0)
+    if ((receiptData.serviceCharge ?? 0) > 0.009) {
+      final chargeLabel = (receiptData.isDeliveryOrder ?? false)
+          ? 'Delivery Charge'
+          : 'Service Charge';
+      bytes.addAll(_text(
+          _formatTotalRow(chargeLabel, _fmt(receiptData.serviceCharge!), cols)));
     }
 
     // ── GRAND TOTAL ──
@@ -354,19 +360,27 @@ class EscPosReceiptBuilder {
 
     // ── PAYMENT INFO ──
     if (PrintSettings.showPaymentPaid) {
-      bytes.addAll(
-          _text(_formatTotalRow('Paid by ${sale.paymentType ?? 'Cash'}', _fmt(sale.grandTotal ?? 0), cols)));
+      // Split payment — show each method on its own line
+      if (receiptData.paymentBreakdown != null && receiptData.paymentBreakdown!.isNotEmpty) {
+        // Split payment — show each method on its own line
+        // Format: "cash: ₹500, card: ₹300" → separate lines
+        final parts = receiptData.paymentBreakdown!.split(', ');
+        for (final part in parts) {
+          bytes.addAll(_text(part.padRight(cols)));
+        }
+      } else {
+        bytes.addAll(
+            _text(_formatTotalRow('Paid by ${sale.paymentType ?? 'Cash'}', _fmt(sale.grandTotal ?? 0), cols)));
+      }
     }
-
-    // Split payment breakdown (if applicable)
-    // The paymentBreakdown string is passed via sale.remark or separately
-    // For now, we show the basic payment info. Split payment detail
-    // will be enhanced in Phase 5 integration.
 
     bytes.addAll(_divider(cols));
 
     // ── FOOTER ──
     bytes.addAll(_alignCenter);
+    if (isTaxInclusive) {
+      bytes.addAll(_text('All prices include GST'));
+    }
     bytes.addAll(_text('Thank you for dining with us!'));
     bytes.addAll(_text('Visit us again!'));
     if (PrintSettings.showPoweredBy) {

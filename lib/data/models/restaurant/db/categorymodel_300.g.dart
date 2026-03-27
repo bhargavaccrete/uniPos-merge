@@ -19,7 +19,6 @@ class CategoryAdapter extends TypeAdapter<Category> {
     return Category(
       id: fields[0] as String,
       name: fields[1] as String,
-      imagePath: fields[2] as String?,
       createdTime: fields[3] as DateTime?,
       lastEditedTime: fields[4] as DateTime?,
       editedBy: fields[5] as String?,
@@ -30,13 +29,11 @@ class CategoryAdapter extends TypeAdapter<Category> {
   @override
   void write(BinaryWriter writer, Category obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
       ..write(obj.name)
-      ..writeByte(2)
-      ..write(obj.imagePath)
       ..writeByte(3)
       ..write(obj.createdTime)
       ..writeByte(4)

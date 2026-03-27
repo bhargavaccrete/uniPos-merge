@@ -1,8 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -264,88 +261,89 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
   Widget _buildCategoryList() {
     return ListView.builder(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: _categories.length,
       itemBuilder: (context, index) {
         final category = _categories[index];
         final itemCount = _itemCounts[category.id] ?? 0;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 15),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
           ),
           child: InkWell(
             onTap: () => _selectCategory(category),
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
                   // Category Image or Icon
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                     ),
-                    child: category.imagePath != null && category.imagePath!.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(category.imagePath!),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(Icons.category, color: AppColors.primary, size: 30);
-                              },
-                            ),
-                          )
-                        : Icon(Icons.category, color: AppColors.primary, size: 30),
+                    child: Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
                   ),
-                  const SizedBox(width: 15),
+                  const SizedBox(width: 12),
 
                   // Category Info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           category.name,
                           style: GoogleFonts.poppins(
-                            fontSize: 16,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            color: AppColors.textPrimary,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
                         Text(
                           '$itemCount item${itemCount != 1 ? 's' : ''}',
                           style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  // Actions
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () => _editCategory(category),
-                        tooltip: 'Edit',
+                  // Compact action buttons
+                  GestureDetector(
+                    onTap: () => _editCategory(category),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteCategory(category),
-                        tooltip: 'Delete',
+                      child: Icon(Icons.edit_rounded, color: Colors.blue, size: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _deleteCategory(category),
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
+                      child: Icon(Icons.delete_rounded, color: Colors.red, size: 16),
+                    ),
                   ),
                 ],
               ),
@@ -370,11 +368,7 @@ class AddCategoryDialog extends StatefulWidget {
 class _AddCategoryDialogState extends State<AddCategoryDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _imagePicker = ImagePicker();
   final _uuid = const Uuid();
-
-  File? _selectedImage;
-  String? _existingImagePath;
   bool _isEditing = false;
 
   @override
@@ -383,7 +377,6 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     if (widget.existingCategory != null) {
       _isEditing = true;
       _nameController.text = widget.existingCategory!.name;
-      _existingImagePath = widget.existingCategory!.imagePath;
     }
   }
 
@@ -391,47 +384,6 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   void dispose() {
     _nameController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final pickedFile = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-        _existingImagePath = null;
-      });
-    }
-  }
-
-  void _removeImage() {
-    setState(() {
-      _selectedImage = null;
-      _existingImagePath = null;
-    });
-  }
-
-  Future<String?> _saveImageToLocalStorage(File imageFile) async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final categoryImagesDir = Directory('${directory.path}/category_images');
-
-      if (!await categoryImagesDir.exists()) {
-        await categoryImagesDir.create(recursive: true);
-      }
-
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'category_$timestamp.jpg';
-      final savedImage = await imageFile.copy('${categoryImagesDir.path}/$fileName');
-
-      return savedImage.path;
-    } catch (e) {
-      print('Error saving category image: $e');
-      return null;
-    }
   }
 
   Future<void> _saveCategory() async {
@@ -444,16 +396,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
           builder: (context) => const Center(child: CircularProgressIndicator()),
         );
 
-        // Save image if new one selected
-        String? imagePath = _existingImagePath;
-        if (_selectedImage != null) {
-          imagePath = await _saveImageToLocalStorage(_selectedImage!);
-        }
-
         final category = Category(
           id: _isEditing ? widget.existingCategory!.id : _uuid.v4(),
           name: _nameController.text.trim(),
-          imagePath: imagePath,
           createdTime: _isEditing ? widget.existingCategory!.createdTime : DateTime.now(),
           editCount: _isEditing ? widget.existingCategory!.editCount + 1 : 0,
         );
@@ -549,13 +494,6 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                     },
                   ),
                 ),
-                const SizedBox(height: 20),
-
-                // ── Category Image ──────────────────────────────────
-                _sectionHeader(
-                    'Category Image (Optional)', Icons.image_outlined),
-                const SizedBox(height: 12),
-                _card(child: _buildImagePicker()),
                 const SizedBox(height: 24),
 
                 // ── Buttons ─────────────────────────────────────────
@@ -636,86 +574,4 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     );
   }
 
-  Widget _buildImagePicker() {
-    final hasImage = _selectedImage != null || _existingImagePath != null;
-    if (hasImage) {
-      return Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: _selectedImage != null
-                ? Image.file(_selectedImage!,
-                    height: 150, width: double.infinity, fit: BoxFit.cover)
-                : Image.file(
-                    File(_existingImagePath!),
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 150,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.broken_image, size: 50),
-                    ),
-                  ),
-          ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: _removeImage,
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                    color: Colors.red, shape: BoxShape.circle),
-                child:
-                    const Icon(Icons.close, color: Colors.white, size: 16),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return InkWell(
-      onTap: _pickImage,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 130,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceLight,
-          border: Border.all(color: AppColors.divider),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.add_photo_alternate_rounded,
-                  size: 28, color: AppColors.primary),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Tap to upload image',
-              style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.primary),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'From Gallery',
-              style: GoogleFonts.poppins(
-                  fontSize: 11, color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

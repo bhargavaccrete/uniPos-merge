@@ -78,6 +78,7 @@ import 'package:unipos/domain/store/restaurant/company_store.dart';
 import 'package:unipos/domain/store/restaurant/eod_store.dart';
 import 'package:unipos/domain/store/restaurant/appStore.dart';
 import 'package:unipos/domain/store/restaurant/printer_store.dart';
+import 'package:unipos/domain/services/restaurant/thermal_printer_service.dart';
 
 // Type aliases for convenience getters (to avoid prefixing with 'restaurant.')
 typedef CartStoreRes = restaurant.CartStoreRes;
@@ -222,6 +223,7 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<CompanyRepository>(() => CompanyRepository());
   locator.registerLazySingleton<EodRepository>(() => EodRepository());
   locator.registerLazySingleton<PrinterRepository>(() => PrinterRepository());
+  locator.registerLazySingleton<ThermalPrinterService>(() => ThermalPrinterService());
 
   // ==================== RESTAURANT STORES ====================
   locator.registerLazySingleton<CategoryStore>(
@@ -287,7 +289,7 @@ Future<void> _registerRestaurantDependencies() async {
   );
   locator.registerLazySingleton<AppStore>(() => AppStore());
   locator.registerLazySingleton<PrinterStore>(
-    () => PrinterStore(locator<PrinterRepository>()),
+    () => PrinterStore(locator<PrinterRepository>(), locator<ThermalPrinterService>()),
   );
 
   // Load saved printers at startup so defaultKotPrinter / defaultReceiptPrinter

@@ -22,19 +22,64 @@ class Managemenu extends StatefulWidget {
 class _ManagemenuState extends State<Managemenu>
     with SingleTickerProviderStateMixin {
   late TabController tabController;
+  final ScrollController _tabScrollController = ScrollController();
+  final List<GlobalKey> _tabKeys = List.generate(6, (_) => GlobalKey());
 
   @override
   void initState() {
     super.initState();
     tabController = TabController(length: 6, vsync: this);
+    // Use animation listener for real-time tab highlight during swipe
+    tabController.animation!.addListener(() {
+      final newIndex = tabController.animation!.value.round();
+      if (newIndex != tabController.index && !tabController.indexIsChanging) {
+        // During swipe — update highlight immediately
+        setState(() {});
+      }
+    });
     tabController.addListener(() {
-      setState(() {});
+      if (!tabController.indexIsChanging) {
+        // After swipe settles — final update + scroll
+        setState(() {});
+        _scrollToSelectedTab(tabController.index);
+      }
     });
   }
 
+  @override
+  void dispose() {
+    _tabScrollController.dispose();
+    tabController.dispose();
+    super.dispose();
+  }
+
+  /// Scrolls the tab bar so the selected tab is visible and centered
+  void _scrollToSelectedTab(int index) {
+    final keyContext = _tabKeys[index].currentContext;
+    if (keyContext == null || !_tabScrollController.hasClients) return;
+
+    final renderBox = keyContext.findRenderObject() as RenderBox;
+    final tabOffset = renderBox.localToGlobal(Offset.zero).dx;
+    final tabWidth = renderBox.size.width;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Calculate scroll offset to center the selected tab
+    final targetScroll = _tabScrollController.offset +
+        tabOffset -
+        (screenWidth / 2) +
+        (tabWidth / 2);
+
+    _tabScrollController.animateTo(
+      targetScroll.clamp(0.0, _tabScrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   Widget _buildTabButton(int index, String label, int count, bool isTablet) {
-    final isSelected = tabController.index == index;
+    final isSelected = tabController.animation!.value.round() == index;
     return GestureDetector(
+      key: _tabKeys[index],
       onTap: () {
         tabController.animateTo(index);
       },
@@ -241,6 +286,7 @@ class _ManagemenuState extends State<Managemenu>
 
                 // For mobile and tablet, show horizontal scroll
                 return SingleChildScrollView(
+                  controller: _tabScrollController,
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [

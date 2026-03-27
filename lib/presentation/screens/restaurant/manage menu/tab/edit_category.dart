@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
@@ -19,8 +17,6 @@ class EditCategory extends StatefulWidget {
 }
 
 class _EditCategoryState extends State<EditCategory> {
-  File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
   late final TextEditingController nameController;
   bool _isSaving = false;
 
@@ -28,23 +24,12 @@ class _EditCategoryState extends State<EditCategory> {
   void initState() {
     super.initState();
     nameController = TextEditingController(text: widget.category.name);
-    if (widget.category.imagePath != null &&
-        widget.category.imagePath!.isNotEmpty) {
-      _selectedImage = File(widget.category.imagePath!);
-    }
   }
 
   @override
   void dispose() {
     nameController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() => _selectedImage = File(pickedFile.path));
-    }
   }
 
   Future<void> _saveChanges() async {
@@ -69,9 +54,6 @@ class _EditCategoryState extends State<EditCategory> {
     try {
       final updated = widget.category.copyWith(
         name: trimmedName,
-        imagePath: _selectedImage != null
-            ? _selectedImage!.path
-            : widget.category.imagePath,
       );
       AuditTrailHelper.trackEdit(updated,
           editedBy:
@@ -117,70 +99,6 @@ class _EditCategoryState extends State<EditCategory> {
               icon: Icons.category_outlined,
               required: true,
             ),
-
-            const SizedBox(height: 24),
-
-            // ── Image Picker ────────────────────────────────────────────
-            Text('Category Image (optional)',
-                style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 160,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  border:
-                      Border.all(color: AppColors.divider, width: 1.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: _selectedImage != null && _selectedImage!.existsSync()
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child:
-                            Image.file(_selectedImage!, fit: BoxFit.cover),
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_photo_alternate,
-                              color: AppColors.textSecondary
-                                  .withValues(alpha: 0.5),
-                              size: 48),
-                          const SizedBox(height: 8),
-                          Text('Tap to upload image',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondary)),
-                          const SizedBox(height: 4),
-                          Text('600×400 • PNG, JPG (Max 3MB)',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary)),
-                        ],
-                      ),
-              ),
-            ),
-
-            if (_selectedImage != null) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => setState(() => _selectedImage = null),
-                  icon: const Icon(Icons.close, size: 16),
-                  label: Text('Remove image',
-                      style: GoogleFonts.poppins(fontSize: 13)),
-                  style: TextButton.styleFrom(
-                      foregroundColor: AppColors.danger),
-                ),
-              ),
-            ],
 
             const SizedBox(height: 32),
 

@@ -152,9 +152,10 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   }
 
   // Helper method to check if minimum requirements are met
-  bool _validateMinimumRequirements() {
-    if (widget.item.extraConstraints == null) return true;
-
+  // Returns list of unmet extra group names (empty = all valid)
+  List<String> _getUnmetRequirements() {
+    if (widget.item.extraConstraints == null) return [];
+    final unmet = <String>[];
     for (var extraGroup in _displayExtra) {
       final constraints = widget.item.extraConstraints![extraGroup.Id];
       if (constraints != null) {
@@ -162,12 +163,12 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         if (minRequired > 0) {
           final currentCount = _getExtraCategoryCount(extraGroup.Id);
           if (currentCount < minRequired) {
-            return false;
+            unmet.add('${extraGroup.Ename} (min $minRequired)');
           }
         }
       }
     }
-    return true;
+    return unmet;
   }
 
 
@@ -204,22 +205,64 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   void _confirmAndAddItem() {
     // Validate minimum requirements for extras
-    if (!_validateMinimumRequirements()) {
-      // Show error dialog
+    final unmet = _getUnmetRequirements();
+    if (unmet.isNotEmpty) {
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Minimum Requirements Not Met', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-          content: Text(
-            'Please select the minimum required extras for this item.',
-            style: GoogleFonts.poppins(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('OK', style: GoogleFonts.poppins(color: AppColors.primary)),
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.warning_rounded, color: Colors.orange, size: 32),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Selection Required',
+                  style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please select the required extras:',
+                  style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                ...unmet.map((name) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, size: 6, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Text(name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                )),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('OK', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       );
       return;
@@ -235,7 +278,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         id: const Uuid().v4(),
         title: finalTitle,
         price: _totalPrice,
-        imagePath: '',
         quantity: 1,
         categoryName: widget.categoryName,
         variantName:  _selectedVariant?.name,

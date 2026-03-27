@@ -88,8 +88,16 @@ class _AddItemSheetState extends State<AddItemSheet> {
   final _formState = AddItemFormState();
   bool _isSaving = false;
 
+  // Focus nodes for all text fields
+  final _itemNameFocusNode = FocusNode();
+  final _priceFocusNode = FocusNode();
+  final _descriptionFocusNode = FocusNode();
+
   @override
   void dispose() {
+    _itemNameFocusNode.dispose();
+    _priceFocusNode.dispose();
+    _descriptionFocusNode.dispose();
     _formState.dispose();
     super.dispose();
   }
@@ -423,6 +431,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
   Widget _buildItemNameField() {
     return AppTextField(
       controller: _formState.itemNameController,
+      focusNode: _itemNameFocusNode,
       label: 'Item Name',
       hint: 'e.g. Margherita Pizza',
       icon: Icons.fastfood_outlined,
@@ -433,6 +442,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
   Widget _buildPriceField() {
     return AppTextField(
       controller: _formState.priceController,
+      focusNode: _priceFocusNode,
       label: 'Price',
       hint: '0.00',
       prefixWidget: Padding(
@@ -450,6 +460,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
   Widget _buildDescriptionField() {
     return AppTextField(
       controller: _formState.descriptionController,
+      focusNode: _descriptionFocusNode,
       label: 'Description',
       hint: 'Optional',
       icon: Icons.notes_outlined,
@@ -459,6 +470,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   Future<void> _selectSellingMethod() async {
+    // Unfocus any field before opening the sheet
+    FocusScope.of(context).unfocus();
     final result = await SellingMethodSheet.show(
       context,
       currentMethod: _formState.sellingMethod,
@@ -469,6 +482,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
         _formState.setSellingMethod(result.method);
         _formState.setUnit(result.unit);
       });
+      // After selecting selling method, move focus to the price field
+      _priceFocusNode.requestFocus();
     }
   }
 

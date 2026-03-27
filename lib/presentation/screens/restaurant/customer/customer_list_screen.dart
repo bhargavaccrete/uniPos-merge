@@ -23,6 +23,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   @override
   void initState() {
     super.initState();
+    restaurantCustomerStore.setSearchQuery(''); // Ensure clean state on entry
     restaurantCustomerStore.loadCustomers();
   }
 
@@ -179,6 +180,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    restaurantCustomerStore.setSearchQuery(''); // Clear filter so next visit shows all
     super.dispose();
   }
 

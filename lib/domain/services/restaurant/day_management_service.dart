@@ -93,17 +93,38 @@ class DayManagementService {
       final lastDayDate = DateTime.parse(lastDayDateStr);
       final today = DateTime.now();
 
-      // If it's a new day, return false so the user is prompted to start it.
-      // We don't call resetDay() here anymore to preserve the old timestamp
-      // until a new day is explicitly started via setOpeningBalance().
+      // If calendar date changed AND the day was already ended (started=false),
+      // then it's truly a new day needing Start Day.
+      // BUT if started=true and date changed, there's a PENDING EOD from yesterday.
       if (lastDayDate.day != today.day ||
           lastDayDate.month != today.month ||
           lastDayDate.year != today.year) {
+        // If previous day was still "started" (EOD never completed), keep it started
+        // so the user can complete EOD before starting a new day.
+        if (started == true) {
+          return true; // Pending EOD — allow completing it
+        }
         return false;
       }
     }
 
     return started == true;
+  }
+
+  /// Check if there is a pending EOD from a previous day (midnight crossed without EOD)
+  static Future<bool> hasPendingEOD() async {
+    final box = _getBox();
+    final started = box.get(_dayStartedKey, defaultValue: false);
+    if (started != true) return false;
+
+    final lastDayDateStr = box.get(_lastDayDateKey);
+    if (lastDayDateStr == null) return false;
+
+    final lastDayDate = DateTime.parse(lastDayDateStr);
+    final today = DateTime.now();
+    return lastDayDate.day != today.day ||
+        lastDayDate.month != today.month ||
+        lastDayDate.year != today.year;
   }
 
   /// Reset the day (called automatically when a NEW calendar day is detected).

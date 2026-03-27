@@ -439,7 +439,6 @@ class RestaurantBulkImportService {
         Category category = Category(
           id: id,
           name: name,
-          imagePath: imagePath.isEmpty ? null : imagePath,
           createdTime: DateTime.now(),
         );
 

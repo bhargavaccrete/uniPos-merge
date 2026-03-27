@@ -10,8 +10,7 @@ class Category{
   @HiveField(1)
   final String name;
 
-  @HiveField(2)
-  final String? imagePath;
+  // HiveField(2) was imagePath — removed (unused)
 
   // --- AUDIT TRAIL FIELDS ---
   @HiveField(3)
@@ -29,7 +28,6 @@ class Category{
   Category({
     required this.id,
     required this.name,
-    this.imagePath,
     this.createdTime,
     this.lastEditedTime,
     this.editedBy,
@@ -40,7 +38,6 @@ class Category{
   Category copyWith({
     String? id,
     String? name,
-    String? imagePath,
     DateTime? createdTime,
     DateTime? lastEditedTime,
     String? editedBy,
@@ -49,7 +46,6 @@ class Category{
     return Category(
       id: id?? this.id,
       name: name ?? this.name,
-      imagePath: imagePath ?? this.imagePath,
       createdTime: createdTime ?? this.createdTime,
       lastEditedTime: lastEditedTime ?? this.lastEditedTime,
       editedBy: editedBy ?? this.editedBy,
@@ -60,7 +56,6 @@ class Category{
     return Category(
       id: map['id'],
       name: map['name'],
-      imagePath: map['imagePath'],
       createdTime: map['createdTime'] != null ? DateTime.parse(map['createdTime']) : null,
       lastEditedTime: map['lastEditedTime'] != null ? DateTime.parse(map['lastEditedTime']) : null,
       editedBy: map['editedBy'],
@@ -72,7 +67,6 @@ class Category{
     return {
       'id': id,
       'name': name,
-      'imagePath': imagePath,
       'createdTime': createdTime?.toIso8601String(),
       'lastEditedTime': lastEditedTime?.toIso8601String(),
       'editedBy': editedBy,
