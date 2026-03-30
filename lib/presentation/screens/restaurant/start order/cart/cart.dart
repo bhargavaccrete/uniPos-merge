@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -280,379 +279,127 @@ class _CartScreenState extends State<CartScreen>
   /// ------------------- MAIN BUILD ------------------- ///
   @override
   Widget build(BuildContext context) {
-    final Color deepBlue = Color(0xFF0D47A1);
     return Scaffold(
       appBar: AppBar(
-        elevation: 8,
-        shadowColor: deepBlue.withOpacity(0.5),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [deepBlue, Color(0xFF1565C0), deepBlue.withOpacity(0.8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        title: Text(
+          isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length})',
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w500,
           ),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                isExistingOrder ? Icons.edit_note : Icons.shopping_cart_rounded,
-                color: deepBlue,
-                size: 26,
-              ),
-            ),
-            SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  isExistingOrder ? 'Update Order' : 'Shopping Cart',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  '${_combinedList.length} ${_combinedList.length == 1 ? 'item' : 'items'}',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
         leading: IconButton(
-          icon: Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-            ),
-            child: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          ),
+          icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: IconButton(
-              icon: Container(
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade400,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withOpacity(0.4),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
+          IconButton(
+            icon: Icon(Icons.delete_outline, color: Colors.white, size: 22),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  title: Text('Clear Cart', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 17)),
+                  content: Text('Remove all items from cart?', style: GoogleFonts.poppins(fontSize: 14)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+                    ),
+                    TextButton(
+                      onPressed: () { Navigator.pop(context); clearCart(); },
+                      child: Text('Clear', style: GoogleFonts.poppins(color: Colors.red)),
                     ),
                   ],
                 ),
-                child: Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 22),
-              ),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    title: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(Icons.delete_forever_rounded, color: Colors.red.shade600, size: 28),
-                        ),
-                        SizedBox(width: 12),
-                        Text(
-                          'Clear Cart',
-                          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20),
-                        ),
-                      ],
-                    ),
-                    content: Text(
-                      'Are you sure you want to clear the cart? This action cannot be undone.',
-                      style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text(
-                          'Cancel',
-                          style: GoogleFonts.poppins(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          clearCart();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade500,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          elevation: 2,
-                        ),
-                        child: Text(
-                          'Clear',
-                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+              );
+            },
           ),
+          SizedBox(width: 4),
         ],
       ),
-// floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-
 
       body: _combinedList.isEmpty
           ? _buildEmptyCart()
           : Stack(
-          children:[
-
-
-
+          children: [
             Column(
               children: [
+                // Order type tabs
                 Container(
-                  margin: EdgeInsets.symmetric(
-                    horizontal: AppResponsive.getValue(context, mobile: 10.0, tablet: 16.0),
-                    vertical: AppResponsive.getValue(context, mobile: 8.0, tablet: 16.0),
-                  ),
-                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 4.0, tablet: 6.0)),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
+                  margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     children: [
-                      // Take Away button - always available
-                        Expanded(
-                          child: _buildModernFilterButton(
-                            icon: Icons.shopping_bag_outlined,
-                            title: 'Take Away',
-                            isSelected: selectedFilter == "Take Away",
-                            onTap: () => setState(() => selectedFilter = "Take Away"),
-                          ),
-                        ),
-                      // Dine In button - only show if enabled
+                      _buildTabChip('Take Away', Icons.shopping_bag_outlined, selectedFilter == "Take Away",
+                        () => setState(() => selectedFilter = "Take Away")),
                       if (OrderSettings.enableDineIn)
-                        Expanded(
-                          child: _buildModernFilterButton(
-                            icon: Icons.restaurant,
-                            title: 'Dine In',
-                            isSelected: selectedFilter == "Dine In",
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const TableScreen(isfromcart: true),
-                                ),
-                              );
-                              if (result is String) {
-                                setState(() {
-                                  selectedFilter = "Dine In";
-                                  _selectedTableNoForUI = result;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      // Delivery button - only show if enabled
+                        _buildTabChip('Dine In', Icons.restaurant, selectedFilter == "Dine In",
+                          () async {
+                            final result = await Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
+                            if (result is String) setState(() { selectedFilter = "Dine In"; _selectedTableNoForUI = result; });
+                          }),
                       if (OrderSettings.enableDelivery)
-                        Expanded(
-                          child: _buildModernFilterButton(
-                            icon: Icons.delivery_dining,
-                            title: 'Delivery',
-                            isSelected: selectedFilter == "Delivery",
-                            onTap: () => setState(() => selectedFilter = "Delivery"),
-                          ),
-                        ),
+                        _buildTabChip('Delivery', Icons.delivery_dining, selectedFilter == "Delivery",
+                          () => setState(() => selectedFilter = "Delivery")),
                     ],
                   ),
                 ),
-                // Display KOT numbers and table info for existing orders (Compact Version)
+                // Existing order info (KOT + table)
                 if (isExistingOrder && widget.existingOrder != null)
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      border: Border.all(color: Colors.blue.shade200),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // KOT Numbers Section (Left Side)
+                        Icon(Icons.receipt_long, color: Colors.grey.shade600, size: 14),
+                        SizedBox(width: 4),
                         Expanded(
-                          child: Row(
-                            children: [
-                              Icon(Icons.receipt_long, color: Colors.blue.shade700, size: 16),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: Wrap(
-                                  spacing: 4,
-                                  runSpacing: 4,
-                                  children: (widget.existingOrder!.kotNumbers ??
-                                      (widget.existingOrder!.kotNumber != null ? [widget.existingOrder!.kotNumber!] : []))
-                                      .map((kotNum) {
-                                    return Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.shade700,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '#$kotNum',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ],
+                          child: Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: (widget.existingOrder!.kotNumbers ??
+                                (widget.existingOrder!.kotNumber != null ? [widget.existingOrder!.kotNumber!] : []))
+                                .map((kotNum) => Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('#$kotNum', style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.primary)),
+                                )).toList(),
                           ),
                         ),
-
-                        // Table Info Section (Right Side) - Only for Dine In
                         if (widget.existingOrder!.orderType == 'Dine In' && widget.existingOrder!.tableNo != null && widget.existingOrder!.tableNo!.isNotEmpty) ...[
-                          Container(
-                            height: 30,
-                            width: 1,
-                            color: Colors.blue.shade300,
-                            margin: EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          Icon(Icons.table_restaurant, color: Colors.blue.shade700, size: 16),
-                          SizedBox(width: 4),
-                          Text(
-                            tableNo ?? widget.existingOrder!.tableNo!,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade700,
-                            ),
-                          ),
+                          Container(height: 16, width: 1, color: Colors.grey.shade300, margin: EdgeInsets.symmetric(horizontal: 8)),
+                          Text(tableNo ?? widget.existingOrder!.tableNo!, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
                           SizedBox(width: 6),
-                          // Change Table Button
                           InkWell(
                             onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const TableScreen(isfromcart: true),
-                                ),
-                              );
+                              final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
                               if (result is String && result != widget.existingOrder!.tableNo) {
                                 try {
                                   final oldTableNo = widget.existingOrder!.tableNo;
-
-                                  print('=== TABLE CHANGE DEBUG ===');
-                                  print('Old table: $oldTableNo');
-                                  print('New table: $result');
-                                  print('Order ID: ${widget.existingOrder!.id}');
-
                                   final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
                                   await orderStore.updateOrder(updatedOrder);
-                                  print('✅ Order updated in database');
-
-                                  if (oldTableNo != null && oldTableNo.isNotEmpty) {
-                                    await tableStore.updateTableStatus(oldTableNo, 'Available');
-                                    print('✅ Old table ($oldTableNo) set to Available');
-                                  }
-
-                                  await tableStore.updateTableStatus(
-                                    result,
-                                    'Cooking',
-                                    total: updatedOrder.totalPrice,
-                                    orderId: updatedOrder.id,
-                                    orderTime: updatedOrder.timeStamp,
-                                  );
-                                  print('✅ New table ($result) set to Cooking');
-
-                                  setState(() {
-                                    _selectedTableNoForUI = result;
-                                    tableNo = result;
-                                  });
-
-                                  print('=== TABLE CHANGE COMPLETE ===');
-
-                                  NotificationService.instance.showInfo(
-                                    'Table changed from $oldTableNo to $result',
-                                  );
-                                } catch (e, stackTrace) {
-                                  print('❌ Error changing table: $e');
-                                  print('Stack trace: $stackTrace');
-                                  NotificationService.instance.showError(
-                                    'Failed to change table. Please try again.',
-                                  );
+                                  if (oldTableNo != null && oldTableNo.isNotEmpty) await tableStore.updateTableStatus(oldTableNo, 'Available');
+                                  await tableStore.updateTableStatus(result, 'Cooking', total: updatedOrder.totalPrice, orderId: updatedOrder.id, orderTime: updatedOrder.timeStamp);
+                                  setState(() { _selectedTableNoForUI = result; tableNo = result; });
+                                  NotificationService.instance.showInfo('Table changed to $result');
+                                } catch (e) {
+                                  NotificationService.instance.showError('Failed to change table');
                                 }
                               }
                             },
-                            child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade700,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Icon(Icons.swap_horiz, size: 14, color: Colors.white),
-                            ),
+                            child: Icon(Icons.swap_horiz, size: 20, color: AppColors.primary),
                           ),
                           SizedBox(width: 4),
-                          // Merge Table Button
                           InkWell(
                             onTap: () => _showMergeTableDialog(),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade700,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Icon(Icons.merge_type, size: 14, color: Colors.white),
-                            ),
+                            child: Icon(Icons.merge_type, size: 20, color: Colors.orange.shade700),
                           ),
                         ],
                       ],
@@ -662,99 +409,54 @@ class _CartScreenState extends State<CartScreen>
               ],
             ),
 
-            // Show Add button only when there are active items but no new items added
+            // Show Add Items button when viewing existing order with no new items
             if (_activeList.isNotEmpty && _newlyAddedList.isEmpty)
               Positioned(
-                bottom: 150,
-                right: 130,
-                child:   FloatingActionButton.extended(
-                  backgroundColor: AppColors.primary,
-
-                  onPressed: _navigateAndAddMoreItems,
-                  icon: const Icon(Icons.add,color: Colors.white,), // The icon to display.
-                  label:  Text('Add',style: GoogleFonts.poppins(color: Colors.white)),     // The text label to display.
-                ),),
-          ]
-
-
+                bottom: 140,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: ElevatedButton.icon(
+                    onPressed: _navigateAndAddMoreItems,
+                    icon: Icon(Icons.add, size: 18),
+                    label: Text('Add Items', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 1,
+                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ),
+          ],
       ),
     );
   }
 
-  // Add this method for modern filter buttons
-  Widget _buildModernFilterButton({
-    required IconData icon,
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    final Color deepBlue = Color(0xFF0D47A1);
-    final isMobile = AppResponsive.isMobile(context);
-    final iconSize = AppResponsive.getValue(context, mobile: 18.0, tablet: 22.0);
-    final fontSize = AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0);
-    final hPadding = AppResponsive.getValue(context, mobile: 6.0, tablet: 12.0);
-    final vPadding = AppResponsive.getValue(context, mobile: 10.0, tablet: 14.0);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        margin: EdgeInsets.symmetric(horizontal: isMobile ? 2 : 4),
-        padding: EdgeInsets.symmetric(vertical: vPadding, horizontal: hPadding),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [deepBlue, Color(0xFF1565C0)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isSelected ? null : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? deepBlue : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
+  Widget _buildTabChip(String title, IconData icon, bool isSelected, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: 3),
+          padding: EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(10),
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: deepBlue.withOpacity(0.4),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                    spreadRadius: 1,
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : deepBlue.withOpacity(0.7),
-              size: iconSize,
-            ),
-            SizedBox(width: isMobile ? 4 : 8),
-            Flexible(
-              child: Text(
-                title,
-                style: GoogleFonts.poppins(
-                  color: isSelected ? Colors.white : deepBlue.withOpacity(0.8),
-                  fontSize: fontSize,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey.shade600),
+              SizedBox(width: 6),
+              Text(title, style: GoogleFonts.poppins(
+                fontSize: 12, fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+              )),
+            ],
+          ),
         ),
       ),
     );
@@ -765,35 +467,9 @@ class _CartScreenState extends State<CartScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.shopping_cart_outlined,
-              size: 80,
-              color: Colors.grey.shade400,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Your cart is empty',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Add items to get started',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
-          ),
+          Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
+          Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade500)),
         ],
       ),
     );

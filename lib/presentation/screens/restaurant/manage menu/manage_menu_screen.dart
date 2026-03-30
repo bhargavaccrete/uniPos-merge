@@ -96,16 +96,7 @@ class _ManagemenuState extends State<Managemenu>
             color: isSelected ? AppColors.primary : Colors.grey.shade300,
             width: 2,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: Offset(0, 4),
-                  ),
-
-                ]
-              : [],
+          boxShadow: [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -166,78 +157,14 @@ class _ManagemenuState extends State<Managemenu>
           ),
         ),
         actions: [
-          // Import Button
-          Container(
-            margin: EdgeInsets.symmetric(
-              vertical: 8,
-              horizontal: isTablet ? 12 : 8,
-            ),
-            child: ElevatedButton.icon(
-              icon: Icon(Icons.upload_file, size: isTablet ? 20 : 18),
-              label: Text(
-                'Import',
-                style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 15 : 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 20 : 16,
-                  vertical: isTablet ? 12 : 8,
-                ),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BulkImportTestScreenV3(),
-                  ),
-                );
-              },
-            ),
+          IconButton(
+            icon: Icon(Icons.upload_file, color: Colors.black87),
+            tooltip: 'Import',
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const BulkImportTestScreenV3()));
+            },
           ),
-
-          // Admin Badge
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
-              vertical: 8,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(isTablet ? 10 : 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    size: isTablet ? 22 : 20,
-                    color: AppColors.primary,
-                  ),
-                ),
-                if (isTablet) ...[
-                  SizedBox(width: 10),
-                  Text(
-                    'Admin',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+          SizedBox(width: 4),
         ],
       ),
       drawer: DrawerManage(islogout: true, isDelete: false, issync: false),
@@ -249,13 +176,7 @@ class _ManagemenuState extends State<Managemenu>
             padding: EdgeInsets.all(isTablet ? 20 : 16),
             decoration: BoxDecoration(
               color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
             ),
             child: Observer(
               builder: (_) {

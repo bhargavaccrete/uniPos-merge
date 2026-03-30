@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
@@ -142,9 +141,9 @@ class _CategoryTabState extends State<CategoryTab> {
           padding: EdgeInsets.all(24),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: _getGridColumns(size.width),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 8,
+            childAspectRatio: 3.5,
           ),
           itemCount: filteredCategories.length,
           itemBuilder: (context, index) {
@@ -201,218 +200,68 @@ class _CategoryTabState extends State<CategoryTab> {
   }
 
   Widget _buildCategoryCard(Category category, List<Items> items, {required bool isGrid}) {
-    return Card(
-      margin: isGrid ? EdgeInsets.zero : EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      margin: isGrid ? EdgeInsets.zero : EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: isGrid ? MainAxisSize.min : MainAxisSize.max,
-          children: [
-            Row(
-              children: [
-                // Category Image or Icon
-                Container(
-                  width: isGrid ? 50 : 60,
-                  height: isGrid ? 50 : 60,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                          Icons.category_rounded,
-                          color: AppColors.primary,
-                          size: isGrid ? 20 : 28,
-                        ),
-                ),
-                SizedBox(width: isGrid ? 12 : 16),
-
-                // Category Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        category.name,
-                        style: GoogleFonts.poppins(
-                          fontSize: isGrid ? 15 : 17,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 4),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.restaurant_menu,
-                              size: 12,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '${items.length} items',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            SizedBox(height: isGrid ? 10 : 8),
-
-            // Compact action row — Edit, Delete, Toggle in one line
-            Row(
-              children: [
-                // Edit
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EditCategory(category: category),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 7),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.edit_rounded, size: 18, color: Colors.blue),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 6),
-                // Delete
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => _showDeleteDialog(category),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 7),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.delete_rounded, size: 18, color: Colors.red),
-                    ),
-                  ),
-                ),
-                // Bulk Enable/Disable
-                if (items.isNotEmpty) ...[
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Builder(builder: (_) {
-                      final allEnabled = items.every((i) => i.isEnabled);
-                      final fg = allEnabled ? Colors.orange.shade700 : Colors.green.shade700;
-                      final bg = allEnabled ? Colors.orange.shade50 : Colors.green.shade50;
-                      final icon = allEnabled ? Icons.visibility_off_rounded : Icons.visibility_rounded;
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => _bulkToggleCategory(category.id, items),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(vertical: 7),
-                          decoration: BoxDecoration(
-                            color: bg,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(icon, size: 18, color: fg),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ],
-            ),
-
-            // Audit Trail (only in mobile view)
-            if (!isGrid &&
-                (category.createdTime != null ||
-                    AuditTrailHelper.hasBeenEdited(category)))
-              Container(
-                margin: EdgeInsets.only(top: 12),
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: isGrid ? MainAxisSize.min : MainAxisSize.max,
+        children: [
+          // Main row: name + item count + actions
+          Row(
+            children: [
+              Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
+              SizedBox(width: 10),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (category.createdTime != null)
-                      Row(
-                        children: [
-                          Icon(Icons.access_time,
-                              size: 12, color: Colors.grey.shade500),
-                          SizedBox(width: 4),
-                          Text(
-                            'Created: ${category.createdTime!.day}/${category.createdTime!.month}/${category.createdTime!.year} ${category.createdTime!.hour}:${category.createdTime!.minute.toString().padLeft(2, '0')}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    if (AuditTrailHelper.hasBeenEdited(category))
-                      Padding(
-                        padding: EdgeInsets.only(
-                            top: category.createdTime != null ? 4 : 0),
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit,
-                                size: 12, color: Colors.orange.shade700),
-                            SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                'Edited ${category.editCount} time(s) • Last: ${category.lastEditedTime!.day}/${category.lastEditedTime!.month}/${category.lastEditedTime!.year}${category.editedBy != null ? ' by ${category.editedBy}' : ''}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: Colors.orange.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    Text(category.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text('${items.length} items', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500)),
                   ],
                 ),
               ),
-          ],
-        ),
+              // Actions inline
+              InkWell(
+                onTap: () => AddCategoryDialog.show(context, editCategory: category),
+                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
+              ),
+              InkWell(
+                onTap: () => _showDeleteDialog(category),
+                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red)),
+              ),
+              if (items.isNotEmpty)
+                Builder(builder: (_) {
+                  final allEnabled = items.every((i) => i.isEnabled);
+                  return InkWell(
+                    onTap: () => _bulkToggleCategory(category.id, items),
+                    child: Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(
+                        allEnabled ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        size: 18,
+                        color: allEnabled ? Colors.orange.shade700 : Colors.green.shade700,
+                      ),
+                    ),
+                  );
+                }),
+            ],
+          ),
+          // Audit trail — compact (mobile only)
+          if (!isGrid && AuditTrailHelper.hasBeenEdited(category))
+            Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Edited ${category.editCount}x • ${category.lastEditedTime!.day}/${category.lastEditedTime!.month}/${category.lastEditedTime!.year}${category.editedBy != null ? ' by ${category.editedBy}' : ''}',
+                style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -430,49 +279,26 @@ class _CategoryTabState extends State<CategoryTab> {
 
 
   void _showDeleteDialog(Category category) {
+    final itemCount = itemStore.items.where((i) => i.categoryOfItem == category.id).length;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 12),
-            Text(
-              'Delete Category',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text('Delete "${category.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
         content: Text(
-          "Are you sure you want to delete this category and all its items?",
-          style: GoogleFonts.poppins(fontSize: 14),
+          itemCount > 0
+              ? 'This will also delete $itemCount item${itemCount > 1 ? 's' : ''} in this category.'
+              : 'This category has no items.',
+          style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              "Cancel",
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              _deleteCategoryhive(category.id);
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Delete',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
+          TextButton(
+            onPressed: () { _deleteCategoryhive(category.id); Navigator.pop(context); },
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -480,50 +306,20 @@ class _CategoryTabState extends State<CategoryTab> {
   }
 
   Widget _buildAddButton() {
-    return Container(
+    return Padding(
       padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
       child: SizedBox(
         width: double.infinity,
-        height: 50,
-        child: ElevatedButton(
+        child: ElevatedButton.icon(
           onPressed: _showAddCategoryBottomSheet,
+          icon: Icon(Icons.add, size: 20),
+          label: Text('Add Category', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(Icons.add, color: AppColors.primary, size: 20),
-              ),
-              SizedBox(width: 10),
-              Text(
-                'Add Category',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
       ),

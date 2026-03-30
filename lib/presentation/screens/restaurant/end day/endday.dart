@@ -12,6 +12,8 @@ import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
+import '../start order/startorder.dart';
 import 'package:unipos/domain/services/restaurant/data_clear_service.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/domain/services/restaurant/eod_service.dart';
@@ -206,8 +208,23 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     print('   Detected Active Orders: ${activeOrders.length}');
 
     if (activeOrders.isNotEmpty) {
-      await _showActiveOrdersError(activeOrders.length);
-      return;
+      final isPendingEOD = await DayManagementService.hasPendingEOD();
+      if (isPendingEOD) {
+        // Previous day pending — user is stuck, offer Void All
+        await _showPendingEODOrdersDialog(activeOrders);
+        // Re-check after voiding (user may have voided all)
+        await orderStore.loadOrders();
+        final stillActive = orderStore.orders.where((o) {
+          final status = o.status.toLowerCase();
+          return status != 'voided' && status != 'cancelled' &&
+              o.isPaid != true && o.paymentStatus?.toLowerCase() != 'paid';
+        }).toList();
+        if (stillActive.isNotEmpty) return; // Still has active orders, can't proceed
+      } else {
+        // Same day — user can navigate to orders freely
+        await _showActiveOrdersError(activeOrders.length);
+        return;
+      }
     }
 
     final confirmed = await _showConfirmationDialog();
@@ -322,7 +339,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         Navigator.pushNamedAndRemoveUntil(
           context,
           RouteNames.restaurantLogin,
-          (route) => false,
+              (route) => false,
         );
       }
     }
@@ -336,7 +353,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             final withdrawal =
                 double.tryParse(withdrawalController.text) ?? 0.0;
             final remaining =
-                (actualCash - withdrawal).clamp(0.0, double.infinity);
+            (actualCash - withdrawal).clamp(0.0, double.infinity);
 
             Future<void> confirm() async {
               if (isConfirming) return;
@@ -347,7 +364,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
               }
               if (w > actualCash) {
                 setDialogState(() =>
-                    fieldError = 'Cannot withdraw more than counted cash');
+                fieldError = 'Cannot withdraw more than counted cash');
                 return;
               }
               try {
@@ -567,10 +584,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                                 ),
                                 child: isConfirming
                                     ? const SizedBox(
-                                        height: 20, width: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    height: 20, width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                     : Text('Confirm & Logout',
-                                        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+                                    style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
                               ),
                             ),
                             if (!isConfirming) ...[
@@ -612,6 +629,81 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     withdrawalController.dispose();
   }
 
+  Future<void> _showPendingEODOrdersDialog(List<dynamic> activeOrders) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Text('Previous Day - ${activeOrders.length} Pending Order(s)', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('These orders were not settled. Void them to complete End of Day.',
+                style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
+              SizedBox(height: 12),
+              ...activeOrders.take(5).map((o) => Padding(
+                padding: EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.receipt_long, size: 14, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Expanded(child: Text(
+                      'KOT #${o.kotNumbers.isNotEmpty ? o.kotNumbers.first : "?"} • ${o.orderType ?? ""}${o.tableNo != null && o.tableNo!.isNotEmpty ? " • Table ${o.tableNo}" : ""}',
+                      style: GoogleFonts.poppins(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    )),
+                  ],
+                ),
+              )),
+              if (activeOrders.length > 5)
+                Text('+${activeOrders.length - 5} more', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Void all stale orders
+                for (final order in activeOrders) {
+                  final voidRecord = PastOrderModel(
+                    id: order.id,
+                    customerName: order.customerName ?? '',
+                    totalPrice: order.totalPrice,
+                    items: order.items,
+                    orderAt: order.timeStamp,
+                    orderType: order.orderType,
+                    paymentmode: 'N/A',
+                    subTotal: order.subTotal,
+                    gstAmount: order.gstAmount,
+                    tableNo: order.tableNo,
+                    orderStatus: 'VOID',
+                    kotNumbers: order.kotNumbers,
+                    kotBoundaries: order.kotBoundaries,
+                  );
+                  await pastOrderStore.addOrder(voidRecord);
+                  await orderStore.deleteOrder(order.id);
+                  if (order.tableNo != null && order.tableNo!.isNotEmpty) {
+                    await tableStore.updateTableStatus(order.tableNo!, 'Available');
+                  }
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                NotificationService.instance.showSuccess('${activeOrders.length} order(s) voided');
+              },
+              child: Text('Void All', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _safeDropRow(String label, double amount, Color color) {
     final isNeg = amount < 0;
     return Padding(
@@ -632,33 +724,50 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   Future<void> _showActiveOrdersError(int count) async {
+    // Get active order details for display
+    final activeOrders = orderStore.orders.where((o) {
+      final status = o.status.toLowerCase();
+      final isVoided = status == 'voided' || status == 'cancelled';
+      final isPaid = o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid';
+      return !isVoided && !isPaid;
+    }).toList();
+
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          title: Row(
+          title: Text('$count Active Order(s)', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.error_rounded, color: Colors.red, size: 28),
-              SizedBox(width: 10),
-              Text('Cannot End Day', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
+              Text('Settle or void these orders to end the day:', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
+              SizedBox(height: 12),
+              ...activeOrders.take(5).map((o) => Padding(
+                padding: EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.receipt_long, size: 14, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Expanded(child: Text(
+                      'KOT #${o.kotNumbers.isNotEmpty ? o.kotNumbers.first : "?"} • ${o.orderType}${o.tableNo != null && o.tableNo!.isNotEmpty ? " • Table ${o.tableNo}" : ""} • ${o.status}',
+                      style: GoogleFonts.poppins(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    )),
+                  ],
+                ),
+              )),
+              if (activeOrders.length > 5)
+                Text('+${activeOrders.length - 5} more', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
             ],
           ),
-          content: Text(
-            'There are $count active order(s) currently running.\n\nYou must complete or void all active orders before you can perform End of Day.',
-            style: GoogleFonts.poppins(fontSize: 14),
-          ),
           actions: [
-            ElevatedButton(
+            // Same-day: just close dialog, user can navigate to orders
+            TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: Text('OK', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+              child: Text('OK', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
             ),
           ],
         );
@@ -938,7 +1047,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     if (result != null && mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => AdminWelcome()),
-        (route) => false,
+            (route) => false,
       );
     }
   }
@@ -1198,7 +1307,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             tilePadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             leading: Container(
               padding: const EdgeInsets.all(8),
@@ -1449,14 +1558,14 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
               hint: 'Enter counted cash amount',
               icon: Icons.payments_rounded,
               keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(
                     RegExp(r'^\d+\.?\d{0,2}')),
               ],
               prefixWidget: Padding(
                 padding:
-                    const EdgeInsets.only(left: 14, right: 8),
+                const EdgeInsets.only(left: 14, right: 8),
                 child: Text(currency,
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
@@ -1481,23 +1590,23 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     color: !hasVal
                         ? AppColors.surfaceLight
                         : (isNeg
-                            ? Colors.red.shade50
-                            : Colors.green.shade50),
+                        ? Colors.red.shade50
+                        : Colors.green.shade50),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                         color: !hasVal
                             ? AppColors.divider
                             : (isNeg
-                                ? Colors.red.shade200
-                                : Colors.green.shade200)),
+                            ? Colors.red.shade200
+                            : Colors.green.shade200)),
                   ),
                   child: Row(children: [
                     Icon(
                       !hasVal
                           ? Icons.calculate_outlined
                           : (isNeg
-                              ? Icons.trending_down_rounded
-                              : Icons.trending_up_rounded),
+                          ? Icons.trending_down_rounded
+                          : Icons.trending_up_rounded),
                       size: 20,
                       color: !hasVal
                           ? AppColors.textSecondary
@@ -1523,8 +1632,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                             color: !hasVal
                                 ? AppColors.textSecondary
                                 : (isNeg
-                                    ? Colors.red.shade700
-                                    : Colors.green.shade700),
+                                ? Colors.red.shade700
+                                : Colors.green.shade700),
                           ),
                         ),
                         if (hasVal && isNeg)
@@ -1553,12 +1662,12 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                 onPressed: _isGenerating ? null : _completeEndOfDay,
                 icon: _isGenerating
                     ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.nightlight_round,
-                        color: Colors.white),
+                    color: Colors.white),
                 label: Text(
                   _isGenerating ? 'Processing...' : 'End of Day',
                   style: GoogleFonts.poppins(

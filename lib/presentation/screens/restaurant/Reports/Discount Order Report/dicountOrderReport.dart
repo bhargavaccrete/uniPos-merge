@@ -307,27 +307,31 @@ class _DiscountDataViewState extends State<DiscountDataView> {
     }
 
     final headers = [
-      'Date & Time',
-      'Invoice ID',
+      'Date',
+      'Invoice',
       'Customer',
-      'Payment Method',
-      'Order Type',
-      'Subtotal',
+      'Payment',
+      'Type',
+      'Original',
       'Discount',
-      'Total Amount'
+      'Final'
     ];
 
-    final data = _filteredOrders.map((order) => [
-      ReportExportService.formatDateTime(order.orderAt),
-      order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
-      order.customerName.isNotEmpty ? order.customerName : 'Guest',
-      order.paymentmode ?? 'N/A',
-      order.orderType ?? 'N/A',
-      ReportExportService.formatCurrency(order.subTotal ?? 0.0),
-      ReportExportService.formatCurrency(order.Discount ?? 0.0),
-      // FIX 2: Use net amount in export to match the table display.
-      ReportExportService.formatCurrency(order.totalPrice - (order.refundAmount ?? 0.0)),
-    ]).toList();
+    final data = _filteredOrders.map((order) {
+      final discount = order.Discount ?? 0.0;
+      final netTotal = order.totalPrice - (order.refundAmount ?? 0.0);
+      final original = netTotal + discount;
+      return [
+        ReportExportService.formatDateTime(order.orderAt),
+        order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
+        order.customerName.isNotEmpty ? order.customerName : 'Guest',
+        order.paymentmode ?? 'N/A',
+        order.orderType ?? 'N/A',
+        ReportExportService.formatCurrency(original),
+        ReportExportService.formatCurrency(discount),
+        ReportExportService.formatCurrency(netTotal),
+      ];
+    }).toList();
 
     final periodDisplay = _getPeriodDisplayName();
 
@@ -756,13 +760,13 @@ class _DiscountDataViewState extends State<DiscountDataView> {
               dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
               dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
               columns: [
-                DataColumn(label: Text('Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
-                DataColumn(label: Text('Invoice ID', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
-                DataColumn(label: Text('Customer', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
-                DataColumn(label: Text('Payment', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
-                DataColumn(label: Text('Type', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
-                DataColumn(label: Text('Discount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Total', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
+                DataColumn(label: Text('Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
+                DataColumn(label: Text('Invoice', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
+                DataColumn(label: Text('Customer', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
+                DataColumn(label: Text('Payment', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
+                DataColumn(label: Text('Type', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
+                DataColumn(label: Text('Discount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize)), numeric: true),
+                DataColumn(label: Text('Total', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize)), numeric: true),
               ],
               rows: pageOrders.map((order) {
                 final discount = order.Discount ?? 0.0;

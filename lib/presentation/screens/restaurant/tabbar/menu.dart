@@ -6,6 +6,7 @@ import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.d
 import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
@@ -159,6 +160,15 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _addItemToCart(CartItem cartItem) async {
+    // Block adding items if EOD is pending from previous day
+    final pendingEOD = await DayManagementService.hasPendingEOD();
+    if (pendingEOD) {
+      if (mounted) {
+        NotificationService.instance.showError('Complete End of Day before placing new orders');
+      }
+      return;
+    }
+
     try {
       final result = await restaurantCartStore.addToCart(cartItem);
 

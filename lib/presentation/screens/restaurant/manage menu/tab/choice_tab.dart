@@ -570,32 +570,14 @@ class _ChoiceTabState extends State<ChoiceTab> {
   Future<void> _delete(ChoicesModel choice) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 12),
-            Text('Delete Choice', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to delete this choice?',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text('Delete "${choice.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
+        content: Text('This choice and its ${choice.choiceOption.length} options will be removed.',
+          style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
         ],
       ),
     );
@@ -686,7 +668,7 @@ class _ChoiceTabState extends State<ChoiceTab> {
             crossAxisCount: _getGridColumns(size.width),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 2,
+            childAspectRatio: 2.8,
           ),
           itemCount: filteredChoices.length,
           itemBuilder: (context, index) {
@@ -741,150 +723,38 @@ class _ChoiceTabState extends State<ChoiceTab> {
   }
 
   Widget _buildMobileChoiceCard(ChoicesModel choice) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-        ),
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          childrenPadding: EdgeInsets.only(bottom: 12),
-          leading: Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.checklist,
-              color: AppColors.primary,
-              size: 24,
-            ),
-          ),
-          title: Text(
-            choice.name,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          subtitle: Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.list_alt, size: 12, color: AppColors.primary),
-                  SizedBox(width: 4),
-                  Text(
-                    '${choice.choiceOption.length} options',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          tilePadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          childrenPadding: EdgeInsets.only(bottom: 8),
+          leading: Icon(Icons.checklist, color: AppColors.primary, size: 20),
+          title: Text(choice.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+          subtitle: Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              InkWell(
-                onTap: () => openBottomSheet(choicemodel: choice),
-                child: Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.edit_outlined,
-                    size: 20,
-                    color: Colors.blue,
-                  ),
-                ),
-              ),
-              SizedBox(width: 8),
-              InkWell(
-                onTap: () => _delete(choice),
-                child: Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.delete_outline,
-                    size: 20,
-                    color: Colors.red,
-                  ),
-                ),
-              ),
+              InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+              InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
             ],
           ),
           children: choice.choiceOption.isEmpty
-              ? [
-                  Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.grey, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          "No options available",
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ]
+              ? [Padding(padding: EdgeInsets.all(16), child: Text("No options", style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade400)))]
               : choice.choiceOption.map((option) {
-                  return Container(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
+                  return Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 3),
                     child: Row(
                       children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            option.name,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
+                        Container(width: 5, height: 5, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                        SizedBox(width: 10),
+                        Text(option.name, style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
                       ],
                     ),
                   );
@@ -895,214 +765,72 @@ class _ChoiceTabState extends State<ChoiceTab> {
   }
 
   Widget _buildGridChoiceCard(ChoicesModel choice) {
-    return Card(
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Padding(
-        padding: EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.checklist,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        choice.name,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 4),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${choice.choiceOption.length} options',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 12),
-            if (choice.choiceOption.isNotEmpty)
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.checklist, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
               Expanded(
-                child: Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: ListView(
-                    children: [
-                      ...choice.choiceOption.take(3).map((option) {
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 4,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  option.name,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                      if (choice.choiceOption.length > 3)
-                        Padding(
-                          padding: EdgeInsets.only(top: 4),
-                          child: Text(
-                            '+${choice.choiceOption.length - 3} more',
-                            style: GoogleFonts.poppins(
-                              fontSize: 10,
-                              color: Colors.grey.shade500,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(choice.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500)),
+                  ],
                 ),
               ),
-            SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => openBottomSheet(choicemodel: choice),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _delete(choice),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.delete_outline,
-                        size: 18,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
+              InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
+            ],
+          ),
+          if (choice.choiceOption.isNotEmpty) ...[
+            SizedBox(height: 8),
+            Expanded(
+              child: ListView(
+                children: [
+                  ...choice.choiceOption.take(2).map((option) => Padding(
+                    padding: EdgeInsets.only(bottom: 3),
+                    child: Row(children: [
+                      Container(width: 4, height: 4, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                      SizedBox(width: 8),
+                      Expanded(child: Text(option.name, style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    ]),
+                  )),
+                  if (choice.choiceOption.length > 2)
+                    Text('+${choice.choiceOption.length - 2} more', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
+                ],
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildAddButton() {
-    return Container(
+    return Padding(
       padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
       child: SizedBox(
         width: double.infinity,
-        height: 50,
-        child: ElevatedButton(
+        child: ElevatedButton.icon(
           onPressed: () => openBottomSheet(),
+          icon: Icon(Icons.add, size: 20),
+          label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(Icons.add, color: AppColors.primary, size: 20),
-              ),
-              SizedBox(width: 10),
-              Text(
-                'Add Choice',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
       ),

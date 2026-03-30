@@ -104,7 +104,7 @@ class EscPosReceiptBuilder {
     if (receiptData.tableNo != null && receiptData.tableNo!.isNotEmpty) {
       infoLine += 'Table: ${receiptData.tableNo}';
     }
-    if (PrintSettings.showOrderType && receiptData.orderType != null) {
+    if (receiptData.orderType != null) {
       if (infoLine.isNotEmpty) infoLine += '  |  ';
       infoLine += receiptData.orderType!;
     }
@@ -250,7 +250,7 @@ class EscPosReceiptBuilder {
     }
 
     // Order type + table
-    if (PrintSettings.showOrderType && receiptData.orderType != null) {
+    if (receiptData.orderType != null) {
       String typeLine = 'Type: ${receiptData.orderType}';
       if (receiptData.tableNo != null && receiptData.tableNo!.isNotEmpty) {
         typeLine += '  Table: ${receiptData.tableNo}';
@@ -381,7 +381,15 @@ class EscPosReceiptBuilder {
     if (isTaxInclusive) {
       bytes.addAll(_text('All prices include GST'));
     }
-    bytes.addAll(_text('Thank you for dining with us!'));
+    // Order-type-aware thank you message
+    final orderType = receiptData.orderType?.toLowerCase() ?? '';
+    if (orderType.contains('dine')) {
+      bytes.addAll(_text('Thank you for dining with us!'));
+    } else if (orderType.contains('delivery')) {
+      bytes.addAll(_text('Thank you for your order!'));
+    } else {
+      bytes.addAll(_text('Thank you! Enjoy your meal!'));
+    }
     bytes.addAll(_text('Visit us again!'));
     if (PrintSettings.showPoweredBy) {
       bytes.addAll(_text('Powered by UniPOS'));

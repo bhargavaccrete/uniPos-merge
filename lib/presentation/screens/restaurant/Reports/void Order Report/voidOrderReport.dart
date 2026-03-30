@@ -986,6 +986,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                 minWidth: MediaQuery.of(context).size.width - (isDesktop ? 48 : (isTablet ? 48 : 32)),
               ),
               child: DataTable(
+                showCheckboxColumn: false,
                 columnSpacing: AppResponsive.tableColumnSpacing(context),
                 headingRowHeight: AppResponsive.tableHeadingHeight(context),
                 dataRowMinHeight: AppResponsive.tableRowMinHeight(context),

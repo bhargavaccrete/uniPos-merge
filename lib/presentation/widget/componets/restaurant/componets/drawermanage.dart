@@ -134,18 +134,7 @@ class DrawerManage extends StatelessWidget {
                     },
                     isTablet: isTablet,
                   ),
-                  // End Shift — shown only when a shift is open AND handover is enabled
-                  if (RestaurantSession.hasOpenShift && AppSettings.shiftHandover)
-                    _buildDrawerItem(
-                      context: context,
-                      icon: Icons.lock_clock_rounded,
-                      title: 'End Shift',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showEndShiftDialog(context);
-                      },
-                      isTablet: isTablet,
-                    ),
+                  // End Shift removed — shifts end automatically on EOD and logout
                   if (issync) ...[
                     _buildDrawerItem(
                       context: context,

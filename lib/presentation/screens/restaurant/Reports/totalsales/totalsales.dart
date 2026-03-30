@@ -299,13 +299,12 @@ class _SalesDataViewState extends State<SalesDataView> {
       return;
     }
 
-    // Prepare headers
     final headers = [
-      'Date & Time',
-      'Bill #',
+      'Date',
+      'Invoice',
       'Customer',
-      'Payment Method',
-      'Order Type',
+      'Payment',
+      'Type',
       'Status',
       'Amount',
     ];

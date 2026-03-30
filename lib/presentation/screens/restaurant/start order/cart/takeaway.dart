@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
@@ -17,7 +18,6 @@ import '../../../../../util/restaurant/restaurant_session.dart';
 
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
-import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/common/app_text_field.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
@@ -181,401 +181,157 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   Widget _buildItemSection(String title, Color color, List<CartItemStatus> items) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: color, width: 2),
-        borderRadius: BorderRadius.circular(12),
-        color: color.withOpacity(0.05),
-      ),
-      child: Column(
-        children: [
-          // Section Header
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              ),
-              border: Border(
-                bottom: BorderSide(color: color, width: 1),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${items.length}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    final sectionFs = AppResponsive.getValue<double>(context, mobile: 11, tablet: 13, desktop: 14);
+    final countFs = AppResponsive.getValue<double>(context, mobile: 10, tablet: 12, desktop: 13);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Container(width: 3, height: 14, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+              SizedBox(width: 6),
+              Text(title, style: GoogleFonts.poppins(fontSize: sectionFs, fontWeight: FontWeight.w500, color: color)),
+              SizedBox(width: 6),
+              Text('${items.length}', style: GoogleFonts.poppins(fontSize: countFs, color: Colors.grey.shade500)),
+            ],
           ),
-          // Items List
-          ...items.asMap().entries.map((entry) {
-            int index = entry.key;
-            CartItemStatus item = entry.value;
-            bool isLastItem = index == items.length - 1;
-
-            return Column(
-              children: [
-                buildCartItemRow(item),
-                if (!isLastItem) Divider(height: 1, color: color.withOpacity(0.3)),
-              ],
-            );
-          }).toList(),
-        ],
-      ),
+        ),
+        ...items.map((item) => buildCartItemRow(item)).toList(),
+      ],
     );
   }
 
-  // Widget _buildSectionHeader(String title, Color color, int itemCount) {
-  //   return Container(
-  //     width: double.infinity,
-  //     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-  //     margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-  //     decoration: BoxDecoration(
-  //       color: color.withOpacity(0.1),
-  //       borderRadius: BorderRadius.circular(8),
-  //       border: Border.all(color: color, width: 1),
-  //     ),
-  //     child: Row(
-  //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //       children: [
-  //         Text(
-  //           title,
-  //           style: GoogleFonts.poppins(
-  //             fontSize: 16,
-  //             fontWeight: FontWeight.bold,
-  //             color: color,
-  //           ),
-  //         ),
-  //         Container(
-  //           padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-  //           decoration: BoxDecoration(
-  //             color: color,
-  //             borderRadius: BorderRadius.circular(12),
-  //           ),
-  //           child: Text(
-  //             '$itemCount',
-  //             style: GoogleFonts.poppins(
-  //               fontSize: 12,
-  //               fontWeight: FontWeight.bold,
-  //               color: Colors.white,
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   Widget buildCartItemRow(CartItemStatus wrapped) {
     final item = wrapped.item;
-    final Color deepBlue = Color(0xFF0D47A1);
-    print(item.title);
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 10.0),
-      padding: EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: deepBlue.withOpacity(0.15),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
+
+    final String? variantLine = item.variantName;
+    final List<String> addOns = [];
+
+    // Choices — deduplicated
+    if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
+      addOns.addAll(item.choiceNames!.toSet());
+    }
+
+    // Extras — grouped by name with price
+    if (item.extras != null && item.extras!.isNotEmpty) {
+      Map<String, Map<String, dynamic>> groupedExtras = {};
+      for (var extra in item.extras!) {
+        String displayName;
+        if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
+          displayName = extra['displayName'];
+        } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
+          displayName = '${extra['categoryName']} - ${extra['name']}';
+        } else {
+          displayName = extra['name'] ?? 'Unknown';
+        }
+        final double price = extra['price']?.toDouble() ?? 0.0;
+        final int itemQuantity = extra['quantity']?.toInt() ?? 1;
+        String key = '$displayName-${price.toStringAsFixed(2)}';
+        if (groupedExtras.containsKey(key)) {
+          groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + itemQuantity;
+        } else {
+          groupedExtras[key] = {'displayName': displayName, 'price': price, 'quantity': itemQuantity};
+        }
+      }
+      addOns.addAll(groupedExtras.entries.map((e) {
+        final d = e.value;
+        final qty = d['quantity'] as int;
+        final name = d['displayName'] as String;
+        final price = d['price'] as double;
+        return qty > 1 ? '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})' : '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
+      }));
+    }
+
+    final String? addOnsLine = addOns.isNotEmpty ? addOns.join(', ') : null;
+
+    final nameFs = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 17);
+    final variantFs = AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 15);
+    final modFs = AppResponsive.getValue<double>(context, mobile: 11, tablet: 13, desktop: 14);
+    final qtyFs = AppResponsive.getValue<double>(context, mobile: 15, tablet: 17, desktop: 18);
+    final priceFs = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 17);
+    final iconSize = AppResponsive.getValue<double>(context, mobile: 16, tablet: 18, desktop: 20);
+    final btnPad = AppResponsive.getValue<double>(context, mobile: 5, tablet: 7, desktop: 8);
+    final priceWidth = AppResponsive.getValue<double>(context, mobile: 75, tablet: 95, desktop: 115);
+    final hPad = AppResponsive.getValue<double>(context, mobile: 12, tablet: 16, desktop: 20);
+    final vPad = AppResponsive.getValue<double>(context, mobile: 5, tablet: 7, desktop: 8);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      child: Row(
         children: [
+          // Item name + variant + modifiers
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Item name + variant inline
+                Text.rich(
+                  TextSpan(
+                    text: item.title,
+                    style: GoogleFonts.poppins(fontSize: nameFs, fontWeight: FontWeight.w500),
+                    children: [
+                      if (variantLine != null)
+                        TextSpan(text: '  $variantLine', style: GoogleFonts.poppins(fontSize: variantFs, fontWeight: FontWeight.w400, color: Colors.grey.shade600)),
+                      if (item.weightDisplay != null)
+                        TextSpan(text: '  ${item.weightDisplay}', style: GoogleFonts.poppins(fontSize: modFs, fontWeight: FontWeight.w400, color: Colors.grey.shade500)),
+                    ],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                // Choices + extras — one line, comma separated, wraps naturally
+                if (addOnsLine != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(addOnsLine, style: GoogleFonts.poppins(fontSize: modFs, color: Colors.grey.shade500)),
+                  ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8),
+          // Qty controls
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Item Name and Weight
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                        letterSpacing: 0.1,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (item.weightDisplay != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3.0),
-                        child: Text(
-                          item.weightDisplay!,
-                          style: GoogleFonts.poppins(
-                            color: Colors.grey.shade600,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 6),
-              // Quantity Controls
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                decoration: BoxDecoration(
-                  color: deepBlue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    InkWell(
-                      onTap: () => widget.onDecreseQty(item),
-                      child: Container(
-                        padding: EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: deepBlue.withOpacity(0.3), width: 1),
-                        ),
-                        child: Icon(
-                          Icons.remove,
-                          color: deepBlue,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      child: Text(
-                        item.quantity.toString(),
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: deepBlue,
-                        ),
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () => widget.onIncreseQty(item),
-                      child: Container(
-                        padding: EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: deepBlue,
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: deepBlue.withOpacity(0.3),
-                              blurRadius: 2,
-                              offset: Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.add,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 6),
-              // Price
-              Expanded(
-                flex: 2,
+              InkWell(
+                onTap: () => widget.onDecreseQty(item),
                 child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-                  decoration: BoxDecoration(
-                    color: deepBlue.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: deepBlue.withOpacity(0.2), width: 1),
-                  ),
-                  child: Text(
-                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.totalPrice)}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: deepBlue,
-                      letterSpacing: 0.2,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  padding: EdgeInsets.all(btnPad),
+                  decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(6)),
+                  child: Icon(Icons.remove, size: iconSize, color: Colors.grey.shade700),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Text(item.quantity.toString(), style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600)),
+              ),
+              InkWell(
+                onTap: () => widget.onIncreseQty(item),
+                child: Container(
+                  padding: EdgeInsets.all(btnPad),
+                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6)),
+                  child: Icon(Icons.add, size: iconSize, color: Colors.white),
                 ),
               ),
             ],
           ),
-
-            // ── Variant / Choice / Extra details ──────────────
-            if (item.variantName != null ||
-                (item.choiceNames != null && item.choiceNames!.isNotEmpty) ||
-                (item.extras != null && item.extras!.isNotEmpty))
-              Padding(
-                padding: const EdgeInsets.only(top: 6, left: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Size / Variant
-                    if (item.variantName != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Row(
-                          children: [
-                            Icon(Icons.straighten, size: 11, color: Colors.blue.shade400),
-                            const SizedBox(width: 4),
-                            Text(
-                              item.variantName!,
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.blue.shade700,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variantPrice ?? 0)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.blue.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Choices
-                    if (item.choiceNames != null && item.choiceNames!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Icon(Icons.tune, size: 11, color: Colors.orange.shade400),
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                item.choiceNames!.join(', '),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w400,
-                                  color: Colors.orange.shade700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Extras
-                    if (item.extras != null && item.extras!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Builder(
-                          builder: (context) {
-                            Map<String, Map<String, dynamic>> groupedExtras = {};
-                            for (var extra in item.extras!) {
-                              String displayName;
-                              if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
-                                displayName = extra['displayName'];
-                              } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
-                                displayName = '${extra['categoryName']} - ${extra['name']}';
-                              } else {
-                                displayName = extra['name'] ?? 'Unknown';
-                              }
-                              final double price = extra['price']?.toDouble() ?? 0.0;
-                              final int itemQuantity = extra['quantity']?.toInt() ?? 1;
-                              String key = '$displayName-${price.toStringAsFixed(2)}';
-                              if (groupedExtras.containsKey(key)) {
-                                groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + itemQuantity;
-                              } else {
-                                groupedExtras[key] = {
-                                  'displayName': displayName,
-                                  'price': price,
-                                  'quantity': itemQuantity,
-                                };
-                              }
-                            }
-                            String extrasText = groupedExtras.entries.map((entry) {
-                              final data = entry.value;
-                              final int qty = data['quantity'] as int;
-                              final String name = data['displayName'] as String;
-                              final double price = data['price'] as double;
-                              if (qty > 1) {
-                                return '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
-                              } else {
-                                return '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
-                              }
-                            }).join(', ');
-
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Icon(Icons.add_circle_outline, size: 11, color: Colors.green.shade400),
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    extrasText,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w400,
-                                      color: Colors.green.shade700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-          ],
-        )
-      );
+          SizedBox(width: 12),
+          // Price
+          SizedBox(
+            width: priceWidth,
+            child: Text(
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.totalPrice)}',
+              style: GoogleFonts.poppins(fontSize: priceFs, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> clearCart() async {
@@ -1136,162 +892,63 @@ class _TakeawayState extends State<Takeaway> {
 
 
 
-    // print(widget.isexisting);
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     return Column(
       children: [
-        // Header - Compact Design
-        Container(
-          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF0D47A1).withOpacity(0.15), Color(0xFF1565C0).withOpacity(0.08)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Color(0xFF0D47A1).withOpacity(0.3), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0xFF0D47A1).withOpacity(0.1),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                flex: 2,
-                child: Row(
-                  children: [
-                    Icon(Icons.restaurant_menu, color: Color(0xFF0D47A1), size: 16),
-                    SizedBox(width: 6),
-                    Text(
-                      'Item',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0D47A1),
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                children: [
-                  Icon(Icons.shopping_cart_outlined, color: Color(0xFF0D47A1), size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    'Qty',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0D47A1),
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(width: 40),
-              Row(
-                children: [
-                  Icon(Icons.currency_rupee, color: Color(0xFF0D47A1), size: 16),
-                  SizedBox(width: 2),
-                  Text(
-                    'Price',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0D47A1),
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // Cart Items
-
-        // cart item
+        // Cart items
         Expanded(
           child: widget.cartItems.isEmpty
               ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'Your cart is empty',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    color: Colors.grey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.shopping_cart_outlined, size: 48, color: Colors.grey.shade300),
+                      SizedBox(height: 8),
+                      Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 14, tablet: 16), color: Colors.grey.shade400)),
+                    ],
                   ),
-                ),
-              ],
-            ),
-          )
+                )
               : Column(
-            children: [
-              Container(
-                padding: EdgeInsets.all(5),
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), border: Border.all(color: AppColors.primary)),
-                  child: widget.isDineIn
-                      ? Text("Table no:${widget.selectedTableNo.toString()}",style: GoogleFonts.poppins(fontWeight: FontWeight.w500),)
-                      : Text(widget.isexisting ? 'Existing Order' : 'New Order',style: GoogleFonts.poppins(fontWeight: FontWeight.w500),)),
-              Expanded(
-                child: _buildGroupedCartItems(),
-              ),
-            ],
-          ),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Row(
+                        children: [
+                          if (widget.isDineIn)
+                            Text("Table ${widget.selectedTableNo}", style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: Colors.grey.shade600))
+                          else
+                            Text(widget.isexisting ? 'Existing Order' : 'New Order', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                    Expanded(child: _buildGroupedCartItems()),
+                  ],
+                ),
         ),
 
-        // Total and Checkout
+        // Bottom: total + buttons
         Container(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
           decoration: BoxDecoration(
             color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 1,
-                blurRadius: 5,
-                offset: Offset(0, -2),
-              ),
-            ],
+            border: Border(top: BorderSide(color: Colors.grey.shade200)),
           ),
           child: Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Total',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text('Total', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 15, tablet: 17, desktop: 18), fontWeight: FontWeight.w500)),
                   Text(
                     '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
+                    style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 17, tablet: 20, desktop: 22), fontWeight: FontWeight.w600, color: AppColors.primary),
                   ),
                 ],
               ),
-              SizedBox(height: 15),
-              // ✅ Pass the calculations object to _existingButtons
-              widget.isexisting ? _existingButtons(height, width, calculations) : _neworderButtons(height, width, calculations)   ],
-
+              SizedBox(height: 12),
+              widget.isexisting ? _existingButtons(height, width, calculations) : _neworderButtons(height, width, calculations),
+            ],
           ),
         ),
       ],
@@ -1299,112 +956,47 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   Widget _existingButtons(double height, double width, CartCalculationService calculations) {
+    final plainItems = widget.cartItems.map((w) => w.item).toList();
+
+    if (widget.isdelivery) {
+      return SizedBox(width: double.infinity, child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations)));
+    }
+
     return Column(
       children: [
-        widget.isdelivery
-            ? CommonButton(
-          bordercircular: 5,
-          width: width * 0.8,
-          height: height * 0.05,
-          onTap: ()=> _updateExistingOrder(calculations),
-          child: Center(
-            child: Text(
-              'Place Order',
-              textScaler: TextScaler.linear(1),
-              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-            ),
-          ),
-        )
-            : Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Row(
           children: [
-            CommonButton(
-              bordercircular: 5,
-              width: width * 0.40,
-              height: height * 0.06,
-              onTap: () {
-                // _completeOrder();
-                final plainItems = widget.cartItems.map((w) => w.item).toList();
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => Customerdetails(
-                          tableid: widget.tableid,
-                          existingModel: widget.existingModel,
-                          cartitems: plainItems, // Include all items (old + new)
-                          totalPrice: calculations.grandTotal,
-                        )));
-              },
-              child: Center(
-                child: Text(
-                  'Settle \n (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)})',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 12),
-                ),
+            Expanded(
+              child: _buildActionButton(
+                'Settle (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)})',
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
+                  tableid: widget.tableid, existingModel: widget.existingModel,
+                  cartitems: plainItems, totalPrice: calculations.grandTotal,
+                ))),
               ),
             ),
-            widget.isdelivery
-                ? SizedBox()
-                : CommonButton(
-              bordercircular: 5,
-              width: width * 0.40,
-              height: height * 0.05,
-              onTap:()=>_updateExistingOrder(calculations),
-              child: Center(
-                child: Text(
-                  'place Order',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                ),
-              ),
-            ),
+            SizedBox(width: 8),
+            Expanded(child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations))),
           ],
         ),
+        SizedBox(height: 8),
         SizedBox(
-          height: 10,
-        ),
-        widget.isdelivery
-            ? SizedBox()
-            : ElevatedButton(
-          onPressed: widget.cartItems.isEmpty || widget.existingModel == null
-              ? null
-              : () async {
-            // Handle print bill for existing order
-            print('🖨️ Print Bill button pressed');
-            print('📦 Cart items count: ${widget.cartItems.length}');
-            print('📄 Existing model: ${widget.existingModel?.id}');
-
-            try {
-              final plainItems = widget.cartItems.map((w) => w.item).toList();
-              print('✅ Plain items count: ${plainItems.length}');
-
-              await RestaurantPrintHelper.printBillForActiveOrder(
-                context: context,
-                order: widget.existingModel!,
-                currentItems: plainItems,
-              );
-
-              print('✅ Print completed successfully');
-              NotificationService.instance.showSuccess('Bill printed successfully');
-            } catch (e, stackTrace) {
-              print('❌ Print error: $e');
-              print('Stack trace: $stackTrace');
-              NotificationService.instance.showError('Failed to print bill: $e');
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            minimumSize: Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: Text(
-            'print Bill',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: widget.cartItems.isEmpty || widget.existingModel == null ? null : () async {
+              try {
+                await RestaurantPrintHelper.printBillForActiveOrder(context: context, order: widget.existingModel!, currentItems: plainItems);
+              } catch (e) {
+                NotificationService.instance.showError('Failed to print bill');
+              }
+            },
+            icon: Icon(Icons.print_outlined, size: 16),
+            label: Text('Print Bill', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              side: BorderSide(color: AppColors.primary),
+              foregroundColor: AppColors.primary,
             ),
           ),
         ),
@@ -1412,499 +1004,247 @@ class _TakeawayState extends State<Takeaway> {
     );
   }
 
-  Widget _neworderButtons(double height, double width ,  CartCalculationService calculations)  {
+  Widget _buildActionButton(String label, VoidCallback onTap) {
+    final btnFs = AppResponsive.getValue<double>(context, mobile: 13, tablet: 15, desktop: 16);
+    final btnPad = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 18);
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: EdgeInsets.symmetric(vertical: btnPad),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: Text(label, style: GoogleFonts.poppins(fontSize: btnFs, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _neworderButtons(double height, double width, CartCalculationService calculations) {
     final plainItems = widget.cartItems.map((w) => w.item).toList();
+
+    if (widget.isdelivery) {
+      return SizedBox(
+        width: double.infinity,
+        child: _buildActionButton('Place Order', () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
+            tableid: widget.tableid, cartitems: plainItems,
+            totalPrice: calculations.grandTotal, orderType: 'Delivery', isSettle: true,
+          )));
+        }),
+      );
+    }
 
     return Column(
       children: [
-
-        // new order placeorder button
-        widget.isdelivery
-            ? CommonButton(
-          bordercircular: 5,
-          width: width * 0.8,
-          height: height * 0.05,
-          onTap:() {
-            // _completeOrder();
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-
-                    builder: (context) => Customerdetails(
-                      tableid: widget.tableid,
-                      cartitems: plainItems,
-                      totalPrice:calculations.grandTotal ,
-                      orderType: 'Delivery',
-                      isSettle: true,
-                    )));
-            // Handle checkout
-          },
-          child: Center(
-            child: Text(
-              'Place Order',
-              textScaler: TextScaler.linear(1),
-              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-            ),
-          ),
-        )
-            : Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Row(
           children: [
-            CommonButton(
-              bordercircular: 5,
-              width: width * 0.40,
-              height: height * 0.05,
-              onTap: () {
-                // Clear suggestions before showing dialog
-                nameSuggestions = [];
-                phoneSuggestions = [];
-                showNameSuggestions = false;
-                showPhoneSuggestions = false;
-
-                // Show dialog for customer details
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return StatefulBuilder(
-                      builder: (context, setDialogState) {
-
-                        // Helper: suggestion dropdown list
-                        Widget _suggestionList(
-                          List<RestaurantCustomer> suggestions,
-                          void Function(RestaurantCustomer) onSelect,
-                        ) =>
-                            Container(
-                              constraints: const BoxConstraints(maxHeight: 160),
-                              margin: const EdgeInsets.only(top: 4, bottom: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.divider),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.06),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: ListView.separated(
-                                shrinkWrap: true,
-                                itemCount: suggestions.length,
-                                separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
-                                itemBuilder: (context, index) {
-                                  final c = suggestions[index];
-                                  return InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: () => onSelect(c),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                      child: Row(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 16,
-                                            backgroundColor: AppColors.primary.withOpacity(0.12),
-                                            child: Text(
-                                              c.name?.isNotEmpty == true ? c.name![0].toUpperCase() : '?',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.primary,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  c.name ?? 'Unknown',
-                                                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
-                                                ),
-                                                Text(
-                                                  '${c.phone ?? ''} • ${c.totalVisites} visits',
-                                                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Icon(Icons.north_west, size: 14, color: AppColors.textSecondary),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-
-                        return Dialog(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                          child: Container(
-                            width: 480,
-                            constraints: BoxConstraints(maxHeight: height * 0.85),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // ── Header ──────────────────────────────────
-                                Container(
-                                  padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.06),
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                                    border: Border(bottom: BorderSide(color: AppColors.divider)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: Icon(Icons.receipt_long_outlined, color: AppColors.primary, size: 20),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'Place Order',
-                                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700),
-                                            ),
-                                            Text(
-                                              'Add customer details (optional)',
-                                              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      IconButton(
-                                        onPressed: () => Navigator.of(context).pop(),
-                                        icon: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
-                                        tooltip: 'Close',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // ── Scrollable body ──────────────────────────
-                                Flexible(
-                                  child: SingleChildScrollView(
-                                    padding: const EdgeInsets.all(20),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-
-                                        // Selected customer banner
-                                        if (selectedCustomer != null) ...[
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: Colors.green.shade50,
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: Colors.green.shade200),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  radius: 18,
-                                                  backgroundColor: Colors.green.shade200,
-                                                  child: Text(
-                                                    selectedCustomer!.name?.isNotEmpty == true
-                                                        ? selectedCustomer!.name![0].toUpperCase()
-                                                        : '?',
-                                                    style: GoogleFonts.poppins(
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Colors.green.shade700,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 10),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        selectedCustomer!.name ?? 'Unknown',
-                                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
-                                                      ),
-                                                      Text(
-                                                        '${selectedCustomer!.totalVisites} visits • ${selectedCustomer!.loyaltyPoints} pts',
-                                                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.green.shade700),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                GestureDetector(
-                                                  onTap: () => setDialogState(() {
-                                                    selectedCustomer = null;
-                                                    nameController.clear();
-                                                    emailController.clear();
-                                                    mobileController.clear();
-                                                  }),
-                                                  child: Container(
-                                                    padding: const EdgeInsets.all(4),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.red.shade50,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: Icon(Icons.close, size: 16, color: Colors.red.shade400),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                        ],
-
-                                        // ── Name field ──────────────────────
-                                        AppTextField(
-                                          controller: nameController,
-                                          label: 'Customer Name',
-                                          hint: 'e.g. John Doe',
-                                          icon: Icons.person_outline,
-                                          onChanged: (value) async {
-                                            if (value.isEmpty) {
-                                              setDialogState(() {
-                                                showNameSuggestions = false;
-                                                nameSuggestions = [];
-                                              });
-                                            } else {
-                                              final results = await restaurantCustomerStore.searchCustomers(value);
-                                              setDialogState(() {
-                                                nameSuggestions = results;
-                                                showNameSuggestions = nameSuggestions.isNotEmpty;
-                                              });
-                                            }
-                                          },
-                                        ),
-                                        if (showNameSuggestions && nameSuggestions.isNotEmpty)
-                                          _suggestionList(nameSuggestions, (c) {
-                                            setDialogState(() {
-                                              selectedCustomer = c;
-                                              nameController.text = c.name ?? '';
-                                              emailController.text = '';
-                                              mobileController.text = c.phone ?? '';
-                                              showNameSuggestions = false;
-                                              nameSuggestions = [];
-                                            });
-                                          })
-                                        else
-                                          const SizedBox(height: 14),
-
-                                        // ── Mobile field ─────────────────────
-                                        AppTextField(
-                                          controller: mobileController,
-                                          label: 'Mobile Number',
-                                          hint: 'e.g. 9876543210',
-                                          icon: Icons.phone_outlined,
-                                          keyboardType: TextInputType.number,
-                                          maxLength: 10,
-                                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                          onChanged: (value) async {
-                                            if (value.isEmpty) {
-                                              setDialogState(() {
-                                                showPhoneSuggestions = false;
-                                                phoneSuggestions = [];
-                                              });
-                                            } else {
-                                              final results = await restaurantCustomerStore.searchCustomers(value);
-                                              setDialogState(() {
-                                                phoneSuggestions = results;
-                                                showPhoneSuggestions = phoneSuggestions.isNotEmpty;
-                                              });
-                                            }
-                                          },
-                                        ),
-                                        if (showPhoneSuggestions && phoneSuggestions.isNotEmpty)
-                                          _suggestionList(phoneSuggestions, (c) {
-                                            setDialogState(() {
-                                              selectedCustomer = c;
-                                              nameController.text = c.name ?? '';
-                                              emailController.text = '';
-                                              mobileController.text = c.phone ?? '';
-                                              showPhoneSuggestions = false;
-                                              phoneSuggestions = [];
-                                            });
-                                          })
-                                        else
-                                          const SizedBox(height: 14),
-
-                                        // ── Email + Remark row ───────────────
-                                        Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Expanded(
-                                              child: AppTextField(
-                                                controller: emailController,
-                                                label: 'Email',
-                                                hint: 'Optional',
-                                                icon: Icons.mail_outline,
-                                                keyboardType: TextInputType.emailAddress,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: AppTextField(
-                                                controller: remarkController,
-                                                label: 'Remark',
-                                                hint: 'e.g. No onions',
-                                                icon: Icons.note_alt_outlined,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-
-                                        const SizedBox(height: 20),
-
-                                        // ── Total banner ─────────────────────
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withOpacity(0.06),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Icon(Icons.payments_outlined, size: 18, color: AppColors.primary),
-                                                  const SizedBox(width: 8),
-                                                  Text(
-                                                    'To Be Paid',
-                                                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                                                  ),
-                                                ],
-                                              ),
-                                              Text(
-                                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
-                                                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                // ── Action buttons ───────────────────────────
-                                Container(
-                                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                                  decoration: BoxDecoration(
-                                    border: Border(top: BorderSide(color: AppColors.divider)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      OutlinedButton.icon(
-                                        onPressed: () => Navigator.of(context).pop(),
-                                        icon: const Icon(Icons.close, size: 16),
-                                        label: Text('Cancel', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                                        style: OutlinedButton.styleFrom(
-                                          minimumSize: const Size(0, 48),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          side: BorderSide(color: AppColors.divider),
-                                          foregroundColor: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          onPressed: () => _placeOrder(calculations),
-                                          icon: const Icon(Icons.check_circle_outline, size: 18),
-                                          label: Text('Place Order', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15)),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.primary,
-                                            foregroundColor: Colors.white,
-                                            minimumSize: const Size(0, 48),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                            elevation: 0,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-              child: Center(
-                child: Text(
-                  'Place Order',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                ),
-              ),
+            Expanded(
+              child: _buildActionButton('Place Order', () {
+                nameSuggestions = []; phoneSuggestions = [];
+                showNameSuggestions = false; showPhoneSuggestions = false;
+                _showPlaceOrderDialog(height, calculations);
+              }),
             ),
-            widget.isdelivery
-                ? SizedBox()
-                : CommonButton(
-              bordercircular: 5,
-              width: width * 0.40,
-              height: height * 0.05,
-              onTap: ()=> _qucikSettleNewOrder(calculations),
-              child: Center(
-                child: Text(
-                  'Quick Settle',
-                  textScaler: TextScaler.linear(1),
-                  style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
-                ),
-              ),
-            ),
+            SizedBox(width: 8),
+            Expanded(child: _buildActionButton('Quick Settle', () => _qucikSettleNewOrder(calculations))),
           ],
         ),
+        SizedBox(height: 8),
         SizedBox(
-          height: 10,
-        ),
-        widget.isdelivery
-            ? SizedBox()
-            : ElevatedButton(
-          onPressed: widget.cartItems.isEmpty
-              ? null
-              : () {
-            // _completeOrder();
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-
-                    builder: (context) => Customerdetails(
-                      tableid: widget.tableid,
-                      cartitems: plainItems,
-                      totalPrice: calculations.grandTotal,
-                      orderType:  widget.isDineIn ? 'Dine In' : 'Take Away',
-                      isSettle: true,
-                    )));
-            // Handle checkout
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            minimumSize: Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: widget.cartItems.isEmpty ? null : () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
+                tableid: widget.tableid, cartitems: plainItems,
+                totalPrice: calculations.grandTotal, orderType: widget.isDineIn ? 'Dine In' : 'Take Away', isSettle: true,
+              )));
+            },
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              side: BorderSide(color: AppColors.primary),
+              foregroundColor: AppColors.primary,
             ),
-          ),
-          child: Text(
-            'Settle & Print Bill',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-            ),
+            child: Text('Settle & Print Bill', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
           ),
         ),
       ],
+    );
+  }
+
+  /// Place order dialog — extracted from inline builder
+  void _showPlaceOrderDialog(double height, CartCalculationService calculations) {
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            Widget suggestionList(List<RestaurantCustomer> suggestions, void Function(RestaurantCustomer) onSelect) {
+              return Container(
+                constraints: const BoxConstraints(maxHeight: 140),
+                margin: const EdgeInsets.only(top: 4, bottom: 8),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: suggestions.length,
+                  separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+                  itemBuilder: (_, index) {
+                    final c = suggestions[index];
+                    return InkWell(
+                      onTap: () => onSelect(c),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: AppColors.primary.withOpacity(0.1),
+                              child: Text(c.name?.isNotEmpty == true ? c.name![0].toUpperCase() : '?',
+                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.primary)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(c.name ?? 'Unknown', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500)),
+                                  Text('${c.phone ?? ''} • ${c.totalVisites} visits', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Container(
+                width: 460,
+                constraints: BoxConstraints(maxHeight: height * 0.85),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text('Place Order', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600))),
+                          IconButton(onPressed: () => Navigator.of(ctx).pop(), icon: Icon(Icons.close, size: 20, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: Colors.grey.shade200),
+
+                    // Body
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Selected customer chip
+                            if (selectedCustomer != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10)),
+                                child: Row(
+                                  children: [
+                                    Text(selectedCustomer!.name ?? 'Unknown', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                                    Spacer(),
+                                    Text('${selectedCustomer!.totalVisites} visits', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
+                                    SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: () => setDialogState(() {
+                                        selectedCustomer = null; nameController.clear(); emailController.clear(); mobileController.clear();
+                                      }),
+                                      child: Icon(Icons.close, size: 16, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+
+                            AppTextField(
+                              controller: nameController, label: 'Customer Name', hint: 'e.g. John Doe', icon: Icons.person_outline,
+                              onChanged: (value) async {
+                                if (value.isEmpty) { setDialogState(() { showNameSuggestions = false; nameSuggestions = []; }); }
+                                else { final r = await restaurantCustomerStore.searchCustomers(value); setDialogState(() { nameSuggestions = r; showNameSuggestions = r.isNotEmpty; }); }
+                              },
+                            ),
+                            if (showNameSuggestions && nameSuggestions.isNotEmpty)
+                              suggestionList(nameSuggestions, (c) { setDialogState(() {
+                                selectedCustomer = c; nameController.text = c.name ?? ''; emailController.text = ''; mobileController.text = c.phone ?? '';
+                                showNameSuggestions = false; nameSuggestions = [];
+                              }); })
+                            else const SizedBox(height: 12),
+
+                            AppTextField(
+                              controller: mobileController, label: 'Mobile', hint: 'e.g. 9876543210', icon: Icons.phone_outlined,
+                              keyboardType: TextInputType.number, maxLength: 10,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              onChanged: (value) async {
+                                if (value.isEmpty) { setDialogState(() { showPhoneSuggestions = false; phoneSuggestions = []; }); }
+                                else { final r = await restaurantCustomerStore.searchCustomers(value); setDialogState(() { phoneSuggestions = r; showPhoneSuggestions = r.isNotEmpty; }); }
+                              },
+                            ),
+                            if (showPhoneSuggestions && phoneSuggestions.isNotEmpty)
+                              suggestionList(phoneSuggestions, (c) { setDialogState(() {
+                                selectedCustomer = c; nameController.text = c.name ?? ''; emailController.text = ''; mobileController.text = c.phone ?? '';
+                                showPhoneSuggestions = false; phoneSuggestions = [];
+                              }); })
+                            else const SizedBox(height: 12),
+
+                            Row(
+                              children: [
+                                Expanded(child: AppTextField(controller: emailController, label: 'Email', hint: 'Optional', icon: Icons.mail_outline, keyboardType: TextInputType.emailAddress)),
+                                const SizedBox(width: 12),
+                                Expanded(child: AppTextField(controller: remarkController, label: 'Remark', hint: 'e.g. No onions', icon: Icons.note_alt_outlined)),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Total
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Total', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey.shade600)),
+                                Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
+                                  style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Actions
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                      child: Row(
+                        children: [
+                          TextButton(onPressed: () => Navigator.of(ctx).pop(),
+                            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildActionButton('Place Order', () => _placeOrder(calculations))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

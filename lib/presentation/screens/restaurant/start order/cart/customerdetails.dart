@@ -1529,13 +1529,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               // Success icon with gradient background
               Container(
                 width: 72,
@@ -1633,6 +1635,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           billNumber: billNumber,
                           loyaltyPointsDiscount: pointsUsed,
                         );
+                        // User stays on dialog — press Skip to go home
                       },
                       icon: const Icon(Icons.print_rounded, size: 20),
                       label: Text(
@@ -1658,6 +1661,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -1700,13 +1704,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               // Success icon with gradient background
               Container(
                 width: 72,
@@ -1802,6 +1808,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           billNumber: billNumber,
                           loyaltyPointsDiscount: pointsUsed,
                         );
+                        // User stays on dialog — press Skip to go home
                       },
                       icon: const Icon(Icons.print_rounded, size: 20),
                       label: Text(
@@ -1827,6 +1834,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

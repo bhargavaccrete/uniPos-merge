@@ -26,12 +26,17 @@ class _ViewExpenseState extends State<ViewExpense> {
   @override
   void initState() {
     super.initState();
+    // Default to today's expenses
+    final today = DateTime.now();
+    _fromDatee = DateTime(today.year, today.month, today.day);
+    _toDate = DateTime(today.year, today.month, today.day);
     _loadExpenses();
   }
 
   Future<void> _loadExpenses() async {
     await expenseStore.loadExpenses();
     await expenseCategoryStore.loadCategories();
+    _filterExpenses();
   }
 
   void _filterExpenses() {
@@ -130,36 +135,10 @@ class _ViewExpenseState extends State<ViewExpense> {
                     ),
                     Row(
                       children: [
-                        Container(
-                          padding: EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withValues(alpha:0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.edit_rounded,
-                            size: 24,
-                            color: Colors.blue,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Edit Expense',
-                            style: GoogleFonts.poppins(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close_rounded, color: AppColors.textSecondary),
-                        ),
+                        Expanded(child: Text('Edit Expense', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600))),
+                        IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, size: 20, color: Colors.grey)),
                       ],
                     ),
-                    Divider(height: 24, color: Colors.grey.shade200),
                     SizedBox(height: 20),
                     Text(
                       'Date',
@@ -344,59 +323,13 @@ class _ViewExpenseState extends State<ViewExpense> {
                               if (_isSubmitting) return;
                               final confirm = await showDialog<bool>(
                                 context: context,
-                                builder: (context) => AlertDialog(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      Container(
-                                        padding: EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withValues(alpha:0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(Icons.delete_rounded, color: Colors.red, size: 24),
-                                      ),
-                                      SizedBox(width: 12),
-                                      Text(
-                                        'Delete Expense',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  content: Text(
-                                    'Are you sure you want to delete this expense?',
-                                    style: GoogleFonts.poppins(fontSize: 14),
-                                  ),
+                                builder: (_) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  title: Text('Delete this expense?', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
                                   actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: Text(
-                                        'Cancel',
-                                        style: GoogleFonts.poppins(
-                                          color: Colors.grey.shade600,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(context, true),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'Delete',
-                                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                      ),
-                                    ),
+                                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+                                    TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
                                   ],
                                 ),
                               );
@@ -515,34 +448,15 @@ class _ViewExpenseState extends State<ViewExpense> {
         children: [
           // Compact Header + Filter
           Container(
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+            color: AppColors.white,
+            child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Title row with total
                     Row(
                       children: [
-                        Text(
-                          'Expenses',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
                         const Spacer(),
                         Observer(
                           builder: (context) {
@@ -559,7 +473,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                                 '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(total)}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   color: Colors.red.shade700,
                                 ),
                               ),
@@ -633,7 +547,6 @@ class _ViewExpenseState extends State<ViewExpense> {
                     ),
                   ],
                 ),
-              ),
             ),
           ),
 
@@ -649,37 +562,9 @@ class _ViewExpenseState extends State<ViewExpense> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          padding: EdgeInsets.all(isTablet ? 24 : 20),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceMedium,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.receipt_long_outlined,
-                            size: isTablet ? 64 : 56,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'No expenses found',
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 18 : 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          _fromDatee != null || _toDate != null
-                              ? 'Try adjusting your filter'
-                              : 'Add your first expense to get started',
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 15 : 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
+                        Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade300),
+                        SizedBox(height: 12),
+                        Text('No expenses found', style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade500)),
                       ],
                     ),
                   );
@@ -693,34 +578,15 @@ class _ViewExpenseState extends State<ViewExpense> {
                     return GestureDetector(
                       onTap: () => _showEditExpenseBottomSheet(expense),
                       child: Container(
-                        margin: EdgeInsets.only(bottom: 12),
-                        padding: EdgeInsets.all(16),
+                        margin: EdgeInsets.only(bottom: 8),
+                        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha:0.03),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade200),
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha:0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.account_balance_wallet_rounded,
-                                color: AppColors.primary,
-                                size: 24,
-                              ),
-                            ),
-                            SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -779,7 +645,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                                 Text(
                                   '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
                                   style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                     fontSize: 18,
                                     color: Colors.red.shade600,
                                   ),

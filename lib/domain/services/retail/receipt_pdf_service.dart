@@ -577,15 +577,17 @@ class ReceiptPdfService {
             ] else ...[
               pw.Text(
                 AppConfig.isRestaurant
-                    ? 'Thank you for dining with us!'
+                    ? (data.orderType?.toLowerCase().contains('dine') == true
+                        ? 'Thank you for dining with us!'
+                        : data.orderType?.toLowerCase().contains('delivery') == true
+                            ? 'Thank you for your order!'
+                            : 'Thank you! Enjoy your meal!')
                     : 'Thank you for your purchase!',
                 style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 4),
               pw.Text(
-                AppConfig.isRestaurant
-                    ? 'Visit us again!'
-                    : 'Please come again',
+                'Visit us again!',
                 style: const pw.TextStyle(fontSize: 10),
               ),
             ],

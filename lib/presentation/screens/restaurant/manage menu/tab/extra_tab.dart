@@ -947,87 +947,39 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Future<void> _deleteTopping(Extramodel extra, int toppingIndex) async {
+    final topping = extra.topping![toppingIndex];
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 12),
-            Text('Delete Topping', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to delete this topping?',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text('Delete "${topping.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
+        content: Text('This topping will be removed from ${extra.Ename}.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
         ],
       ),
     );
-
     if (confirmed == true) {
-      try {
-        await extraStore.removeTopping(extra.Id, toppingIndex);
-      } catch (e) {
-        NotificationService.instance.showError('Error: $e');
-      }
+      try { await extraStore.removeTopping(extra.Id, toppingIndex); } catch (e) { NotificationService.instance.showError('Error: $e'); }
     }
   }
 
   Future<void> _deleteExtra(Extramodel extra) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 12),
-            Text('Delete Extra',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to delete this extra?',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Text('Delete "${extra.Ename}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
+        content: Text('This extra and its ${extra.topping?.length ?? 0} toppings will be removed.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
         ],
       ),
     );
-
     if (confirmed == true) {
-      try {
-        await extraStore.deleteExtra(extra.Id);
-      } catch (e) {
-        NotificationService.instance.showError('Error deleting extra: $e');
-      }
+      try { await extraStore.deleteExtra(extra.Id); } catch (e) { NotificationService.instance.showError('Error deleting extra: $e'); }
     }
   }
 
@@ -1112,7 +1064,7 @@ class _ExtraTabState extends State<ExtraTab> {
             crossAxisCount: _getGridColumns(size.width),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 2,
+            childAspectRatio: 2.5,
           ),
           itemCount: filteredExtras.length,
           itemBuilder: (context, index) {
@@ -1167,216 +1119,67 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildMobileExtraCard(Extramodel extra) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         children: [
-          // Extra Header
+          // Header row
           Padding(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.star, color: Colors.green.shade700, size: 24),
-                ),
-                SizedBox(width: 16),
+                Icon(Icons.star_outline, color: Colors.green.shade700, size: 20),
+                SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        extra.Ename,
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green.shade700,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.local_pizza, size: 12, color: AppColors.primary),
-                            SizedBox(width: 4),
-                            Text(
-                              '${extra.topping?.length ?? 0} toppings',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      Text(extra.Ename, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text('${extra.topping?.length ?? 0} toppings', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500)),
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    InkWell(
-                      onTap: () => _openExtraBottomSheet(extra: extra),
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    InkWell(
-                      onTap: () => _deleteExtra(extra),
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
+                InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+                InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
               ],
             ),
           ),
-
-          // Toppings List (Mobile)
+          // Toppings list
           if (extra.topping != null && extra.topping!.isNotEmpty)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-              ),
-              child: Column(
-                children: extra.topping!.asMap().entries.map((entry) {
-                  final toppingIndex = entry.key;
-                  final topping = entry.value;
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 8),
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: topping.isveg ? Colors.green : Colors.red,
-                              width: 2,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.circle,
-                            color: topping.isveg ? Colors.green : Colors.red,
-                            size: 10,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                topping.name,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  color: Colors.green.shade700,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () =>
-                              _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex),
-                          child: Container(
-                            padding: EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Icon(Icons.edit, color: Colors.blue, size: 16),
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        InkWell(
-                          onTap: () => _deleteTopping(extra, toppingIndex),
-                          child: Container(
-                            padding: EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Icon(Icons.delete, color: Colors.red, size: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-          // Add Topping Button
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: InkWell(
-              onTap: () => _openToppingBottomSheet(extra: extra),
-              child: Container(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.primary, width: 2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
+            ...extra.topping!.asMap().entries.map((entry) {
+              final toppingIndex = entry.key;
+              final topping = entry.value;
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 3),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Add Topping',
-                      style: GoogleFonts.poppins(
-                        color: AppColors.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Container(width: 8, height: 8, decoration: BoxDecoration(color: topping.isveg ? Colors.green : Colors.red, shape: BoxShape.circle)),
+                    SizedBox(width: 10),
+                    Expanded(child: Text(topping.name, style: GoogleFonts.poppins(fontSize: 13))),
+                    Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+                    InkWell(onTap: () => _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 14, color: Colors.blue))),
+                    InkWell(onTap: () => _deleteTopping(extra, toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close, size: 14, color: Colors.red))),
                   ],
                 ),
+              );
+            }),
+          // Add topping
+          InkWell(
+            onTap: () => _openToppingBottomSheet(extra: extra),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add, color: AppColors.primary, size: 16),
+                  SizedBox(width: 4),
+                  Text('Add Topping', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w500)),
+                ],
               ),
             ),
           ),
@@ -1386,198 +1189,61 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildGridExtraCard(Extramodel extra) {
-    return Card(
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Icon(Icons.star_outline, color: Colors.green.shade700, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.star, color: Colors.green.shade700, size: 20),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            extra.Ename,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade700,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          SizedBox(height: 4),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${extra.topping?.length ?? 0} toppings',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Toppings Preview (Grid)
-          if (extra.topping != null && extra.topping!.isNotEmpty)
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: 14),
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListView(
-                  children: [
-                    ...extra.topping!.take(3).map((topping) {
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(1.5),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: topping.isveg ? Colors.green : Colors.red,
-                                  width: 1.5,
-                                ),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.circle,
-                                color: topping.isveg ? Colors.green : Colors.red,
-                                size: 7,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                topping.name,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade700,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    if (extra.topping!.length > 3)
-                      Padding(
-                        padding: EdgeInsets.only(top: 4),
-                        child: Text(
-                          '+${extra.topping!.length - 3} more',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: Colors.grey.shade500,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
+                    Text(extra.Ename, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${extra.topping?.length ?? 0} toppings', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500)),
                   ],
                 ),
               ),
+              InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
+              InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
+            ],
+          ),
+          if (extra.topping != null && extra.topping!.isNotEmpty) ...[
+            SizedBox(height: 8),
+            Expanded(
+              child: ListView(
+                children: [
+                  ...extra.topping!.take(2).map((topping) => Padding(
+                    padding: EdgeInsets.only(bottom: 3),
+                    child: Row(children: [
+                      Container(width: 5, height: 5, decoration: BoxDecoration(color: topping.isveg ? Colors.green : Colors.red, shape: BoxShape.circle)),
+                      SizedBox(width: 8),
+                      Expanded(child: Text(topping.name, style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    ]),
+                  )),
+                  if (extra.topping!.length > 2)
+                    Text('+${extra.topping!.length - 2} more', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
+                ],
+              ),
             ),
-
-          // Action Buttons
-          Padding(
-            padding: EdgeInsets.all(14),
-            child: Column(
-              children: [
-                InkWell(
-                  onTap: () => _openToppingBottomSheet(extra: extra),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.primary, width: 1.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add, color: AppColors.primary, size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          'Add Topping',
-                          style: GoogleFonts.poppins(
-                            color: AppColors.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _openExtraBottomSheet(extra: extra),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _deleteExtra(extra),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          ],
+          InkWell(
+            onTap: () => _openToppingBottomSheet(extra: extra),
+            child: Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.add, color: AppColors.primary, size: 14),
+                SizedBox(width: 4),
+                Text('Add Topping', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w500)),
+              ]),
             ),
           ),
         ],
@@ -1586,50 +1252,20 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   Widget _buildAddButton() {
-    return Container(
+    return Padding(
       padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
       child: SizedBox(
         width: double.infinity,
-        height: 50,
-        child: ElevatedButton(
+        child: ElevatedButton.icon(
           onPressed: _openExtraBottomSheet,
+          icon: Icon(Icons.add, size: 20),
+          label: Text('Add Extra', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(Icons.add, color: AppColors.primary, size: 20),
-              ),
-              SizedBox(width: 10),
-              Text(
-                'Add Extra',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
       ),

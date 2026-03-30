@@ -390,6 +390,7 @@ class PrintService {
     String? storePhone,
     String? storeEmail,
     String? gstNumber,
+    String? orderType, // Take Away, Dine In, Delivery
     int? billNumber, // Bill number for completed orders
     List<int>? kotNumbers, // KOT numbers for restaurant orders
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
@@ -456,6 +457,7 @@ class PrintService {
                     storePhone: storePhone,
                     storeEmail: storeEmail,
                     gstNumber: gstNumber,
+                    orderType: orderType,
                     billNumber: billNumber,
                     kotNumbers: kotNumbers,
                     itemTotal: itemTotal,
@@ -504,10 +506,11 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
+                  orderType: orderType,
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
-                  itemTotal: itemTotal, // Pass item total
-                  paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
+                  itemTotal: itemTotal,
+                  paymentBreakdown: paymentBreakdown,
                   loyaltyPointsDiscount: loyaltyPointsDiscount,
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
@@ -534,10 +537,11 @@ class PrintService {
                   storePhone: storePhone,
                   storeEmail: storeEmail,
                   gstNumber: gstNumber,
+                  orderType: orderType,
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
-                  itemTotal: itemTotal, // Pass item total
-                  paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
+                  itemTotal: itemTotal,
+                  paymentBreakdown: paymentBreakdown,
                   loyaltyPointsDiscount: loyaltyPointsDiscount,
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,

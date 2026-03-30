@@ -5,22 +5,26 @@ import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';
+import '../../../../../util/restaurant/audit_trail_helper.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../common/app_text_field.dart';
 
-/// Dialog/Sheet for adding a new category — responsive:
+/// Dialog/Sheet for adding or editing a category — responsive:
 /// ≥850 px wide → centered Dialog, <850 px → bottom sheet.
 class AddCategoryDialog extends StatefulWidget {
   final VoidCallback? onCategoryAdded;
   final bool isDialog;
+  final Category? editCategory;
 
   const AddCategoryDialog({
     super.key,
     this.onCategoryAdded,
     this.isDialog = false,
+    this.editCategory,
   });
 
   static Future<bool> show(BuildContext context,
-      {VoidCallback? onCategoryAdded}) async {
+      {VoidCallback? onCategoryAdded, Category? editCategory}) async {
     bool wasAdded = false;
     final isWide = MediaQuery.of(context).size.width >= 850;
 
@@ -39,6 +43,7 @@ class AddCategoryDialog extends StatefulWidget {
             ),
             child: AddCategoryDialog(
               isDialog: true,
+              editCategory: editCategory,
               onCategoryAdded: () {
                 wasAdded = true;
                 onCategoryAdded?.call();
@@ -54,6 +59,7 @@ class AddCategoryDialog extends StatefulWidget {
         backgroundColor: Colors.transparent,
         builder: (_) => AddCategoryDialog(
           isDialog: false,
+          editCategory: editCategory,
           onCategoryAdded: () {
             wasAdded = true;
             onCategoryAdded?.call();
@@ -73,13 +79,23 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   final _categoryNameController = TextEditingController();
   bool _isSaving = false;
 
+  bool get _isEditMode => widget.editCategory != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditMode) {
+      _categoryNameController.text = widget.editCategory!.name;
+    }
+  }
+
   @override
   void dispose() {
     _categoryNameController.dispose();
     super.dispose();
   }
 
-  Future<void> _addCategory() async {
+  Future<void> _saveCategory() async {
     final trimmedName = _categoryNameController.text.trim();
     if (trimmedName.isEmpty) {
       NotificationService.instance.showError('Category name cannot be empty');
@@ -87,7 +103,8 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     }
 
     final exists = categoryStore.categories.any(
-      (c) => c.name.toLowerCase() == trimmedName.toLowerCase(),
+      (c) => (_isEditMode ? c.id != widget.editCategory!.id : true) &&
+          c.name.toLowerCase() == trimmedName.toLowerCase(),
     );
     if (exists) {
       NotificationService.instance
@@ -99,14 +116,20 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     setState(() => _isSaving = true);
 
     try {
-      final newCategory = Category(
-        id: const Uuid().v4(),
-        name: trimmedName,
-        createdTime: DateTime.now(),
-        editCount: 0,
-      );
-
-      await categoryStore.addCategory(newCategory);
+      if (_isEditMode) {
+        final updated = widget.editCategory!.copyWith(name: trimmedName);
+        AuditTrailHelper.trackEdit(updated,
+            editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
+        await categoryStore.updateCategory(updated);
+      } else {
+        final newCategory = Category(
+          id: const Uuid().v4(),
+          name: trimmedName,
+          createdTime: DateTime.now(),
+          editCount: 0,
+        );
+        await categoryStore.addCategory(newCategory);
+      }
       widget.onCategoryAdded?.call();
       if (mounted) Navigator.pop(context);
     } finally {
@@ -184,7 +207,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
           Icon(Icons.category_outlined, color: AppColors.primary, size: 24),
           const SizedBox(width: 10),
           Text(
-            'Add Category',
+            _isEditMode ? 'Edit Category' : 'Add Category',
             style: GoogleFonts.poppins(
                 fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
           ),
@@ -228,7 +251,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton.icon(
-            onPressed: _isSaving ? null : _addCategory,
+            onPressed: _isSaving ? null : _saveCategory,
             icon: _isSaving
                 ? const SizedBox(
                     width: 18,
@@ -236,9 +259,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white),
                   )
-                : const Icon(Icons.add_circle_outline, color: Colors.white),
+                : Icon(_isEditMode ? Icons.check_circle_outline : Icons.add_circle_outline, color: Colors.white),
             label: Text(
-              _isSaving ? 'Saving…' : 'Add Category',
+              _isSaving ? 'Saving…' : (_isEditMode ? 'Update Category' : 'Add Category'),
               style: GoogleFonts.poppins(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,

@@ -105,7 +105,8 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   Future<void> _prepareChoices() async {
     if (widget.item.choiceIds == null || widget.item.choiceIds!.isEmpty) return;
 
-    for (String choiceId in widget.item.choiceIds!) {
+    // Deduplicate choice IDs to prevent same choice group showing twice
+    for (String choiceId in widget.item.choiceIds!.toSet()) {
       // Use store instead of direct Hive access
       final choiceGroup = await _choiceStore.getChoiceById(choiceId);
 
@@ -282,7 +283,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         categoryName: widget.categoryName,
         variantName:  _selectedVariant?.name,
         variantPrice: _selectedVariant?.price,
-        choiceNames: _selectedChoices.map((c) => c.name).toList(),
+        choiceNames: _selectedChoices.map((c) => c.name).toSet().toList(),
         taxRate: widget.item.taxRate,
         extras: _selectedExtra.map((e) {
           // Find the category this extra belongs to

@@ -484,11 +484,12 @@ class RestaurantPrintHelper {
         storePhone: receiptData.storePhone,
         storeEmail: receiptData.storeEmail,
         gstNumber: receiptData.gstNumber,
+        orderType: order.orderType,
         billNumber: billNumber,
         kotNumbers: order.kotNumbers,
         itemTotal: receiptData.itemTotal,
         paymentBreakdown: paymentBreakdown,
-        loyaltyPointsDiscount: loyaltyPointsDiscount, // show Points Redeemed line on bill
+        loyaltyPointsDiscount: loyaltyPointsDiscount,
         serviceCharge: calculations.serviceChargeAmount,
         isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
         isTaxInclusive: order.isTaxInclusive,

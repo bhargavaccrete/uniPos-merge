@@ -221,250 +221,83 @@ class _AllTabState extends State<ItemsTab> {
                         )
                         .name;
 
-                    return Card(
-                      margin: EdgeInsets.only(bottom: 12),
-                      elevation: 2,
-                      shadowColor: Colors.black.withValues(alpha: 0.1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(
-                          color: item.isEnabled ? Colors.grey.shade200 : Colors.red.shade100,
-                          width: 1.5,
-                        ),
+                    return Container(
+                      margin: EdgeInsets.only(bottom: 8),
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: item.isEnabled ? Colors.grey.shade200 : Colors.red.shade100),
                       ),
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Header Row
-                            Row(
-                              children: [
-                                // Item Icon
-                                Container(
-                                  padding: EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: item.isEnabled
-                                        ? Colors.green.withValues(alpha: 0.1)
-                                        : Colors.red.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    Icons.restaurant_menu,
-                                    color: item.isEnabled ? Colors.green : Colors.red,
-                                    size: 24,
-                                  ),
-                                ),
-                                SizedBox(width: 12),
-
-                                // Item Info
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(
-                                              item.name,
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.black87,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          SizedBox(width: 8),
-                                          Container(
-                                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: item.isVeg == 'Veg'
-                                                  ? Colors.green.withValues(alpha: 0.1)
-                                                  : Colors.red.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(
-                                                color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
-                                                width: 1,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              item.isVeg == 'Veg' ? 'Veg' : 'Non-Veg',
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w600,
-                                                color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.category, size: 14, color: Colors.grey.shade600),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            categoryName,
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 13,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Toggle Switch
-                                Transform.scale(
-                                  scale: 0.9,
-                                  child: Switch(
-                                    activeColor: Colors.white,
-                                    activeTrackColor: Colors.green,
-                                    inactiveThumbColor: Colors.white70,
-                                    inactiveTrackColor: Colors.red.shade300,
-                                    value: item.isEnabled,
-                                    onChanged: (bool value) async {
-                                      await itemStore.toggleItemStatus(item.id);
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            // Audit Trail Info
-                            if (item.createdTime != null || AuditTrailHelper.hasBeenEdited(item))
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Main row: name + price + veg tag + switch
+                          Row(
+                            children: [
+                              // Veg/Non-veg icon
                               Container(
-                                margin: EdgeInsets.only(top: 12),
-                                padding: EdgeInsets.all(10),
+                                width: 16,
+                                height: 16,
+                                margin: EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
-                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: item.isVeg == 'Veg' ? Colors.green : Colors.red.shade800, width: 1.5),
+                                  borderRadius: BorderRadius.circular(3),
                                 ),
+                                child: Center(
+                                  child: item.isVeg == 'Veg'
+                                      ? Container(width: 8, height: 8, decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle))
+                                      : CustomPaint(size: Size(8, 8), painter: _TrianglePainter(color: Colors.red.shade800)),
+                                ),
+                              ),
+                              // Name + category + price
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    if (item.createdTime != null)
-                                      Row(
-                                        children: [
-                                          Icon(Icons.access_time, size: 12, color: Colors.grey.shade500),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'Created: ${item.createdTime!.day}/${item.createdTime!.month}/${item.createdTime!.year} ${item.createdTime!.hour}:${item.createdTime!.minute.toString().padLeft(2, '0')}',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 11,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    if (AuditTrailHelper.hasBeenEdited(item))
-                                      Padding(
-                                        padding: EdgeInsets.only(top: item.createdTime != null ? 4 : 0),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit, size: 12, color: Colors.orange.shade700),
-                                            SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                'Edited ${item.editCount} time(s) • Last: ${item.lastEditedTime!.day}/${item.lastEditedTime!.month}/${item.lastEditedTime!.year} ${item.lastEditedTime!.hour}:${item.lastEditedTime!.minute.toString().padLeft(2, '0')}${item.editedBy != null ? ' by ${item.editedBy}' : ''}',
-                                                style: GoogleFonts.poppins(
-                                                  fontSize: 11,
-                                                  color: Colors.orange.shade700,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                    Text(item.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      '$categoryName  •  ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}',
+                                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
+                                    ),
                                   ],
                                 ),
                               ),
-
-                            // Footer Row (Price and Actions)
-                            Container(
-                              margin: EdgeInsets.only(top: 12),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  // Price Tag
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.currency_rupee,
-                                          size: 16,
-                                          color: AppColors.primary,
-                                        ),
-                                        Text(
-                                          "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}",
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 16,
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Action Buttons
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                  /*    // QR Code Icon
-                                      Container(
-                                        padding: EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(Icons.qr_code, size: 20, color: Colors.grey.shade700),
-                                      ),
-                                      SizedBox(width: 8),
-*/
-                                      // Edit Button
-                                      InkWell(
-                                        onTap: () => editItems(item),
-                                        child: Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-
-                                      // Delete Button
-                                      InkWell(
-                                        onTap: () => _deleteItem(item.id),
-                                        child: Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                              // Actions: edit, delete, switch
+                              InkWell(
+                                onTap: () => editItems(item),
+                                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
+                              ),
+                              InkWell(
+                                onTap: () => _deleteItem(item.id),
+                                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red)),
+                              ),
+                              Transform.scale(
+                                scale: 0.8,
+                                child: Switch(
+                                  activeColor: Colors.white,
+                                  activeTrackColor: Colors.green,
+                                  inactiveThumbColor: Colors.white70,
+                                  inactiveTrackColor: Colors.red.shade300,
+                                  value: item.isEnabled,
+                                  onChanged: (bool value) async {
+                                    await itemStore.toggleItemStatus(item.id);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Audit trail — compact single line
+                          if (AuditTrailHelper.hasBeenEdited(item))
+                            Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Edited ${item.editCount}x • ${item.lastEditedTime!.day}/${item.lastEditedTime!.month}/${item.lastEditedTime!.year}${item.editedBy != null ? ' by ${item.editedBy}' : ''}',
+                                style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500),
                               ),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
                     );
                   },
@@ -530,8 +363,7 @@ class _AllTabState extends State<ItemsTab> {
             crossAxisCount: columns,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            // childAspectRatio: isTablet ? 1.0 : 0.75,
-            childAspectRatio:1.5,
+            childAspectRatio: 2.8,
           ),
           itemCount: filteredItems.length,
           itemBuilder: (context, index) {
@@ -543,183 +375,60 @@ class _AllTabState extends State<ItemsTab> {
                 )
                 .name;
 
-            return Card(
-              elevation: 2,
-              shadowColor: Colors.black.withValues(alpha: 0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: item.isEnabled ? Colors.grey.shade200 : Colors.red.shade100,
-                  width: 1.5,
-                ),
+            return Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: item.isEnabled ? Colors.grey.shade200 : Colors.red.shade100),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
-                  Container(
-                    padding: EdgeInsets.all(isTablet ? 8 : 10),
-                    decoration: BoxDecoration(
-                      color: item.isEnabled
-                          ? Colors.green.withValues(alpha: 0.05)
-                          : Colors.red.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(isTablet ? 6 : 8),
-                              decoration: BoxDecoration(
-                                color: item.isEnabled
-                                    ? Colors.green.withValues(alpha: 0.1)
-                                    : Colors.red.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.restaurant_menu,
-                                color: item.isEnabled ? Colors.green : Colors.red,
-                                size: isTablet ? 18 : 20,
-                              ),
-                            ),
-                            Transform.scale(
-                              scale: 0.8,
-                              child: Switch(
-                                activeColor: Colors.white,
-                                activeTrackColor: Colors.green,
-                                inactiveThumbColor: Colors.white70,
-                                inactiveTrackColor: Colors.red.shade300,
-                                value: item.isEnabled,
-                                onChanged: (bool value) async {
-                                  await itemStore.toggleItemStatus(item.id);
-                                },
-                              ),
-                            ),
-                          ],
+                  // Name + veg icon + switch
+                  Row(
+                    children: [
+                      Container(
+                        width: 16, height: 16,
+                        margin: EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: item.isVeg == 'Veg' ? Colors.green : Colors.red.shade800, width: 1.5),
+                          borderRadius: BorderRadius.circular(3),
                         ),
-                        SizedBox(height: isTablet ? 6 : 8),
-                        Text(
-                          item.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 13 : 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                          maxLines: 2,
+                        child: Center(
+                          child: item.isVeg == 'Veg'
+                              ? Container(width: 8, height: 8, decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle))
+                              : CustomPaint(size: Size(8, 8), painter: _TrianglePainter(color: Colors.red.shade800)),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(item.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ),
+                      Transform.scale(
+                        scale: 0.7,
+                        child: Switch(
+                          activeColor: Colors.white, activeTrackColor: Colors.green,
+                          inactiveThumbColor: Colors.white70, inactiveTrackColor: Colors.red.shade300,
+                          value: item.isEnabled,
+                          onChanged: (bool value) async => await itemStore.toggleItemStatus(item.id),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 2),
+                  // Category + price + actions
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$categoryName  •  ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}',
+                          style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
                           overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
                         ),
-                      ],
-                    ),
-                  ),
-
-                  // Body
-                  Padding(
-                    padding: EdgeInsets.all(isTablet ? 8 : 12),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: item.isVeg == 'Veg'
-                                    ? Colors.green.withValues(alpha: 0.1)
-                                    : Colors.red.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
-                                ),
-                              ),
-                              child: Text(
-                                item.isVeg == 'Veg' ? 'Veg' : 'Non-Veg',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: item.isVeg == 'Veg' ? Colors.green : Colors.red,
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Icon(Icons.category, size: 11, color: Colors.grey.shade600),
-                            SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                categoryName,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: isTablet ? 8 : 10),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.currency_rupee, size: 13, color: AppColors.primary),
-                              Text(
-                                "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}",
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 13 : 14,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Footer Actions
-                  Container(
-                    padding: EdgeInsets.all(isTablet ? 6 : 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        InkWell(
-                          onTap: () => editItems(item),
-                          child: Container(
-                            padding: EdgeInsets.all(isTablet ? 5 : 6),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Icon(Icons.edit_outlined, size: isTablet ? 15 : 16, color: Colors.blue),
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () => _deleteItem(item.id),
-                          child: Container(
-                            padding: EdgeInsets.all(isTablet ? 5 : 6),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Icon(Icons.delete_outline, size: isTablet ? 15 : 16, color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                      InkWell(onTap: () => editItems(item), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: 15, color: Colors.blue))),
+                      InkWell(onTap: () => _deleteItem(item.id), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
+                    ],
                   ),
                 ],
               ),
@@ -729,4 +438,23 @@ class _AllTabState extends State<ItemsTab> {
       },
     );
   }
+}
+
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+  _TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

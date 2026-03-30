@@ -23,6 +23,7 @@ class AdminWelcome extends StatefulWidget {
 class _AdminWelcomeState extends State<AdminWelcome> {
   DateTime? _lastBackPress;
   String _storeName = '';
+  bool _hasPendingEOD = false;
 
   @override
   void initState() {
@@ -48,18 +49,13 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     // Check if there's a pending EOD from yesterday (midnight crossed without completing EOD)
     final pendingEOD = await DayManagementService.hasPendingEOD();
     if (pendingEOD && mounted) {
-      NotificationService.instance.showError(
-        'Previous day was not closed! Redirecting to End of Day...',
-      );
-      // Auto-navigate to End Day screen so user can complete it
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        await Navigator.pushNamed(context, RouteNames.restaurantEndDay);
-        // After returning from End Day, re-check day status
-        if (mounted) _checkDayStarted();
-      }
-      return;
+      setState(() => _hasPendingEOD = true);
+      // Don't block — user can still access dashboard, orders, reports
+      // Only new order placement is blocked (checked in menu.dart)
+      return; // Skip opening balance dialog — day is technically still "started" from yesterday
     }
+
+    if (mounted) setState(() => _hasPendingEOD = false);
 
     final isDayStarted = await DayManagementService.isDayStarted();
     if (!isDayStarted && mounted) {
@@ -271,6 +267,55 @@ class _AdminWelcomeState extends State<AdminWelcome> {
               ),
             ),
           ),
+
+          // Pending EOD warning banner
+          if (_hasPendingEOD)
+            InkWell(
+              onTap: () async {
+                await Navigator.pushNamed(context, RouteNames.restaurantEndDay);
+                if (mounted) _checkDayStarted();
+              },
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('End of Day Pending', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.red.shade800)),
+                          Text('Previous day was not closed. New orders are blocked.', style: GoogleFonts.poppins(fontSize: 11, color: Colors.red.shade600)),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade600,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('Complete', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           SizedBox(height: 8),
 

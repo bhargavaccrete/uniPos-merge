@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../util/color.dart';
+import '../../../../util/common/app_responsive.dart';
 import '../../../../util/restaurant/order_settings.dart';
 import '../../../widget/componets/restaurant/componets/drawer.dart';
 import '../../../../domain/services/common/auto_backup_service.dart';
@@ -85,39 +85,24 @@ class _StartorderState extends State<Startorder>
     super.dispose();
   }
 
-  Widget _buildTabButton(int index, IconData icon, String label, bool isTablet) {
+  Widget _buildTabButton(int index, IconData icon, String label) {
     final isSelected = tabController.index == index;
+    final fs = AppResponsive.getValue<double>(context, mobile: 13, tablet: 15, desktop: 16);
+    final iconSz = AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 22);
     return GestureDetector(
-      onTap: () {
-        tabController.animateTo(index);
-      },
+      onTap: () => tabController.animateTo(index),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.divider,
-            width: 2,
-          ),
+          color: isSelected ? AppColors.primary : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? AppColors.white : AppColors.textSecondary,
-            ),
-            SizedBox(width: 10),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? AppColors.white : AppColors.textSecondary,
-              ),
-            ),
+            Icon(icon, size: iconSz, color: isSelected ? Colors.white : Colors.grey.shade600),
+            SizedBox(width: 8),
+            Text(label, style: GoogleFonts.poppins(fontSize: fs, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : Colors.grey.shade700)),
           ],
         ),
       ),
@@ -277,8 +262,6 @@ class _StartorderState extends State<Startorder>
     print(widget.newOrderForTableId ?? 'no table id ');
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
-    final height = size.height;
-    final width = size.width;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -298,84 +281,37 @@ class _StartorderState extends State<Startorder>
           ),
           // Header
           Container(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
+            padding: EdgeInsets.fromLTRB(4, 8, 16, 8),
+            color: AppColors.white,
             child: SafeArea(
               bottom: false,
               child: Row(
                 children: [
                   Builder(
-                    builder: (context) {
-                      return GestureDetector(
-                        onTap: () => Scaffold.of(context).openDrawer(),
-                        child: Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(Icons.menu, color: AppColors.white, size: 24),
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'UniPOS',
-                          style: GoogleFonts.poppins(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          widget.newOrderForTableId != null
-                              ? 'Table ${widget.newOrderForTableId}'
-                              : 'Quick Order',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                    builder: (context) => IconButton(
+                      onPressed: () => Scaffold.of(context).openDrawer(),
+                      icon: Icon(Icons.menu, size: 24),
                     ),
                   ),
-                 /* GestureDetector(
-                    onTap: () {
-                      setState(() {});
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMedium,
-                        borderRadius: BorderRadius.circular(12),
+                  SizedBox(width: 4),
+                  Text(
+                    'UniPOS',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 22),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (widget.newOrderForTableId != null) ...[
+                    SizedBox(width: 8),
+                    Text(
+                      '• Table ${widget.newOrderForTableId}',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14),
+                        color: AppColors.textSecondary,
                       ),
-                      child: Icon(Icons.refresh, size: 22, color: AppColors.textSecondary),
                     ),
-                  ),
-                  SizedBox(width: 8),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMedium,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.more_vert, size: 22, color: AppColors.textSecondary),
-                  ),*/
+                  ],
                 ],
               ),
             ),
@@ -385,15 +321,16 @@ class _StartorderState extends State<Startorder>
           if (isTablet)
             Container(
               color: AppColors.white,
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  Expanded(child: _buildTabButton(0, Icons.restaurant_menu, 'Menu', isTablet)),
-                  SizedBox(width: 16),
-                  Expanded(child: _buildTabButton(1, Icons.receipt_long, 'Orders', isTablet)),
-                  SizedBox(width: 16),
-                  if (OrderSettings.enableDineIn)
-                  Expanded(child: _buildTabButton(2, Icons.table_restaurant, 'Tables', isTablet)),
+                  Expanded(child: _buildTabButton(0, Icons.restaurant_menu, 'Menu')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildTabButton(1, Icons.receipt_long, 'Orders')),
+                  if (OrderSettings.enableDineIn) ...[
+                    SizedBox(width: 8),
+                    Expanded(child: _buildTabButton(2, Icons.table_restaurant, 'Tables')),
+                  ],
                 ],
               ),
             ),
@@ -418,45 +355,24 @@ class _StartorderState extends State<Startorder>
       bottomNavigationBar: isTablet ? null : Container(
         decoration: BoxDecoration(
           color: AppColors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: Offset(0, -2),
-            ),
-          ],
+          border: Border(top: BorderSide(color: Colors.grey.shade200)),
         ),
         child: SafeArea(
-          child: Container(
-            height: 60,
+          child: SizedBox(
+            height: 56,
             child: TabBar(
               controller: tabController,
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
               indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
-              labelStyle: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-              unselectedLabelStyle: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+              indicatorWeight: 2,
+              labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500),
+              unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w400),
               tabs: [
-                Tab(
-                  icon: Icon(Icons.restaurant_menu, size: 24),
-                  text: 'Menu',
-                ),
-                Tab(
-                  icon: Icon(Icons.receipt_long, size: 24),
-                  text: 'Orders',
-                ),
+                Tab(icon: Icon(Icons.restaurant_menu, size: 22), text: 'Menu'),
+                Tab(icon: Icon(Icons.receipt_long, size: 22), text: 'Orders'),
                 if (OrderSettings.enableDineIn)
-                Tab(
-                  icon: Icon(Icons.table_restaurant, size: 24),
-                  text: 'Tables',
-                ),
+                  Tab(icon: Icon(Icons.table_restaurant, size: 22), text: 'Tables'),
               ],
             ),
           ),

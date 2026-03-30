@@ -189,41 +189,7 @@ class _manageStaffState extends State<manageStaff> {
             color: Colors.black87,
           ),
         ),
-        actions: [
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
-              vertical: 8,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(isTablet ? 10 : 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    size: isTablet ? 22 : 20,
-                    color: AppColors.primary,
-                  ),
-                ),
-                if (isTablet) ...[
-                  SizedBox(width: 10),
-                  Text(
-                    'Admin',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
+        actions: [SizedBox(width: 4)],
       ),
       drawer: DrawerManage(
         isDelete: true,
@@ -385,37 +351,22 @@ class _manageStaffState extends State<manageStaff> {
             color: (staff.isActive ?? true) == false
                 ? Colors.grey.shade100
                 : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.grey.shade200,
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-          padding: EdgeInsets.all(isTablet ? 16 : 14),
+          padding: EdgeInsets.all(isTablet ? 14 : 12),
           child: Row(
             children: [
               // Avatar
-              Container(
-                width: isTablet ? 56 : 50,
-                height: isTablet ? 56 : 50,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.person,
-                  size: isTablet ? 28 : 24,
-                  color: AppColors.primary,
+              CircleAvatar(
+                radius: isTablet ? 22 : 20,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                child: Text(
+                  staff.firstName.isNotEmpty ? staff.firstName[0].toUpperCase() : '?',
+                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.primary),
                 ),
               ),
-              SizedBox(width: isTablet ? 16 : 12),
+              SizedBox(width: isTablet ? 14 : 10),
               // Staff Info
               Expanded(
                 child: Column(
@@ -468,7 +419,7 @@ class _manageStaffState extends State<manageStaff> {
                               style: GoogleFonts.poppins(
                                 fontSize: isTablet ? 11 : 10,
                                 color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
