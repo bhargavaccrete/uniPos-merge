@@ -317,9 +317,9 @@ class _TableScreenState extends State<TableScreen> {
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
 
-    return SafeArea(
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: AppColors.surfaceLight,
+
         appBar: widget.isfromcart == true
             ? AppBar(
                 backgroundColor: AppColors.white,
@@ -641,7 +641,6 @@ class _TableScreenState extends State<TableScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 

@@ -19,7 +19,9 @@ class CategoryTab extends StatefulWidget {
   State<CategoryTab> createState() => _CategoryTabState();
 }
 
-class _CategoryTabState extends State<CategoryTab> {
+class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   final TextEditingController _searchController = TextEditingController();
   String query = '';
 
@@ -62,7 +64,9 @@ class _CategoryTabState extends State<CategoryTab> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
 

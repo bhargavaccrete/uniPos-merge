@@ -20,7 +20,9 @@ class AllTab extends StatefulWidget {
   State<AllTab> createState() => _AllTabState();
 }
 
-class _AllTabState extends State<AllTab> {
+class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   String query = '';
   final TextEditingController searchController = TextEditingController();
   final Map<String, GlobalKey> _categoryKeys = {};
@@ -49,7 +51,9 @@ class _AllTabState extends State<AllTab> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final height = MediaQuery.of(context).size.height;
 
     return Scaffold(

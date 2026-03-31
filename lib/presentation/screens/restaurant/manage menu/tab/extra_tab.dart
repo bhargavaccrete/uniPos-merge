@@ -21,7 +21,9 @@ class ExtraTab extends StatefulWidget {
   State<ExtraTab> createState() => _ExtraTabState();
 }
 
-class _ExtraTabState extends State<ExtraTab> {
+class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   String? editingId;
   int? editingToppingIndex;
 
@@ -990,7 +992,9 @@ class _ExtraTabState extends State<ExtraTab> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
 

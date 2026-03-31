@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
@@ -61,6 +62,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   Map<String, int> _extraQuantities = {}; // toppingId -> quantity
 
   double _totalPrice = 0.0;
+  int _quantity = 1;
 
   @override
   void initState() {
@@ -279,7 +281,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         id: const Uuid().v4(),
         title: finalTitle,
         price: _totalPrice,
-        quantity: 1,
+        quantity: _quantity,
         categoryName: widget.categoryName,
         variantName:  _selectedVariant?.name,
         variantPrice: _selectedVariant?.price,
@@ -411,84 +413,104 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             ),
           ),
 
-          // Bottom Add to Cart button
-          Container(
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 20,
-                  offset: Offset(0, -4),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: false,
-              child: GestureDetector(
-                onTap: _confirmAndAddItem,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primary, AppColors.primary],
+          // Bottom: Price + Qty + Add to Cart
+          Builder(builder: (_) {
+            // Stock check: determine max quantity allowed
+            final bool trackStock = widget.item.trackInventory;
+            final bool allowOutOfStock = widget.item.allowOrderWhenOutOfStock;
+            double availableStock = 0;
+            if (trackStock) {
+              if (_selectedVariant != null) {
+                availableStock = _selectedVariant!.stockQuantity;
+              } else {
+                availableStock = widget.item.stockQuantity;
+              }
+            }
+
+            // Subtract quantity already in cart for this item+variant
+            int alreadyInCart = 0;
+            if (trackStock && !allowOutOfStock) {
+              for (final cartItem in restaurantCartStore.cartItems) {
+                if (cartItem.productId == widget.item.id) {
+                  if (_selectedVariant != null) {
+                    if (cartItem.variantName == _selectedVariant!.name) alreadyInCart += cartItem.quantity;
+                  } else {
+                    alreadyInCart += cartItem.quantity;
+                  }
+                }
+              }
+            }
+
+            final bool hasStockLimit = trackStock && !allowOutOfStock;
+            final int maxQty = hasStockLimit ? (availableStock.toInt() - alreadyInCart).clamp(0, 9999) : 9999;
+            final bool canIncrease = _quantity < maxQty;
+
+            return Container(
+              padding: EdgeInsets.fromLTRB(16, 10, 16, 10),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                border: Border(top: BorderSide(color: Colors.grey.shade200)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    // Price
+                    Text(
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalPrice * _quantity)}',
+                      style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary),
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: Offset(0, 6),
+                    SizedBox(width: 12),
+                    // Qty controls
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'Total Amount',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.white.withOpacity(0.8),
-                            ),
+                          InkWell(
+                            onTap: () { if (_quantity > 1) setState(() => _quantity--); },
+                            child: Padding(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6), child: Icon(Icons.remove, size: 18, color: Colors.grey.shade700)),
                           ),
-                          SizedBox(height: 2),
-                          Text(
-                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalPrice)}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.white,
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(border: Border.symmetric(vertical: BorderSide(color: Colors.grey.shade300))),
+                            child: Text('$_quantity', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+                          ),
+                          InkWell(
+                            onTap: canIncrease
+                                ? () => setState(() => _quantity++)
+                                : () => NotificationService.instance.showError('Only ${maxQty.toInt()} available in stock'),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              child: Icon(Icons.add, size: 18, color: canIncrease ? AppColors.primary : Colors.grey.shade400),
                             ),
                           ),
                         ],
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            'Add to Cart',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.white,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Icon(Icons.arrow_forward_rounded, color: AppColors.white, size: 20),
-                        ],
+                    ),
+                    SizedBox(width: 12),
+                    // Add to Cart button
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: (hasStockLimit && maxQty <= 0) ? null : _confirmAndAddItem,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: Text('Add to Cart', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );

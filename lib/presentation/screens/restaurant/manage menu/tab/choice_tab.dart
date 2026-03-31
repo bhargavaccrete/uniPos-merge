@@ -19,7 +19,9 @@ class ChoiceTab extends StatefulWidget {
   State<ChoiceTab> createState() => _ChoiceTabState();
 }
 
-class _ChoiceTabState extends State<ChoiceTab> {
+class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   TextEditingController choiceController = TextEditingController();
   TextEditingController optionController = TextEditingController();
   TextEditingController searchController = TextEditingController();
@@ -594,7 +596,9 @@ class _ChoiceTabState extends State<ChoiceTab> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
 

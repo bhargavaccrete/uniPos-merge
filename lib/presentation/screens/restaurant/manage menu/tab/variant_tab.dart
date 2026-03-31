@@ -17,7 +17,9 @@ class VariantTab extends StatefulWidget {
   State<VariantTab> createState() => _VariantTabState();
 }
 
-class _VariantTabState extends State<VariantTab> {
+class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   TextEditingController variantController = TextEditingController();
   TextEditingController searchController = TextEditingController();
   String query = '';
@@ -263,7 +265,9 @@ class _VariantTabState extends State<VariantTab> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
 

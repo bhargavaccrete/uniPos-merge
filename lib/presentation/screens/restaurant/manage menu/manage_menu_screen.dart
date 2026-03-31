@@ -30,17 +30,9 @@ class _ManagemenuState extends State<Managemenu>
     super.initState();
     tabController = TabController(length: 6, vsync: this);
     // Use animation listener for real-time tab highlight during swipe
-    tabController.animation!.addListener(() {
-      final newIndex = tabController.animation!.value.round();
-      if (newIndex != tabController.index && !tabController.indexIsChanging) {
-        // During swipe — update highlight immediately
-        setState(() {});
-      }
-    });
     tabController.addListener(() {
       if (!tabController.indexIsChanging) {
-        // After swipe settles — final update + scroll
-        setState(() {});
+        // After swipe settles — scroll to selected tab
         _scrollToSelectedTab(tabController.index);
       }
     });
@@ -186,39 +178,45 @@ class _ManagemenuState extends State<Managemenu>
                     choiceStore.totalChoices +
                     extraStore.totalExtras;
 
-                // For desktop/large tablets, show tabs in a centered row
-                if (isDesktop) {
-                  return Center(
-                    child: Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        _buildTabButton(0, 'All', totalCount, isTablet),
-                        _buildTabButton(1, 'Items', itemStore.itemCount, isTablet),
-                        _buildTabButton(2, 'Categories', categoryStore.categoryCount, isTablet),
-                        _buildTabButton(3, 'Variants', variantStore.totalVariants, isTablet),
-                        _buildTabButton(4, 'Choices', choiceStore.totalChoices, isTablet),
-                        _buildTabButton(5, 'Extras', extraStore.totalExtras, isTablet),
-                      ],
-                    ),
-                  );
-                }
+                // AnimatedBuilder scopes tab-highlight rebuilds to this subtree only
+                return AnimatedBuilder(
+                  animation: tabController.animation!,
+                  builder: (_, __) {
+                    // For desktop/large tablets, show tabs in a centered row
+                    if (isDesktop) {
+                      return Center(
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            _buildTabButton(0, 'All', totalCount, isTablet),
+                            _buildTabButton(1, 'Items', itemStore.itemCount, isTablet),
+                            _buildTabButton(2, 'Categories', categoryStore.categoryCount, isTablet),
+                            _buildTabButton(3, 'Variants', variantStore.totalVariants, isTablet),
+                            _buildTabButton(4, 'Choices', choiceStore.totalChoices, isTablet),
+                            _buildTabButton(5, 'Extras', extraStore.totalExtras, isTablet),
+                          ],
+                        ),
+                      );
+                    }
 
-                // For mobile and tablet, show horizontal scroll
-                return SingleChildScrollView(
-                  controller: _tabScrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildTabButton(0, 'All', totalCount, isTablet),
-                      _buildTabButton(1, 'Items', itemStore.itemCount, isTablet),
-                      _buildTabButton(2, 'Categories', categoryStore.categoryCount, isTablet),
-                      _buildTabButton(3, 'Variants', variantStore.totalVariants, isTablet),
-                      _buildTabButton(4, 'Choices', choiceStore.totalChoices, isTablet),
-                      _buildTabButton(5, 'Extras', extraStore.totalExtras, isTablet),
-                    ],
-                  ),
+                    // For mobile and tablet, show horizontal scroll
+                    return SingleChildScrollView(
+                      controller: _tabScrollController,
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildTabButton(0, 'All', totalCount, isTablet),
+                          _buildTabButton(1, 'Items', itemStore.itemCount, isTablet),
+                          _buildTabButton(2, 'Categories', categoryStore.categoryCount, isTablet),
+                          _buildTabButton(3, 'Variants', variantStore.totalVariants, isTablet),
+                          _buildTabButton(4, 'Choices', choiceStore.totalChoices, isTablet),
+                          _buildTabButton(5, 'Extras', extraStore.totalExtras, isTablet),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),
