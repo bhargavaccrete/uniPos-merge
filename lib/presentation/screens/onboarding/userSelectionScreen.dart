@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
+import '../captain/captain_setup_screen.dart';
 
 class UserSelectionScreen extends StatefulWidget {
   const UserSelectionScreen({Key? key}) : super(key: key);
@@ -19,6 +20,7 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
 
   bool _isNewUserHovered = false;
   bool _isExistingUserHovered = false;
+  bool _isCaptainHovered = false;
 
 
   @override
@@ -253,6 +255,24 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
                 });
               },
             ),
+            const SizedBox(height: 20),
+            _buildUserCard(
+              title: 'Captain Device',
+              subtitle: 'Waiter ordering ',
+              description: 'Connect to the main POS over WiFi and take orders from this device',
+              icon: Icons.restaurant_menu,
+              color: AppColors.accent,
+              isHovered: _isCaptainHovered,
+              onTap: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const CaptainSetupScreen()),
+              ),
+              onHover: (hover) {
+                setState(() {
+                  _isCaptainHovered = hover;
+                });
+              },
+            ),
           ],
         )
             : Row(
@@ -273,7 +293,7 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
                 },
               ),
             ),
-            const SizedBox(width: 30),
+            const SizedBox(width: 20),
             Expanded(
               child: _buildUserCard(
                 title: 'I\'m an Existing User',
@@ -286,6 +306,26 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
                 onHover: (hover) {
                   setState(() {
                     _isExistingUserHovered = hover;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: _buildUserCard(
+                title: 'Captain Device',
+                subtitle: 'Waiter ordering tablet',
+                description: 'Connect to the main POS over WiFi and take orders from this device',
+                icon: Icons.restaurant_menu,
+                color: AppColors.accent,
+                isHovered: _isCaptainHovered,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CaptainSetupScreen()),
+                ),
+                onHover: (hover) {
+                  setState(() {
+                    _isCaptainHovered = hover;
                   });
                 },
               ),

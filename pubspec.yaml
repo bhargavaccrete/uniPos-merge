@@ -99,6 +99,7 @@ dependencies:
   shelf_router: ^1.1.4
   shelf_web_socket: ^2.0.1
   web_socket_channel: ^3.0.3
+  wakelock_plus: ^1.5.1
 
 
 

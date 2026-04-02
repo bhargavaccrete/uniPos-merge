@@ -6,6 +6,8 @@ import 'package:unipos/util/images.dart';
 import 'package:unipos/core/config/app_config.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
+import '../captain/captain_home_screen.dart';
+import '../captain/captain_login_screen.dart';
 
 // Import your color and responsive utilities
 // import '../util/color.dart';
@@ -111,14 +113,29 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
+    final prefs = await SharedPreferences.getInstance();
+
+    // Captain mode check — must be FIRST, before any POS setup logic
+    final isCaptainMode = prefs.getBool('is_captain_mode') ?? false;
+    if (isCaptainMode) {
+      final captainLoggedIn = prefs.getBool('captain_logged_in') ?? false;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => captainLoggedIn
+              ? const CaptainHomeScreen()
+              : const CaptainLoginScreen(),
+        ),
+      );
+      return;
+    }
+
     // Check if setup is complete
     if (AppConfig.isSetupComplete) {
       // Setup is complete - navigate to appropriate screen based on business mode
       if (AppConfig.isRetail) {
         Navigator.pushReplacementNamed(context, '/retail-billing');
       } else if (AppConfig.isRestaurant) {
-        // Check restaurant login state
-        final prefs = await SharedPreferences.getInstance();
         final isLoggedIn = prefs.getBool('restaurant_is_logged_in') ?? false;
 
         if (isLoggedIn) {
@@ -133,8 +150,6 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacementNamed(context, '/walkthrough');
       }
     } else {
-      // Setup not complete - check if user wants to skip walkthrough
-      final prefs = await SharedPreferences.getInstance();
       final skipWalkthrough = prefs.getBool('skip_walkthrough') ?? false;
 
       if (skipWalkthrough) {

@@ -18,6 +18,7 @@ import 'util/restaurant/print_settings.dart';
 import 'util/restaurant/order_settings.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
 import 'domain/services/restaurant/auto_backup_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
 
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -34,6 +35,9 @@ void main() async {
 
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Enable Wake Lock to prevent device from going to sleep
+    WakelockPlus.enable();
 
     try {
       await _initializeApp();

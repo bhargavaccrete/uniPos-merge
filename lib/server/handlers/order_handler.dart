@@ -5,6 +5,7 @@ import '../websocket.dart';
 import '../../data/models/restaurant/db/database/hive_order.dart';
 import '../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../domain/services/restaurant/inventory_service.dart';
 
 Future<Response> createOrderHandler(Request request) async {
   try {
@@ -41,6 +42,20 @@ Future<Response> createOrderHandler(Request request) async {
 
     // Save order to Hive
     await orderStore.addOrder(order);
+
+    // Deduct stock for ordered items
+    await InventoryService.deductStockForOrder(items);
+
+    // Update table status to Cooking (dine-in only)
+    if (order.tableNo != null) {
+      await tableStore.updateTableStatus(
+        order.tableNo!,
+        'Cooking',
+        total: order.totalPrice,
+        orderId: orderId,
+        orderTime: order.timeStamp,
+      );
+    }
 
     // Notify kitchen via WebSocket
     broadcastEvent({

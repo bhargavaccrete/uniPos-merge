@@ -128,6 +128,24 @@ static Future<void> deleteOrder (String id )async{
     print('✅ Daily order number reset to 0');
   }
 
+  static Future<List<OrderModel>> getAllActiveOrders() async {
+    final box = _getOrderBox();
+    const activeStatuses = {'Processing', 'Cooking', 'Ready', 'Running', 'Reserved', 'Served'};
+    return box.values
+        .where((o) => activeStatuses.contains(o.status))
+        .toList()
+      ..sort((a, b) => (b.timeStamp ?? DateTime(0)).compareTo(a.timeStamp ?? DateTime(0)));
+  }
+
+  static Future<OrderModel?> getOrderById(String orderId) async {
+    final box = _getOrderBox();
+    try {
+      return box.values.firstWhere((o) => o.id == orderId);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<OrderModel?> getActiveOrderByTableId(String tableId) async{
     final box = _getOrderBox();
     final allOrder = box.values.toList();

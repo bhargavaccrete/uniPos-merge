@@ -1162,7 +1162,7 @@ class RestaurantBulkImportServiceV3 {
           unit: rowData['Unit']?.toString().trim(),
           isSoldByWeight: _parseBool(rowData['IsSoldByWeight']?.toString() ?? '', false),
           trackInventory: _parseBool(rowData['TrackInventory']?.toString() ?? '', false),
-          stockQuantity: hasVariants ? 0 : _getDoubleFromValue(rowData['StockQuantity']),
+          stockQuantity: _getDoubleFromValue(rowData['StockQuantity']),
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
           taxRate: taxRateValue,
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
@@ -1224,8 +1224,18 @@ class RestaurantBulkImportServiceV3 {
         for (var row in variantGroups[itemName]!) {
           String variantName = _getValue(row, 1);
           double price = _getDouble(row, 2);
-          bool trackInventory = _parseBool(_getValue(row, 3), false);
-          double stockQuantity = _getDouble(row, 4);
+
+          // Inherit trackInventory from item when not specified in variant row
+          final variantTrackRaw = _getValue(row, 3);
+          bool trackInventory = variantTrackRaw.isEmpty
+              ? item.trackInventory
+              : _parseBool(variantTrackRaw, false);
+
+          // Inherit stockQuantity from item when variant has no stock specified
+          final variantStock = _getDouble(row, 4);
+          double stockQuantity = (variantStock == 0 && item.stockQuantity > 0)
+              ? item.stockQuantity
+              : variantStock;
 
           // Find variant by name
           var variant = _variantCache.values.where((v) => v.name == variantName).firstOrNull;
