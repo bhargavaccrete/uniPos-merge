@@ -43,6 +43,10 @@ class CashMovementModel extends HiveObject {
   @HiveField(6)
   final String staffName;
 
+  /// The POS session ID this movement belongs to
+  @HiveField(7)
+  final String? sessionId;
+
   CashMovementModel({
     required this.id,
     required this.timestamp,
@@ -51,6 +55,7 @@ class CashMovementModel extends HiveObject {
     required this.reason,
     this.note,
     required this.staffName,
+    this.sessionId,
   });
 
   Map<String, dynamic> toMap() => {
@@ -61,6 +66,7 @@ class CashMovementModel extends HiveObject {
         'reason': reason,
         'note': note,
         'staffName': staffName,
+        'sessionId': sessionId,
       };
 
   factory CashMovementModel.fromMap(Map<String, dynamic> map) =>
@@ -73,6 +79,7 @@ class CashMovementModel extends HiveObject {
         reason: map['reason'] ?? '',
         note: map['note'] as String?,
         staffName: map['staffName'] ?? '',
+        sessionId: map['sessionId'],
       );
 
   /// True if this movement adds cash to the drawer

@@ -46,13 +46,14 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       tableNo: fields[26] as String?,
       loyaltyPointsUsed: fields[27] as int?,
       shiftId: fields[28] as String?,
+      sessionId: fields[29] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PastOrderModel obj) {
     writer
-      ..writeByte(29)
+      ..writeByte(30)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -110,7 +111,9 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       ..writeByte(27)
       ..write(obj.loyaltyPointsUsed)
       ..writeByte(28)
-      ..write(obj.shiftId);
+      ..write(obj.shiftId)
+      ..writeByte(29)
+      ..write(obj.sessionId);
   }
 
   @override

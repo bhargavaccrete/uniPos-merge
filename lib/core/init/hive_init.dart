@@ -62,6 +62,7 @@ import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
+import 'package:unipos/data/models/restaurant/db/session_model.dart';
 
 /// Hive Initialization Class
 /// Handles all adapter registrations and box openings
@@ -554,6 +555,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.savedPrinter)) {
       Hive.registerAdapter(SavedPrinterModelAdapter());
     }
+    // RestaurantSessionModel - 131: Session-based day management
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSession)) {
+      Hive.registerAdapter(RestaurantSessionModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -611,6 +616,9 @@ class HiveInit {
 
     // Saved thermal printers (Bluetooth/WiFi configuration)
     await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
+
+    // Restaurant POS Sessions
+    await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
 
     _areRestaurantBoxesOpen = true;
     print('✅ All restaurant boxes opened successfully with correct names and guard flag set');

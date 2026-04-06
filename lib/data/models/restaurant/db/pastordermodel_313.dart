@@ -102,6 +102,9 @@ class PastOrderModel extends HiveObject{
   @HiveField(28)
   final String? shiftId; // Links the order to the active shift at settlement time
 
+  @HiveField(29)
+  final String? sessionId; // Links order to a specific POS session
+
   PastOrderModel({
     required this.id,
     required this.customerName,
@@ -134,6 +137,7 @@ class PastOrderModel extends HiveObject{
     this.tableNo,
     this.loyaltyPointsUsed,
     this.shiftId,
+    this.sessionId,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -169,6 +173,7 @@ class PastOrderModel extends HiveObject{
     String? tableNo,
     int? loyaltyPointsUsed,
     String? shiftId,
+    String? sessionId,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -200,6 +205,7 @@ class PastOrderModel extends HiveObject{
       tableNo: tableNo ?? this.tableNo,
       loyaltyPointsUsed: loyaltyPointsUsed ?? this.loyaltyPointsUsed,
       shiftId: shiftId ?? this.shiftId,
+      sessionId: sessionId ?? this.sessionId,
     );
   }
 
@@ -259,6 +265,7 @@ class PastOrderModel extends HiveObject{
       'tableNo': tableNo,
       'loyaltyPointsUsed': loyaltyPointsUsed,
       'shiftId': shiftId,
+      'sessionId': sessionId,
     };
   }
 
@@ -294,6 +301,7 @@ class PastOrderModel extends HiveObject{
       tableNo: map['tableNo'],
       loyaltyPointsUsed: map['loyaltyPointsUsed'] as int?,
       shiftId: map['shiftId'] as String?,
+      sessionId: map['sessionId'] as String?,
     );
   }
 

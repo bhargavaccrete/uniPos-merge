@@ -160,15 +160,6 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _addItemToCart(CartItem cartItem) async {
-    // Block adding items if EOD is pending from previous day
-    final pendingEOD = await DayManagementService.hasPendingEOD();
-    if (pendingEOD) {
-      if (mounted) {
-        NotificationService.instance.showError('Complete End of Day before placing new orders');
-      }
-      return;
-    }
-
     try {
       final result = await restaurantCartStore.addToCart(cartItem);
 

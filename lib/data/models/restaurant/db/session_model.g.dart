@@ -1,50 +1,48 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'expensel_316.dart';
+part of 'session_model.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class ExpenseAdapter extends TypeAdapter<Expense> {
+class RestaurantSessionModelAdapter
+    extends TypeAdapter<RestaurantSessionModel> {
   @override
-  final int typeId = 116;
+  final int typeId = 131;
 
   @override
-  Expense read(BinaryReader reader) {
+  RestaurantSessionModel read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return Expense(
-      id: fields[0] as String,
-      dateandTime: fields[1] as DateTime,
-      amount: fields[2] as double,
-      categoryOfExpense: fields[3] as String?,
-      reason: fields[4] as String?,
-      paymentType: fields[5] as String?,
-      sessionId: fields[6] as String?,
+    return RestaurantSessionModel(
+      sessionId: fields[0] as String,
+      startTime: fields[1] as DateTime,
+      endTime: fields[2] as DateTime?,
+      openingCash: fields[3] as double,
+      closingCash: fields[4] as double?,
+      isClosed: fields[5] as bool,
     );
   }
 
   @override
-  void write(BinaryWriter writer, Expense obj) {
+  void write(BinaryWriter writer, RestaurantSessionModel obj) {
     writer
-      ..writeByte(7)
-      ..writeByte(0)
-      ..write(obj.id)
-      ..writeByte(1)
-      ..write(obj.dateandTime)
-      ..writeByte(2)
-      ..write(obj.amount)
-      ..writeByte(3)
-      ..write(obj.categoryOfExpense)
-      ..writeByte(4)
-      ..write(obj.reason)
-      ..writeByte(5)
-      ..write(obj.paymentType)
       ..writeByte(6)
-      ..write(obj.sessionId);
+      ..writeByte(0)
+      ..write(obj.sessionId)
+      ..writeByte(1)
+      ..write(obj.startTime)
+      ..writeByte(2)
+      ..write(obj.endTime)
+      ..writeByte(3)
+      ..write(obj.openingCash)
+      ..writeByte(4)
+      ..write(obj.closingCash)
+      ..writeByte(5)
+      ..write(obj.isClosed);
   }
 
   @override
@@ -53,7 +51,7 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ExpenseAdapter &&
+      other is RestaurantSessionModelAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

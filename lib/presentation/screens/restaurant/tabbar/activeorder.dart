@@ -46,12 +46,12 @@ class _ActiveorderState extends State<Activeorder> {
     _initializeWebSocket();
   }
 
-  Future<void> _initializeWebSocket() async {
-    // Start WebSocket client service
-    await _wsService.start();
+  void _initializeWebSocket() {
+    // Start WebSocket client service (fire and forget)
+    _wsService.start();
 
     // Listen for real-time updates from KDS
-    _wsSubscription = _wsService.messageStream.listen((message) {
+    _wsSubscription = _wsService.messageStream.listen((message) async {
       final type = message['type'] as String?;
 
       if (type == 'STATUS_UPDATE') {
@@ -76,9 +76,30 @@ class _ActiveorderState extends State<Activeorder> {
 
         print('🔔 UniPOS: Order updated - KOT #$kotNumber with $newItemCount new items');
 
+        // Reload MobX store — updateOrderWithNewItems writes Hive directly, bypassing MobX
+        await orderStore.loadOrders();
+
         // Show notification
         if (mounted) {
           NotificationService.instance.showSuccess('New KOT #$kotNumber: $newItemCount items added to Table $tableNo');
+        }
+      } else if (type == 'CANCEL_KOT') {
+        final cancelKotNumber = message['cancelKotNumber'];
+        final tableNo = message['tableNo'];
+        final cancelledItems = message['cancelledItems'] as List? ?? [];
+        final itemSummary = cancelledItems.map((i) =>
+            '${i['quantity']}× ${i['title']}${i['variantName'] != null ? ' (${i['variantName']})' : ''}')
+            .join(', ');
+
+        print('🔔 UniPOS: Cancel KOT #$cancelKotNumber for Table $tableNo: $itemSummary');
+
+        // Reload MobX store so UI reflects removed items
+        await orderStore.loadOrders();
+
+        if (mounted) {
+          NotificationService.instance.showError(
+            'Cancel KOT #$cancelKotNumber - Table $tableNo\n$itemSummary',
+          );
         }
       } else if (type == 'NEW_ORDER') {
         final kotNumber = message['kotNumber'];
@@ -145,6 +166,7 @@ class _ActiveorderState extends State<Activeorder> {
           billNumber: order.billNumber,
           kotNumbers: order.kotNumbers,
           kotBoundaries: order.kotBoundaries,
+          sessionId: order.sessionId, // Preserve sessionId for voided order
         );
         await pastOrderStore.addOrder(voidRecord);
       }
@@ -792,6 +814,7 @@ class _ActiveorderState extends State<Activeorder> {
       totalPaid: latestOrder.totalPaid,
       changeReturn: latestOrder.changeReturn,
       tableNo: latestOrder.tableNo,
+      sessionId: latestOrder.sessionId, // Preserve sessionId
     );
 
     await pastOrderStore.addOrder(pastOrder);

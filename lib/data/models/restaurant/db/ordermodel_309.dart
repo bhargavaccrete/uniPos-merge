@@ -109,6 +109,9 @@ class OrderModel extends HiveObject {
   @HiveField(32)
   final int? billNumber; // Daily bill number — generated when payment is recorded
 
+  @HiveField(33)
+  final String? sessionId; // Links order to a specific POS session
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -147,6 +150,7 @@ class OrderModel extends HiveObject {
     // Tax settings at order creation
     this.isTaxInclusive,
     this.billNumber,
+    this.sessionId,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -186,6 +190,7 @@ class OrderModel extends HiveObject {
     double? changeReturn,
     bool? isTaxInclusive,
     int? billNumber,
+    String? sessionId,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -221,6 +226,7 @@ class OrderModel extends HiveObject {
       changeReturn: changeReturn ?? this.changeReturn,
       isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
       billNumber: billNumber ?? this.billNumber,
+      sessionId: sessionId ?? this.sessionId,
     );
   }
 

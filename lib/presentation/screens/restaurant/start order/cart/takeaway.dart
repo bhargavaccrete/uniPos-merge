@@ -10,6 +10,7 @@ import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
+import '../../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
@@ -575,6 +576,9 @@ class _TakeawayState extends State<Takeaway> {
     // Generate daily order number
     final int orderNumber = await orderStore.getNextOrderNumber();
 
+    // Get current session ID
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
+
     final neworder = OrderModel(
       id: Uuid().v4(),
       customerName: nameController.text.trim(),
@@ -605,6 +609,7 @@ class _TakeawayState extends State<Takeaway> {
       orderNumber: orderNumber, // Daily order number
       customerId: customer?.customerId, // Link to customer (now properly set)
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+      sessionId: currentSessionId, // Link to POS session
     );
 
     await orderStore.addOrder(neworder);
@@ -728,6 +733,9 @@ class _TakeawayState extends State<Takeaway> {
         print('KOT Statuses: $updatedKotStatuses');
       }
 
+      // Get current session ID
+      final currentSessionId = await DayManagementService.getCurrentSessionId();
+
       final updateOrder = existingModel.copyWith(
         // The `widget.cartItems` now correctly contains the merged list
         items: plainItems,
@@ -747,6 +755,7 @@ class _TakeawayState extends State<Takeaway> {
         itemCountAtLastKot: newItemCount,
         kotBoundaries: updatedKotBoundaries, // Update KOT boundaries
         kotStatuses: updatedKotStatuses, // Update KOT statuses
+        sessionId: currentSessionId ?? existingModel.sessionId, // Preserve or update session
       );
 
       print('🔍 UPDATE ORDER DEBUG:');
@@ -1395,6 +1404,9 @@ class _TakeawayState extends State<Takeaway> {
     final int billNumber = await orderStore.getNextBillNumber();
     print('✅ Bill number generated for quick settle: $billNumber');
 
+    // Get current session ID
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
+
     final pastOrder = PastOrderModel(
       id: Uuid().v4(), // Generate a unique ID for this transaction
       customerName: 'Quick Settle',
@@ -1418,6 +1430,7 @@ class _TakeawayState extends State<Takeaway> {
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
       tableNo: widget.isDineIn ? (widget.selectedTableNo ?? widget.tableid) : null,
       shiftId: RestaurantSession.currentShiftId,
+      sessionId: currentSessionId, // Link to POS session
     );
 
     // 1. Add the completed order to history

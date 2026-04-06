@@ -12,6 +12,7 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../util/common/currency_helper.dart';
 
 class Addexpence extends StatefulWidget {
@@ -91,6 +92,9 @@ class _AddexpenceState extends State<Addexpence> {
         now.millisecond,
       );
 
+      // Get current session ID
+      final currentSessionId = await DayManagementService.getCurrentSessionId();
+
       final expense = Expense(
         id: Uuid().v4(),
         dateandTime: expenseDateTime,
@@ -98,6 +102,7 @@ class _AddexpenceState extends State<Addexpence> {
         categoryOfExpense: selectedCategoryId,
         reason: _reasonController.text.trim().isEmpty ? null : _reasonController.text.trim(),
         paymentType: Dropvalue2,
+        sessionId: currentSessionId, // Link to POS session
       );
 
       final success = await expenseStore.addExpense(expense);

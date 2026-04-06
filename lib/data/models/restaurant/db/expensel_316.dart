@@ -25,7 +25,8 @@ class Expense extends HiveObject{
   @HiveField(5)
   final String? paymentType;
 
-
+  @HiveField(6)
+  final String? sessionId; // Links expense to a specific POS session
 
   Expense({
     required this.id,
@@ -33,7 +34,8 @@ class Expense extends HiveObject{
     required this.amount,
     this.categoryOfExpense,
     this.reason,
-    this.paymentType
+    this.paymentType,
+    this.sessionId
   });
 
 
@@ -43,7 +45,8 @@ class Expense extends HiveObject{
     double ? amount,
     String? categoryOfExpense,
     String ? reason,
-    String ? paymentType
+    String ? paymentType,
+    String? sessionId,
   }){
     return Expense(
         id: id ?? this.id,
@@ -51,7 +54,8 @@ class Expense extends HiveObject{
         amount: amount ?? this.amount,
         categoryOfExpense: categoryOfExpense ?? this.categoryOfExpense,
         paymentType: paymentType ?? this.paymentType,
-        reason: reason ?? this.reason
+        reason: reason ?? this.reason,
+        sessionId: sessionId ?? this.sessionId,
     );
   }
 
@@ -62,7 +66,8 @@ class Expense extends HiveObject{
       'amount':amount,
       'categoryOfExpense':categoryOfExpense,
       'reason':reason,
-      'paymentType':paymentType
+      'paymentType':paymentType,
+      'sessionId': sessionId,
     };
   }
 
@@ -75,7 +80,8 @@ class Expense extends HiveObject{
         amount: (map['amount'] ?? 0).toDouble(),
         categoryOfExpense: map['categoryOfExpense'],
         reason: map['reason'],
-        paymentType: map['paymentType']
+        paymentType: map['paymentType'],
+        sessionId: map['sessionId'],
     );
   }
 

@@ -7,6 +7,8 @@ import '../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../domain/services/restaurant/inventory_service.dart';
 
+import '../../domain/services/restaurant/day_management_service.dart';
+
 Future<Response> createOrderHandler(Request request) async {
   try {
     final body = await request.readAsString();
@@ -17,6 +19,9 @@ Future<Response> createOrderHandler(Request request) async {
 
     // Get next KOT number
     final kotNumber = await orderStore.getNextKotNumber();
+
+    // Get current session ID
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
 
     // Parse cart items from request
     final items = (data['items'] as List<dynamic>?)
@@ -38,6 +43,7 @@ Future<Response> createOrderHandler(Request request) async {
       kotNumbers: [kotNumber],
       itemCountAtLastKot: items.length,
       kotBoundaries: [items.length],
+      sessionId: currentSessionId, // Link to POS session
     );
 
     // Save order to Hive

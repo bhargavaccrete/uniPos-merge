@@ -24,6 +24,7 @@ Router createRouter() {
   router.post('/captain/send-order', captainSendOrderHandler);
   router.get('/captain/active-orders', getCaptainActiveOrdersHandler);
   router.put('/captain/orders/<id>/status', captainUpdateOrderStatusHandler);
+  router.put('/captain/orders/<id>/modify', captainModifyOrderHandler);
 
   return router;
 }

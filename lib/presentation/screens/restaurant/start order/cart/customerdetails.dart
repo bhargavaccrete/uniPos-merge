@@ -11,6 +11,7 @@ import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
+import '../../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
@@ -1207,6 +1208,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
       }
     }
 
+    // Get current session ID
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
+
     final OrderModel completedOrder = widget.existingModel!.copyWith(
       items: itemsToSettle, // Use updated items if provided
       kotNumbers: finalKotNumbers, // Include new KOT if generated
@@ -1231,6 +1235,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       isSplitPayment: isSplit,
       totalPaid: _totalPaid,
       changeReturn: _changeReturn,
+      sessionId: currentSessionId ?? widget.existingModel!.sessionId, // Ensure sessionId is preserved/attached
     );
     try {
       // For Dine In orders that haven't been served yet: just record the payment
@@ -1304,6 +1309,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final int billNumber = await orderStore.getNextBillNumber();
     print('✅ Bill number generated: $billNumber');
 
+    // Get current session ID or fallback to order's session
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
+
     final pastOrder = PastOrderModel(
       id: activeModel.id,
       customerName: activeModel.customerName,
@@ -1328,6 +1336,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
       tableNo: activeModel.tableNo,
       shiftId: RestaurantSession.currentShiftId,
+      sessionId: currentSessionId ?? activeModel.sessionId, // Assign to current session to reflect payment
     );
     await pastOrderStore.addOrder(pastOrder);
     await orderStore.deleteOrder(activeModel.id);
@@ -1350,6 +1359,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final paymentList = _paymentEntries.map((e) => e.toMap()).toList();
     final isSplit = _paymentEntries.length > 1;
     final paymentMethodDisplay = isSplit ? 'Split Payment' : _paymentEntries.first.method;
+
+    // Get current session ID
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
 
     // Check if this is a "Settle & Print" operation (immediate completion)
     if (widget.isSettle == true) {
@@ -1384,6 +1396,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
         loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
         shiftId: RestaurantSession.currentShiftId,
+        sessionId: currentSessionId, // Link to POS session
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 

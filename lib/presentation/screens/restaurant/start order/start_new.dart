@@ -1219,7 +1219,7 @@ class _ActiveOrdersContentState extends State<_ActiveOrdersContent> {
   }
 
   Future<void> _moveOrderToPast(OrderModel order) async {
-    final pastOrder = pastOrderModel(
+    final pastOrder = PastOrderModel(
       id: order.id,
       customerName: order.customerName,
       totalPrice: order.totalPrice,
@@ -1233,6 +1233,7 @@ class _ActiveOrdersContentState extends State<_ActiveOrdersContent> {
       remark: order.remark,
       kotNumbers: order.kotNumbers,
       kotBoundaries: order.kotBoundaries,
+      sessionId: order.sessionId, // Preserve sessionId
     );
 
     await HivePastOrder.addOrder(pastOrder);

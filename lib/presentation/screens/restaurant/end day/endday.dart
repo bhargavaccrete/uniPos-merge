@@ -78,22 +78,16 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
       print('✅ All boxes reported as open, attempting to access data...');
 
-      final lastEODDate = await _getLastEODDate();
-      final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
       final today = DateTime.now();
 
-      print('🔍 Last EOD date: $lastEODDate');
-      print('🔍 Day start timestamp: $dayStartTimestamp');
       print('🔍 Today date: $today');
 
-      final isEODCompletedAfterDayStart = lastEODDate != null &&
-          dayStartTimestamp != null &&
-          lastEODDate.isAfter(dayStartTimestamp);
+      // Check for current session
+      final currentSession = await DayManagementService.getCurrentSession();
+      print('🔍 Current session: ${currentSession?.sessionId}, isClosed: ${currentSession?.isClosed}');
 
-      print('🔍 Is EOD completed after day start: $isEODCompletedAfterDayStart');
-
-      if (isEODCompletedAfterDayStart) {
-        print('ℹ️ EOD already completed for the current day - showing empty state');
+      if (currentSession == null || currentSession.isClosed) {
+        print('ℹ️ No active session - showing empty state');
         setState(() {
           _currentReport = null;
           openingBalance = 0.0;
@@ -104,42 +98,24 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         return;
       }
 
-      final dayStarted = await DayManagementService.isDayStarted();
-      final pendingEOD = await DayManagementService.hasPendingEOD();
-      print('🔍 Day started: $dayStarted, Pending EOD: $pendingEOD');
+      selectedDate = currentSession.startTime;
+      final sessionId = currentSession.sessionId;
 
-      if (!dayStarted) {
-        print('ℹ️ Day not started - showing empty state');
-        setState(() {
-          _currentReport = null;
-          openingBalance = 0.0;
-          expectedCash = 0.0;
-          totalExpenses = 0.0;
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // If midnight crossed without EOD, use the original day start date for reporting
-      if (pendingEOD && dayStartTimestamp != null) {
-        selectedDate = dayStartTimestamp;
-        print('⚠️ Pending EOD from ${dayStartTimestamp.toIso8601String()} — using that date');
-      }
-
-      print('📦 Fetching past orders...');
+      print('📦 Fetching past orders for session $sessionId...');
       await pastOrderStore.loadPastOrders();
       final pastOrders = pastOrderStore.pastOrders.toList();
       print('✅ Got ${pastOrders.length} past orders in total');
 
-      print('📊 Getting opening balance...');
-      final currentOpeningBalance = await DayManagementService.getOpeningBalance();
+      print('📊 Getting opening balance for session...');
+      final currentOpeningBalance = currentSession.openingCash;
       print('✅ Opening balance: $currentOpeningBalance');
 
-      print('📋 Generating EOD report...');
+      print('📋 Generating EOD report for session...');
       final report = await EODService.generateEODReport(
         date: selectedDate,
         openingBalance: currentOpeningBalance,
         actualCash: 0.0,
+        sessionId: sessionId,
       );
       print('✅ EOD report generated');
 
@@ -154,8 +130,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           (report.totalExpenses > 0) ||
           (currentOpeningBalance > 0);
 
-      final dayStart = await DayManagementService.getDayStartTimestamp()
-          ?? DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      final dayStart = currentSession.startTime;
       await cashMovementStore.loadTodayMovements(dayStart);
 
       setState(() {
@@ -247,7 +222,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       );
 
       await EODService.saveEODReport(report);
-      await DataClearService.clearAllTransactionalData();
+      // await DataClearService.clearAllTransactionalData(); // ❌ REMOVED: Keep orders permanent
 
       await shiftStore.loadShifts();
       final openShifts = shiftStore.shifts.where((s) => s.isOpen).toList();
@@ -256,7 +231,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       }
       await RestaurantSession.clearShiftSession();
 
-      await _markDayCompleted();
+      // Finalize the session
+      await DayManagementService.endSession(closingCash: actualCashAmount);
 
       final expectedTotalCash =
           openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
@@ -670,6 +646,9 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             ),
             TextButton(
               onPressed: () async {
+                // Get current session ID
+                final currentSessionId = await DayManagementService.getCurrentSessionId();
+                
                 // Void all stale orders
                 for (final order in activeOrders) {
                   final voidRecord = PastOrderModel(
@@ -686,6 +665,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     orderStatus: 'VOID',
                     kotNumbers: order.kotNumbers,
                     kotBoundaries: order.kotBoundaries,
+                    sessionId: currentSessionId ?? order.sessionId, // Link to current or original session
                   );
                   await pastOrderStore.addOrder(voidRecord);
                   await orderStore.deleteOrder(order.id);

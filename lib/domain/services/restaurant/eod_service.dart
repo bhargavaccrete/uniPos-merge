@@ -17,40 +17,38 @@ class EODService {
     required double openingBalance,
     required double actualCash,
     String? remarks,
+    String? sessionId,
   }) async {
+    // If sessionId is not provided, try to get current active session
+    final targetSessionId = sessionId ?? await DayManagementService.getCurrentSessionId();
+    final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
+    final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
+    final endTime = DateTime.now();
+
+    print('📋 Generating EOD report for session: $targetSessionId');
+
+    // Fetch all past orders
     await pastOrderStore.loadPastOrders();
     final pastOrders = pastOrderStore.pastOrders.toList();
 
-    // Get the day start timestamp - CRITICAL for filtering orders after "Start Day" was clicked
-    final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
-
-    // Determine the start time for filtering:
-    // - If day was started with a timestamp, use that exact time
-    // - Otherwise, fall back to start of day (00:00:00)
-    final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
-    // Use current time as end — handles midnight crossing (EOD run after midnight for yesterday's session)
-    final endTime = DateTime.now();
-
-    print('📅 EOD Report Date Range: $startTime to $endTime');
-    print('📅 Day Start Timestamp: $dayStartTimestamp');
-    print('📦 Total past orders in system: ${pastOrders.length}');
-
-    // Get ALL orders for the day AFTER day was started
+    // Filter orders by sessionId
     final allDayOrders = pastOrders.where((order) {
+      if (targetSessionId != null) {
+        if (order.sessionId == targetSessionId) return true;
+        // Fallback for orders that might have failed to save sessionId (e.g., hot reload issues)
+        if (order.sessionId == null && order.orderAt != null) {
+          return (order.orderAt!.isAfter(startTime) || order.orderAt!.isAtSameMomentAs(startTime)) &&
+                 (order.orderAt!.isBefore(endTime) || order.orderAt!.isAtSameMomentAs(endTime));
+        }
+        return false;
+      }
+      // Fallback to date range if no target session exists (for legacy data)
       return order.orderAt != null &&
-          order.orderAt!.isAfter(startTime) &&
-          order.orderAt!.isBefore(endTime);
+          (order.orderAt!.isAfter(startTime) || order.orderAt!.isAtSameMomentAs(startTime)) &&
+          (order.orderAt!.isBefore(endTime) || order.orderAt!.isAtSameMomentAs(endTime));
     }).toList();
 
-    print('✅ Orders filtered for current day session: ${allDayOrders.length}');
-    if (allDayOrders.isNotEmpty) {
-      print('🔍 Sample order timestamps:');
-      for (var i = 0; i < allDayOrders.length && i < 3; i++) {
-        print('   Order ${i + 1}: ${allDayOrders[i].orderAt}');
-      }
-    } else if (dayStartTimestamp != null) {
-      print('ℹ️ No orders found after day start time: $dayStartTimestamp');
-    }
+    print('✅ Found ${allDayOrders.length} orders for session');
 
     // Separate fully refunded and voided orders from active orders for reporting
     final activeDayOrders = allDayOrders.where((order) {
@@ -97,29 +95,25 @@ class EODService {
     final totalOrderCount = activeDayOrders.length; // Count only active orders
 
     // Calculate expenses for the day using expense store
-    // Use the same start time as orders filtering for consistency
     await expenseStore.loadExpenses();
     final allExpenses = expenseStore.expenses;
 
-    print('💰 ========== EXPENSE DEBUG ==========');
-    print('💰 Total expenses in system: ${allExpenses.length}');
-    print('💰 Filtering from: $startTime');
-    print('💰 Filtering to: $endTime');
-
-    if (allExpenses.isNotEmpty) {
-      print('💰 All expenses in system:');
-      for (var i = 0; i < allExpenses.length && i < 10; i++) {
-        final e = allExpenses[i];
-        print('   ${i + 1}. Amount: Rs.${e.amount} | PaymentType: "${e.paymentType}" | Time: ${e.dateandTime} | Category: ${e.categoryOfExpense}');
-      }
-    }
-
     final dayExpenses = allExpenses.where((expense) {
+      if (targetSessionId != null) {
+        if (expense.sessionId == targetSessionId) return true;
+        // Fallback for expenses that might have failed to save sessionId (e.g., hot reload issues)
+        if (expense.sessionId == null) {
+          return (expense.dateandTime.isAfter(startTime) || expense.dateandTime.isAtSameMomentAs(startTime)) &&
+                 (expense.dateandTime.isBefore(endTime) || expense.dateandTime.isAtSameMomentAs(endTime));
+        }
+        return false;
+      }
+      // Fallback to date range for legacy
       return (expense.dateandTime.isAfter(startTime) || expense.dateandTime.isAtSameMomentAs(startTime)) &&
           (expense.dateandTime.isBefore(endTime) || expense.dateandTime.isAtSameMomentAs(endTime));
     }).toList();
 
-    print('✅ Found ${dayExpenses.length} expenses for current day');
+    print('✅ Found ${dayExpenses.length} expenses for session');
 
     if (dayExpenses.isNotEmpty) {
       print('💰 Day expenses details:');
@@ -148,9 +142,18 @@ class EODService {
     double totalCashOut = 0.0;
     if (Hive.isBoxOpen(HiveBoxNames.restaurantCashMovements)) {
       final cashMovBox = Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
-      final todayMoves = cashMovBox.values.where(
-        (m) => m.timestamp.isAfter(startTime) && m.timestamp.isBefore(endTime),
-      ).toList();
+      final todayMoves = cashMovBox.values.where((m) {
+        if (targetSessionId != null) {
+          if (m.sessionId == targetSessionId) return true;
+          // Fallback for legacy compatibility
+          final isOpeningFromSession = m.type == 'opening' && (m.note?.contains(targetSessionId) ?? false);
+          if (m.sessionId == null) {
+             return m.timestamp.isAfter(startTime) && m.timestamp.isBefore(endTime) || isOpeningFromSession;
+          }
+          return false;
+        }
+        return m.timestamp.isAfter(startTime) && m.timestamp.isBefore(endTime);
+      }).toList();
       totalCashIn  = todayMoves.where((m) => m.type == 'in' ).fold(0.0, (s, m) => s + m.amount);
       totalCashOut = todayMoves.where((m) => m.type == 'out').fold(0.0, (s, m) => s + m.amount);
       print('💵 Cash In today: Rs.$totalCashIn | Cash Out today: Rs.$totalCashOut');

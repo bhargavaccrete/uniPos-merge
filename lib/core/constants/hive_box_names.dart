@@ -193,6 +193,9 @@ class HiveBoxNames {
   /// Saved thermal printers (Bluetooth/WiFi configuration)
   static const String restaurantPrinters = 'restaurantPrintersBox';
 
+  /// Restaurant POS Sessions
+  static const String restaurantSessions = 'restaurantSessionsBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode
@@ -277,6 +280,7 @@ class HiveBoxNames {
     restaurantCashMovements,
     restaurantCashHandovers,
     restaurantPrinters,
+    restaurantSessions,
   ];
 
   /// All common box names (shared between retail and restaurant)

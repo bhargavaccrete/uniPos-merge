@@ -4,9 +4,29 @@ import '../../core/di/service_locator.dart';
 import '../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../data/models/restaurant/db/database/hive_order.dart';
 import '../../data/models/restaurant/db/ordermodel_309.dart';
+import '../../domain/services/restaurant/day_management_service.dart';
 import '../../domain/services/restaurant/inventory_service.dart';
 import '../../util/restaurant/restaurant_auth_helper.dart';
 import '../websocket.dart';
+
+// ── Idempotency Cache ─────────────────────────────────────────────────────────
+// Prevents duplicate orders if captain taps Send twice (network retry / double-tap).
+// Cache entry: requestId → {response data, expiresAt}
+// TTL: 30 minutes. Entries older than that are eligible to be pruned.
+
+final Map<String, _IdempotencyEntry> _orderRequestCache = {};
+
+class _IdempotencyEntry {
+  final Map<String, dynamic> response;
+  final DateTime expiresAt;
+  _IdempotencyEntry(this.response)
+      : expiresAt = DateTime.now().add(const Duration(minutes: 30));
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+}
+
+void _pruneExpiredRequests() {
+  _orderRequestCache.removeWhere((_, entry) => entry.isExpired);
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -132,6 +152,24 @@ Future<Response> captainSendOrderHandler(Request request) async {
     final body = await request.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
+    final requestId = data['requestId'] as String?;
+    final staffId   = data['staffId']   as String?;
+
+    // ── Duplicate check ──────────────────────────────────────────────────────
+    if (requestId != null && requestId.isNotEmpty) {
+      _pruneExpiredRequests();
+      final cached = _orderRequestCache[requestId];
+      if (cached != null && !cached.isExpired) {
+        print('⚠️ Duplicate order rejected — requestId: $requestId (staffId: $staffId)');
+        return Response.ok(
+          jsonEncode({...cached.response, 'duplicate': true}),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    } else {
+      print('⚠️ captainSendOrderHandler: missing requestId (staffId: $staffId)');
+    }
+
     final tableNo = data['tableNo'] as String?;
     final orderType = data['orderType'] as String? ?? 'Take Away';
     final totalPrice = (data['totalPrice'] as num?)?.toDouble() ?? 0.0;
@@ -165,17 +203,31 @@ Future<Response> captainSendOrderHandler(Request request) async {
           orderId: updated.id,
           orderTime: updated.timeStamp,
         );
+        broadcastEvent({
+          'type': 'NEW_ITEMS_ADDED',
+          'orderId': updated.id,
+          'kotNumber': updated.kotNumbers.last,
+          'newItemCount': newItems.length,
+          'tableNo': tableNo,
+        });
+        final addedResponse = {
+          'success': true,
+          'orderId': updated.id,
+          'kotNumber': updated.kotNumbers.last,
+          'addedToExisting': true,
+        };
+        if (requestId != null && requestId.isNotEmpty) {
+          _orderRequestCache[requestId] = _IdempotencyEntry(addedResponse);
+        }
         return Response.ok(
-          jsonEncode({
-            'success': true,
-            'orderId': updated.id,
-            'kotNumber': updated.kotNumbers.last,
-            'addedToExisting': true,
-          }),
+          jsonEncode(addedResponse),
           headers: {'Content-Type': 'application/json'},
         );
       }
     }
+
+    // Get current session ID
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
 
     // No active order — create new one
     final orderId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -195,6 +247,7 @@ Future<Response> captainSendOrderHandler(Request request) async {
       kotNumbers: [kotNumber],
       itemCountAtLastKot: newItems.length,
       kotBoundaries: [newItems.length],
+      sessionId: currentSessionId, // Link to POS session
     );
 
     await orderStore.addOrder(order);
@@ -214,21 +267,120 @@ Future<Response> captainSendOrderHandler(Request request) async {
       'type': 'NEW_ORDER',
       'orderId': orderId,
       'kotNumber': kotNumber,
-      'tableNo': tableNo,
+      'tableNo': tableNo ?? 'Take Away',
       'orderType': orderType,
     });
 
+    final newOrderResponse = {
+      'success': true,
+      'orderId': orderId,
+      'kotNumber': kotNumber,
+      'addedToExisting': false,
+    };
+    if (requestId != null && requestId.isNotEmpty) {
+      _orderRequestCache[requestId] = _IdempotencyEntry(newOrderResponse);
+    }
     return Response.ok(
-      jsonEncode({
-        'success': true,
-        'orderId': orderId,
-        'kotNumber': kotNumber,
-        'addedToExisting': false,
-      }),
+      jsonEncode(newOrderResponse),
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
     print('❌ Error in captainSendOrderHandler: $e');
+    return Response.internalServerError(
+      body: jsonEncode({'success': false, 'error': e.toString()}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  }
+}
+
+// ── Modify Order (edit qty / remove items → Cancel KOT) ──────────────────────
+
+/// PUT /captain/orders/:id/modify
+/// Body: {
+///   "updatedItems": [...CartItem maps with new quantities (qty > 0 only)],
+///   "cancelledItems": [...CartItem maps with the CANCELLED quantities]
+/// }
+Future<Response> captainModifyOrderHandler(Request request, String orderId) async {
+  try {
+    final body = await request.readAsString();
+    final data = jsonDecode(body) as Map<String, dynamic>;
+
+    final updatedItems = (data['updatedItems'] as List<dynamic>? ?? [])
+        .map((i) => CartItem.fromMap(i as Map<String, dynamic>))
+        .toList();
+
+    final cancelledItems = (data['cancelledItems'] as List<dynamic>? ?? [])
+        .map((i) => CartItem.fromMap(i as Map<String, dynamic>))
+        .toList();
+
+    final order = await HiveOrders.getOrderById(orderId);
+    if (order == null) {
+      return Response(404,
+        body: jsonEncode({'success': false, 'error': 'Order not found'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    // Recalculate total from updated items
+    final newTotal = updatedItems.fold(0.0, (sum, i) => sum + i.totalPrice);
+
+    // Generate a Cancel KOT number
+    final cancelKotNumber = await orderStore.getNextKotNumber();
+
+    // Save order with updated items
+    final updatedOrder = order.copyWith(
+      items: updatedItems,
+      totalPrice: newTotal,
+    );
+    await HiveOrders.updateOrder(updatedOrder);
+
+    // Restore stock for cancelled items
+    if (cancelledItems.isNotEmpty) {
+      final restockMap = <CartItem, int>{
+        for (final item in cancelledItems) item: item.quantity,
+      };
+      await InventoryService.restoreStockForRefund(restockMap);
+    }
+
+    // Update table total
+    if (order.tableNo != null) {
+      await tableStore.updateTableStatus(
+        order.tableNo!,
+        order.status,
+        total: newTotal,
+        orderId: orderId,
+        orderTime: order.timeStamp,
+      );
+    }
+
+    // Broadcast Cancel KOT to kitchen
+    broadcastEvent({
+      'type': 'CANCEL_KOT',
+      'orderId': orderId,
+      'cancelKotNumber': cancelKotNumber,
+      'tableNo': order.tableNo,
+      'cancelledItems': cancelledItems.map((i) => {
+        'title': i.title,
+        'quantity': i.quantity,
+        'variantName': i.variantName,
+      }).toList(),
+    });
+
+    // Also trigger ORDER_UPDATED so activeorder.dart reloads MobX store
+    broadcastEvent({
+      'type': 'ORDER_UPDATED',
+      'orderId': orderId,
+      'tableNo': order.tableNo,
+      'kotNumber': cancelKotNumber,
+      'newItemCount': 0,
+    });
+
+    return Response.ok(
+      jsonEncode({'success': true, 'cancelKotNumber': cancelKotNumber}),
+      headers: {'Content-Type': 'application/json'},
+    );
+  } catch (e) {
+    print('❌ Error in captainModifyOrderHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -243,7 +395,11 @@ Future<Response> captainSendOrderHandler(Request request) async {
 Future<Response> getCaptainActiveOrdersHandler(Request request) async {
   try {
     await tableStore.loadTables();
-    final orders = await HiveOrders.getAllActiveOrders();
+    final allOrders = await HiveOrders.getAllActiveOrders();
+    final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+    final orders = allOrders
+        .where((o) => o.timeStamp == null || o.timeStamp!.isAfter(cutoff))
+        .toList();
 
     final result = orders.map((o) {
       final table = tableStore.tables.cast<dynamic>().firstWhere(

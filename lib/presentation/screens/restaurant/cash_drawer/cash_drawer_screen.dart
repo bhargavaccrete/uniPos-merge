@@ -110,20 +110,49 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
     final dayStart = _dayStart ?? DateTime.now().copyWith(hour: 0, minute: 0, second: 0);
 
+    // Get current session
+    final currentSession = await DayManagementService.getCurrentSession();
+    final targetSessionId = currentSession?.sessionId;
+
     // 2. Load manual Cash In/Out movements for today
     await cashMovementStore.loadTodayMovements(dayStart);
 
+    // If using sessions, manually filter out movements that don't belong to the session
+    // (since store.loadTodayMovements uses time-based logic by default)
+    if (targetSessionId != null) {
+      cashMovementStore.movements.retainWhere((m) {
+        if (m.sessionId == targetSessionId) return true;
+        // Fallback for legacy compatibility
+        final isOpeningFromSession = m.type == 'opening' && (m.note?.contains(targetSessionId) ?? false);
+        if (m.sessionId == null) {
+          return m.timestamp.isAfter(dayStart) || m.timestamp.isAtSameMomentAs(dayStart) || isOpeningFromSession;
+        }
+        return false;
+      });
+      // Recalculate totals - Note: totalCashIn and totalCashOut are computed properties 
+      // in the store, but we can't set them directly if they don't have setters.
+      // Instead, the store recalculates them automatically if it's properly implemented with MobX,
+      // or we can just rely on the filtered `movements` list and compute them when needed.
+      // We will skip manual setting and let the getters do their job.
+    }
+
     // 3. Load cash sales from past orders (today only, cash payment method)
     await pastOrderStore.loadPastOrders();
+
     final cashOrders = pastOrderStore.pastOrders.where((o) {
       // Skip voided orders — no money changed hands
       final status = (o.orderStatus ?? '').toUpperCase();
-      if (status == 'VOIDED') return false;
+      if (status == 'VOIDED' || status.contains('VOID')) return false;
 
-      // Must be a today order
-      final isToday = o.orderAt != null &&
-          o.orderAt!.isAfter(dayStart.subtract(const Duration(seconds: 1)));
-      if (!isToday) return false;
+      // Filter by session ID
+      if (targetSessionId != null) {
+        if (o.sessionId != targetSessionId) return false;
+      } else {
+        // Fallback for legacy data without session ID
+        final isToday = o.orderAt != null &&
+            o.orderAt!.isAfter(dayStart.subtract(const Duration(seconds: 1)));
+        if (!isToday) return false;
+      }
 
       // Pure cash payment
       final method = (o.paymentmode ?? '').toLowerCase().trim();
@@ -143,9 +172,15 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     await expenseStore.loadExpenses();
     final cashExp = expenseStore.expenses.where((e) {
       final isC = (e.paymentType ?? '').toLowerCase().trim() == 'cash';
-      final isToday = e.dateandTime
-          .isAfter(dayStart.subtract(const Duration(seconds: 1)));
-      return isC && isToday;
+
+      if (targetSessionId != null) {
+        return isC && e.sessionId == targetSessionId;
+      } else {
+        // Fallback for legacy data
+        final isToday = e.dateandTime
+            .isAfter(dayStart.subtract(const Duration(seconds: 1)));
+        return isC && isToday;
+      }
     }).toList();
     _cashExpenses = cashExp.fold(0.0, (s, e) => s + e.amount);
 
@@ -622,10 +657,30 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                         fontSize: AppResponsive.headingFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary)),
-                Text(DateFormat('dd MMM yyyy').format(DateTime.now()),
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: AppColors.textSecondary)),
+                Builder(
+                  builder: (context) {
+                    if (_dayStart == null) {
+                      return Text(DateFormat('dd MMM yyyy').format(DateTime.now()),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary));
+                    }
+                    
+                    final now = DateTime.now();
+                    final isSameDay = _dayStart!.year == now.year && 
+                                      _dayStart!.month == now.month && 
+                                      _dayStart!.day == now.day;
+                                      
+                    final dateText = isSameDay 
+                        ? DateFormat('dd MMM yyyy').format(_dayStart!)
+                        : 'Session: ${DateFormat('dd MMM').format(_dayStart!)} - ${DateFormat('dd MMM').format(now)}';
+                        
+                    return Text(dateText,
+                        style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary));
+                  }
+                ),
               ],
             ),
           ),
@@ -917,7 +972,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Today's Activity",
+        Text("Session Activity",
             style: GoogleFonts.poppins(
                 fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w700,
@@ -971,8 +1026,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         dotIcon = Icons.warning_amber_rounded;
     }
 
-    final timeStr =
-        '${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}';
+    final timeStr = entry.time.day != _dayStart?.day 
+        ? '${DateFormat('dd MMM').format(entry.time)}, ${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}'
+        : '${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}';
     final isPositive = entry.signedAmount >= 0;
     final isAdj = entry.type == _LogType.adjustment;
 

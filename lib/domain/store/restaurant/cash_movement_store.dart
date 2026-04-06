@@ -4,6 +4,8 @@ import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import '../../../data/repositories/restaurant/cash_movement_repository.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 
+import '../../../domain/services/restaurant/day_management_service.dart';
+
 part 'cash_movement_store.g.dart';
 
 /// MobX store for cash movements (Cash In / Cash Out during the day).
@@ -79,6 +81,8 @@ abstract class _CashMovementStore with Store {
     String? note,
   }) async {
     try {
+      final currentSessionId = await DayManagementService.getCurrentSessionId();
+      
       final movement = CashMovementModel(
         id: const Uuid().v4(),
         timestamp: DateTime.now(),
@@ -86,6 +90,7 @@ abstract class _CashMovementStore with Store {
         amount: amount,
         reason: reason,
         note: note,
+        sessionId: currentSessionId,
         // Read from active session — cannot be overridden by caller
         staffName: RestaurantSession.effectiveRole == 'Admin'
             ? 'Admin'
@@ -116,6 +121,8 @@ abstract class _CashMovementStore with Store {
     required String staffName,
   }) async {
     try {
+      final currentSessionId = await DayManagementService.getCurrentSessionId();
+      
       final movement = CashMovementModel(
         id: const Uuid().v4(),
         timestamp: DateTime.now(),
@@ -124,6 +131,7 @@ abstract class _CashMovementStore with Store {
         reason: reason,
         note: note,
         staffName: staffName,
+        sessionId: currentSessionId,
       );
       await _repository.saveMovement(movement);
       movements.add(movement);
