@@ -14,6 +14,7 @@ import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
@@ -528,9 +529,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                                 const Text('Balance Warning'),
                               ]),
                               content: Text(
-                                'This withdrawal (${CurrencyHelper.currentSymbol} ${amount.toStringAsFixed(2)}) '
+                                'This withdrawal (${CurrencyHelper.currentSymbol} ${amount.toStringAsFixed(DecimalSettings.precision)}) '
                                 'exceeds the estimated drawer balance '
-                                '(${CurrencyHelper.currentSymbol} ${_balance.toStringAsFixed(2)}).\n\n'
+                                '(${CurrencyHelper.currentSymbol} ${_balance.toStringAsFixed(DecimalSettings.precision)}).\n\n'
                                 'The drawer balance would go negative. '
                                 'Proceed only if you have physically verified the cash.',
                               ),
@@ -766,7 +767,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                   style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: Colors.amber.shade800)),
-              Text('$currency${closingBalance.toStringAsFixed(2)}',
+              Text('$currency${closingBalance.toStringAsFixed(DecimalSettings.precision)}',
                   style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w700,
@@ -777,7 +778,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         SizedBox(height: AppResponsive.smallSpacing(context)),
         Text(
           closingBalance > 0
-              ? 'Safe-drop $currency${closingBalance.toStringAsFixed(2)} or use it as tomorrow\'s opening balance.'
+              ? 'Safe-drop $currency${closingBalance.toStringAsFixed(DecimalSettings.precision)} or use it as tomorrow\'s opening balance.'
               : 'Start a new day when ready.',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.captionFontSize(context),
@@ -816,7 +817,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         SizedBox(height: AppResponsive.smallSpacing(context)),
         // The balance rebuilds automatically via Observer when movements change
         Text(
-          '$currency ${_balance.toStringAsFixed(2)}',
+          '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.getValue<double>(context,
                 mobile: 32, tablet: 38, desktop: 44),
@@ -913,7 +914,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.bodyFontSize(context),
                   color: AppColors.textPrimary)),
-          Text('$currency ${_balance.toStringAsFixed(2)}',
+          Text('$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
               style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.bodyFontSize(context),
@@ -943,7 +944,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                     color: AppColors.textSecondary)),
           ]),
           Text(
-            '${isPositive ? '+' : '−'} $currency ${amount.toStringAsFixed(2)}',
+            '${isPositive ? '+' : '−'} $currency ${amount.toStringAsFixed(DecimalSettings.precision)}',
             style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w600,
@@ -1084,7 +1085,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '${isPositive ? '+' : ''}$currency ${entry.signedAmount.abs().toStringAsFixed(2)}',
+              '${isPositive ? '+' : ''}$currency ${entry.signedAmount.abs().toStringAsFixed(DecimalSettings.precision)}',
               style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.smallFontSize(context),
@@ -1094,7 +1095,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             ),
             if (!isAdj)
               Text(
-                'Bal: $currency ${entry.runningBalance.toStringAsFixed(2)}',
+                'Bal: $currency ${entry.runningBalance.toStringAsFixed(DecimalSettings.precision)}',
                 style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary),
@@ -1179,7 +1180,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                   const SizedBox(width: 4),
                   Text('${h.closedBy} reported ',
                       style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
-                  Text('$currency ${h.closedAmount.toStringAsFixed(2)}',
+                  Text('$currency ${h.closedAmount.toStringAsFixed(DecimalSettings.precision)}',
                       style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700)),
                 ]),
                 if (h.receivedBy != null) ...[
@@ -1189,7 +1190,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                     const SizedBox(width: 4),
                     Text('${h.receivedBy} received ',
                         style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
-                    Text('$currency ${h.receivedAmount!.toStringAsFixed(2)}',
+                    Text('$currency ${h.receivedAmount!.toStringAsFixed(DecimalSettings.precision)}',
                         style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700)),
                   ]),
                 ],
@@ -1207,8 +1208,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                       const SizedBox(width: 6),
                       Text(
                         h.variance! < 0
-                            ? 'Shortage: $currency ${h.variance!.abs().toStringAsFixed(2)}'
-                            : 'Overage: $currency ${h.variance!.toStringAsFixed(2)}',
+                            ? 'Shortage: $currency ${h.variance!.abs().toStringAsFixed(DecimalSettings.precision)}'
+                            : 'Overage: $currency ${h.variance!.toStringAsFixed(DecimalSettings.precision)}',
                         style: GoogleFonts.poppins(
                             fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red.shade700),
                       ),
@@ -1561,7 +1562,7 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
                                 fontSize: 13,
                                 color: AppColors.textSecondary)),
                         Text(
-                          '$currency ${widget.closedAmount.toStringAsFixed(2)}',
+                          '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}',
                           style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
@@ -1692,10 +1693,10 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
       child: Column(
         children: [
           _buildCompareRow('Reported by ${widget.closedBy}',
-              '$currency ${widget.closedAmount.toStringAsFixed(2)}', Colors.grey.shade700),
+              '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}', Colors.grey.shade700),
           const SizedBox(height: 6),
           _buildCompareRow('You counted',
-              '$currency ${counted.toStringAsFixed(2)}', AppColors.textPrimary),
+              '$currency ${counted.toStringAsFixed(DecimalSettings.precision)}', AppColors.textPrimary),
           const Divider(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1710,7 +1711,7 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
               Text(
                 isMatch
                     ? 'No difference'
-                    : '${diff < 0 ? '-' : '+'}$currency ${diff.abs().toStringAsFixed(2)}',
+                    : '${diff < 0 ? '-' : '+'}$currency ${diff.abs().toStringAsFixed(DecimalSettings.precision)}',
                 style: GoogleFonts.poppins(
                     fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
               ),
@@ -1754,7 +1755,7 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
     final title = isMatched ? 'Amounts Match ✓' : 'Discrepancy Found';
     final msg = isMatched
         ? 'Handover confirmed. Both counts agree.'
-        : 'Variance: $currency ${_variance!.abs().toStringAsFixed(2)}'
+        : 'Variance: $currency ${_variance!.abs().toStringAsFixed(DecimalSettings.precision)}'
             ' ${_variance! < 0 ? '(Shortage)' : '(Overage)'}.\n'
             'This has been recorded and the manager has been notified.';
 

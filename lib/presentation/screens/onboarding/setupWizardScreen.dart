@@ -9,6 +9,7 @@ import 'package:unipos/presentation/screens/onboarding/taxSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/paymentSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/staffSetupStep.dart';
 
+import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../util/responsive.dart';
@@ -135,6 +136,8 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
         // Navigate to appropriate screen based on business mode
         if (AppConfig.isRestaurant) {
+          // Mark session as logged in so RestaurantGuard doesn't redirect to login
+          await RestaurantSession.saveAdminSession();
           // Navigate to Restaurant Admin Welcome screen
           Navigator.pushReplacement(
             context,

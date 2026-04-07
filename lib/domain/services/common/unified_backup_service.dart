@@ -40,6 +40,8 @@ import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
+import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
+import 'package:unipos/data/models/restaurant/db/session_model.dart';
 
 // Shared models
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
@@ -690,36 +692,46 @@ class UnifiedBackupService {
         exportMap["restaurantCustomers"] = [];
       }
 
-      // Past Orders (batched processing with safe serialization)
+      // Past Orders — regular Box, all values in memory, no async reads needed
       try {
-        final pastOrderBox = Hive.box<PastOrderModel>("pastorderBox");
-        final List<Map<String, dynamic>> pastOrdersList = [];
-        final allOrders = pastOrderBox.values.toList();
-
-        const batchSize = 500;
-        for (int i = 0; i < allOrders.length; i += batchSize) {
-          final end = (i + batchSize < allOrders.length) ? i + batchSize : allOrders.length;
-          final batch = allOrders.sublist(i, end);
-
-          // Convert each order with error handling
-          for (var order in batch) {
-            try {
-              final orderMap = order.toMap();
-              // Deep clean the map to ensure all values are JSON serializable
-              final cleanedMap = _deepCleanMap(orderMap) as Map<String, dynamic>;
-              pastOrdersList.add(cleanedMap);
-            } catch (e) {
-              debugPrint("⚠️ Error converting order ${order.id}: $e");
-              // Skip this order and continue
-            }
+        final pastOrderBox = Hive.box<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
+        final pastOrdersList = <Map<String, dynamic>>[];
+        for (final order in pastOrderBox.values) {
+          try {
+            pastOrdersList.add(_deepCleanMap(order.toMap()) as Map<String, dynamic>);
+          } catch (e) {
+            debugPrint("⚠️ Error converting order ${order.id}: $e");
           }
-          await Future.delayed(Duration(milliseconds: 10));
         }
         exportMap["pastOrders"] = pastOrdersList;
         debugPrint("📦 Past Orders exported: ${pastOrdersList.length}");
       } catch (e) {
         debugPrint("❌ Error exporting past orders: $e");
         exportMap["pastOrders"] = [];
+      }
+
+      // Saved Printers (thermal printer configs — WiFi/BT)
+      try {
+        exportMap["printers"] = Hive.box<SavedPrinterModel>(HiveBoxNames.restaurantPrinters)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Printers exported: ${exportMap["printers"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Printers box error: $e");
+        exportMap["printers"] = [];
+      }
+
+      // Restaurant Sessions
+      try {
+        exportMap["restaurantSessions"] = Hive.box<RestaurantSessionModel>(HiveBoxNames.restaurantSessions)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Sessions exported: ${exportMap["restaurantSessions"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Sessions box error: $e");
+        exportMap["restaurantSessions"] = [];
       }
 
     } else if (AppConfig.isRetail) {
@@ -1740,6 +1752,30 @@ class UnifiedBackupService {
       );
     } catch (e) {
       debugPrint("⚠️ Error restoring restaurant customers: $e");
+    }
+
+    // ✅ Restore Saved Printers
+    try {
+      await restoreBoxWithId(
+        "printers",
+        Hive.box<SavedPrinterModel>(HiveBoxNames.restaurantPrinters),
+        (m) => SavedPrinterModel.fromMap(m),
+        (p) => p.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring printers: $e");
+    }
+
+    // ✅ Restore Restaurant Sessions
+    try {
+      await restoreBoxWithId(
+        "restaurantSessions",
+        Hive.box<RestaurantSessionModel>(HiveBoxNames.restaurantSessions),
+        (m) => RestaurantSessionModel.fromMap(m),
+        (s) => s.sessionId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant sessions: $e");
     }
   }
 
