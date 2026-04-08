@@ -283,43 +283,6 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                   ),
 
                   SizedBox(height: AppResponsive.height(context, 0.03)),
-
-                  // Default Credentials Info
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: RichText(
-                            text: TextSpan(
-                              text: 'Admin default: ',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.3, desktop: 15.6),
-                                color: Colors.blue.shade700,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: 'admin / 123456',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.3, desktop: 15.6),
-                                    color: Colors.blue.shade900,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),

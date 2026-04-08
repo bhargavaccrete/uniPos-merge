@@ -105,6 +105,16 @@ class PastOrderModel extends HiveObject{
   @HiveField(29)
   final String? sessionId; // Links order to a specific POS session
 
+  // ── Audit Trail ─────────────────────────────────────────────────────────────
+  @HiveField(30)
+  final String? discountAppliedBy; // Staff name/role who applied the discount
+
+  @HiveField(31)
+  final String? voidedBy; // Staff name/role who voided this order
+
+  @HiveField(32)
+  final String? refundedBy; // Staff name/role who processed the refund
+
   PastOrderModel({
     required this.id,
     required this.customerName,
@@ -138,6 +148,9 @@ class PastOrderModel extends HiveObject{
     this.loyaltyPointsUsed,
     this.shiftId,
     this.sessionId,
+    this.discountAppliedBy,
+    this.voidedBy,
+    this.refundedBy,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -174,6 +187,9 @@ class PastOrderModel extends HiveObject{
     int? loyaltyPointsUsed,
     String? shiftId,
     String? sessionId,
+    String? discountAppliedBy,
+    String? voidedBy,
+    String? refundedBy,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -206,6 +222,9 @@ class PastOrderModel extends HiveObject{
       loyaltyPointsUsed: loyaltyPointsUsed ?? this.loyaltyPointsUsed,
       shiftId: shiftId ?? this.shiftId,
       sessionId: sessionId ?? this.sessionId,
+      discountAppliedBy: discountAppliedBy ?? this.discountAppliedBy,
+      voidedBy: voidedBy ?? this.voidedBy,
+      refundedBy: refundedBy ?? this.refundedBy,
     );
   }
 
@@ -266,6 +285,9 @@ class PastOrderModel extends HiveObject{
       'loyaltyPointsUsed': loyaltyPointsUsed,
       'shiftId': shiftId,
       'sessionId': sessionId,
+      'discountAppliedBy': discountAppliedBy,
+      'voidedBy': voidedBy,
+      'refundedBy': refundedBy,
     };
   }
 
@@ -302,6 +324,9 @@ class PastOrderModel extends HiveObject{
       loyaltyPointsUsed: map['loyaltyPointsUsed'] as int?,
       shiftId: map['shiftId'] as String?,
       sessionId: map['sessionId'] as String?,
+      discountAppliedBy: map['discountAppliedBy'] as String?,
+      voidedBy: map['voidedBy'] as String?,
+      refundedBy: map['refundedBy'] as String?,
     );
   }
 

@@ -36,6 +36,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
   bool _isLoading = false;
   bool _isGenerating = false;
+  bool _hasActiveSession = false;
   EndOfDayReport? _currentReport;
   DateTime selectedDate = DateTime.now();
   double openingBalance = 0.0;
@@ -89,6 +90,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       if (currentSession == null || currentSession.isClosed) {
         print('ℹ️ No active session - showing empty state');
         setState(() {
+          _hasActiveSession = false;
           _currentReport = null;
           openingBalance = 0.0;
           expectedCash = 0.0;
@@ -97,6 +99,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         });
         return;
       }
+      _hasActiveSession = true;
 
       selectedDate = currentSession.startTime;
       final sessionId = currentSession.sessionId;
@@ -134,7 +137,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       await cashMovementStore.loadTodayMovements(dayStart);
 
       setState(() {
-        _currentReport = hasAnyData ? report : null;
+        _currentReport = report;
         openingBalance = currentOpeningBalance;
         expectedCash = expectedCashAmount;
         totalExpenses = report.totalExpenses;
@@ -232,6 +235,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       await RestaurantSession.clearShiftSession();
 
       // Finalize the session
+      await DayManagementService.clearEODSnooze();
       await DayManagementService.endSession(closingCash: actualCashAmount);
 
       final expectedTotalCash =
@@ -1685,7 +1689,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       );
     }
 
-    if (_isGenerating || _currentReport == null) {
+    if (_isGenerating || !_hasActiveSession) {
       return Scaffold(
         backgroundColor: AppColors.surfaceLight,
         appBar: _buildAppBar(isTablet),

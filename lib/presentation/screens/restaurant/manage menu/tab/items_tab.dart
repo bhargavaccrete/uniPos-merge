@@ -12,6 +12,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/bottom
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
@@ -32,6 +33,10 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
   bool get wantKeepAlive => true;
   TextEditingController searchController = TextEditingController();
   String query = '';
+
+  /// Only admin and manager can add, edit, or delete items.
+  /// Cashier can only toggle item enabled/disabled.
+  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
 
   @override
   void initState() {
@@ -150,16 +155,16 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          // Bottom Sheet Menu
-          BottomsheetMenu(
-            onCategorySelected: (category) {
-              setState(() {});
-            },
-            onItemAdded: () {
-              // Show success feedback
-              NotificationService.instance.showSuccess('Item added successfully!');
-            },
-          ),
+          // Bottom Sheet Menu — only shown to Admin and Manager
+          if (_canEdit)
+            BottomsheetMenu(
+              onCategorySelected: (category) {
+                setState(() {});
+              },
+              onItemAdded: () {
+                NotificationService.instance.showSuccess('Item added successfully!');
+              },
+            ),
         ],
       ),
     );
@@ -268,15 +273,17 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                                   ],
                                 ),
                               ),
-                              // Actions: edit, delete, switch
-                              InkWell(
-                                onTap: () => editItems(item),
-                                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
-                              ),
-                              InkWell(
-                                onTap: () => _deleteItem(item.id),
-                                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red)),
-                              ),
+                              // Actions: edit & delete (Admin/Manager only), switch (all roles)
+                              if (_canEdit) ...[
+                                InkWell(
+                                  onTap: () => editItems(item),
+                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
+                                ),
+                                InkWell(
+                                  onTap: () => _deleteItem(item.id),
+                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red)),
+                                ),
+                              ],
                               Transform.scale(
                                 scale: 0.8,
                                 child: Switch(
@@ -430,8 +437,10 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      InkWell(onTap: () => editItems(item), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: 15, color: Colors.blue))),
-                      InkWell(onTap: () => _deleteItem(item.id), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
+                      if (_canEdit) ...[
+                        InkWell(onTap: () => editItems(item), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: 15, color: Colors.blue))),
+                        InkWell(onTap: () => _deleteItem(item.id), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
+                      ],
                     ],
                   ),
                 ],

@@ -1,6 +1,7 @@
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
+import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/restaurant/staticswitch.dart';
 import 'inventory_service.dart';
 
@@ -72,14 +73,19 @@ class RefundService {
       final newStatus = allItemsRefunded ? 'FULLY_REFUNDED' : 'PARTIALLY_REFUNDED';
       print('📝 New order status: $newStatus');
 
+      final _staffLabel = RestaurantSession.isAdmin
+          ? 'Admin'
+          : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})';
+
       // Create updated order
       final updatedOrder = order.copyWith(
         items: updatedItems,
         orderStatus: newStatus,
         refundAmount: (order.refundAmount ?? 0) + refundResult.totalRefundAmount,
         refundReason: (order.refundReason ?? '') +
-            '\n[${DateTime.now().toLocal().toString().substring(0, 16)}] ${refundResult.reason}',
+            '\n[${DateTime.now().toLocal().toString().substring(0, 16)}] $_staffLabel: ${refundResult.reason}',
         refundedAt: DateTime.now(),
+        refundedBy: _staffLabel,
       );
 
       print('💾 Saving updated order...');
@@ -192,10 +198,15 @@ class RefundService {
     try {
       print('🔄 RefundService: Voiding order...');
 
+      final _staffLabel = RestaurantSession.isAdmin
+          ? 'Admin'
+          : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})';
+
       final voidedOrder = order.copyWith(
         orderStatus: 'VOIDED',
         refundReason: reason.isNotEmpty ? 'VOIDED: $reason' : 'VOIDED: No reason provided',
         refundedAt: DateTime.now(),
+        voidedBy: _staffLabel,
       );
 
       await pastOrderStore.updateOrder(voidedOrder);

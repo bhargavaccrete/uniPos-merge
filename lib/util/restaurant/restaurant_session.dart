@@ -21,9 +21,13 @@ class RestaurantSession {
   /// Fires true when the session expires due to inactivity.
   static final ValueNotifier<bool> sessionExpiredNotifier = ValueNotifier(false);
 
-  /// Inactivity timeout is currently disabled.
+  /// Resets the 15-minute inactivity timer. Called on every user touch via RestaurantGuard.
+  /// When the timer fires, sessionExpiredNotifier triggers a forced logout.
   static void resetInactivityTimer() {
-    // Disabled — no auto-logout on inactivity
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(_timeoutDuration, () {
+      sessionExpiredNotifier.value = true;
+    });
   }
 
   static final ValueNotifier<String>  loginTypeNotifier = ValueNotifier('admin');

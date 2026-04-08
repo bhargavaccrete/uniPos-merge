@@ -10,6 +10,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
@@ -26,6 +27,8 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   bool get wantKeepAlive => true;
   String? editingId;
   int? editingToppingIndex;
+
+  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
 
   final _extrasController = TextEditingController();
   final _toppingController = TextEditingController();
@@ -1025,8 +1028,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          // Add Extra Button
-          _buildAddButton(),
+          if (_canEdit) _buildAddButton(),
         ],
       ),
     );
@@ -1148,8 +1150,10 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                     ],
                   ),
                 ),
-                InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
-                InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+                if (_canEdit) ...[
+                  InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+                  InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+                ],
               ],
             ),
           ),
@@ -1166,27 +1170,30 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                     SizedBox(width: 10),
                     Expanded(child: Text(topping.name, style: GoogleFonts.poppins(fontSize: 13))),
                     Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
-                    InkWell(onTap: () => _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 14, color: Colors.blue))),
-                    InkWell(onTap: () => _deleteTopping(extra, toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close, size: 14, color: Colors.red))),
+                    if (_canEdit) ...[
+                      InkWell(onTap: () => _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 14, color: Colors.blue))),
+                      InkWell(onTap: () => _deleteTopping(extra, toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close, size: 14, color: Colors.red))),
+                    ],
                   ],
                 ),
               );
             }),
-          // Add topping
-          InkWell(
-            onTap: () => _openToppingBottomSheet(extra: extra),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add, color: AppColors.primary, size: 16),
-                  SizedBox(width: 4),
-                  Text('Add Topping', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w500)),
-                ],
+          // Add topping — Admin/Manager only
+          if (_canEdit)
+            InkWell(
+              onTap: () => _openToppingBottomSheet(extra: extra),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add, color: AppColors.primary, size: 16),
+                    SizedBox(width: 4),
+                    Text('Add Topping', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w500)),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1216,8 +1223,10 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                   ],
                 ),
               ),
-              InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
-              InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
+              if (_canEdit) ...[
+                InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
+                InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
+              ],
             ],
           ),
           if (extra.topping != null && extra.topping!.isNotEmpty) ...[
@@ -1239,17 +1248,18 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
               ),
             ),
           ],
-          InkWell(
-            onTap: () => _openToppingBottomSheet(extra: extra),
-            child: Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(Icons.add, color: AppColors.primary, size: 14),
-                SizedBox(width: 4),
-                Text('Add Topping', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w500)),
-              ]),
+          if (_canEdit)
+            InkWell(
+              onTap: () => _openToppingBottomSheet(extra: extra),
+              child: Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.add, color: AppColors.primary, size: 14),
+                  SizedBox(width: 4),
+                  Text('Add Topping', style: GoogleFonts.poppins(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w500)),
+                ]),
+              ),
             ),
-          ),
         ],
       ),
     );

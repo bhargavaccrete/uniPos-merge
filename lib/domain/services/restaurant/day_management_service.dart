@@ -131,9 +131,33 @@ class DayManagementService {
     if (session == null || session.isClosed) return false;
 
     final today = DateTime.now();
-    return session.startTime.day != today.day ||
+    final isOldSession = session.startTime.day != today.day ||
         session.startTime.month != today.month ||
         session.startTime.year != today.year;
+
+    if (!isOldSession) return false;
+
+    // Check if user snoozed the alert for today
+    final prefs = await SharedPreferences.getInstance();
+    final snoozedDate = prefs.getString('pendingEod_snoozed_date');
+    final todayKey = '${today.year}-${today.month}-${today.day}';
+    if (snoozedDate == todayKey) return false;
+
+    return true;
+  }
+
+  /// Snooze the pending EOD alert for today. Alert returns tomorrow if still not closed.
+  static Future<void> snoozeEODAlert() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now();
+    final todayKey = '${today.year}-${today.month}-${today.day}';
+    await prefs.setString('pendingEod_snoozed_date', todayKey);
+  }
+
+  /// Clear the snooze (called when EOD is actually completed).
+  static Future<void> clearEODSnooze() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('pendingEod_snoozed_date');
   }
 
   static Future<double> getLastClosingBalance() async {

@@ -123,17 +123,33 @@ class _OrderdetailsState extends State<Orderdetails> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        'This order was voided (deleted before payment). No refund is applicable.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.red.shade700,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'This order was voided (deleted before payment). No refund is applicable.',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                          if ((currentOrder.voidedBy ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Voided by: ${currentOrder.voidedBy}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: Colors.red.shade600,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
@@ -235,6 +251,14 @@ class _OrderdetailsState extends State<Orderdetails> {
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           'Last Refund At: ${_fmtDate(currentOrder.refundedAt!)}',
+                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade700),
+                        ),
+                      ),
+                    if ((currentOrder.refundedBy ?? '').isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Refunded by: ${currentOrder.refundedBy}',
                           style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade700),
                         ),
                       ),
@@ -541,6 +565,17 @@ class _OrderdetailsState extends State<Orderdetails> {
                     if ((currentOrder.Discount ?? 0) > 0) ...[
                       const SizedBox(height: 6),
                       _totalRow('Discount', '-${_money(currentOrder.Discount)}', color: Colors.green.shade700),
+                      if ((currentOrder.discountAppliedBy ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'by ${currentOrder.discountAppliedBy}',
+                              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500),
+                            ),
+                          ),
+                        ),
                     ],
                     if ((currentOrder.loyaltyPointsUsed ?? 0) > 0) ...[
                       const SizedBox(height: 6),

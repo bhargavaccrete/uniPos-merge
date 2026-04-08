@@ -9,6 +9,7 @@ import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/util/images.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 
 class VariantTab extends StatefulWidget {
   const VariantTab({super.key});
@@ -24,6 +25,8 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   TextEditingController searchController = TextEditingController();
   String query = '';
   VariantModel? editingVariante;
+
+  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
 
   @override
   void initState() {
@@ -298,8 +301,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          // Add Variant Button
-          _buildAddButton(),
+          if (_canEdit) _buildAddButton(),
         ],
       ),
     );
@@ -409,8 +411,10 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
             Icon(Icons.tune, color: AppColors.primary, size: 18),
             SizedBox(width: 8),
             Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis)),
-            InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 15, color: Colors.blue))),
-            InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
+            if (_canEdit) ...[
+              InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 15, color: Colors.blue))),
+              InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
+            ],
           ],
         ),
       );
@@ -429,8 +433,10 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
           Icon(Icons.tune, color: AppColors.primary, size: 20),
           SizedBox(width: 10),
           Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis)),
-          InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
-          InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+          if (_canEdit) ...[
+            InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+            InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+          ],
         ],
       ),
     );

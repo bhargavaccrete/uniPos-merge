@@ -30,6 +30,8 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   ChoicesModel? editingChoice;
   bool allowMultipleSelection = false; // Track if choice allows multiple selections
 
+  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+
   @override
   void initState() {
     super.initState();
@@ -629,8 +631,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          // Add Choice Button
-          _buildAddButton(),
+          if (_canEdit) _buildAddButton(),
         ],
       ),
     );
@@ -745,8 +746,10 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
-              InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+              if (_canEdit) ...[
+                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+              ],
             ],
           ),
           children: choice.choiceOption.isEmpty
@@ -792,8 +795,10 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                   ],
                 ),
               ),
-              InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
-              InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
+              if (_canEdit) ...[
+                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
+                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
+              ],
             ],
           ),
           if (choice.choiceOption.isNotEmpty) ...[

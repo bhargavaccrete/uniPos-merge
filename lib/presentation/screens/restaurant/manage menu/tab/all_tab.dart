@@ -12,6 +12,7 @@ import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 
 class AllTab extends StatefulWidget {
   const AllTab({super.key});
@@ -26,6 +27,9 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
   String query = '';
   final TextEditingController searchController = TextEditingController();
   final Map<String, GlobalKey> _categoryKeys = {};
+
+
+  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
 
   @override
   void initState() {
@@ -486,6 +490,7 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
               ),
 
           // Bottom Sheet Menu
+          if(_canEdit)
           BottomsheetMenu(
             onItemAdded: () {
               // Show success feedback

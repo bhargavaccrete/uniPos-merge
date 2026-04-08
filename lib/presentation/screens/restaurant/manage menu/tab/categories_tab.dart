@@ -11,6 +11,7 @@ import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
+import '../../../../../util/restaurant/restaurant_session.dart';
 
 class CategoryTab extends StatefulWidget {
   const CategoryTab({super.key});
@@ -23,6 +24,9 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
   @override
   bool get wantKeepAlive => true;
   final TextEditingController _searchController = TextEditingController();
+
+  /// Only admin and manager can add, edit, or delete categories.
+  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
   String query = '';
 
   @override
@@ -97,8 +101,8 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          // Add Category Button
-          _buildAddButton(),
+          // Add Category Button — only shown to Admin/Manager
+          if (_canEdit) _buildAddButton(),
         ],
       ),
     );
@@ -230,15 +234,17 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
                   ],
                 ),
               ),
-              // Actions inline
-              InkWell(
-                onTap: () => AddCategoryDialog.show(context, editCategory: category),
-                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
-              ),
-              InkWell(
-                onTap: () => _showDeleteDialog(category),
-                child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red)),
-              ),
+              // Actions inline — edit & delete only for Admin/Manager
+              if (_canEdit) ...[
+                InkWell(
+                  onTap: () => AddCategoryDialog.show(context, editCategory: category),
+                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
+                ),
+                InkWell(
+                  onTap: () => _showDeleteDialog(category),
+                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red)),
+                ),
+              ],
               if (items.isNotEmpty)
                 Builder(builder: (_) {
                   final allEnabled = items.every((i) => i.isEnabled);

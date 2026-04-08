@@ -1337,6 +1337,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
       tableNo: activeModel.tableNo,
       shiftId: RestaurantSession.currentShiftId,
       sessionId: currentSessionId ?? activeModel.sessionId, // Assign to current session to reflect payment
+      discountAppliedBy: (activeModel.discount != null && activeModel.discount! > 0)
+          ? (RestaurantSession.isAdmin ? 'Admin' : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})')
+          : null,
     );
     await pastOrderStore.addOrder(pastOrder);
     await orderStore.deleteOrder(activeModel.id);
@@ -1397,6 +1400,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
         loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
         shiftId: RestaurantSession.currentShiftId,
         sessionId: currentSessionId, // Link to POS session
+        discountAppliedBy: calculations.discountAmount > 0.009
+            ? (RestaurantSession.isAdmin ? 'Admin' : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})')
+            : null,
       );
       print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
