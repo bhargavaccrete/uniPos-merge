@@ -196,6 +196,9 @@ class HiveBoxNames {
   /// Restaurant POS Sessions
   static const String restaurantSessions = 'restaurantSessionsBox';
 
+  /// Staff attendance clock-in/out records
+  static const String restaurantAttendance = 'restaurantAttendanceBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode
@@ -281,6 +284,7 @@ class HiveBoxNames {
     restaurantCashHandovers,
     restaurantPrinters,
     restaurantSessions,
+    restaurantAttendance,
   ];
 
   /// All common box names (shared between retail and restaurant)

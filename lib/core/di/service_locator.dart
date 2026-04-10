@@ -78,7 +78,10 @@ import 'package:unipos/domain/store/restaurant/company_store.dart';
 import 'package:unipos/domain/store/restaurant/eod_store.dart';
 import 'package:unipos/domain/store/restaurant/appStore.dart';
 import 'package:unipos/domain/store/restaurant/printer_store.dart';
+import 'package:unipos/domain/store/restaurant/attendance_store.dart';
 import 'package:unipos/domain/services/restaurant/thermal_printer_service.dart';
+
+import 'package:unipos/data/repositories/restaurant/attendance_repository.dart';
 
 // Type aliases for convenience getters (to avoid prefixing with 'restaurant.')
 typedef CartStoreRes = restaurant.CartStoreRes;
@@ -223,6 +226,7 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<CompanyRepository>(() => CompanyRepository());
   locator.registerLazySingleton<EodRepository>(() => EodRepository());
   locator.registerLazySingleton<PrinterRepository>(() => PrinterRepository());
+  locator.registerLazySingleton<AttendanceRepository>(() => AttendanceRepository());
   locator.registerLazySingleton<ThermalPrinterService>(() => ThermalPrinterService());
 
   // ==================== RESTAURANT STORES ====================
@@ -264,6 +268,8 @@ Future<void> _registerRestaurantDependencies() async {
   );
   // Auto-close the open shift when any logout path calls RestaurantSession.clearSession()
   RestaurantSession.onShiftAutoClose = (id) => shiftStore.closeShift(id);
+  // Auto clock-out attendance on logout
+  RestaurantSession.onAttendanceAutoClockOut = (name) => attendanceStore.autoClockOutIfOpen(name);
 
   // Cash Management stores
   locator.registerLazySingleton<CashMovementStore>(
@@ -291,6 +297,7 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<PrinterStore>(
     () => PrinterStore(locator<PrinterRepository>(), locator<ThermalPrinterService>()),
   );
+  locator.registerLazySingleton<AttendanceStore>(() => AttendanceStore(locator<AttendanceRepository>()));
 
   // Load saved printers at startup so defaultKotPrinter / defaultReceiptPrinter
   // are available immediately when the first order is placed.
@@ -403,6 +410,7 @@ CompanyStore get companyStore => locator<CompanyStore>();
 EodStore get eodStore => locator<EodStore>();
 AppStore get appStore => locator<AppStore>();
 PrinterStore get printerStore => locator<PrinterStore>();
+AttendanceStore get attendanceStore => locator<AttendanceStore>();
 
 /// Restaurant Repositories
 CategoryRepository get categoryRepository => locator<CategoryRepository>();

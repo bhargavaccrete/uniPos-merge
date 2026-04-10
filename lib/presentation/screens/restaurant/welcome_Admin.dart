@@ -408,6 +408,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory)),
       _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings)),
       _MenuCardData('Cash Drawer',   Icons.point_of_sale_rounded,       const Color(0xFF00897B), 'cashDrawer', () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer)),
+      _MenuCardData('Attendance',    Icons.access_time_rounded,         Colors.deepPurple,     'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantAttendance)),
       _MenuCardData('Logout',        Icons.logout_rounded,              Colors.red.shade700,   'logout',       () => _showLogoutDialog(context)),
     ];
     return all.where((c) => c.permission == 'logout' || RestaurantSession.canAccess(c.permission)).toList();

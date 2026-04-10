@@ -10,6 +10,7 @@ import 'package:unipos/util/images.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
+import '../../../../core/di/service_locator.dart';
 import '../welcome_Admin.dart';
 
 class AdminLogin extends StatefulWidget {
@@ -58,6 +59,7 @@ class _AdminLoginState extends State<AdminLogin> {
         _failedAttempts = 0;
         await prefs.setBool(_isLoggedInKey, true);
         await RestaurantSession.saveAdminSession();
+        try { await attendanceStore.clockIn(staffName: 'Admin', staffRole: 'Admin'); } catch (_) {}
         if (mounted) {
           Navigator.pushReplacement(
             context,

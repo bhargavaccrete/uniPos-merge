@@ -63,6 +63,7 @@ import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:unipos/data/models/restaurant/db/session_model.dart';
+import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 
 /// Hive Initialization Class
 /// Handles all adapter registrations and box openings
@@ -559,6 +560,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSession)) {
       Hive.registerAdapter(RestaurantSessionModelAdapter());
     }
+    // AttendanceModel - 132: Staff clock-in/clock-out records
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAttendance)) {
+      Hive.registerAdapter(AttendanceModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -619,6 +624,9 @@ class HiveInit {
 
     // Restaurant POS Sessions
     await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
+
+    // Staff attendance
+    await Hive.openBox<AttendanceModel>(HiveBoxNames.restaurantAttendance);
 
     _areRestaurantBoxesOpen = true;
     print('✅ All restaurant boxes opened successfully with correct names and guard flag set');

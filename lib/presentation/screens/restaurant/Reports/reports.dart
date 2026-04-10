@@ -251,6 +251,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         iconColor: Colors.teal,
                         isTablet: isTablet,
                       ),
+                      _buildReportCard(
+                        icon: Icons.access_time_rounded,
+                        title: 'Attendance Report',
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantAttendanceReport),
+                        iconColor: Colors.deepPurple,
+                        isTablet: isTablet,
+                      ),
                     ],
                   );
                 },

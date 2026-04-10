@@ -11,6 +11,8 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import '../start order/startorder.dart';
@@ -207,6 +209,47 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
     final confirmed = await _showConfirmationDialog();
     if (!confirmed) return;
+
+    // --- AUTO CLOCK-OUT CHECK ---
+    try {
+      final attendanceBox = Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance);
+      final openAttendance = attendanceBox.values.where((r) => r.isOpen).toList();
+      
+      if (openAttendance.isNotEmpty) {
+        final confirmedAttendance = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            title: Text('Staff Still Clocked In', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            content: Text('${openAttendance.length} staff member(s) are still clocked in. Do you want to automatically clock them out now?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text('Cancel EOD', style: GoogleFonts.poppins(color: Colors.grey.shade700)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text('Clock Out All', style: GoogleFonts.poppins(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmedAttendance != true) return;
+        
+        // Force clock out all remaining staff
+        for (final r in openAttendance) {
+          await attendanceStore.clockOut(r.id);
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Failed to auto clock-out staff: $e');
+    }
+    // ---------------------------
 
     final actualCashAmount = double.parse(_actualCashController.text);
 

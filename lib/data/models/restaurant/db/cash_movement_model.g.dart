@@ -24,13 +24,14 @@ class CashMovementModelAdapter extends TypeAdapter<CashMovementModel> {
       reason: fields[4] as String,
       note: fields[5] as String?,
       staffName: fields[6] as String,
+      sessionId: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CashMovementModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class CashMovementModelAdapter extends TypeAdapter<CashMovementModel> {
       ..writeByte(5)
       ..write(obj.note)
       ..writeByte(6)
-      ..write(obj.staffName);
+      ..write(obj.staffName)
+      ..writeByte(7)
+      ..write(obj.sessionId);
   }
 
   @override

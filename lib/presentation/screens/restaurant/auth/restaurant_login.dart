@@ -89,6 +89,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
           RestaurantAuthHelper.verifyPassword(enteredPassword, storedPassword)) {
         await prefs.setBool(_isLoggedInKey, true);
         await RestaurantSession.saveAdminSession();
+        await _autoClockIn('Admin', 'Admin');
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -109,6 +110,8 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
       if (match != null) {
         await prefs.setBool(_isLoggedInKey, true);
         await RestaurantSession.saveStaffSession(match);
+        final name = '${match.firstName} ${match.lastName}'.trim();
+        await _autoClockIn(name, match.isCashier);
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -129,6 +132,12 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _autoClockIn(String staffName, String role) async {
+    try {
+      await attendanceStore.clockIn(staffName: staffName, staffRole: role);
+    } catch (_) {}
   }
 
   @override

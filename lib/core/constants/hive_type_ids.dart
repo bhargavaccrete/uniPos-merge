@@ -60,6 +60,7 @@ class HiveTypeIds {
   static const int savedPrinter = 130; // SavedPrinterModel — BT/WiFi printer config
 
   static const int restaurantSession = 131; // RestaurantSessionModel — Session-based day management
+  static const int restaurantAttendance = 132; // AttendanceModel — Staff clock-in/clock-out
 
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;

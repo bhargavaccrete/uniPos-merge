@@ -46,6 +46,7 @@ class RestaurantSession {
   /// Registered by service_locator — called with the open shiftId before session is cleared.
   /// Allows auto-closing the shift on logout without a circular import.
   static Future<void> Function(String shiftId)? onShiftAutoClose;
+  static Future<void> Function(String staffName)? onAttendanceAutoClockOut;
 
   // ── Getters ──────────────────────────────────────────────────────────────
   static String  get loginType => loginTypeNotifier.value;
@@ -104,6 +105,11 @@ class RestaurantSession {
     // Auto-close open shift before clearing session
     if (_currentShiftId != null && onShiftAutoClose != null) {
       await onShiftAutoClose!(_currentShiftId!);
+    }
+    // Auto clock-out attendance if still open
+    final currentName = staffName ?? (isAdmin ? 'Admin' : null);
+    if (currentName != null && onAttendanceAutoClockOut != null) {
+      await onAttendanceAutoClockOut!(currentName);
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_loginTypeKey);

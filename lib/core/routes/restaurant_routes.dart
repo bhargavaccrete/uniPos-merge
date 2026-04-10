@@ -12,6 +12,8 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbyCategory/s
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/data_generator_screen.dart';
+import 'package:unipos/presentation/screens/restaurant/attendance/staff_attendance_screen.dart';
+import 'package:unipos/presentation/screens/restaurant/attendance/attendance_report_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/order.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
@@ -222,6 +224,10 @@ class RestaurantRoutes {
 
     // Restaurant - End Day
     RouteNames.restaurantEndDay: _guard(const EndDayDrawer(), 'endDay'),
+
+    // Restaurant - Attendance
+    RouteNames.restaurantAttendance: _guard(const StaffAttendanceScreen()),
+    RouteNames.restaurantAttendanceReport: _guard(const AttendanceReportScreen(), 'reports'),
 
     // Restaurant - Other
     RouteNames.restaurantNeedHelp: _guard(const NeedhelpDrawer()),

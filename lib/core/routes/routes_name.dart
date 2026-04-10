@@ -107,6 +107,10 @@ class RouteNames {
   // Restaurant - End Day
   static const restaurantEndDay = '/restaurant-end-day';
 
+  // Restaurant - Attendance
+  static const restaurantAttendance = '/restaurant-attendance';
+  static const restaurantAttendanceReport = '/restaurant-attendance-report';
+
   // Restaurant - Other
   static const restaurantLanguage = '/restaurant-language';
   static const restaurantNeedHelp = '/restaurant-need-help';
