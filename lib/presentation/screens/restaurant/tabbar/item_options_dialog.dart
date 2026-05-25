@@ -32,9 +32,11 @@ class DisplayVariant {
 class ItemOptionsDialog extends StatefulWidget {
   final Items item;
   final String? categoryName;
+  final ScrollController? scrollController;
 
   const ItemOptionsDialog({super.key, required this.item,
-    this.categoryName
+    this.categoryName,
+    this.scrollController,
   });
 
   @override
@@ -92,7 +94,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           stockQuantity: itemVariant.stockQuantity ?? 0,
         ));
       } else {
-        print("Warning: Variant ID ${itemVariant.variantId} found in item but not in store.");
       }
     }
     if (_displayVariants.isNotEmpty) {
@@ -115,7 +116,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
       if (choiceGroup != null) {
         _displayChoiceGroups.add(choiceGroup);
       } else {
-         print("Warning: Choice ID $choiceId found in item but not in store.");
       }
     }
   }
@@ -136,7 +136,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           }
         }
       } else {
-         print("Warning: Extra ID $extraId found in item but not in store.");
       }
     }
 
@@ -157,17 +156,14 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   // Helper method to check if minimum requirements are met
   // Returns list of unmet extra group names (empty = all valid)
   List<String> _getUnmetRequirements() {
-    if (widget.item.extraConstraints == null) return [];
     final unmet = <String>[];
     for (var extraGroup in _displayExtra) {
-      final constraints = widget.item.extraConstraints![extraGroup.Id];
-      if (constraints != null) {
-        final minRequired = constraints['min'] ?? 0;
-        if (minRequired > 0) {
-          final currentCount = _getExtraCategoryCount(extraGroup.Id);
-          if (currentCount < minRequired) {
-            unmet.add('${extraGroup.Ename} (min $minRequired)');
-          }
+      final constraints = widget.item.extraConstraints?[extraGroup.Id];
+      final minRequired = constraints?['min'] ?? extraGroup.minimum ?? 0;
+      if (minRequired > 0) {
+        final currentCount = _getExtraCategoryCount(extraGroup.Id);
+        if (currentCount < minRequired) {
+          unmet.add('${extraGroup.Ename} (min $minRequired)');
         }
       }
     }
@@ -273,7 +269,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
     String finalTitle = widget.item.name;
 
-    print("DEBUG in Dialog: Received category name: '${widget.categoryName}'");
 
     final cartItem = CartItem(
         productId: widget.item.id,
@@ -307,7 +302,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           // Get the quantity for this extra
           final quantity = _extraQuantities[e.name] ?? 1;
 
-          print('Extra Debug: Category="$categoryName", Name="${e.name}", DisplayName="$displayName", Quantity=$quantity');
 
           return {
             'name': e.name,
@@ -320,19 +314,19 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         }).toList()
     );
 
-    print(cartItem);
     Navigator.of(context).pop(cartItem);
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         children: [
           // Drag handle
           Container(
@@ -394,8 +388,9 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           SizedBox(height: 20),
 
           // Scrollable content
-          Flexible(
+          Expanded(
             child: SingleChildScrollView(
+              controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,26 +515,27 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMedium,
-                borderRadius: BorderRadius.circular(8),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.straighten_rounded, size: 16, color: AppColors.primary),
+              SizedBox(width: 10),
+              Text(
+                'Select Size',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
               ),
-              child: Icon(Icons.straighten_rounded, size: 16, color: AppColors.textSecondary),
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Select Size',
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         SizedBox(height: 12),
         ..._displayVariants.map((variant) {
@@ -567,12 +563,17 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 margin: EdgeInsets.only(bottom: 8),
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : (canOrder ? AppColors.white : AppColors.surfaceMedium),
+                  color: isSelected
+                      ? AppColors.primary
+                      : (canOrder ? Colors.grey.shade50 : AppColors.surfaceMedium),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : AppColors.divider,
-                    width: 1.5,
+                    color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                    width: isSelected ? 2 : 1.5,
                   ),
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 6, offset: Offset(0, 2))]
+                      : null,
                 ),
                 child: Row(
                   children: [
@@ -642,7 +643,9 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.white.withOpacity(0.2) : AppColors.surfaceLight,
+                        color: isSelected
+                            ? AppColors.white.withOpacity(0.2)
+                            : AppColors.primary.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -650,7 +653,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: isSelected ? AppColors.white : AppColors.textPrimary,
+                          color: isSelected ? AppColors.white : AppColors.primary,
                         ),
                       ),
                     ),
@@ -672,26 +675,27 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceMedium,
-                    borderRadius: BorderRadius.circular(8),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(8),
+                border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.checklist_rounded, size: 16, color: AppColors.primary),
+                  SizedBox(width: 10),
+                  Text(
+                    choiceGroup.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  child: Icon(Icons.checklist_rounded, size: 16, color: AppColors.textSecondary),
-                ),
-                SizedBox(width: 10),
-                Text(
-                  choiceGroup.name,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: 12),
             ...choiceGroup.choiceOption.map((option) {
@@ -726,12 +730,15 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                   margin: EdgeInsets.only(bottom: 8),
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.white,
+                    color: isSelected ? AppColors.primary.withOpacity(0.08) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.divider,
-                      width: 1.5,
+                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                      width: isSelected ? 1.5 : 1,
                     ),
+                    boxShadow: isSelected
+                        ? [BoxShadow(color: AppColors.primary.withOpacity(0.12), blurRadius: 4, offset: Offset(0, 2))]
+                        : null,
                   ),
                   child: Row(
                     children: [
@@ -739,10 +746,9 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                         width: 20,
                         height: 20,
                         decoration: BoxDecoration(
-                          // Radio button (circle) for single select, checkbox (square) for multi-select
                           borderRadius: BorderRadius.circular(allowMultiple ? 4 : 10),
                           border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.divider,
+                            color: isSelected ? AppColors.primary : Colors.grey.shade400,
                             width: 2,
                           ),
                           color: isSelected ? AppColors.primary : Colors.transparent,
@@ -782,10 +788,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     return Column(
         crossAxisAlignment:  CrossAxisAlignment.start,
         children: _displayExtra.map((extraGroup){
-          // Get min/max constraints for this extra category
+          // Get min/max constraints for this extra category.
+          // Per-item extraConstraints takes priority; falls back to the extra's global default.
           final constraints = widget.item.extraConstraints?[extraGroup.Id];
-          final minRequired = constraints?['min'] ?? 0;
-          final maxAllowed = constraints?['max'] ?? 0;
+          final minRequired = constraints?['min'] ?? extraGroup.minimum ?? 0;
+          final maxAllowed  = constraints?['max'] ?? extraGroup.maximum ?? 0;
           final currentCount = _getExtraCategoryCount(extraGroup.Id);
 
           // First, filter the toppings for this extra group
@@ -812,33 +819,34 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMedium,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.add_circle_outline, size: 16, color: AppColors.textSecondary),
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    extraGroup.Ename,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (minRequired > 0 || maxAllowed > 0) ...[
-                    const SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.add_circle_outline, size: 16, color: AppColors.primary),
+                    SizedBox(width: 10),
                     Text(
-                      '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
-                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+                      extraGroup.Ename,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
                     ),
+                    if (minRequired > 0 || maxAllowed > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
+                        style: GoogleFonts.poppins(fontSize: 12, color: AppColors.primary.withOpacity(0.7)),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
               SizedBox(height: 12),
               if (maxAllowed > 0 && currentCount >= maxAllowed)
@@ -863,12 +871,15 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                   margin: EdgeInsets.only(bottom: 8),
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.05) : AppColors.white,
+                    color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.08) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.3) : AppColors.divider,
-                      width: 1,
+                      color: currentQuantity > 0 ? AppColors.primary : Colors.grey.shade300,
+                      width: currentQuantity > 0 ? 1.5 : 1,
                     ),
+                    boxShadow: currentQuantity > 0
+                        ? [BoxShadow(color: AppColors.primary.withOpacity(0.12), blurRadius: 4, offset: Offset(0, 2))]
+                        : null,
                   ),
                   child: Row(
                     children: [

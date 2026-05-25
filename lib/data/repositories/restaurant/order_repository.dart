@@ -59,9 +59,7 @@ class OrderRepository {
 
     if (orderKey != null) {
       await _orderBox.put(orderKey, updatedOrder);
-      print('✅ Order updated successfully with key: $orderKey');
     } else {
-      print("❌ Error: Could not find order with ID ${updatedOrder.id} to update.");
       throw Exception('Order not found');
     }
   }
@@ -78,7 +76,6 @@ class OrderRepository {
     if (lastKotDate != todayStr) {
       await _counterBox.put('lastKotNumber', 0);
       await _counterBox.put('lastKotDate', todayStr);
-      print('🔄 New day detected - KOT number reset to 0');
     }
 
     int lastNumber = await _counterBox.get('lastKotNumber', defaultValue: 0);
@@ -101,7 +98,6 @@ class OrderRepository {
     if (lastResetYear != currentFiscalYearStartYear) {
       await _counterBox.put('lastBillNumber', 0);
       await _counterBox.put('lastBillResetYear', currentFiscalYearStartYear);
-      print('🔄 New Fiscal Year Detected ($currentFiscalYearStartYear) - Bill number reset to 0');
     }
 
     // Get and increment the bill number
@@ -116,7 +112,6 @@ class OrderRepository {
   /// DEPRECATED: Now handled automatically by getNextBillNumber on fiscal year change
   Future<void> resetDailyBillNumber() async {
     // No-op to prevent daily reset
-    print('⚠️ Daily bill reset skipped (Using Fiscal Year Reset)');
   }
 
   /// Get next daily order number (resets every day)
@@ -129,7 +124,6 @@ class OrderRepository {
     if (lastOrderDate != todayStr) {
       await _counterBox.put('lastOrderNumber', 0);
       await _counterBox.put('lastOrderDate', todayStr);
-      print('🔄 New day detected - Order number reset to 0');
     }
 
     // Get and increment the order number
@@ -137,7 +131,6 @@ class OrderRepository {
     int newNumber = lastNumber + 1;
     await _counterBox.put('lastOrderNumber', newNumber);
 
-    print('📋 Order Number Generated: #$newNumber');
     return newNumber;
   }
 
@@ -147,7 +140,6 @@ class OrderRepository {
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     await _counterBox.put('lastOrderDate', todayStr);
-    print('✅ Daily order number reset to 0');
   }
 
   /// Update order with new items added (e.g., adding items to existing order)
@@ -185,9 +177,6 @@ class OrderRepository {
     // Save to database
     await updateOrder(updatedOrder);
 
-    print('✅ Order ${existingOrder.id} updated with ${newItems.length} new items');
-    print('   New KOT #$newKotNumber generated');
-    print('   Status: ${existingOrder.status} → ${updatedOrder.status}');
 
     return updatedOrder;
   }

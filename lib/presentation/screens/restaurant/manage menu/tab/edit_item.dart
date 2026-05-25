@@ -18,6 +18,7 @@ import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import 'edit_category.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 enum SellingMethod { byUnit, byWeight }
 
@@ -128,15 +129,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
       return widget.items.extraId?.contains(allExtra[index].Id) ?? false;
     });
 
-    // Initialize min/max controllers for extras
+    // Initialize min/max controllers for extras.
+    // Per-item constraints take priority; global extra defaults pre-fill when no override exists.
     for (var extra in allExtra) {
       final constraints = widget.items.extraConstraints?[extra.Id];
-      final hasConstraints = constraints != null && (constraints['min'] != 0 || constraints['max'] != 0);
+      final globalMin = extra.minimum;
+      final globalMax = extra.maximum;
+      final hasConstraints = constraints != null
+          ? (constraints['min'] != 0 || constraints['max'] != 0)
+          : (globalMin != null && globalMin != 0) || (globalMax != null && globalMax != 0);
 
       _extraHasConstraints[extra.Id] = hasConstraints;
       _extraConstraintControllers[extra.Id] = {
-        'min': TextEditingController(text: constraints?['min']?.toString() ?? ''),
-        'max': TextEditingController(text: constraints?['max']?.toString() ?? ''),
+        'min': TextEditingController(text: constraints?['min']?.toString() ?? (globalMin != null && globalMin != 0 ? globalMin.toString() : '')),
+        'max': TextEditingController(text: constraints?['max']?.toString() ?? (globalMax != null && globalMax != 0 ? globalMax.toString() : '')),
       };
     }
 
@@ -623,6 +629,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
               final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
               if (pickedFile != null) {
                 final bytes = await pickedFile.readAsBytes();
+                
+                // Validate image size (max 2MB)
+                final int maxSizeInBytes = 2 * 1024 * 1024; // 2MB
+                if (bytes.length > maxSizeInBytes) {
+                  if (mounted) {
+                    NotificationService.instance.showError('Image is too large. Please select an image under 2MB.');
+                  }
+                  return;
+                }
+
                 setState(() => _selectedImageBytes = bytes);
               }
             },
@@ -966,9 +982,13 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
 
   void _deleteCategory(String categoryId) async {
     // Show confirmation dialog
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         title: const Text('Are you sure?'),
         content: const Text('Do you want to delete this category?'),
         actions: [

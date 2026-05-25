@@ -10,7 +10,6 @@ String getDeviceCategory(BuildContext context, {double ppi = 160}) {
   final size = MediaQuery.of(context).size;
   final width = size.width;
   final height = size.height;
-  print("this is the heigth and the widht of the screen - ---- > ${width}--- H${height}");
   // Convert logical pixels to actual pixels
   final pixelRatio = MediaQuery.of(context).devicePixelRatio;
   final widthPx = width * pixelRatio;

@@ -1,7 +1,9 @@
 import 'package:mobx/mobx.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/repositories/restaurant/order_repository.dart';
+import '../../../util/restaurant/restaurant_session.dart';
 
 part 'order_store.g.dart';
 
@@ -234,11 +236,24 @@ abstract class _OrderStore with Store {
       errorMessage = null;
 
       final loadedOrders = await _repository.getAllOrders();
+
+      // Reconcile crash-interrupted settlements: an order present in both
+      // activeBox and pastOrderBox means the app died after addOrder but before
+      // deleteOrder. Remove from active so it doesn't show as unpaid again.
+      final List<OrderModel> clean = [];
+      for (final order in loadedOrders) {
+        final alreadySettled = await pastOrderStore.getOrderById(order.id);
+        if (alreadySettled != null) {
+          await _repository.deleteOrder(order.id);
+        } else {
+          clean.add(order);
+        }
+      }
+
       orders.clear();
-      orders.addAll(loadedOrders);
+      orders.addAll(clean);
     } catch (e) {
       errorMessage = 'Failed to load orders: $e';
-      print('Error loading orders: $e');
     } finally {
       isLoading = false;
     }
@@ -256,7 +271,6 @@ abstract class _OrderStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to add order: $e';
-      print('Error adding order: $e');
       return false;
     } finally {
       isLoading = false;
@@ -269,18 +283,23 @@ abstract class _OrderStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      await _repository.updateOrder(order);
+      final stamped = order.copyWith(
+        lastModifiedBy: RestaurantSession.isAdmin
+            ? 'Admin'
+            : '${RestaurantSession.staffName ?? 'Staff'} (${RestaurantSession.effectiveRole})',
+        lastModifiedAt: DateTime.now(),
+      );
+      await _repository.updateOrder(stamped);
 
-      // Update in local list
-      final index = orders.indexWhere((o) => o.id == order.id);
+      // Update in local list with the stamped copy
+      final index = orders.indexWhere((o) => o.id == stamped.id);
       if (index != -1) {
-        orders[index] = order;
+        orders[index] = stamped;
       }
 
       return true;
     } catch (e) {
       errorMessage = 'Failed to update order: $e';
-      print('Error updating order: $e');
       return false;
     } finally {
       isLoading = false;
@@ -301,7 +320,6 @@ abstract class _OrderStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to delete order: $e';
-      print('Error deleting order: $e');
       return false;
     } finally {
       isLoading = false;
@@ -322,7 +340,6 @@ abstract class _OrderStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to update order status: $e';
-      print('Error updating order status: $e');
       return false;
     }
   }
@@ -355,7 +372,6 @@ abstract class _OrderStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to mark order as paid: $e';
-      print('Error marking order as paid: $e');
       return false;
     }
   }
@@ -383,7 +399,6 @@ abstract class _OrderStore with Store {
       return updatedOrder;
     } catch (e) {
       errorMessage = 'Failed to update order with new items: $e';
-      print('Error updating order with new items: $e');
       return null;
     } finally {
       isLoading = false;
@@ -396,7 +411,6 @@ abstract class _OrderStore with Store {
       return await _repository.getNextKotNumber();
     } catch (e) {
       errorMessage = 'Failed to get next KOT number: $e';
-      print('Error getting next KOT number: $e');
       return 0;
     }
   }
@@ -407,7 +421,6 @@ abstract class _OrderStore with Store {
       return await _repository.getNextBillNumber();
     } catch (e) {
       errorMessage = 'Failed to get next bill number: $e';
-      print('Error getting next bill number: $e');
       return 0;
     }
   }
@@ -418,7 +431,6 @@ abstract class _OrderStore with Store {
       await _repository.resetDailyBillNumber();
     } catch (e) {
       errorMessage = 'Failed to reset daily bill number: $e';
-      print('Error resetting daily bill number: $e');
     }
   }
 
@@ -428,7 +440,6 @@ abstract class _OrderStore with Store {
       return await _repository.getNextOrderNumber();
     } catch (e) {
       errorMessage = 'Failed to get next order number: $e';
-      print('Error getting next order number: $e');
       return 0;
     }
   }
@@ -452,7 +463,6 @@ abstract class _OrderStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to update KOT status: $e';
-      print('Error updating KOT status: $e');
       return false;
     }
   }

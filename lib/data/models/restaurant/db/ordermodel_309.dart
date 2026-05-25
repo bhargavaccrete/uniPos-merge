@@ -112,6 +112,12 @@ class OrderModel extends HiveObject {
   @HiveField(33)
   final String? sessionId; // Links order to a specific POS session
 
+  @HiveField(34)
+  final String? lastModifiedBy; // Staff who last modified this order
+
+  @HiveField(35)
+  final DateTime? lastModifiedAt; // When the order was last modified
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -151,6 +157,8 @@ class OrderModel extends HiveObject {
     this.isTaxInclusive,
     this.billNumber,
     this.sessionId,
+    this.lastModifiedBy,
+    this.lastModifiedAt,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -191,6 +199,8 @@ class OrderModel extends HiveObject {
     bool? isTaxInclusive,
     int? billNumber,
     String? sessionId,
+    String? lastModifiedBy,
+    DateTime? lastModifiedAt,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -227,6 +237,8 @@ class OrderModel extends HiveObject {
       isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
       billNumber: billNumber ?? this.billNumber,
       sessionId: sessionId ?? this.sessionId,
+      lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/pos%20End%20Day%2
 import 'package:unipos/presentation/screens/restaurant/Reports/customer%20list%20by%20revenue/customerlistbyrevenue.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/expenseReport/expensereport.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../core/routes/routes_name.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -68,9 +69,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final isDesktop = size.width > 1200;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -100,23 +99,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
           // Reports Grid
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  int columns = 2;
-                  if (isDesktop) {
-                    columns = 4;
-                  } else if (isTablet) {
-                    columns = 3;
-                  }
-
-                  return GridView.count(
+              padding: AppResponsive.padding(context),
+              child: GridView.count(
                     shrinkWrap: true,
                     physics: NeverScrollableScrollPhysics(),
-                    crossAxisCount: columns,
-                    crossAxisSpacing: isTablet ? 16 : 12,
-                    mainAxisSpacing: isTablet ? 16 : 12,
-                    childAspectRatio: isTablet ? 1.2 : 1.1,
+                    crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4),
+                    crossAxisSpacing: AppResponsive.gridSpacing(context),
+                    mainAxisSpacing: AppResponsive.gridSpacing(context),
+                    childAspectRatio: AppResponsive.gridAspectRatio(context),
                     children: [
                       _buildReportCard(
                         icon: Icons.shopping_bag_outlined,
@@ -259,9 +249,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         isTablet: isTablet,
                       ),
                     ],
-                  );
-                },
-              ),
+                  ),
             ),
           ),
         ],

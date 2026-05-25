@@ -13,6 +13,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
+import '../../../../../util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
@@ -55,9 +56,13 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
   }
 
   void _deleteItem(String id) async {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -113,20 +118,13 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
     }
   }
 
-  int _getGridColumns(double width) {
-    if (width > 1200) return 4;
-    else if (width > 900) return 3;
-    else return 2;
-  }
 
   @override
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final height = size.height;
-    final width = size.width;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -365,15 +363,12 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
           );
         }
 
-        final columns = _getGridColumns(size.width);
-        final isTablet = size.width > 600;
-
         return GridView.builder(
-          padding: EdgeInsets.all(24),
+          padding: AppResponsive.padding(context),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+            crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4),
+            crossAxisSpacing: AppResponsive.gridSpacing(context),
+            mainAxisSpacing: AppResponsive.gridSpacing(context),
             childAspectRatio: 2.8,
           ),
           itemCount: filteredItems.length,

@@ -313,7 +313,6 @@ abstract class _PastOrderStore with Store {
       return updatedOrder;
     } catch (e) {
       errorMessage = 'Failed to process refund: $e';
-      print('❌ PastOrderStore: Error processing refund: $e');
       return null;
     } finally {
       isLoading = false;
@@ -361,7 +360,6 @@ abstract class _PastOrderStore with Store {
       return voidedOrder;
     } catch (e) {
       errorMessage = 'Failed to void order: $e';
-      print('❌ PastOrderStore: Error voiding order: $e');
       return null;
     } finally {
       isLoading = false;

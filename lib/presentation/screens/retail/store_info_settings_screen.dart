@@ -68,6 +68,20 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
 
       if (image != null) {
         final bytes = await image.readAsBytes();
+
+        // Validate image size (max 2MB)
+        if (bytes.length > 2 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image is too large. Please select an image under 2MB.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
         setState(() {
           _logoBytes = bytes;
           _logoChanged = true;
@@ -76,10 +90,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick logo: $e'),
-            backgroundColor: AppColors.danger,
-          ),
+          SnackBar(content: Text('Error picking image: $e')),
         );
       }
     }

@@ -26,6 +26,7 @@ import 'customerdetails.dart';
 import '../../util/restaurant_print_helper.dart';
 import '../../../../../server/websocket.dart' as ws;
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/stores/payment_method_store.dart';
 class Takeaway extends StatefulWidget {
   bool isexisting = false;
   final OrderModel? existingModel;
@@ -37,6 +38,10 @@ class Takeaway extends StatefulWidget {
   final Function(CartItem) onAddtoCart;
   final Function(CartItem) onIncreseQty;
   final Function(CartItem) onDecreseQty;
+  final List<CartItem>? originalActiveItems;
+  final Map<String, int>? originalQuantities;
+  final List<int>? currentKotBoundaries;
+  final List<int>? currentKotNumbers;
 
   Takeaway(
       {super.key,
@@ -49,7 +54,11 @@ class Takeaway extends StatefulWidget {
         required this.onIncreseQty,
         required this.onDecreseQty,
         required this.isDineIn,
-        this.selectedTableNo});
+        this.selectedTableNo,
+        this.originalActiveItems,
+        this.originalQuantities,
+        this.currentKotBoundaries,
+        this.currentKotNumbers});
 
   @override
   State<Takeaway> createState() => _TakeawayState();
@@ -63,31 +72,24 @@ class _TakeawayState extends State<Takeaway> {
   /* double get totalPrice {
 
     // This print statement tells us the function is running.
-    print("--- Checking totalPrice ---");
 
     final double originalTotal = widget.cartItems.fold(0.0, (sum, item) => sum + item.item.totalPrice);
 
-    print("1. Original Total: $originalTotal");
 
     // This will print true, false, or null, telling us what the app sees.
-    print("2. Is 'Round Off' setting on? ${AppSettings.values['Round Off']}");
 
     if (AppSettings.values['Round Off'] == true) {
-      print("   -> Rounding is ON. Proceeding with calculation.");
 
       final String roundOffSettingValue = AppSettings.selectedRoundOffValue;
-      print("3. Rounding to nearest: $roundOffSettingValue");
 
       final double roundTO = double.tryParse(roundOffSettingValue) ?? 1.0;
 
       if (roundTO > 0) {
         final double finalPrice = (originalTotal / roundTO).round() * roundTO;
-        print("4. Final Calculated Price: $finalPrice");
         return finalPrice;
       }
     }
 
-    print("-> Rounding is OFF or setting not found. Returning original total.");
     return originalTotal;
   }*/
 
@@ -124,8 +126,8 @@ class _TakeawayState extends State<Takeaway> {
     if (widget.existingModel == null) return SizedBox();
 
     final existingModel = widget.existingModel!;
-    final List<int> kotNumbers = existingModel.kotNumbers;
-    final List<int> kotBoundaries = existingModel.kotBoundaries;
+    final List<int> kotNumbers = widget.currentKotNumbers ?? existingModel.kotNumbers;
+    final List<int> kotBoundaries = widget.currentKotBoundaries ?? existingModel.kotBoundaries;
 
     List<Widget> kotSections = [];
     final allItems = widget.cartItems;
@@ -145,10 +147,13 @@ class _TakeawayState extends State<Takeaway> {
           final activeKotItems = kotItems.where((item) => item.isActive).toList();
           final newKotItems = kotItems.where((item) => !item.isActive).toList();
 
+          final kotStatus = existingModel.getKotStatus(kotNum).toLowerCase();
+          final isCooked = kotStatus == 'cooked' || kotStatus == 'ready' || kotStatus == 'served' || kotStatus == 'completed';
+
           // Show ACTIVE items for this KOT
           if (activeKotItems.isNotEmpty) {
             kotSections.add(
-                _buildItemSection('KOT #$kotNum - ACTIVE', Colors.green, activeKotItems)
+                _buildItemSection('KOT #$kotNum - ACTIVE${isCooked ? ' (Cooked)' : ''}', isCooked ? Colors.orange : Colors.green, activeKotItems, isCooked: isCooked)
             );
             kotSections.add(SizedBox(height: 16));
           }
@@ -181,7 +186,7 @@ class _TakeawayState extends State<Takeaway> {
     );
   }
 
-  Widget _buildItemSection(String title, Color color, List<CartItemStatus> items) {
+  Widget _buildItemSection(String title, Color color, List<CartItemStatus> items, {bool isCooked = false}) {
     final sectionFs = AppResponsive.getValue<double>(context, mobile: 11, tablet: 13, desktop: 14);
     final countFs = AppResponsive.getValue<double>(context, mobile: 10, tablet: 12, desktop: 13);
     return Column(
@@ -199,13 +204,13 @@ class _TakeawayState extends State<Takeaway> {
             ],
           ),
         ),
-        ...items.map((item) => buildCartItemRow(item)).toList(),
+        ...items.map((item) => buildCartItemRow(item, isCooked: isCooked)).toList(),
       ],
     );
   }
 
 
-  Widget buildCartItemRow(CartItemStatus wrapped) {
+  Widget buildCartItemRow(CartItemStatus wrapped, {bool isCooked = false}) {
     final item = wrapped.item;
 
     final String? variantLine = item.variantName;
@@ -298,26 +303,52 @@ class _TakeawayState extends State<Takeaway> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              InkWell(
-                onTap: () => widget.onDecreseQty(item),
-                child: Container(
-                  padding: EdgeInsets.all(btnPad),
-                  decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(6)),
-                  child: Icon(Icons.remove, size: iconSize, color: Colors.grey.shade700),
+              if (!wrapped.isActive) ...[
+                InkWell(
+                  onTap: () => widget.onDecreseQty(item),
+                  child: Container(
+                    padding: EdgeInsets.all(btnPad),
+                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(6)),
+                    child: Icon(Icons.remove, size: iconSize, color: Colors.grey.shade700),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Text(item.quantity.toString(), style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600)),
-              ),
-              InkWell(
-                onTap: () => widget.onIncreseQty(item),
-                child: Container(
-                  padding: EdgeInsets.all(btnPad),
-                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6)),
-                  child: Icon(Icons.add, size: iconSize, color: Colors.white),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(item.quantity.toString(), style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600)),
                 ),
-              ),
+                InkWell(
+                  onTap: () => widget.onIncreseQty(item),
+                  child: Container(
+                    padding: EdgeInsets.all(btnPad),
+                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6)),
+                    child: Icon(Icons.add, size: iconSize, color: Colors.white),
+                  ),
+                ),
+              ] else ...[
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Text('${item.quantity}x', style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600)),
+                ),
+                SizedBox(width: 8),
+                if (isCooked)
+                  Tooltip(
+                    message: 'Cannot cancel cooked items',
+                    child: Container(
+                      padding: EdgeInsets.all(btnPad),
+                      decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(6)),
+                      child: Icon(Icons.cancel_outlined, size: iconSize, color: Colors.grey.shade400),
+                    ),
+                  )
+                else
+                  InkWell(
+                    onTap: () => _showCancelDialog(context, item),
+                    child: Container(
+                      padding: EdgeInsets.all(btnPad),
+                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
+                      child: Icon(Icons.cancel_outlined, size: iconSize, color: Colors.red),
+                    ),
+                  ),
+              ],
             ],
           ),
           SizedBox(width: 12),
@@ -334,6 +365,167 @@ class _TakeawayState extends State<Takeaway> {
       ),
     );
   }
+
+  void _showCancelDialog(BuildContext context, CartItem item) {
+    int cancelQty = 1;
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Cancel Item', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('How many "${item.title}" do you want to cancel?', style: GoogleFonts.poppins(fontSize: 14)),
+                  SizedBox(height: 20),
+                  if (item.quantity > 1)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: cancelQty > 1 ? () => setState(() => cancelQty--) : null,
+                            icon: Icon(Icons.remove_circle_outline, color: cancelQty > 1 ? AppColors.primary : Colors.grey),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text('$cancelQty', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
+                          ),
+                          IconButton(
+                            onPressed: cancelQty < item.quantity ? () => setState(() => cancelQty++) : null,
+                            icon: Icon(Icons.add_circle_outline, color: cancelQty < item.quantity ? AppColors.primary : Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Text('Cancel 1x ${item.title}?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
+                  SizedBox(height: 10),
+                  Text('This will print a Cancel KOT for the kitchen.', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Keep Item', style: GoogleFonts.poppins(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    for (int i = 0; i < cancelQty; i++) {
+                      widget.onDecreseQty(item);
+                    }
+                  },
+                  child: Text('Confirm Cancel', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500)),
+                )
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+/*
+  void _showCancelDialog(BuildContext context, CartItem item) {
+    int cancelQty = 1;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('Cancel Item', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('How many "${item.title}" do you want to cancel?', style: GoogleFonts.poppins(fontSize: 14)),
+                  SizedBox(height: 20),
+                  if (item.quantity > 1)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: cancelQty > 1 ? () => setState(() => cancelQty--) : null,
+                            icon: Icon(Icons.remove_circle_outline, color: cancelQty > 1 ? AppColors.primary : Colors.grey),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text('$cancelQty', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
+                          ),
+                          IconButton(
+                            onPressed: cancelQty < item.quantity ? () => setState(() => cancelQty++) : null,
+                            icon: Icon(Icons.add_circle_outline, color: cancelQty < item.quantity ? AppColors.primary : Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Text('Cancel 1x ${item.title}?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
+                  SizedBox(height: 10),
+                  Text('This will print a Cancel KOT for the kitchen.', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Keep Item', style: GoogleFonts.poppins(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    for (int i = 0; i < cancelQty; i++) {
+                      widget.onDecreseQty(item);
+                    }
+                  },
+                  child: Text('Confirm Cancel', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500)),
+                )
+              ],
+            );
+          },
+        );
+      },
+    );
+  }*/
 
   Future<void> clearCart() async {
     try {
@@ -352,7 +544,6 @@ class _TakeawayState extends State<Takeaway> {
         // );
       }
     } catch (e) {
-      print('Error clearing cart: $e');
       if (mounted) {
 
         NotificationService.instance.showError(
@@ -386,8 +577,6 @@ class _TakeawayState extends State<Takeaway> {
   // Update customer statistics (visits, loyalty points, last visit, etc.)
   Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
     try {
-      print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
-      print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
 
       await restaurantCustomerStore.updateCustomerVisit(
         customerId: customer.customerId,
@@ -398,13 +587,9 @@ class _TakeawayState extends State<Takeaway> {
       // Verify the update
       final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
       if (updatedCustomer != null) {
-        print('✅ Customer stats updated successfully!');
-        print('✅ New visits: ${updatedCustomer.totalVisites}, New points: ${updatedCustomer.loyaltyPoints}');
       } else {
-        print('❌ Failed to verify customer update');
       }
     } catch (e) {
-      print('❌ Error updating customer stats: $e');
     }
   }
 
@@ -418,28 +603,23 @@ class _TakeawayState extends State<Takeaway> {
 
       // Skip if both name and phone are empty
       if (name.trim().isEmpty && phone.trim().isEmpty) {
-        print('ℹ️ No customer details provided, skipping customer creation');
         return null;
       }
 
       // Search for existing customer by phone number (phone is more unique than name)
       if (phone.trim().isNotEmpty) {
-        print('🔍 Searching for existing customer with phone: $phone');
         final searchResults = await restaurantCustomerStore.searchCustomers(phone.trim());
 
         // Check if we have an exact phone match
         for (var customer in searchResults) {
           if (customer.phone?.trim().toLowerCase() == phone.trim().toLowerCase()) {
-            print('✅ Found existing customer: ${customer.name} (${customer.customerId})');
             return customer;
           }
         }
-        print('ℹ️ No existing customer found with phone: $phone');
       }
 
       // If not found and we have at least phone or name, create new customer
       if (phone.trim().isNotEmpty || name.trim().isNotEmpty) {
-        print('➕ Creating new customer: Name=$name, Phone=$phone');
 
         final newCustomer = RestaurantCustomer.create(
           customerId: Uuid().v4(),
@@ -448,17 +628,17 @@ class _TakeawayState extends State<Takeaway> {
         );
 
         await restaurantCustomerStore.addCustomer(newCustomer);
-        print('✅ New customer created successfully: ${newCustomer.customerId}');
 
         return newCustomer;
       }
 
       return null;
     } catch (e) {
-      print('❌ Error in _getOrCreateCustomer: $e');
       return null;
     }
   }
+
+  late final PaymentMethodStore _paymentMethodStore;
 
   TextEditingController nameController = TextEditingController();
   TextEditingController mobileController = TextEditingController();
@@ -497,7 +677,6 @@ class _TakeawayState extends State<Takeaway> {
     );
 
     await orderStore.addOrder(neworder);
-    print("✅ New active order saved with GST: ${gstDetails['totalGstAmount']}");
 
     if (widget.isDineIn && widget.selectedTableNo != null) {
       await tableStore.updateTableStatus(
@@ -510,9 +689,6 @@ class _TakeawayState extends State<Takeaway> {
     }
 
     await clearCart();
-    print('===================This is New Order==============');
-    print(neworder);
-    print('===================This is past Order==============');
     // print(pastOrder);
     if (mounted) {
       Navigator.of(context).pop();
@@ -529,6 +705,18 @@ class _TakeawayState extends State<Takeaway> {
 
   // NEW ORDER // This is the corrected and reliable version of your function
   Future<void> _placeOrder(CartCalculationService calculations) async {
+    // Block if no active day session — orders placed without a session are excluded from EOD
+    final bool sessionOpen = await DayManagementService.isSessionOpen();
+    if (!sessionOpen) {
+      if (mounted) {
+        Navigator.pop(context);
+        NotificationService.instance.showError(
+          'No active session. Please start the day from the End Day menu first.',
+        );
+      }
+      return;
+    }
+
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
     // Validate mobile number if entered
@@ -568,7 +756,6 @@ class _TakeawayState extends State<Takeaway> {
     );
 
     if (customer != null) {
-      print('✅ Customer linked to order: ${customer.name} (${customer.customerId})');
     }
 
     final int newKotNumber = await orderStore.getNextKotNumber();
@@ -617,11 +804,6 @@ class _TakeawayState extends State<Takeaway> {
     // NOTE: Customer stats (visits + points) are updated only at settlement, not here.
     // Adding points on order placement would double-count when the order is later settled.
 
-    print("✅ New active order saved with Total: ${neworder.totalPrice}");
-    print("✅ Order ID: ${neworder.id}");
-    print("✅ Table No: ${neworder.tableNo}");
-    print("✅ Order Status: ${neworder.status}");
-    print("✅ Total orders in store: ${orderStore.orders.length}");
 
     // Auto-print KOT directly to printer (only if Generate KOT setting is enabled)
     if (mounted && AppSettings.generateKOT) {
@@ -632,24 +814,18 @@ class _TakeawayState extends State<Takeaway> {
           kotNumber: newKotNumber,
           autoPrint: true, // Direct print without preview
         );
-        print("✅ KOT printed successfully");
       } catch (e) {
-        print("⚠️ KOT print failed: $e");
         // Don't block order placement if print fails
       }
     } else if (!AppSettings.generateKOT) {
-      print("ℹ️ KOT printing skipped - Generate KOT setting is disabled");
     }
 
     // Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
-    print("✅ Stock deducted for order items");
-    print("✅ Selected Table id is ${widget.selectedTableNo.toString()}");
 
     // print("")
     if (widget.isDineIn && widget.selectedTableNo != null) {
       // Also use the correct total here
-      print('🔄 Updating table ${widget.selectedTableNo} status to Running');
       await tableStore.updateTableStatus(
         widget.selectedTableNo!,
         'Running',
@@ -657,7 +833,6 @@ class _TakeawayState extends State<Takeaway> {
         orderId: neworder.id,
         orderTime: neworder.timeStamp,
       );
-      print('✅ Table ${widget.selectedTableNo} status updated');
     }
 
     await clearCart();
@@ -692,170 +867,234 @@ class _TakeawayState extends State<Takeaway> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+    _paymentMethodStore = locator<PaymentMethodStore>();
+    if (_paymentMethodStore.paymentMethods.isEmpty) {
+      _paymentMethodStore.init();
+    }
+    if (widget.isexisting && widget.existingModel != null) {
+      final m = widget.existingModel!;
+      nameController.text   = m.customerName   ?? '';
+      mobileController.text = m.customerNumber ?? '';
+      emailController.text  = m.customerEmail  ?? '';
+      remarkController.text = m.remark         ?? '';
+      // Restore the linked customer so _getOrCreateCustomer skips search/create
+      if (m.customerId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final customer = await restaurantCustomerStore.getCustomerById(m.customerId!);
+          if (mounted && customer != null) {
+            setState(() => selectedCustomer = customer);
+          }
+        });
+      }
+    }
   }
   Future<void> _updateExistingOrder(CartCalculationService calculations) async {
-    final plainItems  = widget.cartItems.map((w)=> w.item).toList();
+    if (!widget.isexisting || widget.existingModel == null) return;
+    final existingModel = widget.existingModel!;
 
-    // Use a direct boolean check.
-    if (widget.isexisting && widget.existingModel != null) {
-      final existingModel = widget.existingModel!;
+    final List<CartItem> currentActiveItems = widget.cartItems.where((w) => w.isActive).map((w) => w.item).toList();
+    final List<CartItem> newlyAddedItems    = widget.cartItems.where((w) => !w.isActive).map((w) => w.item).toList();
+    final List<CartItem> allCurrentItems    = [...currentActiveItems, ...newlyAddedItems];
 
-      // Check if new items have been added
-      final int previousItemCount = existingModel.itemCountAtLastKot ?? existingModel.items.length;
-      final int newItemCount = plainItems.length;
-      final bool hasNewItems = newItemCount > previousItemCount;
+    if (allCurrentItems.isEmpty) {
+      NotificationService.instance.showError('Cannot place order: cart is empty');
+      return;
+    }
 
-      // Generate new KOT if items were added
-      int? newKotNumber;
-      List<int> updatedKotNumbers = List<int>.from(existingModel.getKotNumbers());
-      List<int> updatedKotBoundaries = List<int>.from(existingModel.kotBoundaries);
+    // Snapshot of original state (passed from cart.dart)
+    final List<CartItem> originalItems = widget.originalActiveItems ?? existingModel.items;
+    final Map<String, int> origQtyMap  = widget.originalQuantities  ?? {for (final i in originalItems) i.id: i.quantity};
 
-      // Track KOT statuses
-      Map<int, String> updatedKotStatuses = Map<int, String>.from(existingModel.kotStatuses ?? {});
-
-      if (hasNewItems) {
-        // Generate a new KOT for the newly added items
-        newKotNumber = await orderStore.getNextKotNumber();
-        updatedKotNumbers.add(newKotNumber);
-        updatedKotBoundaries.add(newItemCount); // Add boundary at new item count
-
-        // Set new KOT status to 'Processing' (not inheriting parent order status)
-        updatedKotStatuses[newKotNumber] = 'Processing';
-
-        print('====== NEW KOT GENERATED ======');
-        print('Previous item count: $previousItemCount');
-        print('New item count: $newItemCount');
-        print('New KOT Number: $newKotNumber');
-        print('All KOT Numbers: $updatedKotNumbers');
-        print('KOT Boundaries: $updatedKotBoundaries');
-        print('KOT Statuses: $updatedKotStatuses');
+    int getKotNumberForItem(String itemId) {
+      final int idx = originalItems.indexWhere((orig) => orig.id == itemId);
+      if (idx == -1) return 0;
+      final boundaries = existingModel.kotBoundaries;
+      final kotNums = existingModel.getKotNumbers();
+      for (int i = 0; i < boundaries.length; i++) {
+        if (idx < boundaries[i]) {
+          return i < kotNums.length ? kotNums[i] : 0;
+        }
       }
+      return 0;
+    }
 
-      // Get current session ID
-      final currentSessionId = await DayManagementService.getCurrentSessionId();
+    // Items removed entirely from the active list
+    final List<CartItem> removedItems = originalItems
+        .where((orig) => !currentActiveItems.any((curr) => curr.id == orig.id))
+        .map((orig) => orig.copyWith(instruction: 'Cancelled from KOT #${getKotNumberForItem(orig.id)}'))
+        .toList();
 
-      final updateOrder = existingModel.copyWith(
-        // The `widget.cartItems` now correctly contains the merged list
-        items: plainItems,
-        totalPrice: calculations.grandTotal,
-        // Update financial summary so receipts reflect new items
-        subTotal: AppSettings.isTaxInclusive
-            ? calculations.subtotal - calculations.totalGST
-            : calculations.subtotal,
-        gstAmount: calculations.totalGST,
-        // You can also update customer details if they were edited
-        customerName: nameController.text.isNotEmpty ? nameController.text : existingModel.customerName,
-        customerNumber: mobileController.text.isNotEmpty ? mobileController.text : existingModel.customerNumber,
-        // Use the current tableNo (which might have been changed) instead of the old one
-        tableNo: widget.selectedTableNo ?? existingModel.tableNo,
-        // Update KOT tracking fields
-        kotNumbers: updatedKotNumbers,
-        itemCountAtLastKot: newItemCount,
-        kotBoundaries: updatedKotBoundaries, // Update KOT boundaries
-        kotStatuses: updatedKotStatuses, // Update KOT statuses
-        sessionId: currentSessionId ?? existingModel.sessionId, // Preserve or update session
+    // Items still present but with changed quantity → inventory delta items
+    final List<CartItem> stockToDeduct  = [];
+    final List<CartItem> stockToRestore = [];
+    for (final curr in currentActiveItems) {
+      final origQty = origQtyMap[curr.id];
+      if (origQty == null) continue;
+      final delta = curr.quantity - origQty;
+      if (delta > 0) {
+        stockToDeduct.add(CartItem(
+          id: curr.id, title: curr.title, price: curr.price,
+          productId: curr.productId, quantity: delta,
+          variantName: curr.variantName, weightDisplay: curr.weightDisplay,
+          discount: curr.discount,
+        ));
+      } else if (delta < 0) {
+        stockToRestore.add(CartItem(
+          id: curr.id, title: curr.title, price: curr.price,
+          productId: curr.productId, quantity: -delta,
+          variantName: curr.variantName, weightDisplay: curr.weightDisplay,
+          discount: curr.discount,
+          instruction: 'Reduced from KOT #${getKotNumberForItem(curr.id)}',
+        ));
+      }
+    }
+
+    final bool hasNewItems  = newlyAddedItems.isNotEmpty;
+    final bool hasCorrection = removedItems.isNotEmpty || stockToRestore.isNotEmpty;
+
+    // Items to include in correction KOT (removed + reduced)
+    final List<CartItem> correctionItems = [
+      ...removedItems,
+      ...stockToRestore,
+    ];
+
+    // Build KOT structure from staged local state
+    List<int> updatedKotNumbers    = List<int>.from(widget.currentKotNumbers ?? existingModel.getKotNumbers());
+    List<int> updatedKotBoundaries = List<int>.from(widget.currentKotBoundaries ?? existingModel.kotBoundaries);
+    Map<int, String> updatedKotStatuses = Map<int, String>.from(existingModel.kotStatuses ?? {});
+
+    int? newAddedKotNumber;
+    if (hasNewItems) {
+      newAddedKotNumber = await orderStore.getNextKotNumber();
+      updatedKotNumbers.add(newAddedKotNumber);
+      updatedKotBoundaries.add(currentActiveItems.length + newlyAddedItems.length);
+      updatedKotStatuses[newAddedKotNumber] = 'Processing';
+    }
+
+    final currentSessionId = await DayManagementService.getCurrentSessionId();
+
+    final updateOrder = existingModel.copyWith(
+      items: allCurrentItems,
+      totalPrice: calculations.grandTotal,
+      subTotal: AppSettings.isTaxInclusive
+          ? calculations.subtotal - calculations.totalGST
+          : calculations.subtotal,
+      gstAmount: calculations.totalGST,
+      customerName: nameController.text.isNotEmpty ? nameController.text : existingModel.customerName,
+      customerNumber: mobileController.text.isNotEmpty ? mobileController.text : existingModel.customerNumber,
+      tableNo: widget.selectedTableNo ?? existingModel.tableNo,
+      kotNumbers: updatedKotNumbers,
+      itemCountAtLastKot: allCurrentItems.length,
+      kotBoundaries: updatedKotBoundaries,
+      kotStatuses: updatedKotStatuses,
+      sessionId: currentSessionId ?? existingModel.sessionId,
+    );
+
+    await orderStore.updateOrder(updateOrder);
+
+    // Apply all inventory changes at commit time
+    for (final item in removedItems) await InventoryService.restoreStockForOrder([item]);
+    if (stockToRestore.isNotEmpty) await InventoryService.restoreStockForOrder(stockToRestore);
+    if (stockToDeduct.isNotEmpty)  await InventoryService.deductStockForOrder(stockToDeduct);
+    if (hasNewItems) await InventoryService.deductStockForOrder(newlyAddedItems);
+
+    // WebSocket: new items KOT
+    if (hasNewItems && newAddedKotNumber != null) {
+      try {
+        final kotStatusesJson = updatedKotStatuses.map((k, v) => MapEntry(k.toString(), v));
+        ws.broadcastEvent({
+          'type': 'NEW_ITEMS_ADDED',
+          'orderId': updateOrder.id,
+          'status': updateOrder.status,
+          'tableNo': updateOrder.tableNo,
+          'kotNumber': newAddedKotNumber,
+          'newItemCount': newlyAddedItems.length,
+          'allKotNumbers': updatedKotNumbers,
+          'kotBoundaries': updatedKotBoundaries,
+          'kotStatuses': kotStatusesJson,
+        });
+      } catch (e) {}
+    }
+
+    // WebSocket: correction (removals / quantity reductions)
+    if (hasCorrection) {
+      try {
+        ws.broadcastEvent({
+          'type': 'ORDER_MODIFIED',
+          'orderId': updateOrder.id,
+          'tableNo': updateOrder.tableNo,
+          'removedItems': removedItems.map((i) => {'id': i.id, 'title': i.title, 'quantity': i.quantity}).toList(),
+          'reducedItems': stockToRestore.map((i) => {'id': i.id, 'title': i.title, 'reducedBy': i.quantity}).toList(),
+        });
+      } catch (e) {}
+    }
+
+    // Print new-items KOT
+    if (hasNewItems && newAddedKotNumber != null && mounted && AppSettings.generateKOT) {
+      try {
+        await RestaurantPrintHelper.printKOT(
+          context: context,
+          order: updateOrder,
+          kotNumber: newAddedKotNumber,
+          autoPrint: true,
+        );
+      } catch (e) {}
+    }
+
+    // Print correction KOT for removed / reduced items
+    if (correctionItems.isNotEmpty && mounted && AppSettings.generateKOT) {
+      try {
+        final correctionKotNumber = await orderStore.getNextKotNumber();
+        final correctionOrder = existingModel.copyWith(
+          items: correctionItems,
+          kotNumbers: [correctionKotNumber],
+          kotBoundaries: [correctionItems.length],
+          kotStatuses: {correctionKotNumber: 'CANCEL'},
+        );
+
+        final uniqueKots = correctionItems.map((i) {
+           final match = RegExp(r'#(\d+)').firstMatch(i.instruction ?? '');
+           return match != null ? match.group(1) : null;
+        }).where((e) => e != null).toSet().toList();
+        final cancelRef = uniqueKots.isNotEmpty ? 'KOT #${uniqueKots.join(', ')}' : null;
+
+        await RestaurantPrintHelper.printKOT(
+          context: context,
+          order: correctionOrder,
+          kotNumber: correctionKotNumber,
+          autoPrint: true,
+          cancelReference: cancelRef,
+        );
+      } catch (e) {}
+    }
+
+    // Update table total
+    if (updateOrder.tableNo != null) {
+      await tableStore.updateTableStatus(
+        updateOrder.tableNo!,
+        updateOrder.status,
+        total: calculations.grandTotal,
+        orderId: updateOrder.id,
+        orderTime: updateOrder.timeStamp,
+      );
+    }
+
+    await clearCart();
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => Startorder()),
+        (Route<dynamic> route) => false,
       );
 
-      print('🔍 UPDATE ORDER DEBUG:');
-      print('   Order ID: ${updateOrder.id}');
-      print('   Table No: ${updateOrder.tableNo}');
-      print('   Status: ${updateOrder.status}');
-      print('   Total: ${updateOrder.totalPrice}');
-      print('   Items count: ${updateOrder.items.length}');
+      final msgParts = <String>[];
+      if (hasNewItems && newAddedKotNumber != null) msgParts.add('New KOT #$newAddedKotNumber');
+      if (hasCorrection) msgParts.add('Correction KOT printed');
 
-      await orderStore.updateOrder(updateOrder);
-
-      // Deduct stock for newly added items only
-      if (hasNewItems) {
-        // Extract only the newly added items (items after the previous count)
-        final newlyAddedItems = plainItems.skip(previousItemCount).toList();
-        await InventoryService.deductStockForOrder(newlyAddedItems);
-        print("✅ Stock deducted for ${newlyAddedItems.length} newly added items");
-      }
-
-      // Broadcast update to KDS via WebSocket
-      if (hasNewItems && newKotNumber != null) {
-        try {
-          // Convert integer keys to strings for JSON encoding
-          final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
-
-          ws.broadcastEvent({
-            'type': 'NEW_ITEMS_ADDED',
-            'orderId': updateOrder.id,
-            'status': updateOrder.status,
-            'tableNo': updateOrder.tableNo,
-            'kotNumber': newKotNumber,
-            'newItemCount': newItemCount - previousItemCount,
-            'allKotNumbers': updatedKotNumbers,
-            'kotBoundaries': updatedKotBoundaries,
-            'kotStatuses': kotStatusesJson,
-          });
-          print('📡 WebSocket event broadcast: NEW_ITEMS_ADDED to KDS');
-        } catch (e) {
-          print('⚠️ Failed to broadcast WebSocket event: $e');
-        }
-      }
-
-      // Auto-print KOT for new items directly to printer (only if Generate KOT setting is enabled)
-      if (hasNewItems && newKotNumber != null && mounted && AppSettings.generateKOT) {
-        try {
-          await RestaurantPrintHelper.printKOT(
-            context: context,
-            order: updateOrder,
-            kotNumber: newKotNumber,
-            autoPrint: true, // Direct print without preview
-          );
-          print("✅ KOT #$newKotNumber printed successfully");
-        } catch (e) {
-          print("⚠️ KOT print failed: $e");
-          // Don't block order update if print fails
-        }
-      } else if (hasNewItems && !AppSettings.generateKOT) {
-        print("ℹ️ KOT printing skipped - Generate KOT setting is disabled");
-      }
-
-      // Update the table's total price as well
-      if (updateOrder.tableNo != null) {
-        print('🔄 UPDATE ORDER: Updating table ${updateOrder.tableNo} status to ${updateOrder.status}');
-        print('🔄 UPDATE ORDER: Total = ${calculations.grandTotal}');
-        await tableStore.updateTableStatus(
-          updateOrder.tableNo!,
-          updateOrder.status,
-          total: calculations.grandTotal,
-          orderId: updateOrder.id,
-          orderTime: updateOrder.timeStamp,
-        );
-        print('✅ UPDATE ORDER: Table ${updateOrder.tableNo} status updated');
-      } else {
-        print('⚠️ UPDATE ORDER: No table number found, skipping table status update');
-      }
-
-      // Clear the cart after successfully updating the order
-      await clearCart();
-
-      if (mounted) {
-        // Navigate back to Startorder to reset the UI completely
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => Startorder()),
-          (Route<dynamic> route) => false,
-        );
-
-        if (hasNewItems) {
-          NotificationService.instance.showSuccess(
-            'Order Updated - New KOT #$newKotNumber Generated',
-          );
-        } else {
-          NotificationService.instance.showSuccess(
-            'Order Updated Successfully',
-          );
-        }
-
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //     SnackBar(content: Text('Order Updated Successfully'))
-        // );
-      }
+      NotificationService.instance.showSuccess(
+        msgParts.isNotEmpty ? 'Order Updated — ${msgParts.join(' • ')}' : 'Order Updated',
+      );
     }
   }
   @override
@@ -1056,7 +1295,7 @@ class _TakeawayState extends State<Takeaway> {
               }),
             ),
             SizedBox(width: 8),
-            Expanded(child: _buildActionButton('Quick Settle', () => _qucikSettleNewOrder(calculations))),
+            Expanded(child: _buildActionButton('Quick Settle', () => _showQuickSettleSheet(calculations))),
           ],
         ),
         SizedBox(height: 8),
@@ -1259,7 +1498,6 @@ class _TakeawayState extends State<Takeaway> {
 
 /*
   Future<void> completeOrder(OrderModel activeModel) async {
-    print("--- Starting to complete order KOT #${activeModel.kotNumber} ---");
 
     // ✅ 1. Calculate the GST from the items
     // final gstDetails = _calculateGst(activeModel.items);
@@ -1284,21 +1522,16 @@ class _TakeawayState extends State<Takeaway> {
     // 3. IMPORTANT: Now, delete the original order from the ACTIVE orders box
     await clearCart();
     // await HiveOrders.deleteOrder(activeModel.id);
-    print("🗑️ Active order has been deleted.");
-    print("--- Order completion process finished. ---");
     // await HiveOrders.deleteOrder(c);
 
-    print('Order ${activeModel.id} moved to past');
   }
 */
 
   // Replace your completeOrder function with this simplified version
   Future<void> completeOrder(OrderModel activeModel) async {
-    print("--- Completing order KOT #${activeModel.kotNumber} ---");
 
     // Generate daily bill number for completed order
     final int billNumber = await orderStore.getNextBillNumber();
-    print('✅ Bill number generated: $billNumber');
 
     // Directly convert the active order to a past order.
     // All calculations (GST, subtotal) were already done and saved on the activeModel.
@@ -1321,11 +1554,9 @@ class _TakeawayState extends State<Takeaway> {
     );
 
     await pastOrderStore.addOrder(pastOrder);
-    print("✅ Order saved to past orders history with Bill #$billNumber");
 
     // This is the critical missing step: delete the order from the ACTIVE list.
     await orderStore.deleteOrder(activeModel.id);
-    print("🗑️ Active order has been deleted.");
   }
 
 /*
@@ -1372,8 +1603,153 @@ class _TakeawayState extends State<Takeaway> {
 
 */
 
+  void _showQuickSettleSheet(CartCalculationService calculations) {
+    final methods = _paymentMethodStore.enabledMethods;
+    String selected = methods.isNotEmpty ? methods.first.name : 'Cash';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            child: Container(
+              width: 420,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                        child: Icon(Icons.flash_on_rounded, size: 18, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text('Quick Settle', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700))),
+                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close, size: 18, color: Colors.grey), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Total amount card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Amount to Collect', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade600)),
+                        Text(
+                          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
+                          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Payment method label
+                  Text('Select Payment Method', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                  const SizedBox(height: 10),
+
+                  // Payment chips
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: methods.map((m) {
+                      final isSelected = selected == m.name;
+                      return GestureDetector(
+                        onTap: () => setDialog(() => selected = m.name),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.shade300, width: 1.5),
+                            boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 6, offset: const Offset(0, 2))] : [],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(_paymentIcon(m.name), size: 16, color: isSelected ? Colors.white : Colors.grey.shade500),
+                              const SizedBox(width: 6),
+                              Text(m.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : Colors.grey.shade700)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Actions
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            side: BorderSide(color: Colors.grey.shade300),
+                            foregroundColor: Colors.grey.shade700,
+                          ),
+                          child: Text('Cancel', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _qucikSettleNewOrder(calculations, selected);
+                          },
+                          icon: const Icon(Icons.check_circle_outline, size: 16),
+                          label: Text('Settle Now', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  IconData _paymentIcon(String method) {
+    final lower = method.toLowerCase();
+    if (lower.contains('cash')) return Icons.payments_outlined;
+    if (lower.contains('card') || lower.contains('credit') || lower.contains('debit')) return Icons.credit_card_outlined;
+    if (lower.contains('upi') || lower.contains('qr')) return Icons.qr_code_outlined;
+    if (lower.contains('wallet')) return Icons.account_balance_wallet_outlined;
+    if (lower.contains('bank') || lower.contains('transfer') || lower.contains('neft')) return Icons.account_balance_outlined;
+    return Icons.payment_outlined;
+  }
+
 // Replace your entire _qucikSettleNewOrder function with this one.
-  Future<void> _qucikSettleNewOrder(CartCalculationService calculations) async {
+  Future<void> _qucikSettleNewOrder(CartCalculationService calculations, String paymentMethod) async {
     // Get the plain cart items
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
@@ -1402,7 +1778,6 @@ class _TakeawayState extends State<Takeaway> {
 
     // Generate daily bill number for quick settle
     final int billNumber = await orderStore.getNextBillNumber();
-    print('✅ Bill number generated for quick settle: $billNumber');
 
     // Get current session ID
     final currentSessionId = await DayManagementService.getCurrentSessionId();
@@ -1414,7 +1789,7 @@ class _TakeawayState extends State<Takeaway> {
       items: plainItems,
       orderAt: DateTime.now(),
       orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
-      paymentmode: 'Cash', // Default for quick settle
+      paymentmode: paymentMethod,
 
       // ✅ Use the CORRECT values from the calculation service
       subTotal: AppSettings.isTaxInclusive
@@ -1438,7 +1813,6 @@ class _TakeawayState extends State<Takeaway> {
 
     // 2. Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
-    print("✅ Stock deducted for quick settle order");
 
     // 3. Free the table for Dine In quick settle
     final String? tableForQuickSettle = widget.isDineIn
@@ -1446,7 +1820,6 @@ class _TakeawayState extends State<Takeaway> {
         : null;
     if (tableForQuickSettle != null && tableForQuickSettle.isNotEmpty) {
       await tableStore.updateTableStatus(tableForQuickSettle, 'Available');
-      print("✅ Table $tableForQuickSettle freed after quick settle");
     }
 
     // 4. Clear the user's cart

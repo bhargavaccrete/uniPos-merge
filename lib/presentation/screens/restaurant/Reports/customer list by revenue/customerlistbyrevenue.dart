@@ -220,8 +220,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     if (_isLoading) {
       return Center(
@@ -342,7 +341,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
   }
 
   Widget _buildRefreshButton(BuildContext context, bool isTablet) {
-    final isDesktop = MediaQuery.of(context).size.width > 1200;
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return SizedBox(
       width: double.infinity,
@@ -367,7 +366,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
   }
 
   Widget _buildExportButton(BuildContext context, bool isTablet) {
-    final isDesktop = MediaQuery.of(context).size.width > 1200;
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return SizedBox(
       width: double.infinity,

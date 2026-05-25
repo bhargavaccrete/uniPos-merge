@@ -121,48 +121,57 @@ class _VoidOrderReportState extends State<VoidOrderReport> {
           // Period Selection Buttons
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(
-              AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
+            color: AppColors.white,
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
+              vertical: 12,
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildPeriodButton(
-                    context,
-                    'Today',
-                    Icons.today,
-                    VoidOrderPeriod.Today,
-                  ),
-                  SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                  _buildPeriodButton(
-                    context,
-                    'This Week',
-                    Icons.date_range,
-                    VoidOrderPeriod.ThisWeek,
-                  ),
-                  SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                  _buildPeriodButton(
-                    context,
-                    'Month',
-                    Icons.calendar_month,
-                    VoidOrderPeriod.Month,
-                  ),
-                  SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                  _buildPeriodButton(
-                    context,
-                    'Year',
-                    Icons.calendar_today,
-                    VoidOrderPeriod.Year,
-                  ),
-                  SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                  _buildPeriodButton(
-                    context,
-                    'Custom',
-                    Icons.tune,
-                    VoidOrderPeriod.Custom,
-                  ),
-                ],
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: MediaQuery.of(context).size.width -
+                      AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildPeriodButton(
+                      context,
+                      'Today',
+                      Icons.today,
+                      VoidOrderPeriod.Today,
+                    ),
+                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
+                    _buildPeriodButton(
+                      context,
+                      'This Week',
+                      Icons.date_range,
+                      VoidOrderPeriod.ThisWeek,
+                    ),
+                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
+                    _buildPeriodButton(
+                      context,
+                      'Month',
+                      Icons.calendar_month,
+                      VoidOrderPeriod.Month,
+                    ),
+                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
+                    _buildPeriodButton(
+                      context,
+                      'Year',
+                      Icons.calendar_today,
+                      VoidOrderPeriod.Year,
+                    ),
+                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
+                    _buildPeriodButton(
+                      context,
+                      'Custom',
+                      Icons.tune,
+                      VoidOrderPeriod.Custom,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -49,7 +49,6 @@ class HiveExtra {
       }
       return false;
     } catch (e) {
-      print("Error adding topping: $e");
       return false;
     }
   }
@@ -74,7 +73,6 @@ class HiveExtra {
       }
       return false;
     } catch (e) {
-      print("Error removing topping: $e");
       return false;
     }
   }
@@ -99,7 +97,6 @@ class HiveExtra {
       }
       return false;
     } catch (e) {
-      print("Error updating topping: $e");
       return false;
     }
   }

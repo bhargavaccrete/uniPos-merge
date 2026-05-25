@@ -5,6 +5,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
@@ -28,6 +29,7 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
     super.initState();
     itemStore.loadItems();
     categoryStore.loadCategories();
+    variantStore.loadVariants();
     _searchController.addListener(() {
       setState(() => _query = _searchController.text.trim().toLowerCase());
     });
@@ -268,7 +270,7 @@ class _ItemCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('₹${item.price?.toStringAsFixed(2) ?? '—'}',
+                    Text('${CurrencyHelper.currentSymbol}${item.price?.toStringAsFixed(2) ?? '—'}',
                         style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -373,8 +375,12 @@ class _ItemCard extends StatelessWidget {
         spacing: 6,
         runSpacing: 4,
         children: variants.map((v) {
-          final name = (v as ItemVariante).variantId;
-          final price = '₹${v.price.toStringAsFixed(2)}';
+          final iv = v as ItemVariante;
+          final variantModel = variantStore.variants
+              .where((vm) => vm.id == iv.variantId)
+              .firstOrNull;
+          final name = variantModel?.name ?? iv.variantId;
+          final price = '${CurrencyHelper.currentSymbol}${iv.price.toStringAsFixed(2)}';
           return Container(
             padding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

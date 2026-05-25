@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:hive/hive.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -15,11 +16,13 @@ import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
 import '../start order/startorder.dart';
 import 'package:unipos/domain/services/restaurant/data_clear_service.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/domain/services/restaurant/eod_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/restaurant/inventory_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/core/routes/routes_name.dart';
@@ -79,18 +82,14 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                 'Please restart the app completely (stop and relaunch).');
       }
 
-      print('✅ All boxes reported as open, attempting to access data...');
 
       final today = DateTime.now();
 
-      print('🔍 Today date: $today');
 
       // Check for current session
       final currentSession = await DayManagementService.getCurrentSession();
-      print('🔍 Current session: ${currentSession?.sessionId}, isClosed: ${currentSession?.isClosed}');
 
       if (currentSession == null || currentSession.isClosed) {
-        print('ℹ️ No active session - showing empty state');
         setState(() {
           _hasActiveSession = false;
           _currentReport = null;
@@ -106,23 +105,17 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       selectedDate = currentSession.startTime;
       final sessionId = currentSession.sessionId;
 
-      print('📦 Fetching past orders for session $sessionId...');
       await pastOrderStore.loadPastOrders();
       final pastOrders = pastOrderStore.pastOrders.toList();
-      print('✅ Got ${pastOrders.length} past orders in total');
 
-      print('📊 Getting opening balance for session...');
       final currentOpeningBalance = currentSession.openingCash;
-      print('✅ Opening balance: $currentOpeningBalance');
 
-      print('📋 Generating EOD report for session...');
       final report = await EODService.generateEODReport(
         date: selectedDate,
         openingBalance: currentOpeningBalance,
         actualCash: 0.0,
         sessionId: sessionId,
       );
-      print('✅ EOD report generated');
 
       final expectedCashAmount = report.paymentSummaries
           .where((p) => p.paymentType.toLowerCase().trim() == 'cash')
@@ -165,6 +158,14 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
   }
 
+  /// Returns true if an order is unsettled and blocks EOD.
+  bool _isUnsettledOrder(dynamic o) {
+    final status = o.status.toLowerCase();
+    if (status == 'voided' || status == 'cancelled' || status == 'completed') return false;
+    if (o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid') return false;
+    return true;
+  }
+
   Future<void> _completeEndOfDay() async {
     if (_actualCashController.text.isEmpty) {
       _showError('Please enter actual cash amount');
@@ -173,19 +174,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
     await orderStore.loadOrders();
 
-    print('🔍 DEBUG: Checking for active orders before End Day...');
-    print('   Total Orders in Active Store: ${orderStore.orders.length}');
-
-    final activeOrders = orderStore.orders.where((o) {
-      final status = o.status.toLowerCase();
-      final isVoided = status == 'voided' || status == 'cancelled';
-      final isPaid = o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid';
-      if (isVoided) return false;
-      if (isPaid) return false;
-      return true;
-    }).toList();
-
-    print('   Detected Active Orders: ${activeOrders.length}');
+    final activeOrders = orderStore.orders.where(_isUnsettledOrder).toList();
 
     if (activeOrders.isNotEmpty) {
       final isPendingEOD = await DayManagementService.hasPendingEOD();
@@ -194,12 +183,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         await _showPendingEODOrdersDialog(activeOrders);
         // Re-check after voiding (user may have voided all)
         await orderStore.loadOrders();
-        final stillActive = orderStore.orders.where((o) {
-          final status = o.status.toLowerCase();
-          return status != 'voided' && status != 'cancelled' &&
-              o.isPaid != true && o.paymentStatus?.toLowerCase() != 'paid';
-        }).toList();
-        if (stillActive.isNotEmpty) return; // Still has active orders, can't proceed
+        final stillActive = orderStore.orders.where(_isUnsettledOrder).toList();
+        if (stillActive.isNotEmpty) return;
       } else {
         // Same day — user can navigate to orders freely
         await _showActiveOrdersError(activeOrders.length);
@@ -216,9 +201,13 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       final openAttendance = attendanceBox.values.where((r) => r.isOpen).toList();
       
       if (openAttendance.isNotEmpty) {
+        final hInset = !AppResponsive.isMobile(context)
+            ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+            : 24.0;
         final confirmedAttendance = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
+            insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             title: Text('Staff Still Clocked In', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             content: Text('${openAttendance.length} staff member(s) are still clocked in. Do you want to automatically clock them out now?'),
@@ -267,19 +256,24 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         actualCash: actualCashAmount,
       );
 
+      // Save report first — if this throws, session stays open and user can retry
       await EODService.saveEODReport(report);
-      // await DataClearService.clearAllTransactionalData(); // ❌ REMOVED: Keep orders permanent
 
-      await shiftStore.loadShifts();
-      final openShifts = shiftStore.shifts.where((s) => s.isOpen).toList();
-      for (final s in openShifts) {
-        await shiftStore.closeShift(s.id);
+      // Report is committed. Now close session in a finally block so it ALWAYS
+      // runs — prevents stuck-open session on shift/snooze cleanup failure.
+      try {
+        await shiftStore.loadShifts();
+        final openShifts = shiftStore.shifts.where((s) => s.isOpen).toList();
+        for (final s in openShifts) {
+          await shiftStore.closeShift(s.id);
+        }
+        await RestaurantSession.clearShiftSession();
+        await DayManagementService.clearEODSnooze();
+      } catch (_) {
+        // Shift/snooze cleanup failure is non-critical — session closure must still proceed
+      } finally {
+        await DayManagementService.endSession(closingCash: actualCashAmount);
       }
-      await RestaurantSession.clearShiftSession();
-
-      // Finalize the session
-      await DayManagementService.clearEODSnooze();
-      await DayManagementService.endSession(closingCash: actualCashAmount);
 
       final expectedTotalCash =
           openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
@@ -653,12 +647,16 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   Future<void> _showPendingEODOrdersDialog(List<dynamic> activeOrders) async {
+    final pendingHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
         child: AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: pendingHInset, vertical: 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           title: Text('Previous Day - ${activeOrders.length} Pending Order(s)', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
           content: Column(
@@ -712,9 +710,22 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     orderStatus: 'VOID',
                     kotNumbers: order.kotNumbers,
                     kotBoundaries: order.kotBoundaries,
-                    sessionId: currentSessionId ?? order.sessionId, // Link to current or original session
+                    sessionId: currentSessionId ?? order.sessionId,
+                    voidedBy: 'EOD Auto-void by ${RestaurantSession.isAdmin ? 'Admin' : RestaurantSession.staffName ?? 'Staff'}',
                   );
                   await pastOrderStore.addOrder(voidRecord);
+
+                  // Only restore stock if kitchen hadn't started (Processing = ingredients not yet used)
+                  if (order.status == 'Processing') {
+                    final itemsToRestock = <CartItem, int>{};
+                    for (final item in order.items) {
+                      if (item.quantity > 0) itemsToRestock[item] = item.quantity;
+                    }
+                    if (itemsToRestock.isNotEmpty) {
+                      await InventoryService.restoreStockForRefund(itemsToRestock);
+                    }
+                  }
+
                   await orderStore.deleteOrder(order.id);
                   if (order.tableNo != null && order.tableNo!.isNotEmpty) {
                     await tableStore.updateTableStatus(order.tableNo!, 'Available');
@@ -751,19 +762,17 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   Future<void> _showActiveOrdersError(int count) async {
-    // Get active order details for display
-    final activeOrders = orderStore.orders.where((o) {
-      final status = o.status.toLowerCase();
-      final isVoided = status == 'voided' || status == 'cancelled';
-      final isPaid = o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid';
-      return !isVoided && !isPaid;
-    }).toList();
+    final activeOrders = orderStore.orders.where(_isUnsettledOrder).toList();
 
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
+        final activeHInset = !AppResponsive.isMobile(context)
+            ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+            : 24.0;
         return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: activeHInset, vertical: 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           title: Text('$count Active Order(s)', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
           content: Column(
@@ -791,10 +800,22 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             ],
           ),
           actions: [
-            // Same-day: just close dialog, user can navigate to orders
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('OK', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+              child: Text('Later', style: GoogleFonts.poppins(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pushNamed(context, RouteNames.restaurantActiveOrders);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text('Go to Orders', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             ),
           ],
         );
@@ -803,6 +824,17 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   Future<bool> _showConfirmationDialog() async {
+    // Compute cash variance
+    final actual = double.tryParse(_actualCashController.text) ?? 0.0;
+    final expectedTotal = openingBalance + expectedCash + _cashIn - _cashOut - cashExpenses;
+    final difference = actual - expectedTotal;
+    final hasVariance = difference.abs() > 50;
+
+    // Active dine-in orders still in kitchen (not yet served — soft warning only)
+    final paidNotServed = orderStore.orders
+        .where((o) => _isUnsettledOrder(o) && o.orderType?.toLowerCase().contains('dine') == true)
+        .length;
+
     return await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -866,6 +898,57 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     ],
                   ),
                 ),
+
+                // Cash variance warning
+                if (hasVariance) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, size: 18, color: Colors.red.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Cash variance of ${CurrencyHelper.currentSymbol}${difference.abs().toStringAsFixed(0)} detected (${difference > 0 ? 'excess' : 'short'})',
+                            style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade700, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Paid-not-served soft warning
+                if (paidNotServed > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.restaurant_rounded, size: 18, color: Colors.orange.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$paidNotServed paid order${paidNotServed > 1 ? 's' : ''} not yet marked Served',
+                            style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange.shade800, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 24),
 
                 // Buttons
@@ -1721,7 +1804,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
     final currency = CurrencyHelper.currentSymbol;
 
     if (_isLoading) {

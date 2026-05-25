@@ -45,35 +45,30 @@ class OrderSettings {
     enableTakeAwayNotifier.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_enableTakeAwayKey, value);
-    print('📋 Order Setting: Enable Take Away = $value');
   }
 
   static Future<void> setEnableDineIn(bool value) async {
     enableDineInNotifier.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_enableDineInKey, value);
-    print('📋 Order Setting: Enable Dine In = $value');
   }
 
   static Future<void> setEnableDelivery(bool value) async {
     enableDeliveryNotifier.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_enableDeliveryKey, value);
-    print('📋 Order Setting: Enable Delivery = $value');
   }
 
   static Future<void> setShowTakeAwayDialog(bool value) async {
     showTakeAwayDialogNotifier.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_showTakeAwayDialogKey, value);
-    print('📋 Order Setting: Show Take Away Dialog = $value');
   }
 
   static Future<void> setShowDineInDialog(bool value) async {
     showDineInDialogNotifier.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_showDineInDialogKey, value);
-    print('📋 Order Setting: Show Dine In Dialog = $value');
   }
 
   /// Load all settings from SharedPreferences
@@ -91,12 +86,6 @@ class OrderSettings {
     showDineInDialogNotifier.value =
         prefs.getBool(_showDineInDialogKey) ?? _defaultShowDineInDialog;
 
-    print('📋 Order Settings loaded:');
-    print('   Take Away: ${enableTakeAwayNotifier.value}');
-    print('   Dine In: ${enableDineInNotifier.value}');
-    print('   Delivery: ${enableDeliveryNotifier.value}');
-    print('   Take Away Dialog: ${showTakeAwayDialogNotifier.value}');
-    print('   Dine In Dialog: ${showDineInDialogNotifier.value}');
   }
 
   /// Reset to default settings
@@ -114,7 +103,6 @@ class OrderSettings {
     await prefs.setBool(_showTakeAwayDialogKey, _defaultShowTakeAwayDialog);
     await prefs.setBool(_showDineInDialogKey, _defaultShowDineInDialog);
 
-    print('📋 Order Settings reset to defaults');
   }
 
   /// Check if any order type is enabled

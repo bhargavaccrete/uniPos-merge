@@ -80,11 +80,29 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   bool _isPinVisible = false;
   bool _isSaving = false; // double-tap guard for Add button
   bool _isSavingAll = false; // guard for Save & Continue
+  bool _usernameManuallyEdited = false;
 
   // Inline error for first name
   String? _firstNameError;
 
   List<dynamic> _staffMembers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _firstNameController.addListener(_syncUsernameFromFirstName);
+  }
+
+  void _syncUsernameFromFirstName() {
+    if (_usernameManuallyEdited) return;
+    final generated = _firstNameController.text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    if (_usernameController.text != generated) {
+      _usernameController.value = _usernameController.value.copyWith(
+        text: generated,
+        selection: TextSelection.collapsed(offset: generated.length),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -225,6 +243,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
       }
 
       // Clear form
+      _usernameManuallyEdited = false;
       _firstNameController.clear();
       _lastNameController.clear();
       _emailController.clear();
@@ -301,11 +320,21 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
 
     final hPad = AppResponsive.getValue<double>(
         context, mobile: 20, tablet: 32, desktop: 40);
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final vPad = AppResponsive.getValue<double>(
+        context, mobile: 16, tablet: 20, desktop: 24);
+    final maxWidth = AppResponsive.getValue<double>(
+        context, mobile: double.infinity, tablet: 680, desktop: 760);
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
           // ── Header ──
           Row(
             children: [
@@ -471,6 +500,14 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         label: 'Username',
                         hint: 'Auto from first name',
                         icon: Icons.alternate_email_rounded,
+                        onChanged: (v) {
+                          if (v.trim().isEmpty) {
+                            setState(() => _usernameManuallyEdited = false);
+                            _syncUsernameFromFirstName();
+                          } else {
+                            _usernameManuallyEdited = true;
+                          }
+                        },
                         onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_pinFocus),
                       ),
                     ),
@@ -578,81 +615,136 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
             ...List.generate(_staffMembers.length, (i) => _buildStaffCard(i)),
           ],
 
-          const SizedBox(height: 32),
-
-          // ── Navigation ──
-          Observer(builder: (_) {
-            return Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: widget.onPrevious,
-                    icon: const Icon(Icons.arrow_back, size: 16),
-                    label: Text('Back',
-                        style: GoogleFonts.poppins(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
-                      side: const BorderSide(color: AppColors.divider),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    onPressed: (widget.store.isLoading || _isSavingAll)
-                        ? null
-                        : () async {
-                            setState(() => _isSavingAll = true);
-                            try {
-                              if (_staffMembers.isNotEmpty) {
-                                final ok = await _saveStaffToDatabase();
-                                if (!ok) return; // error shown, don't advance
-                              }
-                              widget.onNext();
-                            } finally {
-                              if (mounted) setState(() => _isSavingAll = false);
-                            }
-                          },
-                    icon: (widget.store.isLoading || _isSavingAll)
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.arrow_forward, size: 16, color: AppColors.white),
-                    label: Text(
-                      _isSavingAll
-                          ? 'Saving…'
-                          : _staffMembers.isEmpty
-                              ? 'Skip (Add Later)'
-                              : 'Save & Continue',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      disabledBackgroundColor:
-                          AppColors.primary.withValues(alpha: 0.5),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }),
-        ],
-      ),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, vPad),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
+            ),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: _buildNavSection(),
+            ),
+          ),
+        ),
+      ],
     );
+  }
+
+  Future<void> _handleNext() async {
+    // Check if the form is dirty (user entered data but didn't click Add)
+    if (_firstNameController.text.isNotEmpty ||
+        _lastNameController.text.isNotEmpty ||
+        _pinController.text.isNotEmpty) {
+      final shouldContinue = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Unsaved Staff Member'),
+          content: const Text(
+              'You have entered details for a staff member but haven\'t added them yet. Are you sure you want to continue without saving?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.warning,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Continue Without Saving'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldContinue != true) {
+        return; // User canceled
+      }
+    }
+
+    setState(() => _isSavingAll = true);
+    try {
+      if (_staffMembers.isNotEmpty) {
+        final ok = await _saveStaffToDatabase();
+        if (!ok) return;
+      }
+      widget.onNext();
+    } finally {
+      if (mounted) setState(() => _isSavingAll = false);
+    }
+  }
+
+  Widget _buildNavSection() {
+    return Observer(builder: (_) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: widget.onPrevious,
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: Text('Back',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: const BorderSide(color: AppColors.divider),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: (widget.store.isLoading || _isSavingAll)
+                  ? null
+                  : _handleNext,
+              icon: (widget.store.isLoading || _isSavingAll)
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.arrow_forward,
+                      size: 16, color: AppColors.white),
+              label: Text(
+                _isSavingAll
+                    ? 'Saving…'
+                    : _staffMembers.isEmpty
+                        ? 'Skip (Add Later)'
+                        : 'Save & Continue',
+                style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                disabledBackgroundColor:
+                    AppColors.primary.withValues(alpha: 0.5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      );
+    });
   }
 
   // ── Staff card ────────────────────────────────────────────────────────────

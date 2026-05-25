@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-
+import 'package:unipos/util/common/app_responsive.dart';
 import 'mulTextFelids&userinfoPopUp.dart';
 
 class Showdialog extends StatelessWidget {
@@ -14,9 +14,13 @@ class Showdialog extends StatelessWidget {
 
   const Showdialog({Key? key,this.child, this.title,this.content,this.ButtonText ,this.buttonColor,this.actions}) : super(key: key);
 
-  @override 
+  @override
   Widget build(BuildContext context) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
       title: Text(
         title??'',
 

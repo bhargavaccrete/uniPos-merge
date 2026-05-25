@@ -26,7 +26,6 @@ class ImagePickerService {
       }
       return null;
     } catch (e) {
-      print('Error picking image: $e');
       return null;
     }
   }
@@ -51,7 +50,6 @@ class ImagePickerService {
       }
       return null;
     } catch (e) {
-      print('Error taking photo: $e');
       return null;
     }
   }
@@ -73,7 +71,6 @@ class ImagePickerService {
         maxHeight: maxHeight,
       );
     } catch (e) {
-      print('Error in pickImageWithDialog: $e');
       return null;
     }
   }

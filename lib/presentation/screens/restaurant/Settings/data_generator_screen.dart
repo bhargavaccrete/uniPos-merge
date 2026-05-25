@@ -5,6 +5,7 @@ import 'package:unipos/presentation/widget/componets/common/app_text_field.dart'
 
 import '../../../../domain/services/restaurant/comprehensive_data_generator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class DataGeneratorScreen extends StatefulWidget {
   const DataGeneratorScreen({super.key});
@@ -94,9 +95,13 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   }
 
   Future<void> _clearAllData() async {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         title: const Text('Clear All Data?'),
         content: const Text(
           'This will permanently delete ALL test data from all Hive boxes. '
@@ -141,8 +146,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,

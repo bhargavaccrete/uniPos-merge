@@ -6,6 +6,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/restaurant/thermal_printer_service.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 /// Bluetooth Printer discovery and setup screen.
 ///
@@ -354,12 +355,16 @@ class _BluthoothhState extends State<Bluthooth> {
     int paperSize = 80;
     String role = 'both';
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         // StatefulBuilder lets us call setState inside the dialog
         // to update radio buttons without rebuilding the whole screen
         builder: (ctx, setDialogState) => AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
           title: Text('Save Printer', style: GoogleFonts.poppins()),
           content: SingleChildScrollView(
             child: Column(
@@ -483,9 +488,13 @@ class _BluthoothhState extends State<Bluthooth> {
 
   /// Delete with confirmation
   Future<void> _confirmDelete(String id, String name) async {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         title: Text('Delete Printer', style: GoogleFonts.poppins()),
         content: Text('Remove "$name" from saved printers?',
             style: GoogleFonts.poppins()),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
@@ -55,9 +56,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   Future<void> _addLoyaltyPoints() async {
     if (_isLoading) return;
     final pointsController = TextEditingController();
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Add Loyalty Points', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
         content: AppTextField(
@@ -104,9 +109,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
   Future<void> _deleteCustomer() async {
     if (_isLoading) return;
+    final dialogHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: dialogHInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${_customer.name ?? 'Customer'}"?', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
         content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
@@ -145,8 +154,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,

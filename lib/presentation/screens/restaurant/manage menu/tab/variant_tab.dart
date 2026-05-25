@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
@@ -54,45 +55,67 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
       editingVariante = null;
     }
 
-    showModalBottomSheet(
-      isScrollControlled: true,
-      context: context,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, _) => _buildBottomSheet(ctx),
-      ),
-    );
+    final isTablet = !AppResponsive.isMobile(context);
+    if (isTablet) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 40),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 480,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+            ),
+            child: _buildBottomSheet(ctx, isDialog: true),
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        isScrollControlled: true,
+        context: context,
+        backgroundColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, _) => _buildBottomSheet(ctx, isDialog: false),
+        ),
+      );
+    }
   }
 
-  Widget _buildBottomSheet(BuildContext ctx) {
+  Widget _buildBottomSheet(BuildContext ctx, {bool isDialog = false}) {
     final isEditing = editingVariante != null;
-    final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+    final bottomInset = isDialog ? 0.0 : MediaQuery.of(ctx).viewInsets.bottom;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: isDialog
+            ? BorderRadius.circular(20)
+            : const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + bottomInset),
+      padding: EdgeInsets.fromLTRB(20, isDialog ? 20 : 8, 20, 20 + bottomInset),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Drag handle ──────────────────────────────────────────────
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+          // ── Drag handle (sheet only) ─────────────────────────────────
+          if (!isDialog)
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
 
           // ── Header ───────────────────────────────────────────────────
           Row(
@@ -243,9 +266,15 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
 
   Future<void> _delete(String id) async {
     final variant = variantStore.variants.firstWhere((v) => v.id == id);
+    final isTablet = !AppResponsive.isMobile(context);
+    final hInset = isTablet
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2)
+            .clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${variant.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
         content: Text('This variant will be removed.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
@@ -261,18 +290,13 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
     }
   }
 
-  int _getGridColumns(double width) {
-    if (width > 1200) return 5;
-    else if (width > 900) return 4;
-    else return 3;
-  }
 
   @override
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -340,7 +364,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         return GridView.builder(
           padding: EdgeInsets.all(24),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _getGridColumns(size.width),
+            crossAxisCount: AppResponsive.gridColumns(context, mobile: 3, tablet: 4, desktop: 5),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             childAspectRatio: 4,
@@ -443,19 +467,20 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   }
 
   Widget _buildAddButton() {
+    final isTablet = !AppResponsive.isMobile(context);
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(isTablet ? 20 : 16),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () => openBottomSheet(),
-          icon: Icon(Icons.add, size: 20),
-          label: Text('Add Variant', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+          label: Text('Add Variant', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: 14),
+            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),

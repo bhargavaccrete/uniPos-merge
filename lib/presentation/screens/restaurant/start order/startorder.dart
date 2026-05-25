@@ -32,6 +32,7 @@ class _StartorderState extends State<Startorder>
   String? _tableIdForCurrentSession;
   late final int _tabCount = OrderSettings.enableDineIn ? 3 : 2;
   DateTime? _lastBackPress;
+  int _previousTabIndex = 0;
 
   @override
   void initState() {
@@ -46,9 +47,12 @@ class _StartorderState extends State<Startorder>
       tabController.index = 0; // Default to menu for a new order
     }
 
+    _previousTabIndex = tabController.index;
+
     // Listen to tab changes - refresh data when switching tabs
     tabController.addListener(() {
-      if (mounted) {
+      if (mounted && tabController.index != _previousTabIndex) {
+        _previousTabIndex = tabController.index;
         setState(() {});
         _refreshCurrentTab();
       }
@@ -61,7 +65,6 @@ class _StartorderState extends State<Startorder>
   }
 
   void _refreshCurrentTab() {
-    print('🔄 Refreshing tab ${tabController.index}');
     // Refresh menu/cart data when switching to menu tab
     if (tabController.index == 0) {
       categoryStore.loadCategories();
@@ -259,9 +262,7 @@ class _StartorderState extends State<Startorder>
 
   /// Builds the default TabBar view for starting new orders.
   Widget build(BuildContext context) {
-    print(widget.newOrderForTableId ?? 'no table id ');
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,

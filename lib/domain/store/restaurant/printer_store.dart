@@ -102,9 +102,6 @@ abstract class _PrinterStore with Store {
       defaultReceiptPrinter =
           await _repository.getDefaultPrinterForRole('receipt');
 
-      print('PrinterStore loaded: ${printers.length} printers, '
-          'KOT default=${defaultKotPrinter?.name ?? "none"}, '
-          'Receipt default=${defaultReceiptPrinter?.name ?? "none"}');
     } catch (e) {
       errorMessage = 'Failed to load printers: $e';
     }

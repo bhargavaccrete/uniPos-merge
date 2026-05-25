@@ -43,6 +43,7 @@ class PastOrderRepository {
   ) async {
     return _pastOrderBox.values
         .where((order) =>
+            order.orderAt != null &&
             order.orderAt!.isAfter(startDate) &&
             order.orderAt!.isBefore(endDate))
         .toList();

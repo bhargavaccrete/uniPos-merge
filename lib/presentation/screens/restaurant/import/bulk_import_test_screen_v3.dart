@@ -39,7 +39,12 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
           ),
         ),
       ),
-      body: Padding(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: AppResponsive.isMobile(context) ? double.infinity : 680,
+          ),
+          child: Padding(
         padding: AppResponsive.screenPadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -359,6 +364,8 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
             ],
           ],
         ),
+          ),
+        ),
       ),
     );
   }
@@ -508,11 +515,16 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
       );
 
       // Pick and parse file
-      setState(() => _statusMessage = 'Parsing Excel file...');
       final sheets = await serviceWithProgress.pickAndParseFile();
 
       if (sheets.isEmpty) {
-        throw Exception('No file selected or failed to parse');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _statusMessage = '';
+          });
+        }
+        return; // User canceled file picker or file was empty
       }
 
       // Import data
@@ -547,6 +559,10 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.isMobile(context) ? 24 : 160,
+          vertical: 24,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         ),

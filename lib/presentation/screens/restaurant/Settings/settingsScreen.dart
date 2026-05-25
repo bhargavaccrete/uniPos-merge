@@ -1,17 +1,21 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/util/color.dart';
 
 import '../../../../domain/services/common/auto_backup_service.dart';
+import '../../../../domain/services/common/device_id_service.dart';
 import '../../../../domain/services/common/backup_encryption_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../util/common/decimal_settings.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
+import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import '../../../../util/common/app_responsive.dart';
 
 class Settingsscreen extends StatefulWidget {
   const Settingsscreen({super.key});
@@ -23,9 +27,11 @@ class _settingsScreenState extends State<Settingsscreen> {
   bool _isDecimalExpanded = false;
   bool _isCurrencyExpanded = false;
   bool _isRefundWindowExpanded = false;
+  bool _isTimeoutExpanded = false;
 
   bool _backupEnabled = false;
   bool _hasBackupPassword = false;
+  DeviceIdResult? _deviceIdResult;
 
   @override
   void initState() {
@@ -35,6 +41,8 @@ class _settingsScreenState extends State<Settingsscreen> {
 
   Future<void> _loadSettings() async {
     await DecimalSettings.load();
+    final result = await DeviceIdService.getResult();
+    if (mounted) setState(() => _deviceIdResult = result);
     final backupEnabled = await AutoBackupService.isAutoBackupEnabled();
     final hasPassword = await BackupEncryptionService.hasPassword();
     setState(() {
@@ -103,6 +111,11 @@ class _settingsScreenState extends State<Settingsscreen> {
         ),
       ),
     );
+  }
+
+  String _getTimeoutLabel(int minutes) {
+    if (minutes < 60) return '$minutes min';
+    return '1 hr';
   }
 
   String _getRefundWindowLabel(int minutes) {
@@ -287,8 +300,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -326,8 +338,11 @@ class _settingsScreenState extends State<Settingsscreen> {
       drawer:
           DrawerManage(issync: false, isDelete: true, islogout: true),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.all(isTablet ? 20 : 16),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: AppResponsive.maxFormWidth(context)),
+            child: ListView(
+              padding: AppResponsive.padding(context),
           children: [
 
             // ── 1. Account & Security ───────────────────────────────────
@@ -417,7 +432,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                 ]),
               ),
             ]),
-            SizedBox(height: isTablet ? 24 : 20),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 2. Display ──────────────────────────────────────────────
             _sectionHeader('Display', Icons.palette_outlined),
@@ -492,7 +507,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                 ),
               ),
             ]),
-            SizedBox(height: isTablet ? 24 : 20),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 3. Orders & Payments ────────────────────────────────────
             _sectionHeader(
@@ -571,11 +586,36 @@ class _settingsScreenState extends State<Settingsscreen> {
                 ),
               ),
             ]),
-            SizedBox(height: isTablet ? 24 : 20),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 4. Staff & Shifts ───────────────────────────────────────
             _sectionHeader('Staff & Shifts', Icons.people_rounded),
             _sectionCard([
+              ValueListenableBuilder<int>(
+                valueListenable: RestaurantSession.timeoutMinutesNotifier,
+                builder: (context, minutes, __) => _expandableTile(
+                  title: 'Auto Logout Timeout',
+                  subtitle: 'Current: ${_getTimeoutLabel(minutes)}',
+                  icon: Icons.lock_clock_rounded,
+                  color: Colors.orange,
+                  isExpanded: _isTimeoutExpanded,
+                  onTap: () => setState(
+                      () => _isTimeoutExpanded = !_isTimeoutExpanded),
+                  expandedChild: Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [5, 10, 15, 30, 60].map((min) {
+                      return Filterbutton(
+                        title: min < 60 ? '$min min' : '1 hr',
+                        selectedFilter: _getTimeoutLabel(minutes),
+                        onpressed: () =>
+                            RestaurantSession.setTimeoutMinutes(min),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              _tileDivider(),
               ValueListenableBuilder<Map<String, bool>>(
                 valueListenable: AppSettings.settingsNotifier,
                 builder: (context, _, __) {
@@ -616,7 +656,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                 },
               ),
             ]),
-            SizedBox(height: isTablet ? 24 : 20),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 5. Backup ───────────────────────────────────────────────
             _sectionHeader('Backup', Icons.backup_rounded),
@@ -654,9 +694,14 @@ class _settingsScreenState extends State<Settingsscreen> {
                 },
               ),
             ]),
-            SizedBox(height: isTablet ? 24 : 20),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
 
-            // ── 6. Developer ────────────────────────────────────────────
+            // ── 6. About / Device ───────────────────────────────────────
+            _sectionHeader('About This Device', Icons.info_outline_rounded),
+            _buildDeviceIdCard(),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+
+            // ── 7. Developer ────────────────────────────────────────────
             _sectionHeader('Developer', Icons.code_rounded),
             _sectionCard([
               _navTile(
@@ -668,11 +713,68 @@ class _settingsScreenState extends State<Settingsscreen> {
                     context, RouteNames.restaurantDataGenratorScreen),
               ),
             ]),
-            SizedBox(height: isTablet ? 16 : 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
           ],
+        ),
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildDeviceIdCard() {
+    final id = _deviceIdResult?.id ?? 'Loading...';
+    return _sectionCard([
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.fingerprint_rounded,
+                  color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Device ID',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(id,
+                      style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 1.2)),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.copy_rounded,
+                  size: 18, color: AppColors.textSecondary),
+              tooltip: 'Copy Device ID',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: id));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Device ID copied'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    ]);
   }
 
   Widget _actionChip(

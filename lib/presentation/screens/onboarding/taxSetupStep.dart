@@ -179,22 +179,51 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
   Widget build(BuildContext context) {
     final hPad = AppResponsive.getValue<double>(
         context, mobile: 20, tablet: 32, desktop: 40);
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 24),
-          _buildInclusiveToggle(),
-          const SizedBox(height: 20),
-          _buildAddCard(),
-          const SizedBox(height: 20),
-          _buildTaxList(),
-          const SizedBox(height: 32),
-          _buildNavButtons(),
-        ],
-      ),
+    final vPad = AppResponsive.getValue<double>(
+        context, mobile: 16, tablet: 20, desktop: 24);
+    final maxWidth = AppResponsive.getValue<double>(
+        context, mobile: double.infinity, tablet: 680, desktop: 760);
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 24),
+                    _buildInclusiveToggle(),
+                    const SizedBox(height: 20),
+                    _buildAddCard(),
+                    const SizedBox(height: 20),
+                    _buildTaxList(),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, vPad),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
+            ),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: _buildNavButtons(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

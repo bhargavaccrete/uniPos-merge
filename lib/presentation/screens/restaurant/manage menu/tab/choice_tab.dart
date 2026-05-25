@@ -4,6 +4,7 @@ import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
@@ -66,7 +67,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
       }
     });
 
-    final isWide = MediaQuery.of(context).size.width >= 850;
+    final isWide = !AppResponsive.isMobile(context);
     if (isWide) {
       showDialog<void>(
         context: context,
@@ -572,9 +573,13 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   }
 
   Future<void> _delete(ChoicesModel choice) async {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${choice.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
         content: Text('This choice and its ${choice.choiceOption.length} options will be removed.',
@@ -591,18 +596,13 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     }
   }
 
-  int _getGridColumns(double width) {
-    if (width > 1200) return 3;
-    else if (width > 800) return 2;
-    else return 2;
-  }
 
   @override
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -670,7 +670,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         return GridView.builder(
           padding: EdgeInsets.all(24),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _getGridColumns(size.width),
+            crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 2, desktop: 3),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             childAspectRatio: 2.8,
@@ -826,19 +826,20 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   }
 
   Widget _buildAddButton() {
+    final isTablet = !AppResponsive.isMobile(context);
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(isTablet ? 20 : 16),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () => openBottomSheet(),
-          icon: Icon(Icons.add, size: 20),
-          label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+          label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: 14),
+            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),

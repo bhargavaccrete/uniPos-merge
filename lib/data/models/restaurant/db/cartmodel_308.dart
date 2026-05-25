@@ -91,26 +91,40 @@ class CartItem extends HiveObject {
 
   double get totalPrice => finalItemPrice * quantity;
 
-  // ========== CORRECTED CODE BELOW ==========
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
+    if (other is! CartItem) return false;
 
-    return other is CartItem &&
-        other.id == id &&
-        other.title == title &&
-        other.variantName == variantName && // Check variant name
-        listEquals(other.choiceNames, choiceNames); // Check choices
-    // We usually don't compare price or imagePath for equality,
-    // as the ID and options are what make an item unique.
+    final aChoices = (choiceNames ?? []).toList()..sort();
+    final bChoices = (other.choiceNames ?? []).toList()..sort();
+
+    return other.title == title &&
+        other.variantName == variantName &&
+        other.weightDisplay == weightDisplay &&
+        (other.price - price).abs() < 0.001 &&
+        listEquals(aChoices, bChoices) &&
+        _extrasEqual(other.extras, extras);
+  }
+
+  static bool _extrasEqual(
+      List<Map<String, dynamic>>? a, List<Map<String, dynamic>>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    String normalize(Map<String, dynamic> m) =>
+        (m.entries.toList()..sort((x, y) => x.key.compareTo(y.key)))
+            .map((e) => '${e.key}:${e.value}')
+            .join(',');
+    final normA = a.map(normalize).toList()..sort();
+    final normB = b.map(normalize).toList()..sort();
+    return listEquals(normA, normB);
   }
 
   @override
   int get hashCode {
-    return id.hashCode ^
-    title.hashCode ^
-    variantName.hashCode ^
-    choiceNames.hashCode; // Include choices in the hash
+    final sortedChoices = (choiceNames ?? []).toList()..sort();
+    return Object.hash(title, variantName, weightDisplay, sortedChoices.join(','));
   }
   CartItem copyWith({
     String? id,

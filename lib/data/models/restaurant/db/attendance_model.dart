@@ -54,9 +54,18 @@ class AttendanceModel extends HiveObject {
   String get formattedClockIn =>
       '${clockIn.hour.toString().padLeft(2, '0')}:${clockIn.minute.toString().padLeft(2, '0')}';
 
-  String get formattedClockOut => clockOut == null
-      ? '—'
-      : '${clockOut!.hour.toString().padLeft(2, '0')}:${clockOut!.minute.toString().padLeft(2, '0')}';
+  String get formattedClockOut {
+    if (clockOut == null) return '—';
+    final t = '${clockOut!.hour.toString().padLeft(2, '0')}:${clockOut!.minute.toString().padLeft(2, '0')}';
+    // Cross-day shift: show date prefix so it's clear the checkout was next day
+    if (clockOut!.day != clockIn.day ||
+        clockOut!.month != clockIn.month ||
+        clockOut!.year != clockIn.year) {
+      const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${m[clockOut!.month - 1]} ${clockOut!.day}, $t';
+    }
+    return t;
+  }
 
   String get formattedDuration {
     if (totalMinutes == null) return 'In progress';

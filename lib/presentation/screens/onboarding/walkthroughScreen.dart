@@ -154,14 +154,17 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
         Align(
           alignment: Alignment.topRight,
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: AppResponsive.smallSpacing(context),
+            ),
             child: TextButton(
               onPressed: _skipWalkthrough,
               child: Text(
                 'Skip',
                 style: TextStyle(
                   color: AppColors.primary,
-                  fontSize: 16,
+                  fontSize: AppResponsive.buttonFontSize(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -327,19 +330,29 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
 
   Widget _buildPageContent(WalkthroughItem item, {bool isMobile = false}) {
     final illustrationSize = isMobile
-        ? AppResponsive.height(context, 0.22).clamp(120.0, 200.0)
-        : 300.0;
+        ? AppResponsive.height(context, 0.17).clamp(90.0, 140.0)
+        : AppResponsive.isTablet(context) ? 220.0 : 300.0;
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 16.0 : 40.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildIllustration(item, size: illustrationSize),
-          SizedBox(height: isMobile ? 20 : 60),
-          _buildTextContent(item),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildIllustration(item, size: illustrationSize),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildTextContent(item),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -404,13 +417,12 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
   }
 
   Widget _buildTextContent(WalkthroughItem item) {
-    final isMobile = AppResponsive.isMobile(context);
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 20 : 60,
-          vertical: isMobile ? 16 : 40,
+          horizontal: AppResponsive.getValue(context, mobile: 8.0, tablet: 40.0, desktop: 60.0),
+          vertical: AppResponsive.smallSpacing(context),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -418,13 +430,13 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
             Text(
               item.title,
               style: TextStyle(
-                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 28.0, desktop: 32.0),
+                fontSize: AppResponsive.getValue(context, mobile: 20.0, tablet: 26.0, desktop: 32.0),
                 fontWeight: FontWeight.bold,
                 color: item.color,
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: isMobile ? 12 : 20),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               item.description,
               style: TextStyle(
@@ -434,17 +446,17 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: isMobile ? 16 : 30),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             // Feature chips
             Wrap(
               alignment: WrapAlignment.center,
-              spacing: 10,
-              runSpacing: 10,
+              spacing: AppResponsive.smallSpacing(context),
+              runSpacing: AppResponsive.smallSpacing(context),
               children: item.features.map((feature) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.mediumSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context) - 2,
                   ),
                   decoration: BoxDecoration(
                     color: item.color.withOpacity(0.1),
@@ -459,14 +471,14 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                     children: [
                       Icon(
                         Icons.check_circle,
-                        size: 16,
+                        size: AppResponsive.smallIconSize(context),
                         color: item.color,
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: AppResponsive.smallSpacing(context) - 2),
                       Text(
                         feature,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: AppResponsive.smallFontSize(context),
                           color: item.color,
                           fontWeight: FontWeight.w500,
                         ),
@@ -484,7 +496,10 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
 
   Widget _buildBottomNavigation() {
     return Container(
-      padding: EdgeInsets.all(AppResponsive.isMobile(context) ? 12 : 20),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       child: Column(
         children: [
           // Page indicators
@@ -495,7 +510,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                   (index) => _buildPageIndicator(index == _currentPage),
             ),
           ),
-          SizedBox(height: AppResponsive.isMobile(context) ? 16 : 30),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           // Action buttons
           Row(
@@ -525,12 +540,12 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                 onPressed: _goToNextPage,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _walkthroughItems[_currentPage].color,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 15,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.getValue(context, mobile: 24.0, tablet: 30.0, desktop: 36.0),
+                    vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 15.0),
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 child: Row(
@@ -539,19 +554,19 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
                       _currentPage == _walkthroughItems.length - 1
                           ? 'Get Started'
                           : 'Next',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: AppResponsive.buttonFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: AppResponsive.smallSpacing(context) - 4),
                     Icon(
                       _currentPage == _walkthroughItems.length - 1
                           ? Icons.check
                           : Icons.arrow_forward_ios,
                       color: Colors.white,
-                      size: 16,
+                      size: AppResponsive.smallIconSize(context),
                     ),
                   ],
                 ),

@@ -285,7 +285,6 @@ class RestaurantBulkImportService {
         return allSheets;
       }
     } catch (e) {
-      print('Error parsing file: $e');
       throw Exception('Failed to parse file: $e');
     }
     return {};
@@ -325,91 +324,56 @@ class RestaurantBulkImportService {
     ImportResult result = ImportResult();
 
     try {
-      print('🔄 Starting import process...');
 
       // Ensure all data is loaded with individual try-catch
       try {
-        print('📂 Loading categories...');
         await categoryStore.loadCategories();
-        print('✅ Categories loaded: ${categoryStore.categories.length}');
       } catch (e) {
-        print('⚠️ Error loading categories: $e');
         result.warnings.add('Could not load existing categories: $e');
       }
 
       try {
-        print('📂 Loading choices...');
         await choiceStore.loadChoices();
-        print('✅ Choices loaded: ${choiceStore.choices.length}');
       } catch (e) {
-        print('⚠️ Error loading choices: $e');
         result.warnings.add('Could not load existing choices: $e');
       }
 
       try {
-        print('📂 Loading extras...');
         await extraStore.loadExtras();
-        print('✅ Extras loaded: ${extraStore.extras.length}');
       } catch (e) {
-        print('⚠️ Error loading extras: $e');
         result.warnings.add('Could not load existing extras: $e');
       }
 
       try {
-        print('📂 Loading items...');
         await itemStore.loadItems();
-        print('✅ Items loaded: ${itemStore.items.length}');
       } catch (e) {
-        print('⚠️ Error loading items: $e');
         result.warnings.add('Could not load existing items: $e');
       }
 
-      print('📥 Starting import operations...');
 
       // Import in order (dependencies first)
-      print('1️⃣ Importing categories...');
       await _importCategories(allSheets[SHEET_CATEGORIES], result);
-      print('✅ Categories imported: ${result.categoriesImported}');
 
-      print('2️⃣ Importing variants...');
       await _importVariants(allSheets[SHEET_VARIANTS], result);
-      print('✅ Variants imported: ${result.variantsImported}');
 
-      print('3️⃣ Importing extras...');
       await _importExtras(allSheets[SHEET_EXTRAS], result);
-      print('✅ Extras imported: ${result.extrasImported}');
 
-      print('4️⃣ Importing toppings...');
       await _importToppings(allSheets[SHEET_TOPPINGS], result);
-      print('✅ Toppings imported: ${result.toppingsImported}');
 
-      print('5️⃣ Importing choices...');
       await _importChoices(allSheets[SHEET_CHOICES], result);
-      print('✅ Choices imported: ${result.choicesImported}');
 
-      print('6️⃣ Importing choice options...');
       await _importChoiceOptions(allSheets[SHEET_CHOICE_OPTIONS], result);
-      print('✅ Choice options imported: ${result.choiceOptionsImported}');
 
-      print('7️⃣ Importing items...');
       await _importItems(allSheets[SHEET_ITEMS], result);
-      print('✅ Items imported: ${result.itemsImported}');
 
-      print('8️⃣ Importing item variants...');
       await _importItemVariants(allSheets[SHEET_ITEM_VARIANTS], result);
-      print('✅ Item variants imported: ${result.itemVariantsImported}');
 
       // 🔄 Refresh all stores to ensure UI updates
-      print('🔄 Refreshing all restaurant stores to trigger UI updates...');
       await refreshAllRestaurantStores();
-      print('✅ All stores refreshed and UI notified');
 
       result.success = result.errors.isEmpty;
-      print('✅ Import process complete! Success: ${result.success}');
       return result;
     } catch (e, stackTrace) {
-      print('❌ Fatal error during import: $e');
-      print('Stack trace: $stackTrace');
       result.errors.add('Fatal error during import: $e');
       result.success = false;
       return result;
@@ -763,7 +727,6 @@ class RestaurantBulkImportService {
               imageBytes = await file.readAsBytes();
             }
           } catch (e) {
-            print('⚠️ Failed to read image for item $id: $e');
           }
         }
 

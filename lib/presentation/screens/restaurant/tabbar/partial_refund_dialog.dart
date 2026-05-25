@@ -8,6 +8,7 @@ import '../../../../domain/services/restaurant/refund_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 // Export PartialRefundResult so UI screens can use it
 export '../../../../domain/services/restaurant/refund_service.dart' show PartialRefundResult;
@@ -163,7 +164,14 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+    final screenWidth = AppResponsive.screenWidth(context);
+    final dialogMaxWidth = AppResponsive.dialogWidth(context); // 500 on tablet, ∞ on mobile
+    final hInset = isTablet
+        ? ((screenWidth - dialogMaxWidth) / 2).clamp(40.0, 200.0)
+        : 24.0;
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
       title: Text('Select Items to Refund', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
       content: SizedBox(
         width: double.maxFinite,
@@ -321,17 +329,12 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
         ),
         ElevatedButton(
           onPressed: () {
-            print('🔘 Confirm Refund button pressed');
-            print('Total refund amount: $_totalRefundAmount');
-            print('Reason: ${_refundReasonController.text.trim()}');
 
             if (_totalRefundAmount <= 0) {
-              print('❌ Validation failed: No items selected');
               NotificationService.instance.showError('Please select at least one item to refund');
               return;
             }
             if (_refundReasonController.text.trim().isEmpty) {
-              print('❌ Validation failed: No reason provided');
               setState(() => _showReasonError = true);
               NotificationService.instance.showError('Reason is required! Please enter a reason for this refund.');
               // Also show a dialog for emphasis
@@ -372,19 +375,15 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
             }
 
             final itemsToRefund = Map.of(_refundQuantities)..removeWhere((key, value) => value == 0);
-            print('Items to refund: ${itemsToRefund.length}');
 
             final Map<CartItem, int> itemsToRestock = {};
             itemsToRefund.forEach((item, quantity) {
               if (_restockStatus[item] == true) {
                 itemsToRestock[item] = quantity;
-                print('✅ Will restock: ${item.title} x$quantity');
               } else {
-                print('⚠️ Will NOT restock: ${item.title} x$quantity');
               }
             });
 
-            print('Items to restock: ${itemsToRestock.length}');
 
             final result = PartialRefundResult(
               itemsToRefund: itemsToRefund,
@@ -396,7 +395,6 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
             // Reset error state on successful submission
             setState(() => _showReasonError = false);
 
-            print('✅ Closing dialog with result');
             Navigator.pop(context, result);
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),

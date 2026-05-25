@@ -137,7 +137,6 @@ abstract class _ItemStore with Store {
       items.addAll(loadedItems);
     } catch (e) {
       errorMessage = 'Failed to load items: $e';
-      print('Error loading items: $e');
     } finally {
       isLoading = false;
     }
@@ -189,7 +188,6 @@ abstract class _ItemStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to update item: $e';
-      print('Error updating item: $e');
       return false;
     } finally {
       isLoading = false;
@@ -210,7 +208,6 @@ abstract class _ItemStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to delete item: $e';
-      print('Error deleting item: $e');
       return false;
     } finally {
       isLoading = false;
@@ -235,7 +232,6 @@ abstract class _ItemStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to toggle item status: $e';
-      print('Error toggling item status: $e');
       return false;
     }
   }
@@ -258,7 +254,6 @@ abstract class _ItemStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to update stock: $e';
-      print('Error updating stock: $e');
       return false;
     }
   }

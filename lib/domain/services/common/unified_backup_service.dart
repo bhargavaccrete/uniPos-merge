@@ -42,6 +42,7 @@ import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:unipos/data/models/restaurant/db/session_model.dart';
+import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 
 // Shared models
 import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
@@ -732,6 +733,18 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Sessions box error: $e");
         exportMap["restaurantSessions"] = [];
+      }
+
+      // Restaurant Attendance
+      try {
+        exportMap["restaurantAttendance"] = Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Attendance exported: ${exportMap["restaurantAttendance"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Attendance box error: $e");
+        exportMap["restaurantAttendance"] = [];
       }
 
     } else if (AppConfig.isRetail) {
@@ -1776,6 +1789,17 @@ class UnifiedBackupService {
       );
     } catch (e) {
       debugPrint("⚠️ Error restoring restaurant sessions: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantAttendance",
+        Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance),
+        (m) => AttendanceModel.fromMap(m),
+        (a) => a.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant attendance: $e");
     }
   }
 

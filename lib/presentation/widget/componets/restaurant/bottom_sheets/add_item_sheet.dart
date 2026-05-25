@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';
+import '../../../../../util/common/app_responsive.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import 'add_category_dialog.dart';
 import '../../common/app_text_field.dart';
@@ -40,7 +41,7 @@ class AddItemSheet extends StatefulWidget {
     Function(String)? onCategorySelected,
     VoidCallback? onItemAdded,
   }) async {
-    final isWide = MediaQuery.of(context).size.width >= 850;
+    final isWide = !AppResponsive.isMobile(context);
 
     if (isWide) {
       await showDialog<void>(
@@ -196,9 +197,13 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   void _showValidationError(ValidationResult validation) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Missing Required Fields',
             style:

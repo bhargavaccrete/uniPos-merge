@@ -75,7 +75,6 @@ class CurrencyHelper {
     final prefs = await SharedPreferences.getInstance();
     final savedCurrency = prefs.getString(_currencyKey) ?? 'INR';
     currencyNotifier.value = savedCurrency;
-    print('💰 Currency loaded: $savedCurrency (${currencies[savedCurrency]?.symbol})');
   }
 
   /// Set the selected currency
@@ -86,7 +85,6 @@ class CurrencyHelper {
     currencyNotifier.value = currencyCode; // Update notifier for reactive UI
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_currencyKey, currencyCode);
-    print('💰 Currency changed to: $currencyCode (${currencies[currencyCode]?.symbol})');
   }
 
   /// Format an amount with the selected currency symbol

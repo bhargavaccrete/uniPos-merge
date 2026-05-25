@@ -6,6 +6,7 @@ import 'package:unipos/data/models/restaurant/db/staffModel_310.dart';
 import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 
 import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
@@ -33,12 +34,16 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
     bool _obscureText = true;
     bool _hasError = false;
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
+            insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Text('Enter PIN for ${staff.firstName}',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),

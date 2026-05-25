@@ -5,30 +5,30 @@ import 'package:flutter/material.dart';
 /// Use this for all new screens going forward
 class AppResponsive {
   // ==================== BREAKPOINTS ====================
-  // Aligned with lib/util/responsive.dart breakpoints
+  // Google Material Design breakpoints
 
-  /// Mobile breakpoint (< 850px)
-  static const double mobileBreakpoint = 850;
+  /// Mobile breakpoint (< 600px)
+  static const double mobileBreakpoint = 600;
 
-  /// Tablet breakpoint (850px - 1100px)
-  static const double tabletBreakpoint = 1100;
+  /// Tablet breakpoint (600px - 1023px)
+  static const double tabletBreakpoint = 1024;
 
-  /// Desktop breakpoint (>= 1100px)
-  static const double desktopBreakpoint = 1100;
+  /// Desktop breakpoint (>= 1024px)
+  static const double desktopBreakpoint = 1024;
 
   // ==================== SCREEN TYPE CHECKS ====================
 
-  /// Check if current screen is mobile (< 850px)
+  /// Check if current screen is mobile (< 600px)
   static bool isMobile(BuildContext context) =>
       MediaQuery.of(context).size.width < mobileBreakpoint;
 
-  /// Check if current screen is tablet (850px - 1100px)
+  /// Check if current screen is tablet (600px - 1023px)
   static bool isTablet(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     return width >= mobileBreakpoint && width < tabletBreakpoint;
   }
 
-  /// Check if current screen is desktop (>= 1100px)
+  /// Check if current screen is desktop (>= 1024px)
   static bool isDesktop(BuildContext context) =>
       MediaQuery.of(context).size.width >= desktopBreakpoint;
 

@@ -151,26 +151,21 @@ class _GenericTabManagerState<T> extends State<GenericTabManager<T>> {
               builder: (context) {
                 // Get data from MobX observable
                 final allItems = widget.config.getItems();
-                print('🔍 GenericTabManager: Got ${allItems.length} items from store');
 
                 // No data
                 if (allItems.isEmpty) {
-                  print('⚠️ GenericTabManager: No items found, showing empty state');
                   return _buildEmpty(widget.config.emptyMessage);
                 }
 
                 // Filter data based on search query
                 final items = widget.config.filterItems(allItems, _query);
-                print('🔍 GenericTabManager: After filtering with "$_query", ${items.length} items remaining');
 
                 // No results after filtering
                 if (items.isEmpty) {
-                  print('⚠️ GenericTabManager: No items after filtering');
                   return _buildEmpty('No results found for "$_query"');
                 }
 
                 // Display data
-                print('✅ GenericTabManager: Building ${isTablet ? 'grid' : 'list'} with ${items.length} items');
                 return isTablet
                     ? _buildGrid(items, size.width)
                     : _buildList(items);

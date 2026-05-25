@@ -12,6 +12,7 @@ import '../../../util/restaurant/restaurant_session.dart';
 import '../../../core/di/service_locator.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
+import '../../../util/common/app_responsive.dart';
 
 class AdminWelcome extends StatefulWidget {
   const AdminWelcome({super.key});
@@ -124,9 +125,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final isDesktop = size.width > 1200;
+    final isTablet = !AppResponsive.isMobile(context);
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return PopScope(
       canPop: false,
@@ -166,7 +166,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         children: [
           // Header
           Container(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+            padding: EdgeInsets.fromLTRB(isTablet ? 24 : 20, isTablet ? 20 : 16, isTablet ? 24 : 20, isTablet ? 20 : 16),
             decoration: BoxDecoration(
               color: AppColors.white,
               boxShadow: [
@@ -191,7 +191,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                             color: AppColors.primary,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(Icons.menu, color: AppColors.white, size: 24),
+                          child: Icon(Icons.menu, color: AppColors.white, size: isTablet ? 26 : 24),
                         ),
                       );
                     },
@@ -204,7 +204,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                         Text(
                           'Dashboard',
                           style: GoogleFonts.poppins(
-                            fontSize: 20,
+                            fontSize: isTablet ? 22 : 20,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),
@@ -212,7 +212,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                         Text(
                           _storeName.isNotEmpty ? _storeName : 'Restaurant',
                           style: GoogleFonts.poppins(
-                            fontSize: 13,
+                            fontSize: isTablet ? 14 : 13,
                             fontWeight: FontWeight.w500,
                             color: AppColors.textSecondary,
                           ),
@@ -347,7 +347,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           // Content
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              padding: EdgeInsets.all(isDesktop ? 28 : isTablet ? 24 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -357,21 +357,17 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   // Menu Grid
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      int columns = 2;
-                      if (isDesktop) {
-                        columns = 4;
-                      } else if (isTablet) {
-                        columns = 3;
-                      }
+                      final w = MediaQuery.of(context).size.width;
+                      final int columns = w >= 1024 ? 4 : w >= 600 ? 3 : 2;
 
                       final cards = _getVisibleCards(context);
                       return GridView.count(
                         shrinkWrap: true,
                         physics: NeverScrollableScrollPhysics(),
                         crossAxisCount: columns,
-                        crossAxisSpacing: isTablet ? 16 : 12,
-                        mainAxisSpacing: isTablet ? 16 : 12,
-                        childAspectRatio: isTablet ? 1.3 : 1.2,
+                        crossAxisSpacing: isDesktop ? 20 : isTablet ? 16 : 12,
+                        mainAxisSpacing: isDesktop ? 20 : isTablet ? 16 : 12,
+                        childAspectRatio: isDesktop ? 1.4 : isTablet ? 1.3 : 1.2,
                         children: cards.map((card) => _buildMenuCard(
                           context: context,
                           icon: card.icon,
@@ -447,18 +443,18 @@ class _AdminWelcomeState extends State<AdminWelcome> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: EdgeInsets.all(isTablet ? 16 : 14),
+                padding: EdgeInsets.all(isTablet ? 20 : 14),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   icon,
-                  size: isTablet ? 32 : 28,
+                  size: isTablet ? 38 : 28,
                   color: color,
                 ),
               ),
-              SizedBox(height: isTablet ? 12 : 10),
+              SizedBox(height: isTablet ? 14 : 10),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
@@ -467,7 +463,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 15 : 14,
+                    fontSize: isTablet ? 16 : 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),

@@ -402,8 +402,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     if (_isLoading) {
       return Center(child: CircularProgressIndicator(color: AppColors.primary));
@@ -417,8 +416,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
   }
 
   Widget _buildCustomDateSelector(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
+    final isDesktop = AppResponsive.isDesktop(context);
 
     String formatDate(DateTime? date) {
       if (date == null) return 'Select Date';
@@ -635,8 +633,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
   }
 
   Widget _buildExportButton(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return SizedBox(
       width: double.infinity,

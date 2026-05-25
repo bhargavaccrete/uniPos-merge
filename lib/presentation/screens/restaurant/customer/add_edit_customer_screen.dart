@@ -7,6 +7,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class AddEditCustomerScreen extends StatefulWidget {
   final RestaurantCustomer? customer;
@@ -142,8 +143,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -174,10 +174,13 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: EdgeInsets.all(isTablet ? 20 : 16),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: AppResponsive.maxFormWidth(context)),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: AppResponsive.padding(context),
           children: [
             // Header Card
             Container(
@@ -413,6 +416,8 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
 
             SizedBox(height: isTablet ? 20 : 16),
           ],
+        ),
+      ),
         ),
       ),
     );

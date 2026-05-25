@@ -68,7 +68,6 @@ abstract class _CategoryStore with Store {
       await _loadCategoryItems();
     } catch (e) {
       errorMessage = 'Failed to load categories: $e';
-      print('Error loading categories: $e');
     } finally {
       isLoading = false;
     }
@@ -97,7 +96,6 @@ abstract class _CategoryStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to add category: $e';
-      print('Error adding category: $e');
       return false;
     } finally {
       isLoading = false;
@@ -121,7 +119,6 @@ abstract class _CategoryStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to update category: $e';
-      print('Error updating category: $e');
       return false;
     } finally {
       isLoading = false;
@@ -143,7 +140,6 @@ abstract class _CategoryStore with Store {
       return true;
     } catch (e) {
       errorMessage = 'Failed to delete category: $e';
-      print('Error deleting category: $e');
       return false;
     } finally {
       isLoading = false;

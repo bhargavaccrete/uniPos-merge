@@ -11,6 +11,7 @@ import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import 'apply_tax_screen.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class Addtax extends StatefulWidget {
   @override
@@ -135,8 +136,7 @@ class _AddtaxState extends State<Addtax> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
         backgroundColor: Colors.grey.shade50,
@@ -396,9 +396,13 @@ class _AddtaxState extends State<Addtax> {
 
 
   void _showDeleteConfirmation(BuildContext context, bool isTablet, String taxId) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -465,6 +469,152 @@ class _AddtaxState extends State<Addtax> {
   }
 
 
+  Widget _buildFormContent(bool isTablet, bool isEdit, StateSetter setModalState, {Tax? existingTax}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isEdit
+                    ? Colors.orange.withValues(alpha: 0.1)
+                    : AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                isEdit ? Icons.edit_rounded : Icons.add_circle_rounded,
+                size: isTablet ? 28 : 24,
+                color: isEdit ? Colors.orange : AppColors.primary,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isEdit ? 'Edit Tax' : 'Add New Tax',
+                style: GoogleFonts.poppins(
+                  fontSize: isTablet ? 20 : 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(Icons.close_rounded),
+              color: Colors.grey.shade700,
+            ),
+          ],
+        ),
+        Divider(height: 32, color: Colors.grey.shade200),
+        Row(
+          children: [
+            Expanded(
+              child: AppTextField(
+                controller: _taxNameController,
+                label: 'Tax Name',
+                hint: 'e.g. GST, VAT',
+                icon: Icons.receipt_outlined,
+                required: true,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: AppTextField(
+                controller: _taxNumberController,
+                label: 'Tax %',
+                hint: 'e.g. 18',
+                icon: Icons.percent_rounded,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+        if (!isEdit)
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _ischecked1,
+                  activeColor: AppColors.primary,
+                  onChanged: (bool? value) {
+                    setModalState(() => _ischecked1 = value ?? false);
+                  },
+                ),
+                Expanded(
+                  child: Text(
+                    'Apply to all existing items',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 14 : 13,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        SizedBox(height: isTablet ? 28 : 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 24 : 20,
+                  vertical: isTablet ? 14 : 12,
+                ),
+              ),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  fontSize: isTablet ? 15 : 14,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: () => _addOrUpdateTax(existingTax: existingTax),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isEdit ? Colors.orange : AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 28 : 24,
+                  vertical: isTablet ? 14 : 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                isEdit ? 'Update' : 'Add Tax',
+                style: GoogleFonts.poppins(
+                  fontSize: isTablet ? 15 : 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+      ],
+    );
+  }
+
   Future<void> _model(bool isTablet, {Tax? existingTax}) {
     bool isEdit = existingTax != null;
 
@@ -475,6 +625,24 @@ class _AddtaxState extends State<Addtax> {
       _clearControllers();
     }
 
+    // Tablet: centered dialog
+    if (isTablet) {
+      return showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setModalState) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            insetPadding: EdgeInsets.symmetric(horizontal: 80, vertical: 60),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: _buildFormContent(isTablet, isEdit, setModalState, existingTax: existingTax),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Mobile: bottom sheet (unchanged)
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -487,154 +655,12 @@ class _AddtaxState extends State<Addtax> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: isTablet ? 24 : 20,
-                right: isTablet ? 24 : 20,
-                top: isTablet ? 24 : 20,
+                left: 20,
+                right: 20,
+                top: 20,
               ),
               child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isEdit
-                                ? Colors.orange.withValues(alpha: 0.1)
-                                : AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            isEdit ? Icons.edit_rounded : Icons.add_circle_rounded,
-                            size: isTablet ? 28 : 24,
-                            color: isEdit ? Colors.orange : AppColors.primary,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            isEdit ? 'Edit Tax' : 'Add New Tax',
-                            style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 20 : 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close_rounded),
-                          color: Colors.grey.shade700,
-                        ),
-                      ],
-                    ),
-                    Divider(height: 32, color: Colors.grey.shade200),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppTextField(
-                            controller: _taxNameController,
-                            label: 'Tax Name',
-                            hint: 'e.g. GST, VAT',
-                            icon: Icons.receipt_outlined,
-                            required: true,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: AppTextField(
-                            controller: _taxNumberController,
-                            label: 'Tax %',
-                            hint: 'e.g. 18',
-                            icon: Icons.percent_rounded,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    if (!isEdit)
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: _ischecked1,
-                              activeColor: AppColors.primary,
-                              onChanged: (bool? value) {
-                                setModalState(() => _ischecked1 = value ?? false);
-                              },
-                            ),
-                            Expanded(
-                              child: Text(
-                                'Apply to all existing items',
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 14 : 13,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    SizedBox(height: isTablet ? 28 : 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isTablet ? 24 : 20,
-                              vertical: isTablet ? 14 : 12,
-                            ),
-                          ),
-                          child: Text(
-                            'Cancel',
-                            style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 15 : 14,
-                              color: Colors.grey.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: () => _addOrUpdateTax(existingTax: existingTax),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isEdit ? Colors.orange : AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isTablet ? 28 : 24,
-                              vertical: isTablet ? 14 : 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            isEdit ? 'Update' : 'Add Tax',
-                            style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 15 : 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                  ],
-                ),
+                child: _buildFormContent(false, isEdit, setModalState, existingTax: existingTax),
               ),
             );
           },

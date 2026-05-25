@@ -116,7 +116,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         _validateFile();
       }
     } catch (e) {
-      print("File pick error: $e");
     }
   }
 

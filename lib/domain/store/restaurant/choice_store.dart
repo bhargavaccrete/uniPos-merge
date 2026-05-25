@@ -47,10 +47,8 @@ abstract class _ChoiceStore with Store {
       errorMessage = null;
       final loadedChoices = await _repository.getAllChoices();
       choices = ObservableList.of(loadedChoices);
-      print('✅ ChoiceStore: Loaded ${choices.length} choices');
     } catch (e) {
       errorMessage = 'Failed to load choices: $e';
-      print('❌ ChoiceStore: Error loading choices - $e');
     } finally {
       isLoading = false;
     }
@@ -64,14 +62,11 @@ abstract class _ChoiceStore with Store {
   @action
   Future<bool> addChoice(ChoicesModel choice) async {
     try {
-      print('📝 ChoiceStore: Adding choice "${choice.name}" with ID: ${choice.id}');
       await _repository.addChoice(choice);
       choices.add(choice);
-      print('✅ ChoiceStore: Added successfully. Total choices now: ${choices.length}');
       return true;
     } catch (e) {
       errorMessage = 'Failed to add choice: $e';
-      print('❌ ChoiceStore: Failed to add choice - $e');
       return false;
     }
   }

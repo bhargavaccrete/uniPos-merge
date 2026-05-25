@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/images.dart';
 import 'package:unipos/core/config/app_config.dart';
+import 'package:unipos/domain/services/common/device_id_service.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
 import '../captain/captain_home_screen.dart';
@@ -164,9 +165,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   // Placeholder for any initialization tasks
   Future<void> _performInitialization() async {
-    // Add any async initialization tasks here (e.g., preloading data, checking updates)
-    // For now, this completes immediately
-    return Future.value();
+    // Pre-load device ID into cache so it's ready instantly everywhere
+    await DeviceIdService.init();
   }
 
   @override
@@ -270,7 +270,7 @@ class _SplashScreenState extends State<SplashScreen>
                                 child: Text(
                                   'UniPOS',
                                   style: TextStyle(
-                                    fontSize: Responsive.isMobile(context) ? 42 : 52,
+                                    fontSize: Responsive.isMobile(context) ? 42 : 54,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                     letterSpacing: 2,
@@ -278,10 +278,10 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              const Text(
+                              Text(
                                 'Unified Point of Sale Solution',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: Responsive.isMobile(context) ? 16 : 19,
                                   color: Colors.white70,
                                   letterSpacing: 1,
                                 ),
@@ -292,16 +292,16 @@ class _SplashScreenState extends State<SplashScreen>
                       );
                     },
                   ),
-                  const SizedBox(height: 80),
+                  SizedBox(height: Responsive.isMobile(context) ? 80 : 60),
                   // Loading indicator
                   AnimatedBuilder(
                     animation: _fadeAnimation,
                     builder: (context, child) {
                       return Opacity(
                         opacity: _fadeAnimation.value,
-                        child: Container(
-                          width: 50,
-                          height: 50,
+                        child: SizedBox(
+                          width: Responsive.isMobile(context) ? 50 : 58,
+                          height: Responsive.isMobile(context) ? 50 : 58,
                           child: CircularProgressIndicator(
                             valueColor: AlwaysStoppedAnimation<Color>(
                               Colors.white.withOpacity(0.8),
@@ -332,23 +332,23 @@ class _SplashScreenState extends State<SplashScreen>
                           children: [
                             Icon(Icons.store, color: Colors.white70, size: 20),
                             const SizedBox(width: 8),
-                            const Text(
+                            Text(
                               'Retail • Restaurant • Services',
                               style: TextStyle(
                                 color: Colors.white70,
-                                fontSize: 14,
+                                fontSize: Responsive.isMobile(context) ? 14 : 16,
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Icon(Icons.point_of_sale, color: Colors.white70, size: 20),
+                            Icon(Icons.point_of_sale, color: Colors.white70, size: Responsive.isMobile(context) ? 20 : 22),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Empowering Businesses, Simplifying Sales',
                           style: TextStyle(
                             color: Colors.white60,
-                            fontSize: 12,
+                            fontSize: Responsive.isMobile(context) ? 12 : 14,
                             fontStyle: FontStyle.italic,
                           ),
                         ),

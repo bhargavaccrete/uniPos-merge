@@ -88,7 +88,6 @@ class HiveCart {
                 };
               }
             } catch (e) {
-              print('Error checking variant stock: $e');
             }
           } else {
             // Check regular item stock
@@ -115,7 +114,6 @@ class HiveCart {
       
       return {'success': true, 'message': 'Item added to cart'};
     } catch (e) {
-      print('Error adding item to cart: $e');
       return {'success': false, 'message': 'Error adding item to cart'};
     }
   }
@@ -127,7 +125,6 @@ class HiveCart {
       final index = box.values.toList().indexOf(itemToDelete);
       await box.deleteAt(index);
     } catch (e) {
-      print('Error removing item from cart: $e');
       rethrow;
     }
   }
@@ -140,7 +137,6 @@ class HiveCart {
       item.quantity = newQuantity;
       await box.putAt(index, item);
     } catch (e) {
-      print('Error updating quantity: $e');
       rethrow;
     }
   }
@@ -150,7 +146,6 @@ class HiveCart {
       final box = _openBox();
       return box.values.toList();
     } catch (e) {
-      print('Error getting cart items: $e');
       rethrow;
     }
   }
@@ -160,7 +155,6 @@ class HiveCart {
       final box = _openBox();
       await box.clear();
     } catch (e) {
-      print('Error clearing cart: $e');
       rethrow;
     }
   }
@@ -170,7 +164,6 @@ class HiveCart {
       final box = _openBox();
       return box.length;
     } catch (e) {
-      print('Error getting cart item count: $e');
       rethrow;
     }
   }
@@ -184,7 +177,6 @@ class HiveCart {
       }
       return total;
     } catch (e) {
-      print('Error calculating cart total: $e');
       rethrow;
     }
   }

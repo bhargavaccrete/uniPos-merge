@@ -5,6 +5,7 @@ import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/app_text_field.dart';
@@ -371,7 +372,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final hInset = !AppResponsive.isMobile(context)
+                ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                : 24.0;
             return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
               title: Text(
                 'Add New Extra',
                 style: GoogleFonts.poppins(
@@ -536,7 +541,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                 hint: '0.00',
                                 prefixWidget: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                                  child: Text('₹', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                  child: Text(CurrencyHelper.currentSymbol, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
                                 ),
                                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                               ),
@@ -594,7 +599,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                                   controller: variantControllers[variant.id],
                                                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                                                   hint: '0',
-                                                  prefixWidget: Text('₹'),
+                                                  prefixWidget: Text(CurrencyHelper.currentSymbol),
                                                 ),
                                               ),
                                             ),

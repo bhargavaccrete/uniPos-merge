@@ -36,8 +36,6 @@ class AuditTrailHelper {
         object.editedBy = editedBy;
         object.editCount = (object.editCount ?? 0) + 1;
       } catch (e) {
-        print('Error tracking edit: $e');
-        print('Make sure the object has audit trail fields: lastEditedTime, editedBy, editCount');
       }
     }
   }
@@ -54,8 +52,6 @@ class AuditTrailHelper {
         object.editedBy = createdBy;
         object.editCount = 0;
       } catch (e) {
-        print('Error initializing audit trail: $e');
-        print('Make sure the object has audit trail fields: createdTime, lastEditedTime, editedBy, editCount');
       }
     }
   }

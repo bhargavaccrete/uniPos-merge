@@ -201,28 +201,30 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     });
   }
 
-  /// Returns the net cash component of an order:
-  /// - Pure cash order  → totalPrice − refundAmount
-  /// - Split order      → sum of cash entries in paymentList
-  /// - Any other method → 0.0
+  /// Returns the net cash component of an order.
+  /// Uses paymentListJson as the source of truth (mirrors EOD service logic).
+  /// Falls back to totalPrice for legacy orders without paymentListJson.
   /// Voided orders should be excluded before calling this.
   double _cashComponentOf(PastOrderModel o) {
-    if (o.isSplitPayment == true) {
+    final refund = o.refundAmount ?? 0.0;
+
+    // Use paymentListJson when present — same source of truth as EOD service.
+    if (o.paymentListJson != null && o.paymentListJson!.isNotEmpty) {
       final rawCash = o.paymentList
           .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
           .fold(0.0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-      // Deduct refunds proportionally: refund is spread across all payment methods
-      // by the same ratio as each method's share of the total.
-      final refund = o.refundAmount ?? 0.0;
+      if (rawCash <= 0) return 0.0;
       if (refund > 0 && o.totalPrice > 0) {
         final cashRatio = rawCash / o.totalPrice;
         return (rawCash - refund * cashRatio).clamp(0.0, double.infinity);
       }
       return rawCash;
     }
+
+    // Legacy fallback: no paymentListJson — use paymentmode + totalPrice.
     final method = (o.paymentmode ?? '').toLowerCase().trim();
     if (method == 'cash') {
-      return (o.totalPrice - (o.refundAmount ?? 0.0)).clamp(0.0, double.infinity);
+      return (o.totalPrice - refund).clamp(0.0, double.infinity);
     }
     return 0.0;
   }
@@ -349,6 +351,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final noteCtrl = TextEditingController();
 
     final isCashIn = type == 'in';
+    final _hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     // Separate reason lists for Cash In vs Cash Out
     const cashInReasons = [
       'Owner deposit',
@@ -373,6 +378,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) => AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: _hInset, vertical: 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           contentPadding: EdgeInsets.zero,
           content: Column(
@@ -522,7 +528,12 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                         if (type == 'out' && amount > _balance) {
                           final proceed = await showDialog<bool>(
                             context: ctx,
-                            builder: (warnCtx) => AlertDialog(
+                            builder: (warnCtx) {
+                              final wHInset = !AppResponsive.isMobile(warnCtx)
+                                  ? ((AppResponsive.screenWidth(warnCtx) - AppResponsive.dialogWidth(warnCtx)) / 2).clamp(40.0, 200.0)
+                                  : 24.0;
+                              return AlertDialog(
+                              insetPadding: EdgeInsets.symmetric(horizontal: wHInset, vertical: 24),
                               title: Row(children: [
                                 Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
                                 const SizedBox(width: 8),
@@ -546,7 +557,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                                     child: const Text('Proceed Anyway',
                                         style: TextStyle(color: Colors.white))),
                               ],
-                            ),
+                            );
+                            },
                           );
                           if (proceed != true) return;
                         }
@@ -1277,8 +1289,12 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
   @override
   Widget build(BuildContext context) {
     final currency = CurrencyHelper.currentSymbol;
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
 
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       contentPadding: EdgeInsets.zero,
       // barrierDismissible: false is set by the caller
@@ -1488,11 +1504,15 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   Widget build(BuildContext context) {
     final currency = CurrencyHelper.currentSymbol;
     final fmt = DateFormat('dd MMM  HH:mm');
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
 
     // After confirming, show result screen before letting user proceed
     if (_resultStatus != null) return _buildResult(context);
 
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       contentPadding: EdgeInsets.zero,
       content: SingleChildScrollView(
@@ -1748,6 +1768,9 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
 
   Widget _buildResult(BuildContext context) {
     final currency = CurrencyHelper.currentSymbol;
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final isMatched = _resultStatus == 'MATCHED';
     final color = isMatched ? Colors.green : Colors.orange;
     final icon =
@@ -1760,6 +1783,7 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
             'This has been recorded and the manager has been notified.';
 
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 56, color: color),

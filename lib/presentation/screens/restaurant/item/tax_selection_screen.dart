@@ -270,9 +270,13 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
     final nameController = TextEditingController();
     final percentageController = TextEditingController();
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         title: Text(
           'Add New Tax',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -370,9 +374,13 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
   }
 
   Future<void> _deleteTax(String taxId) async {
+    final deleteHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
         title: Text(
           'Delete Tax?',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),

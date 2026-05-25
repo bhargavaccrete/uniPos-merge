@@ -406,8 +406,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     if (_isLoading) {
       return Center(child: CircularProgressIndicator(color: AppColors.primary));

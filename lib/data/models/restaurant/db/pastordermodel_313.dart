@@ -112,8 +112,17 @@ class PastOrderModel extends HiveObject{
   @HiveField(31)
   final String? voidedBy; // Staff name/role who voided this order
 
+  @HiveField(35)
+  final String? voidReason; // Reason entered by staff when voiding this order
+
   @HiveField(32)
   final String? refundedBy; // Staff name/role who processed the refund
+
+  @HiveField(33)
+  final String? customerId; // Links to RestaurantCustomer for loyalty point restoration
+
+  @HiveField(34)
+  final double? serviceCharge; // Computed service/delivery charge amount at settlement time
 
   PastOrderModel({
     required this.id,
@@ -150,7 +159,10 @@ class PastOrderModel extends HiveObject{
     this.sessionId,
     this.discountAppliedBy,
     this.voidedBy,
+    this.voidReason,
     this.refundedBy,
+    this.customerId,
+    this.serviceCharge,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -189,7 +201,10 @@ class PastOrderModel extends HiveObject{
     String? sessionId,
     String? discountAppliedBy,
     String? voidedBy,
+    String? voidReason,
     String? refundedBy,
+    String? customerId,
+    double? serviceCharge,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -224,7 +239,10 @@ class PastOrderModel extends HiveObject{
       sessionId: sessionId ?? this.sessionId,
       discountAppliedBy: discountAppliedBy ?? this.discountAppliedBy,
       voidedBy: voidedBy ?? this.voidedBy,
+      voidReason: voidReason ?? this.voidReason,
       refundedBy: refundedBy ?? this.refundedBy,
+      customerId: customerId ?? this.customerId,
+      serviceCharge: serviceCharge ?? this.serviceCharge,
     );
   }
 
@@ -287,7 +305,9 @@ class PastOrderModel extends HiveObject{
       'sessionId': sessionId,
       'discountAppliedBy': discountAppliedBy,
       'voidedBy': voidedBy,
+      'voidReason': voidReason,
       'refundedBy': refundedBy,
+      'serviceCharge': serviceCharge,
     };
   }
 
@@ -326,7 +346,9 @@ class PastOrderModel extends HiveObject{
       sessionId: map['sessionId'] as String?,
       discountAppliedBy: map['discountAppliedBy'] as String?,
       voidedBy: map['voidedBy'] as String?,
+      voidReason: map['voidReason'] as String?,
       refundedBy: map['refundedBy'] as String?,
+      serviceCharge: map['serviceCharge'] != null ? (map['serviceCharge'] as num).toDouble() : null,
     );
   }
 

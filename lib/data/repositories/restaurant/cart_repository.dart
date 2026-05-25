@@ -23,15 +23,7 @@ class CartRepository {
       // Check for existing item
       CartItem? existingItem;
       try {
-        existingItem = _cartBox.values.firstWhere(
-          (i) =>
-              i.title == item.title &&
-              i.variantName == item.variantName &&
-              i.choiceNames.toString() == item.choiceNames.toString() &&
-              i.extras.toString() == item.extras.toString() &&
-              i.price == item.price &&
-              i.weightDisplay == item.weightDisplay,
-        );
+        existingItem = _cartBox.values.firstWhere((i) => i == item);
       } catch (e) {
         existingItem = null;
       }
@@ -60,15 +52,8 @@ class CartRepository {
           );
         }
       } catch (e) {
-        // Item not found in inventory, allow adding (no inventory tracking)
-        if (existingItem != null) {
-          final index = _cartBox.values.toList().indexOf(existingItem);
-          existingItem.quantity = finalQuantity;
-          await _cartBox.putAt(index, existingItem);
-        } else {
-          await _cartBox.add(item);
-        }
-        return {'success': true, 'message': 'Item added to cart'};
+        // Item not found in inventory database, reject addition to prevent stock bypass.
+        return {'success': false, 'message': 'Item not found in inventory database'};
       }
 
       // Check if inventory tracking is enabled and stock is available
@@ -78,24 +63,19 @@ class CartRepository {
           if (item.variantName != null && inventoryItem.variant != null) {
             // Check variant stock
             try {
-              print('🔍 CART DEBUG: Looking for variant "${item.variantName}"');
-              print('🔍 CART DEBUG: Item has ${inventoryItem.variant!.length} variants');
 
               final variant = inventoryItem.variant!.firstWhere(
                 (v) {
                   final variantDetails = _variantBox.get(v.variantId);
                   final variantName = variantDetails?.name;
-                  print('🔍 CART DEBUG: Checking variant ID ${v.variantId}: name="$variantName", stock=${v.stockQuantity}');
                   return variantName == item.variantName;
                 },
               );
               final availableStock = variant.stockQuantity ?? 0;
 
-              print('🔍 CART DEBUG: Found variant! Stock available: $availableStock, Requested: $finalQuantity');
 
               if (availableStock < finalQuantity) {
                 // Insufficient stock
-                print('❌ CART DEBUG: Insufficient stock!');
                 return {
                   'success': false,
                   'message':
@@ -104,7 +84,6 @@ class CartRepository {
                 };
               }
             } catch (e) {
-              print('❌ CART DEBUG: Error checking variant stock: $e');
             }
           } else {
             // Check regular item stock
@@ -132,7 +111,6 @@ class CartRepository {
 
       return {'success': true, 'message': 'Item added to cart'};
     } catch (e) {
-      print('Error adding item to cart: $e');
       return {'success': false, 'message': 'Error adding item to cart'};
     }
   }
@@ -145,7 +123,6 @@ class CartRepository {
       final index = _cartBox.values.toList().indexOf(itemToDelete);
       await _cartBox.deleteAt(index);
     } catch (e) {
-      print('Error removing item from cart: $e');
       rethrow;
     }
   }
@@ -158,7 +135,6 @@ class CartRepository {
       item.quantity = newQuantity;
       await _cartBox.putAt(index, item);
     } catch (e) {
-      print('Error updating quantity: $e');
       rethrow;
     }
   }
@@ -168,7 +144,6 @@ class CartRepository {
     try {
       return _cartBox.values.toList();
     } catch (e) {
-      print('Error getting cart items: $e');
       rethrow;
     }
   }
@@ -178,7 +153,6 @@ class CartRepository {
     try {
       await _cartBox.clear();
     } catch (e) {
-      print('Error clearing cart: $e');
       rethrow;
     }
   }
@@ -188,7 +162,6 @@ class CartRepository {
     try {
       return _cartBox.length;
     } catch (e) {
-      print('Error getting cart item count: $e');
       rethrow;
     }
   }
@@ -202,7 +175,6 @@ class CartRepository {
       }
       return total;
     } catch (e) {
-      print('Error calculating cart total: $e');
       rethrow;
     }
   }
@@ -216,7 +188,6 @@ class CartRepository {
       }
       return total;
     } catch (e) {
-      print('Error calculating total quantity: $e');
       rethrow;
     }
   }

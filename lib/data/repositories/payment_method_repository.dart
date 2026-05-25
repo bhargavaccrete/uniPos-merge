@@ -7,27 +7,19 @@ class PaymentMethodRepository {
   Box<PaymentMethod>? _box;
 
   Future<void> init() async {
-    print('🗄️  PaymentMethodRepository: init() called');
     // Box is already opened during app startup in HiveInit
-    print('🗄️  PaymentMethodRepository: Getting box $_boxName');
     _box = Hive.box<PaymentMethod>(_boxName);
-    print('🗄️  PaymentMethodRepository: Box reference obtained successfully');
 
-    print('🗄️  PaymentMethodRepository: Box has ${_box!.length} items');
 
     // Initialize with default payment methods if box is empty
     if (_box!.isEmpty) {
-      print('🗄️  PaymentMethodRepository: Box is empty, initializing default methods');
       await _initializeDefaultMethods();
-      print('🗄️  PaymentMethodRepository: Default methods created, box now has ${_box!.length} items');
     } else {
-      print('🗄️  PaymentMethodRepository: Box already has data, skipping initialization');
     }
   }
 
   /// Initialize default payment methods
   Future<void> _initializeDefaultMethods() async {
-    print('🗄️  PaymentMethodRepository: Creating 6 default payment methods...');
     final defaultMethods = [
       PaymentMethod(
         id: const Uuid().v4(),
@@ -80,27 +72,21 @@ class PaymentMethodRepository {
     ];
 
     for (var method in defaultMethods) {
-      print('🗄️  PaymentMethodRepository: Adding ${method.name}...');
       await _box!.add(method);
     }
-    print('🗄️  PaymentMethodRepository: All default methods added');
   }
 
   /// Get all payment methods
   List<PaymentMethod> getAll() {
     // Try to get the box if not already set
     if (_box == null || !_box!.isOpen) {
-      print('🗄️  PaymentMethodRepository.getAll(): Box not initialized, attempting to get it');
       if (Hive.isBoxOpen(_boxName)) {
-        print('🗄️  PaymentMethodRepository.getAll(): Box is open in Hive, getting reference');
         _box = Hive.box<PaymentMethod>(_boxName);
       } else {
-        print('⚠️  PaymentMethodRepository.getAll(): Box is not open in Hive, returning empty list');
         return [];
       }
     }
     final items = _box!.values.toList();
-    print('🗄️  PaymentMethodRepository.getAll(): Returning ${items.length} items');
     return items..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 

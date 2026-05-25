@@ -12,6 +12,14 @@ import 'package:hive/hive.dart';
 class EODService {
   static const _uuid = Uuid();
 
+  /// Returns true if the order should be completely excluded from all EOD totals.
+  /// VOID/VOIDED = never paid, CANCELLED = abandoned, FULLY_REFUNDED = all money returned.
+  static bool _isExcluded(String status) {
+    return status.contains('VOID') ||
+        status == 'CANCELLED' ||
+        status == 'FULLY_REFUNDED';
+  }
+
   static Future<EndOfDayReport> generateEODReport({
     required DateTime date,
     required double openingBalance,
@@ -25,7 +33,6 @@ class EODService {
     final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
     final endTime = DateTime.now();
 
-    print('📋 Generating EOD report for session: $targetSessionId');
 
     // Fetch all past orders
     await pastOrderStore.loadPastOrders();
@@ -35,10 +42,13 @@ class EODService {
     final allDayOrders = pastOrders.where((order) {
       if (targetSessionId != null) {
         if (order.sessionId == targetSessionId) return true;
-        // Fallback for orders that might have failed to save sessionId (e.g., hot reload issues)
-        if (order.sessionId == null && order.orderAt != null) {
-          return (order.orderAt!.isAfter(startTime) || order.orderAt!.isAtSameMomentAs(startTime)) &&
-                 (order.orderAt!.isBefore(endTime) || order.orderAt!.isAtSameMomentAs(endTime));
+        // Legacy fallback: null sessionId orders attributed by calendar day, not session timestamps.
+        // Using exact session timestamps caused old-data orders to be permanently dropped because
+        // their orderAt predates the current session's startTime.
+        if (order.sessionId == null) {
+          if (order.orderAt == null) return false;
+          final d = order.orderAt!;
+          return d.year == date.year && d.month == date.month && d.day == date.day;
         }
         return false;
       }
@@ -48,48 +58,43 @@ class EODService {
           (order.orderAt!.isBefore(endTime) || order.orderAt!.isAtSameMomentAs(endTime));
     }).toList();
 
-    print('✅ Found ${allDayOrders.length} orders for session');
 
-    // Separate fully refunded and voided orders from active orders for reporting
+    // Exclude voided, cancelled, and fully refunded orders from count-based stats
     final activeDayOrders = allDayOrders.where((order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      return status != 'FULLY_REFUNDED' && !status.contains('VOID');
+      return !_isExcluded(status);
     }).toList();
 
     // Use activeDayOrders for count-based statistics (excludes fully refunded orders)
     final orderSummaries = _calculateOrderTypeSummaries(activeDayOrders);
-    final categorySales = _calculateCategorySales(allDayOrders); // Use all orders for accurate financial calculation
+    final categorySales = _calculateCategorySales(activeDayOrders);
     final paymentSummaries = _calculatePaymentSummaries(activeDayOrders);
-    final taxSummaries = _calculateTaxSummaries(allDayOrders);
+    final taxSummaries = _calculateTaxSummaries(activeDayOrders);
 
-    // Calculate totals with refunds properly deducted
-    // Use allDayOrders but skip VOID orders (never paid, should not count)
     final totalSales = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status.contains('VOID')) return sum;
+      if (_isExcluded(status)) return sum;
       return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
     });
     final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status.contains('VOID')) return sum;
+      if (_isExcluded(status)) return sum;
       return sum + (order.Discount ?? 0.0);
     });
 
-    // Calculate proportional tax amount (subtract tax on refunded and voided amounts)
     final totalTax = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return sum;
-
-      final orderRefundRatio = order.totalPrice > 0
+      if (_isExcluded(status)) return sum;
+      final refundRatio = order.totalPrice > 0
           ? ((order.totalPrice - (order.refundAmount ?? 0.0)) / order.totalPrice)
           : 1.0;
-      final effectiveTax = (order.gstAmount ?? 0.0) * orderRefundRatio;
-      return sum + effectiveTax;
+      return sum + (order.gstAmount ?? 0.0) * refundRatio;
     });
 
+    // Refunds: include partially/fully refunded amounts (real cash returned to customers)
     final totalRefunds = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status.contains('VOID')) return sum;
+      if (status.contains('VOID') || status == 'CANCELLED') return sum;
       return sum + (order.refundAmount ?? 0.0);
     });
     final totalOrderCount = activeDayOrders.length; // Count only active orders
@@ -113,15 +118,6 @@ class EODService {
           (expense.dateandTime.isBefore(endTime) || expense.dateandTime.isAtSameMomentAs(endTime));
     }).toList();
 
-    print('✅ Found ${dayExpenses.length} expenses for session');
-
-    if (dayExpenses.isNotEmpty) {
-      print('💰 Day expenses details:');
-      for (var i = 0; i < dayExpenses.length; i++) {
-        final e = dayExpenses[i];
-        print('   ${i + 1}. Amount: Rs.${e.amount} | PaymentType: "${e.paymentType}" | Time: ${e.dateandTime}');
-      }
-    }
 
     // Calculate total expenses (all payment types) for P&L reporting
     final totalExpenses = dayExpenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
@@ -129,13 +125,9 @@ class EODService {
     // Calculate ONLY cash expenses for cash drawer reconciliation
     final cashExpenses = dayExpenses.where((expense) {
       final paymentType = expense.paymentType?.toLowerCase().trim() ?? '';
-      print('   Checking expense Rs.${expense.amount}: paymentType="${expense.paymentType}" -> lowercase+trim="${paymentType}" -> isCash=${paymentType == 'cash'}');
       return paymentType == 'cash';
     }).fold<double>(0.0, (sum, expense) => sum + expense.amount);
 
-    print('💰 Total expenses (all types): Rs.$totalExpenses');
-    print('💰 Cash expenses only: Rs.$cashExpenses');
-    print('💰 ====================================');
 
     // Load manual Cash In / Cash Out movements recorded during the day
     double totalCashIn = 0.0;
@@ -156,11 +148,10 @@ class EODService {
       }).toList();
       totalCashIn  = todayMoves.where((m) => m.type == 'in' ).fold(0.0, (s, m) => s + m.amount);
       totalCashOut = todayMoves.where((m) => m.type == 'out').fold(0.0, (s, m) => s + m.amount);
-      print('💵 Cash In today: Rs.$totalCashIn | Cash Out today: Rs.$totalCashOut');
     }
 
     final expectedCash = paymentSummaries
-        .where((payment) => payment.paymentType.toLowerCase() == 'cash')
+        .where((payment) => payment.paymentType.toLowerCase().trim() == 'cash')
         .fold<double>(0.0, (sum, payment) => sum + payment.totalAmount);
 
     // Full formula: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
@@ -237,9 +228,8 @@ class EODService {
     double grandTotal = 0.0;
 
     for (final order in orders) {
-      // Skip voided orders completely (covers both 'VOID' and 'VOIDED')
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status.contains('VOID')) continue;
+      if (_isExcluded(status)) continue;
 
       final netOrderAmount = order.totalPrice - (order.refundAmount ?? 0.0);
       grandTotal += netOrderAmount;
@@ -281,19 +271,20 @@ class EODService {
     double grandTotal = 0.0;
 
     for (final order in orders) {
-      // Skip voided orders (covers both 'VOID' and 'VOIDED')
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status.contains('VOID')) continue;
+      if (_isExcluded(status)) continue;
 
       final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
 
-      // Expand split payments into individual methods (matches retail logic)
-      if (order.isSplitPayment == true &&
-          order.paymentListJson != null &&
-          order.paymentListJson!.isNotEmpty) {
+      // Always decode paymentListJson if present — it's the source of truth.
+      // Avoid relying on isSplitPayment flag which can be null for legacy orders.
+      if (order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
+        final refundRatio =
+            order.totalPrice > 0 ? netAmount / order.totalPrice : 1.0;
         for (final entry in order.paymentList) {
           final method = (entry['method'] as String? ?? 'Unknown');
-          final amt = (entry['amount'] as num?)?.toDouble() ?? 0.0;
+          final amt =
+              ((entry['amount'] as num?)?.toDouble() ?? 0.0) * refundRatio;
           paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
           paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
           grandTotal += amt;
@@ -326,9 +317,8 @@ class EODService {
     final Map<String, TaxInfo> taxData = {};
 
     for (final order in orders) {
-      // Skip fully refunded and voided orders
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') continue;
+      if (_isExcluded(status)) continue;
 
       if (order.gstRate != null && order.gstAmount != null && order.gstRate! > 0) {
         final taxKey = 'GST ${(order.gstRate! * 100).toStringAsFixed(1)}%';
@@ -366,6 +356,11 @@ class EODService {
   }
 
   static Future<void> saveEODReport(EndOfDayReport report) async {
+    // Replace any existing report for the same date (handles safe retry on failure)
+    final existing = await eodStore.getEODByDate(report.date);
+    if (existing != null) {
+      await eodStore.deleteEODReport(existing.reportId);
+    }
     await eodStore.addEODReport(report);
   }
 
@@ -402,21 +397,15 @@ class EODService {
     // Use current time as end — handles midnight crossing (EOD run after midnight for yesterday's session)
     final endTime = DateTime.now();
 
-    print('📊 Filtering sales from $startTime to $endTime');
 
     // Get all sales for the day using SaleStore
     final allSales = await saleStore.getSalesByDateRange(startTime, endTime);
 
-    print('✅ Found ${allSales.length} sales after day start');
 
     // Debug: Print each sale's timestamp to verify filtering
     if (allSales.isNotEmpty) {
-      print('🔍 SALE TIMESTAMPS:');
       for (var sale in allSales) {
-        print('  Sale ID: ${sale.saleId} | Created: ${sale.createdAt} | Amount: Rs.${sale.totalAmount}');
       }
-      print('🔍 Day Start Time: $startTime');
-      print('🔍 Are these sales AFTER day start? Check timestamps above!');
     }
 
     // Filter out returns for count-based stats, but include them in financial calculations
@@ -454,7 +443,6 @@ class EODService {
           (expense.dateandTime.isBefore(endTime) || expense.dateandTime.isAtSameMomentAs(endTime));
     }).toList();
 
-    print('✅ Found ${dayExpenses.length} expenses after day start');
 
     final totalExpenses = dayExpenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
     final cashExpenses = dayExpenses
@@ -463,7 +451,7 @@ class EODService {
 
     // Calculate expected cash
     final expectedCash = paymentSummaries
-        .where((payment) => payment.paymentType.toLowerCase() == 'cash')
+        .where((payment) => payment.paymentType.toLowerCase().trim() == 'cash')
         .fold<double>(0.0, (sum, payment) => sum + payment.totalAmount);
 
     // Load manual Cash In / Cash Out movements recorded during the retail day
@@ -476,7 +464,6 @@ class EODService {
       ).toList();
       totalCashIn  = todayMoves.where((m) => m.type == 'in' ).fold(0.0, (s, m) => s + m.amount);
       totalCashOut = todayMoves.where((m) => m.type == 'out').fold(0.0, (s, m) => s + m.amount);
-      print('💵 Retail Cash In today: Rs.$totalCashIn | Cash Out today: Rs.$totalCashOut');
     }
 
     // Full formula: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses

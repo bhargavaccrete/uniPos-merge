@@ -6,6 +6,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/util/color.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -16,6 +17,9 @@ import '../../../../services/websocket_client_service.dart';
 import '../../../../server/websocket.dart' as ws;
 import '../util/restaurant_print_helper.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/inventory_service.dart';
+import '../../../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../../../util/common/app_responsive.dart';
 
 
 class Activeorder extends StatefulWidget {
@@ -60,7 +64,6 @@ class _ActiveorderState extends State<Activeorder> {
         final tableNo = message['tableNo'] as String?;
         final kotNumber = message['kotNumber'];
 
-        print('🔔 UniPOS: Order status updated - KOT #$kotNumber (Table $tableNo) → $status');
 
         // Show notification to user
         if (mounted && status != null) {
@@ -74,7 +77,6 @@ class _ActiveorderState extends State<Activeorder> {
         final newItemCount = message['newItemCount'];
         final tableNo = message['tableNo'];
 
-        print('🔔 UniPOS: Order updated - KOT #$kotNumber with $newItemCount new items');
 
         // Reload MobX store — updateOrderWithNewItems writes Hive directly, bypassing MobX
         await orderStore.loadOrders();
@@ -91,7 +93,6 @@ class _ActiveorderState extends State<Activeorder> {
             '${i['quantity']}× ${i['title']}${i['variantName'] != null ? ' (${i['variantName']})' : ''}')
             .join(', ');
 
-        print('🔔 UniPOS: Cancel KOT #$cancelKotNumber for Table $tableNo: $itemSummary');
 
         // Reload MobX store so UI reflects removed items
         await orderStore.loadOrders();
@@ -105,7 +106,6 @@ class _ActiveorderState extends State<Activeorder> {
         final kotNumber = message['kotNumber'];
         final tableNo = message['tableNo'];
 
-        print('🔔 UniPOS: New order received - KOT #$kotNumber (Table $tableNo)');
 
         // Show notification
         if (mounted) {
@@ -123,33 +123,14 @@ class _ActiveorderState extends State<Activeorder> {
   }
 
   Future<void> _deleteOrder(String orderId) async {
-    // Show a confirmation dialog
-    final bool? shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Order'),
-        content: Text('Are you sure you want to delete this order?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+    final String? voidReason = await _showVoidReasonDialog();
+    if (voidReason == null) return;
 
-    // Only delete if the user confirmed
-    if (shouldDelete == true) {
-      final order = orderStore.orders.where((o) => o.id == orderId).firstOrNull;
+    final order = orderStore.orders.where((o) => o.id == orderId).firstOrNull;
 
       if (order != null) {
         // Save to past orders as VOID so it appears in the Void Order Report
         final voidRecord = PastOrderModel(
-
           id: order.id,
           customerName: order.customerName ?? '',
           totalPrice: order.totalPrice,
@@ -166,9 +147,43 @@ class _ActiveorderState extends State<Activeorder> {
           billNumber: order.billNumber,
           kotNumbers: order.kotNumbers,
           kotBoundaries: order.kotBoundaries,
-          sessionId: order.sessionId, // Preserve sessionId for voided order
+          sessionId: order.sessionId,
+          voidedBy: RestaurantSession.isAdmin
+              ? 'Admin'
+              : '${RestaurantSession.staffName ?? 'Staff'} (${RestaurantSession.effectiveRole})',
+          voidReason: voidReason.isNotEmpty ? voidReason : null,
         );
         await pastOrderStore.addOrder(voidRecord);
+
+        // Restore stock only for items in KOTs that have NOT been served yet.
+        // Served KOT items were already consumed by the kitchen — don't restore.
+        {
+          final kotNums = order.kotNumbers;
+          final kotBounds = order.kotBoundaries;
+          final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+          final itemsToRestock = <CartItem, int>{};
+
+          int start = 0;
+          for (int i = 0; i < kotNums.length; i++) {
+            final kotNum = kotNums[i];
+            final end = (i < kotBounds.length ? kotBounds[i] : order.items.length)
+                .clamp(start, order.items.length);
+            final kotStatus = kotStatuses[kotNum] ?? order.status;
+
+            if (kotStatus != 'Served') {
+              for (final item in order.items.sublist(start, end)) {
+                if (item.quantity > 0) {
+                  itemsToRestock[item] = (itemsToRestock[item] ?? 0) + item.quantity;
+                }
+              }
+            }
+            start = end;
+          }
+
+          if (itemsToRestock.isNotEmpty) {
+            await InventoryService.restoreStockForRefund(itemsToRestock);
+          }
+        }
       }
 
       await orderStore.deleteOrder(orderId);
@@ -177,12 +192,151 @@ class _ActiveorderState extends State<Activeorder> {
       if (order?.tableNo != null && order!.tableNo!.isNotEmpty) {
         await tableStore.updateTableStatus(order.tableNo!, 'Available');
       }
-    }
   }
 
 
 
-  // In _ActiveorderState class
+  Future<String?> _showVoidReasonDialog() async {
+    final reasonCtrl = TextEditingController();
+    const quickReasons = ['Wrong order', 'Customer cancelled', 'Item unavailable', 'Test order'];
+
+    final result = await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.block, size: 18, color: Colors.red.shade600),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text('Void Order',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx, null),
+                        icon: Icon(Icons.close, size: 18, color: Colors.grey.shade500),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: quickReasons.map((r) {
+                      final selected = reasonCtrl.text == r;
+                      return GestureDetector(
+                        onTap: () => setDialog(() {
+                          reasonCtrl.text = r;
+                          reasonCtrl.selection = TextSelection.collapsed(offset: r.length);
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: selected ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: selected ? AppColors.primary : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Text(r,
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: selected ? AppColors.primary : Colors.grey.shade700,
+                              )),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: reasonCtrl,
+                    onChanged: (_) => setDialog(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Or type a reason (optional)',
+                      hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade400),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppColors.primary),
+                      ),
+                    ),
+                    style: GoogleFonts.poppins(fontSize: 13),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, null),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          child: Text('Cancel',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, reasonCtrl.text.trim()),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade600,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text('Void Order',
+                              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    reasonCtrl.dispose();
+    return result;
+  }
+
   Color _getColorForStatus(String? status) {
     switch (status) {
       case 'Processing':
@@ -610,6 +764,59 @@ class _ActiveorderState extends State<Activeorder> {
                                           ],
                                         ),
                                       ),
+
+                                    // Item list for this KOT — cancel buttons shown only for non-served KOTs
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Divider(height: 16, color: Colors.grey.shade200),
+                                          ...order.items.sublist(startIndex, endIndex).asMap().entries.map((e) {
+                                            final item = e.value;
+                                            return Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 3),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.primary.withValues(alpha: 0.08),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text('${item.quantity}×',
+                                                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      '${item.title}${item.variantName != null ? ' (${item.variantName})' : ''}',
+                                                      style: GoogleFonts.poppins(fontSize: 12),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  if (!isServed)
+                                                    InkWell(
+                                                      onTap: () => _cancelKotItem(
+                                                        order: order,
+                                                        kotIndex: kotIndex,
+                                                        itemIndexInOrder: startIndex + e.key,
+                                                        dialogContext: dialogContext,
+                                                      ),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.all(4),
+                                                        child: Icon(Icons.cancel_outlined, size: 18, color: Colors.red.shade300),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
                               );
@@ -690,7 +897,6 @@ class _ActiveorderState extends State<Activeorder> {
 // ACTION 1: Updates KOT status and syncs with KDS
   Future<void> _updateKotStatus(OrderModel order, int kotNumber, String newStatus) async {
     try {
-      print('🔄 Updating KOT #$kotNumber to $newStatus');
 
       // Update KOT status map
       Map<int, String> updatedKotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
@@ -715,10 +921,8 @@ class _ActiveorderState extends State<Activeorder> {
           orderId: order.id,
           orderTime: order.timeStamp,
         );
-        print('📍 Table ${order.tableNo} status updated to $overallStatus');
       }
 
-      print('✅ KOT #$kotNumber updated to $newStatus (Overall: $overallStatus)');
 
       // Broadcast to KDS via WebSocket
       try {
@@ -735,9 +939,7 @@ class _ActiveorderState extends State<Activeorder> {
           'allKotNumbers': order.kotNumbers,
           'kotStatuses': kotStatusesJson,
         });
-        print('📡 Status update broadcast to KDS');
       } catch (e) {
-        print('⚠️ Failed to broadcast to KDS: $e');
       }
 
       // Show success message
@@ -745,7 +947,6 @@ class _ActiveorderState extends State<Activeorder> {
         NotificationService.instance.showSuccess('KOT #$kotNumber updated to $newStatus');
       }
     } catch (e) {
-      print('❌ Error updating KOT status: $e');
       if (mounted) {
         NotificationService.instance.showError('Failed to update status: $e');
       }
@@ -778,7 +979,6 @@ class _ActiveorderState extends State<Activeorder> {
     final updatedOrder = order.copyWith(status: newStatus);
     // Save the change to the store
     await orderStore.updateOrder(updatedOrder);
-    print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} status updated to $newStatus.");
   }
 
 // ACTION 2: Moves the order to the past orders box
@@ -814,7 +1014,9 @@ class _ActiveorderState extends State<Activeorder> {
       totalPaid: latestOrder.totalPaid,
       changeReturn: latestOrder.changeReturn,
       tableNo: latestOrder.tableNo,
-      sessionId: latestOrder.sessionId, // Preserve sessionId
+      sessionId: latestOrder.sessionId,
+      serviceCharge: latestOrder.serviceCharge,
+      isTaxInclusive: latestOrder.isTaxInclusive,
     );
 
     await pastOrderStore.addOrder(pastOrder);
@@ -823,10 +1025,97 @@ class _ActiveorderState extends State<Activeorder> {
       await tableStore.updateTableStatus(latestOrder.tableNo!, 'Available');
     }
 
-    print("Order ${latestOrder.kotNumbers.isNotEmpty ? latestOrder.kotNumbers.first : latestOrder.id} moved to past orders (Bill #$billNumber).");
   }
 
 
+
+  Future<void> _cancelKotItem({
+    required OrderModel order,
+    required int kotIndex,
+    required int itemIndexInOrder,
+    required BuildContext dialogContext,
+  }) async {
+    final item = order.items[itemIndexInOrder];
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Cancel Item?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        content: Text(
+          'Remove ${item.quantity}× ${item.title}${item.variantName != null ? ' (${item.variantName})' : ''} from KOT #${order.kotNumbers[kotIndex]}?',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Keep', style: GoogleFonts.poppins()),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Cancel Item', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // 1. Remove item from the list
+    final updatedItems = List<CartItem>.from(order.items)..removeAt(itemIndexInOrder);
+
+    // 2. Adjust boundaries: every boundary at index >= kotIndex decreases by 1
+    final updatedBoundaries = List<int>.from(order.kotBoundaries);
+    for (int i = kotIndex; i < updatedBoundaries.length; i++) {
+      updatedBoundaries[i] = updatedBoundaries[i] - 1;
+    }
+
+    // 3. If this KOT is now empty, remove it from both lists
+    final updatedNumbers = List<int>.from(order.kotNumbers);
+    final updatedStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+    final prevBoundary = kotIndex == 0 ? 0 : updatedBoundaries[kotIndex - 1];
+    if (updatedBoundaries[kotIndex] == prevBoundary) {
+      final removedKotNumber = updatedNumbers[kotIndex];
+      updatedNumbers.removeAt(kotIndex);
+      updatedBoundaries.removeAt(kotIndex);
+      updatedStatuses.remove(removedKotNumber);
+    }
+
+    // 4. Recalculate total
+    final newTotal = order.totalPrice - (item.finalItemPrice * item.quantity);
+
+    // 5. Persist the updated order
+    final updatedOrder = order.copyWith(
+      items: updatedItems,
+      kotNumbers: updatedNumbers,
+      kotBoundaries: updatedBoundaries,
+      kotStatuses: updatedStatuses,
+      totalPrice: newTotal.clamp(0, double.infinity),
+      itemCountAtLastKot: updatedItems.length,
+    );
+    await orderStore.updateOrder(updatedOrder);
+
+    // 6. Restore inventory stock
+    await InventoryService.restoreStockForOrder([item]);
+
+    // 7. Broadcast cancellation to KDS
+    ws.broadcastEvent({
+      'type': 'CANCEL_KOT_ITEM',
+      'orderId': order.id,
+      'kotNumber': order.kotNumbers[kotIndex],
+      'tableNo': order.tableNo,
+      'cancelledItem': item.title,
+    });
+
+    // 8. Close the status dialog
+    if (dialogContext.mounted) Navigator.pop(dialogContext);
+
+    // 9. Notify user
+    NotificationService.instance.showInfo('${item.quantity}× ${item.title} removed from KOT');
+  }
 
   // Show dialog to select KOT for reprinting
   void _showKotPrintSelectionDialog(OrderModel order) {
@@ -847,10 +1136,14 @@ class _ActiveorderState extends State<Activeorder> {
     }
 
     // If multiple KOTs, show selection dialog
+    final reprintHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: reprintHInset, vertical: 24),
           title: Text('Select KOT to Reprint', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           content: Container(
             width: double.maxFinite,
@@ -895,13 +1188,16 @@ class _ActiveorderState extends State<Activeorder> {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+    final hPad = isTablet ? 20.0 : 12.0;
+
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
           // Order Type Filter + Search Row
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 10),
             color: AppColors.white,
             child: Row(
               children: [
@@ -1040,6 +1336,60 @@ class _ActiveorderState extends State<Activeorder> {
                   );
                 }
 
+                // Tablet: 2-column wrap layout (variable-height cards)
+                if (isTablet) {
+                  return LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      final cols = AppResponsive.gridColumns(context, mobile: 1, tablet: 1, desktop: 2);
+                      final spacing = 12.0;
+                      final cardWidth = (constraints.maxWidth - 32 - spacing * (cols - 1)) / cols;
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Wrap(
+                          spacing: spacing,
+                          runSpacing: spacing,
+                          children: filterOrderList.map((order) => SizedBox(
+                            width: cardWidth,
+                            child: OrderCard(
+                              color: _getColorForStatus(order.status),
+                              order: order,
+                              onDelete: _deleteOrder,
+                              onPrintKot: () => _showKotPrintSelectionDialog(order),
+                              onPrintBill: () => RestaurantPrintHelper.printBillForActiveOrder(
+                                context: context,
+                                order: order,
+                                currentItems: order.items,
+                              ),
+                              ontapcooking: () async {
+                                if (order.status == 'Processing' ||
+                                    order.status == 'Cooking' ||
+                                    order.status == 'Ready' ||
+                                    order.status == 'Served') {
+                                  _showStatusUpdateDialog(order, order.orderType == 'Take Away');
+                                }
+                              },
+                              ontap: () async {
+                                if (order.isPaid != true) {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CartScreen(
+                                        existingOrder: order,
+                                        selectedTableNo: order.tableNo,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          )).toList(),
+                        ),
+                      );
+                    },
+                  );
+                }
+
+                // Mobile: original single-column list (unchanged)
                 return ListView.builder(
                   padding: EdgeInsets.all(16),
                   itemCount: filterOrderList.length,
@@ -1066,8 +1416,6 @@ class _ActiveorderState extends State<Activeorder> {
                       },
                       ontap: () async {
                         if (order.isPaid != true) {
-                          print(
-                              'Card with Kot ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id}');
 
                           await Navigator.push(
                             context,
@@ -1079,7 +1427,6 @@ class _ActiveorderState extends State<Activeorder> {
                             ),
                           );
                         } else {
-                          print("Order is in status: ${order.status}");
                         }
                       },
                     );

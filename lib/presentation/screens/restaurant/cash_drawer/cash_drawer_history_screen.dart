@@ -1301,9 +1301,13 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   }
 
   void _showNote(BuildContext context, _HistoryRow r) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         title: Text(r.typeName,
             style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w700,

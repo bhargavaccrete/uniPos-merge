@@ -85,6 +85,22 @@ mixin _$AttendanceStore on _AttendanceStore, Store {
     return _$endBreakAsyncAction.run(() => super.endBreak(recordId));
   }
 
+  late final _$addRecordAsyncAction =
+      AsyncAction('_AttendanceStore.addRecord', context: context);
+
+  @override
+  Future<void> addRecord(AttendanceModel record) {
+    return _$addRecordAsyncAction.run(() => super.addRecord(record));
+  }
+
+  late final _$deleteRecordAsyncAction =
+      AsyncAction('_AttendanceStore.deleteRecord', context: context);
+
+  @override
+  Future<void> deleteRecord(String recordId) {
+    return _$deleteRecordAsyncAction.run(() => super.deleteRecord(recordId));
+  }
+
   late final _$updateRecordAsyncAction =
       AsyncAction('_AttendanceStore.updateRecord', context: context);
 

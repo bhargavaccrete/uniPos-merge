@@ -99,7 +99,6 @@ Future<Response> getKdsOrdersHandler(Request request) async {
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in getKdsOrdersHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -154,7 +153,6 @@ Future<Response> updateKdsStatusHandler(Request request, String id) async {
     final updatedOrder = orderToUpdate.copyWith(status: orderStatus);
     await orderStore.updateOrder(updatedOrder);
 
-    print('✅ Order $id status updated to: $orderStatus');
 
     // Broadcast status change to all connected clients (UniPOS + other KDS apps)
     // Convert integer keys to strings for JSON encoding
@@ -257,8 +255,6 @@ Future<Response> updateKotStatusHandler(Request request, String id, String kotNu
     );
     await orderStore.updateOrder(updatedOrder);
 
-    print('✅ KOT #$kotNumber status updated to: $kotStatus');
-    print('📊 Overall order status: $overallStatus');
 
     // Broadcast KOT status change to all connected clients
     // Convert integer keys to strings for JSON encoding
@@ -286,7 +282,6 @@ Future<Response> updateKotStatusHandler(Request request, String id, String kotNu
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in updateKotStatusHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},

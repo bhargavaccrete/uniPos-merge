@@ -611,7 +611,6 @@ abstract class _AddProductFormStore with Store {
           finalImageBytes = await file.readAsBytes();
         }
       } catch (e) {
-        print('Warning: Could not read image file: $e');
       }
     }
 

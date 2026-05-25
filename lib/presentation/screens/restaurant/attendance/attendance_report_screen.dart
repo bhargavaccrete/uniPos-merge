@@ -32,10 +32,11 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final boldFont = await PdfGoogleFonts.poppinsBold();
 
     final allStaff = _staffNames;
-    int daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
-    if (_selectedMonth.year == DateTime.now().year && _selectedMonth.month == DateTime.now().month) {
-      daysInMonth = DateTime.now().day;
-    }
+    final periodEnd = (_selectedMonth.year == DateTime.now().year &&
+            _selectedMonth.month == DateTime.now().month)
+        ? DateTime.now()
+        : DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+    final workingDays = _workingDaysInPeriod(_selectedMonth, periodEnd);
 
     await Printing.layoutPdf(
       name: 'Attendance_Report_${monthName}_$year',
@@ -78,7 +79,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                   headers: ['Staff Name', 'Days Present', 'Days Absent', 'Total Hours Worked'],
                   data: allStaff.map((name) {
                     final presentDays = _presentDays(name);
-                    final absentDays = daysInMonth - presentDays;
+                    final absentDays = (workingDays - presentDays).clamp(0, workingDays);
                     final totalMins = _totalMinutes(name);
                     
                     final h = totalMins ~/ 60;
@@ -116,7 +117,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedMonth,
-      firstDate: DateTime(2024),
+      firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       initialDatePickerMode: DatePickerMode.year,
       helpText: 'SELECT MONTH',
@@ -160,7 +161,19 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     });
   }
 
-  // All unique staff names 
+  // Working days (Mon–Fri) between two dates, inclusive
+  int _workingDaysInPeriod(DateTime start, DateTime end) {
+    int count = 0;
+    var d = DateTime(start.year, start.month, start.day);
+    final last = DateTime(end.year, end.month, end.day);
+    while (!d.isAfter(last)) {
+      if (d.weekday <= 5) count++; // 1=Mon … 5=Fri
+      d = d.add(const Duration(days: 1));
+    }
+    return count;
+  }
+
+  // All unique staff names
   List<String> get _staffNames {
     // Include all active staff from staffStore so absent staff show up
     final fromRecords = _records.map((r) => r.staffName).toSet();
@@ -177,9 +190,20 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
   }
 
   int _totalMinutes(String name) {
+    final now = DateTime.now();
     return _records
         .where((r) => r.staffName == name)
-        .fold(0, (s, r) => s + (r.totalMinutes ?? 0));
+        .fold(0, (s, r) {
+          if (r.totalMinutes != null) return s + r.totalMinutes!;
+          if (!r.isOpen) return s;
+          final gross = now.difference(r.clockIn).inMinutes;
+          final breaks = (r.breakTotalMinutes ?? 0) +
+              (r.isOnBreak && r.breakStartTime != null
+                  ? now.difference(r.breakStartTime!).inMinutes
+                  : 0);
+          final active = gross - breaks;
+          return s + (active < 0 ? 0 : active);
+        });
   }
 
   String _fmtMins(int mins) {
@@ -202,11 +226,10 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final isCurrentMonth = _selectedMonth.year == DateTime.now().year && 
                            _selectedMonth.month == DateTime.now().month;
 
-    // Days to calculate absent days
-    int daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
-    if (isCurrentMonth) {
-      daysInMonth = DateTime.now().day; // If it's the current month, only count days up to today
-    }
+    final periodEnd = isCurrentMonth
+        ? DateTime.now()
+        : DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+    final workingDays = _workingDaysInPeriod(_selectedMonth, periodEnd);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
@@ -293,7 +316,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                   final name = allStaff[i];
                   
                   final presentDays = _presentDays(name);
-                  final absentDays = daysInMonth - presentDays;
+                  final absentDays = (workingDays - presentDays).clamp(0, workingDays);
                   final totalMins = _totalMinutes(name);
 
                   // Role from staff store or first record

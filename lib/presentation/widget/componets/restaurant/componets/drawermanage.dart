@@ -15,6 +15,7 @@ import '../../../../screens/restaurant/AuthSelectionScreen.dart';
 import '../../../../screens/restaurant/need help/needhelp.dart';
 import '../../../../screens/retail/reports_screen.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class DrawerManage extends StatelessWidget {
   final bool issync;
@@ -30,8 +31,7 @@ class DrawerManage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -361,6 +361,9 @@ class DrawerManage extends StatelessWidget {
     // NavigatorState outlives the DrawerManage widget, so it's safe to use
     // across async gaps without a mounted check.
     final navigator = Navigator.of(context);
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
 
     final duration = DateTime.now().difference(shift.startTime);
     final hours = duration.inHours;
@@ -399,6 +402,7 @@ class DrawerManage extends StatelessWidget {
             final isOver  = diff != null && diff > 1.0;
 
             return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               contentPadding: EdgeInsets.zero,
               content: SingleChildScrollView(
@@ -633,6 +637,7 @@ class DrawerManage extends StatelessWidget {
 
           // ── Phase 1: End Shift confirm ──────────────────────────────
           return AlertDialog(
+            insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             contentPadding: EdgeInsets.zero,
             content: Column(
@@ -760,10 +765,14 @@ class DrawerManage extends StatelessWidget {
     final formKey = GlobalKey<FormState>();
     String? errorMsg;
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(children: [
             Icon(Icons.lock_reset_rounded, color: Colors.teal),
@@ -872,9 +881,13 @@ class DrawerManage extends StatelessWidget {
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -953,10 +966,14 @@ class DrawerManage extends StatelessWidget {
   }
 
   void _showLogoutDialog(BuildContext context) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),

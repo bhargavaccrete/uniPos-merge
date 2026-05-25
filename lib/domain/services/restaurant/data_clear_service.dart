@@ -36,21 +36,7 @@ class DataClearService {
     }
   }
 
-  /// Clears only completed orders (past orders)
-  static Future<void> clearCompletedOrders() async {
-    try {
-      final pastOrders = await HivePastOrder.getAllPastOrderModel();
-      for (final order in pastOrders) {
-        await HivePastOrder.deleteOrder(order.id);
-      }
-      debugPrint('Completed orders cleared successfully');
-    } catch (e) {
-      debugPrint('Error clearing completed orders: $e');
-      rethrow;
-    }
-  }
-
-  /// Get count of orders to be cleared
+  ///Get count of orders to be cleared
   static Future<Map<String, int>> getDataCountsToBeCleared() async {
     try {
       final pastOrders = await HivePastOrder.getAllPastOrderModel();

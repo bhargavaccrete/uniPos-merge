@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/presentation/screens/restaurant/TaxSetting/addMultipleTax.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 
@@ -10,8 +11,7 @@ import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 class taxSetting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,

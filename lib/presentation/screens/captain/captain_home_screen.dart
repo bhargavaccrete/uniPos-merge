@@ -160,7 +160,6 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
         _showErrorSnack('Failed: ${data['error']}');
       }
     } catch (e) {
-      print('❌ _modifyOrder error: $e');
       final msg = e.toString().contains('SocketException') || e.toString().contains('TimeoutException')
           ? 'Cannot reach POS. Check WiFi.'
           : 'Error: ${e.toString()}';

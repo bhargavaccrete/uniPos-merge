@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
@@ -152,7 +153,6 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         _availableTaxes = taxStore.taxes.toList();
       });
     } catch (e) {
-      print('Error loading taxes: $e');
     }
   }
 
@@ -167,6 +167,20 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     if (pickedFile != null) {
       // Read image as bytes for web compatibility
       final bytes = await pickedFile.readAsBytes();
+      
+      // Validate image size (max 2MB)
+      if (bytes.length > 2 * 1024 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image is too large. Please select an image under 2MB.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      
       setState(() {
         _selectedImage = File(pickedFile.path);
         _selectedImageBytes = bytes;
@@ -189,7 +203,6 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
       return savedImage.path;
     } catch (e) {
-      print('Error saving image: $e');
       return null;
     }
   }
@@ -258,9 +271,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   void _showValidationDialog(List<String> errors) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         title: Text(
           'Missing Required Fields',
           style: GoogleFonts.poppins(
@@ -357,13 +374,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
       if (tax.id.isNotEmpty && tax.taxperecentage != null) {
         final taxRate = tax.taxperecentage!;
-        print('📊 Tax rate: $taxRate% (${tax.taxname})');
         return taxRate / 100; // Convert percentage to decimal (5% -> 0.05)
       }
 
       return 0.0;
     } catch (e) {
-      print('❌ Error calculating tax rate: $e');
       return 0.0;
     }
   }
@@ -486,7 +501,6 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         try {
            _savedImagePath = await _saveImageToLocalStorage(_selectedImage!);
         } catch (e) {
-           print('Warning: Failed to save local image copy: $e');
         }
       }
 
@@ -1335,7 +1349,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                             ),
                           ),
                           Text(
-                            '₹${_calculateBasePrice().toStringAsFixed(2)}',
+                            '${CurrencyHelper.currentSymbol}${_calculateBasePrice().toStringAsFixed(2)}',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.grey[700],
@@ -1355,7 +1369,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                             ),
                           ),
                           Text(
-                            '₹${_calculateTaxAmount().toStringAsFixed(2)}',
+                            '${CurrencyHelper.currentSymbol}${_calculateTaxAmount().toStringAsFixed(2)}',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.grey[700],
@@ -1376,7 +1390,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                             ),
                           ),
                           Text(
-                            '₹${_calculatePriceWithTax().toStringAsFixed(2)}',
+                            '${CurrencyHelper.currentSymbol}${_calculatePriceWithTax().toStringAsFixed(2)}',
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -1526,6 +1540,75 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     );
   }
 
+  Future<void> _handleNext() async {
+    final hInsetNext = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
+    if (_itemNameController.text.isNotEmpty ||
+        _priceController.text.isNotEmpty ||
+        _selectedCategoryId != null) {
+      final shouldContinue = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInsetNext, vertical: 24),
+          title: const Text('Unsaved Item'),
+          content: const Text(
+              'You have entered details for an item but haven\'t added it yet. Are you sure you want to continue without saving?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.warning,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Continue Without Saving'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldContinue != true) {
+        return;
+      }
+    }
+
+    if (_totalItemsInDatabase == 0) {
+      final shouldContinueEmpty = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInsetNext, vertical: 24),
+          title: const Text('No Items Added'),
+          content: const Text(
+              'You haven\'t added any items to your menu yet. Are you sure you want to skip? You can add items later from the dashboard.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Skip Item Setup'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldContinueEmpty != true) {
+        return;
+      }
+    }
+
+    widget.onNext!();
+  }
+
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1567,7 +1650,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           if (widget.onNext != null) ...[
             const SizedBox(width: 15),
             CommonButton(
-              onTap: widget.onNext!,
+              onTap: _handleNext,
               bgcolor: _totalItemsInDatabase > 0 ? Colors.green : Colors.grey[600]!,
               bordercircular: 10,
               height: AppResponsive.height(context, 0.06),

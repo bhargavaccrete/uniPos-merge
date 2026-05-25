@@ -6,6 +6,7 @@ import 'package:unipos/util/color.dart';
 
 import '../../../../constants/restaurant/color.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
+import '../../../../util/common/app_responsive.dart';
 import 'activeorder.dart';
 
 class Order extends StatefulWidget {
@@ -34,8 +35,7 @@ class _OrderState extends State<Order> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,

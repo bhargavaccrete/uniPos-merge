@@ -137,6 +137,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
   Future<void> _autoClockIn(String staffName, String role) async {
     try {
       await attendanceStore.clockIn(staffName: staffName, staffRole: role);
+
     } catch (_) {}
   }
 

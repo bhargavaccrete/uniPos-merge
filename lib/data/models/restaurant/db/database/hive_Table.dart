@@ -22,9 +22,6 @@ class HiveTables {
       return box.values.toList();
     } catch (e, stacktrace) {
       // This will print the real, specific error to your debug console
-      print('!!!!!!!!!! HIVE DATABASE ERROR !!!!!!!!!!');
-      print('Error: $e');
-      print('Stacktrace: $stacktrace');
       rethrow; // This makes sure your UI still shows an error message
     }
   }

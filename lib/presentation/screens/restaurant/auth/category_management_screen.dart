@@ -7,6 +7,7 @@ import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 /// Category Management Screen
 /// Allows users to view, add, edit, and delete categories with images
@@ -47,7 +48,6 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         _itemCounts[category.id] = count;
       }
     } catch (e) {
-      print('Error loading categories: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -81,9 +81,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     final itemCount = _itemCounts[category.id] ?? 0;
 
     if (itemCount > 0) {
+      final hInset = !AppResponsive.isMobile(context)
+          ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+          : 24.0;
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
           title: Text(
             'Cannot Delete',
             style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -109,9 +113,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
       return;
     }
 
+    final hInset2 = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset2, vertical: 24),
         title: Text(
           'Delete Category?',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -179,13 +187,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle, color: AppColors.primary, size: 28),
-            onPressed: _addCategory,
-            tooltip: 'Add New Category',
-          ),
-        ],
+        actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -388,6 +390,16 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
 
   Future<void> _saveCategory() async {
     if (_formKey.currentState!.validate()) {
+      // Duplicate name check (case-insensitive, exclude self when editing)
+      final trimmedName = _nameController.text.trim().toLowerCase();
+      final duplicate = categoryStore.categories.any((c) =>
+          c.name.trim().toLowerCase() == trimmedName &&
+          c.id != (widget.existingCategory?.id ?? ''));
+      if (duplicate) {
+        NotificationService.instance.showError('A category with this name already exists');
+        return;
+      }
+
       try {
         // Show loading
         showDialog(

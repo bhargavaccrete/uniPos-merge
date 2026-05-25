@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 
@@ -73,11 +75,16 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+
     return PopScope(
       canPop: false,
       child: Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 120 : 28,
+          vertical: isTablet ? 60 : 40,
+        ),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -90,7 +97,10 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
               // ── Header ────────────────────────────────────────
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+                padding: EdgeInsets.symmetric(
+                  vertical: isTablet ? 32 : 28,
+                  horizontal: isTablet ? 28 : 24,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -104,22 +114,22 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(14),
+                      padding: EdgeInsets.all(isTablet ? 16 : 14),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.account_balance_wallet_rounded,
-                        size: 32,
+                        size: isTablet ? 38 : 32,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: isTablet ? 14 : 12),
                     Text(
                       'Start New Day',
                       style: GoogleFonts.poppins(
-                        fontSize: 20,
+                        fontSize: isTablet ? 24 : 20,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
@@ -128,7 +138,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                     Text(
                       'Set your opening cash balance',
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: isTablet ? 15 : 13,
                         color: Colors.white.withOpacity(0.85),
                       ),
                     ),
@@ -138,21 +148,32 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
 
               // ── Body ──────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                padding: EdgeInsets.fromLTRB(
+                  isTablet ? 28 : 24,
+                  isTablet ? 24 : 20,
+                  isTablet ? 28 : 24,
+                  isTablet ? 28 : 24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Enter the cash amount currently in the drawer to start your day.',
-                      style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+                      style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 14 : 13,
+                        color: AppColors.textSecondary,
+                      ),
                       textAlign: TextAlign.center,
                     ),
 
                     // Last closing balance info
                     if (!_isLoadingBalance && _lastClosingBalance > 0) ...[
-                      const SizedBox(height: 14),
+                      SizedBox(height: isTablet ? 16 : 14),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isTablet ? 14 : 12,
+                          vertical: isTablet ? 12 : 10,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withOpacity(0.06),
                           border: Border.all(color: AppColors.primary.withOpacity(0.25)),
@@ -160,13 +181,13 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.history_rounded, size: 16, color: AppColors.primary),
+                            Icon(Icons.history_rounded, size: isTablet ? 18 : 16, color: AppColors.primary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Yesterday closed with ₹${_lastClosingBalance.toStringAsFixed(2)} in drawer',
+                                'Yesterday closed with ${CurrencyHelper.currentSymbol}${_lastClosingBalance.toStringAsFixed(2)} in drawer',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 12,
+                                  fontSize: isTablet ? 13 : 12,
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -177,7 +198,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                       ),
                     ],
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: isTablet ? 24 : 20),
 
                     // Amount input
                     AppTextField(
@@ -188,9 +209,9 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                       prefixWidget: Padding(
                         padding: const EdgeInsets.only(left: 12),
                         child: Text(
-                          '₹',
+                          CurrencyHelper.currentSymbol,
                           style: GoogleFonts.poppins(
-                            fontSize: 18,
+                            fontSize: isTablet ? 20 : 18,
                             fontWeight: FontWeight.w700,
                             color: AppColors.primary,
                           ),
@@ -206,13 +227,16 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                       },
                     ),
 
-                    const SizedBox(height: 8),
+                    SizedBox(height: isTablet ? 10 : 8),
                     Text(
                       'This amount will be used as the starting cash balance for today.',
-                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                      style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 12 : 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
 
-                    const SizedBox(height: 24),
+                    SizedBox(height: isTablet ? 28 : 24),
 
                     // Buttons
                     Row(
@@ -222,16 +246,16 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                             child: OutlinedButton(
                               onPressed: () => Navigator.of(context).pop(0.0),
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
                                 side: const BorderSide(color: AppColors.divider),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                               child: Text(
-                                'Start with ₹0',
+                                'Start with ${CurrencyHelper.currentSymbol}0',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 13,
+                                  fontSize: isTablet ? 14 : 13,
                                   color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -245,7 +269,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                             onPressed: _isLoading ? null : _saveOpeningBalance,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -265,7 +289,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                                     style: GoogleFonts.poppins(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 14,
+                                      fontSize: isTablet ? 16 : 14,
                                     ),
                                   ),
                           ),

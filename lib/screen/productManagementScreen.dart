@@ -308,15 +308,12 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   }
 
   void _showEditDialog(int index) {
-    print('Edit dialog called for index: $index');
 
     if (index < 0 || index >= _products.length) {
-      print('Invalid index: $index');
       return;
     }
 
     final product = _products[index];
-    print('Editing product: ${product.name}');
 
     // Create local controllers for the dialog
     final nameController = TextEditingController(text: product.name);
@@ -1256,7 +1253,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   }
 
   Widget _buildProductListTab() {
-    print('Building product list tab. Product count: ${_products.length}');
     final filteredProducts = _filteredProducts;
 
     return Container(
@@ -1519,7 +1515,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                             IconButton(
                               icon: const Icon(Icons.edit, size: 20),
                               onPressed: () {
-                                print('Edit button tapped for index: $productIndex');
                                 _showEditDialog(productIndex);
                               },
                               tooltip: 'Edit Product',
@@ -1527,7 +1522,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                             IconButton(
                               icon: Icon(Icons.delete, size: 20, color: AppColors.danger),
                               onPressed: () {
-                                print('Delete button tapped for index: $productIndex');
                                 _showDeleteConfirmation(productIndex);
                               },
                               tooltip: 'Delete Product',

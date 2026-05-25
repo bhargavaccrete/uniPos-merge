@@ -11,6 +11,7 @@ import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/core/init/hive_init.dart';
 import 'package:unipos/core/di/service_locator.dart' as sl;
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
+import 'package:unipos/domain/services/common/device_id_service.dart';
 
 part 'setup_wizard_store.g.dart';
 
@@ -176,7 +177,6 @@ abstract class _SetupWizardStore with Store {
         : BusinessMode.retail;
 
     // ignore: avoid_print
-    print('selectBusinessType: id=$id, mode=$mode, isSetupComplete=${AppConfig.isSetupComplete}');
 
     // During setup wizard (before setup is complete), use forceSetBusinessMode
     // to allow user to change their mind. The mode is only permanently locked
@@ -186,10 +186,8 @@ abstract class _SetupWizardStore with Store {
         // Use forceSetBusinessMode during setup to allow changing selection
         await AppConfig.forceSetBusinessMode(mode);
         // ignore: avoid_print
-        print('selectBusinessType: AppConfig.forceSetBusinessMode completed');
       } catch (e) {
         // ignore: avoid_print
-        print('selectBusinessType: AppConfig.forceSetBusinessMode failed: $e');
       }
     }
 
@@ -197,23 +195,18 @@ abstract class _SetupWizardStore with Store {
     // This handles both first-time setup and cases where user goes back/forward
     try {
       // ignore: avoid_print
-      print('selectBusinessType: initializing Hive boxes for $mode');
       // Initialize Hive boxes for the selected business mode
       // This is needed because the Add Product screen will access these boxes
       await HiveInit.initializeForMode(mode);
       // ignore: avoid_print
-      print('selectBusinessType: Hive boxes initialized');
 
       // ignore: avoid_print
-      print('selectBusinessType: registering GetIt dependencies for $mode');
       // Register GetIt dependencies for the selected business mode
       // This must be done after Hive boxes are opened
       await _registerBusinessDependencies(mode);
       // ignore: avoid_print
-      print('selectBusinessType: GetIt dependencies registered');
     } catch (e) {
       // ignore: avoid_print
-      print('selectBusinessType initialization error: $e');
     }
   }
 
@@ -480,15 +473,11 @@ abstract class _SetupWizardStore with Store {
   Future<void> saveTaxDetails() async {
     isLoading = true;
     try {
-      print('saveTaxDetails: taxRates = $taxRates');
-      print('saveTaxDetails: taxRates length = ${taxRates?.length}');
 
       // Convert taxRates to TaxRateItem list
       List<TaxRateItem>? rateItems;
       if (taxRates != null && taxRates!.isNotEmpty) {
-        print('saveTaxDetails: Converting ${taxRates!.length} tax rates');
         rateItems = taxRates!.map((tax) {
-          print('saveTaxDetails: Converting tax - name: ${tax.name}, rate: ${tax.rate}, isDefault: ${tax.isDefault}');
           // tax is a TaxItem from UI, convert to TaxRateItem for storage
           return TaxRateItem(
             name: tax.name as String,
@@ -496,9 +485,7 @@ abstract class _SetupWizardStore with Store {
             isDefault: tax.isDefault as bool,
           );
         }).toList();
-        print('saveTaxDetails: Converted rateItems = $rateItems');
       } else {
-        print('saveTaxDetails: No tax rates to save (taxRates is null or empty)');
       }
 
       final details = TaxDetails(
@@ -511,11 +498,8 @@ abstract class _SetupWizardStore with Store {
         notes: taxNotes,
         taxRates: rateItems,
       );
-      print('saveTaxDetails: Saving TaxDetails with ${details.taxRates?.length ?? 0} tax rates');
       await _taxDetailsRepo.save(details);
-      print('saveTaxDetails: Successfully saved tax details');
     } catch (e) {
-      print('saveTaxDetails: ERROR - $e');
       errorMessage = 'Failed to save tax details: $e';
     } finally {
       isLoading = false;
@@ -582,7 +566,10 @@ abstract class _SetupWizardStore with Store {
         gstNumber: gstin.isNotEmpty ? gstin : null,
       );
 
-      // 8. Mark setup complete in AppConfig
+      // 8. Generate and cache device ID on first registration
+      await DeviceIdService.init();
+
+      // 9. Mark setup complete in AppConfig
       await AppConfig.setSetupComplete(true);
 
       isSetupComplete = true;

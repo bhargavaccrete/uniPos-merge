@@ -4,6 +4,7 @@ import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
+import '../../../../../util/common/app_responsive.dart';
 
 
 class OrderCard extends StatelessWidget {
@@ -21,14 +22,16 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+
     // Helper function to create an icon+text pair
     Widget buildHeaderItem(IconData icon, String title) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: Colors.white, size: 20),
+          Icon(icon, color: Colors.white, size: isTablet ? 22 : 20),
           SizedBox(height: 4),
-          Text(title, style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+          Text(title, style: GoogleFonts.poppins(color: Colors.white, fontSize: isTablet ? 13 : 12)),
         ],
       );
     }
@@ -74,14 +77,14 @@ class OrderCard extends StatelessWidget {
                             '#${order.orderNumber}',
                             style: GoogleFonts.poppins(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: isTablet ? 26 : 24,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           SizedBox(height: 2),
                           Text(
                             'Order No.',
-                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 10),
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: isTablet ? 11 : 10),
                           ),
                         ],
                       ),
@@ -109,20 +112,20 @@ class OrderCard extends StatelessWidget {
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 10,
+                                  fontSize: isTablet ? 12 : 10,
                                 ),
                               ),
                             );
                           }).toList(),
                         ),
                         SizedBox(height: 4),
-                        Text('KOT', style: GoogleFonts.poppins(color: Colors.white, fontSize: 10)),
+                        Text('KOT', style: GoogleFonts.poppins(color: Colors.white, fontSize: isTablet ? 11 : 10)),
                       ],
                     ),
                   ),
 
                   // Time
-                  Expanded(child: Center(child: Text(DateFormat.jm().format(order.timeStamp), style: GoogleFonts.poppins(color: Colors.white)))),
+                  Expanded(child: Center(child: Text(DateFormat.jm().format(order.timeStamp), style: GoogleFonts.poppins(color: Colors.white, fontSize: isTablet ? 13 : 12)))),
                 ],
               ),
             ),
@@ -248,7 +251,7 @@ class OrderCard extends StatelessWidget {
 
             // 5. Items List and Final Button
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(isTablet ? 14 : 12),
               color: Colors.white,
               child: Column(
                 children: [
@@ -256,18 +259,18 @@ class OrderCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 4.0),
                     child: Row(
                       children: [
-                        Text('${item.quantity}X', style: GoogleFonts.poppins()),
+                        Text('${item.quantity}X', style: GoogleFonts.poppins(fontSize: isTablet ? 14 : 13)),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(item.title, style: GoogleFonts.poppins()),
+                              Text(item.title, style: GoogleFonts.poppins(fontSize: isTablet ? 14 : 13)),
                               if (item.variantName != null && item.variantName!.isNotEmpty)
                                 Text(
                                   'Size: ${item.variantName}',
                                   style: GoogleFonts.poppins(
-                                    fontSize: 12,
+                                    fontSize: isTablet ? 13 : 12,
                                     color: Colors.grey.shade600,
                                     fontStyle: FontStyle.italic,
                                   ),
@@ -276,7 +279,7 @@ class OrderCard extends StatelessWidget {
                                 Text(
                                   'Choices: ${item.choiceNames!.join(', ')}',
                                   style: GoogleFonts.poppins(
-                                    fontSize: 12,
+                                    fontSize: isTablet ? 13 : 12,
                                     color: Colors.grey.shade600,
                                     fontStyle: FontStyle.italic,
                                   ),
@@ -322,7 +325,7 @@ class OrderCard extends StatelessWidget {
                                     return Text(
                                       'Extras: $extrasDisplay',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 12,
+                                        fontSize: isTablet ? 13 : 12,
                                         color: Colors.orange.shade700,
                                         fontStyle: FontStyle.italic,
                                         fontWeight: FontWeight.w500,
@@ -341,10 +344,10 @@ class OrderCard extends StatelessWidget {
                     onPressed:ontapcooking,
                     style: ElevatedButton.styleFrom(
                       backgroundColor:color,
-                      minimumSize: const Size(double.infinity, 40),
+                      minimumSize: Size(double.infinity, isTablet ? 46 : 40),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    child: Text(order.status, style: GoogleFonts.poppins(color: Colors.white)),
+                    child: Text(order.status, style: GoogleFonts.poppins(color: Colors.white, fontSize: isTablet ? 14 : 13)),
                   ),
                 ],
               ),

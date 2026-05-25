@@ -33,9 +33,6 @@ class ItemRepository {
 
   /// Update an existing item in Hive
   Future<void> updateItem(Items item) async {
-    print('📝 REPOSITORY - Saving item: ${item.name}');
-    print('   trackInventory BEFORE save: ${item.trackInventory}');
-    print('   allowOrderWhenOutOfStock BEFORE save: ${item.allowOrderWhenOutOfStock}');
 
     await _itemBox.put(item.id, item);
 
@@ -47,8 +44,6 @@ class ItemRepository {
 
     // Verify what was actually saved
     final savedItem = _itemBox.get(item.id);
-    print('   trackInventory AFTER save: ${savedItem?.trackInventory}');
-    print('   allowOrderWhenOutOfStock AFTER save: ${savedItem?.allowOrderWhenOutOfStock}');
   }
 
   /// Delete an item from Hive

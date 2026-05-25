@@ -7,6 +7,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -61,18 +62,13 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
     await AddCategoryDialog.show(context);
   }
 
-  int _getGridColumns(double width) {
-    if (width > 1200) return 4;
-    else if (width > 900) return 3;
-    else return 2;
-  }
 
   @override
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -148,7 +144,7 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
         return GridView.builder(
           padding: EdgeInsets.all(24),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _getGridColumns(size.width),
+            crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4),
             crossAxisSpacing: 12,
             mainAxisSpacing: 8,
             childAspectRatio: 3.5,
@@ -290,9 +286,13 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
   void _showDeleteDialog(Category category) {
     final itemCount = itemStore.items.where((i) => i.categoryOfItem == category.id).length;
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${category.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
         content: Text(
@@ -316,19 +316,20 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
   }
 
   Widget _buildAddButton() {
+    final isTablet = !AppResponsive.isMobile(context);
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(isTablet ? 20 : 16),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: _showAddCategoryBottomSheet,
-          icon: Icon(Icons.add, size: 20),
-          label: Text('Add Category', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+          label: Text('Add Category', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: 14),
+            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),

@@ -83,9 +83,7 @@ abstract class _CartStore with Store {
                 },
               );
               availableStock = itemVariant.stockQuantity ?? 0;
-              print('✅ STOCK CHECK: Variant "${item.variantName}" - Available: $availableStock');
             } catch (e) {
-              print('❌ VARIANT NOT FOUND: ${item.variantName} for ${item.title}');
               return {
                 'success': false,
                 'message': 'Variant "${item.variantName}" not found'
@@ -94,14 +92,12 @@ abstract class _CartStore with Store {
           } else {
             // No variants - use base item stock
             availableStock = actualItem.stockQuantity;
-            print('✅ STOCK CHECK: Base item - Available: $availableStock');
           }
 
           // Check if item is weight-based (already validated in dialog, but double-check)
           if (!actualItem.isSoldByWeight) {
             // For unit-based items, check if we have enough quantity
             if (availableStock < item.quantity) {
-              print('❌ STOCK CHECK FAILED: ${item.title} - Available: $availableStock, Requested: ${item.quantity}');
               return {
                 'success': false,
                 'message': 'Insufficient stock! Available: ${availableStock.toInt()} units, You requested: ${item.quantity} units'
@@ -116,7 +112,6 @@ abstract class _CartStore with Store {
             if (existingItem != null) {
               final totalNeeded = existingItem.quantity + item.quantity;
               if (totalNeeded > availableStock) {
-                print('❌ STOCK CHECK FAILED: ${item.title} - Already in cart: ${existingItem.quantity}, Total needed: $totalNeeded, Available: $availableStock');
                 return {
                   'success': false,
                   'message': 'Insufficient stock! Available: ${availableStock.toInt()} units, In cart: ${existingItem.quantity}, Total needed: $totalNeeded units'
@@ -181,16 +176,13 @@ abstract class _CartStore with Store {
                 },
               );
               availableStock = itemVariant.stockQuantity ?? 0;
-              print('✅ UPDATE QTY: Variant "${cartItem.variantName}" - Available: $availableStock, Requested: $newQuantity');
             } catch (e) {
-              print('❌ UPDATE QTY: Variant not found: ${cartItem.variantName}');
               NotificationService.instance.showError('Variant "${cartItem.variantName}" not found');
               return false;
             }
           } else {
             // No variants - use base item stock
             availableStock = item.stockQuantity;
-            print('✅ UPDATE QTY: Base item - Available: $availableStock, Requested: $newQuantity');
           }
 
           if (item.isSoldByWeight == true) {

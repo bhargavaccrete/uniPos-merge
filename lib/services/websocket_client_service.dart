@@ -23,7 +23,6 @@ class WebSocketClientService {
   /// Start the WebSocket client service
   Future<void> start() async {
     if (_isEnabled) {
-      print('⚠️ WebSocket client already started');
       return;
     }
 
@@ -45,7 +44,6 @@ class WebSocketClientService {
     try {
       // Use 127.0.0.1 instead of localhost for better Android compatibility
       const wsUrl = 'ws://127.0.0.1:9090/ws';
-      print('🔌 UniPOS connecting to WebSocket: $wsUrl');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
@@ -56,27 +54,21 @@ class WebSocketClientService {
         (message) {
           try {
             final data = jsonDecode(message as String);
-            print('📨 UniPOS received WebSocket message: ${data['type']}');
             _messageController?.add(data);
           } catch (e) {
-            print('⚠️ Error parsing WebSocket message: $e');
           }
         },
         onError: (error) {
-          print('⚠️ UniPOS WebSocket error: $error');
           _handleDisconnect();
         },
         onDone: () {
-          print('🔌 UniPOS WebSocket connection closed');
           _handleDisconnect();
         },
         cancelOnError: false,
       );
 
       _isConnecting = false;
-      print('✅ UniPOS WebSocket connected successfully');
     } catch (e) {
-      print('❌ UniPOS WebSocket connection error: $e');
       _isConnecting = false;
       _handleDisconnect();
     }
@@ -91,7 +83,6 @@ class WebSocketClientService {
       _reconnectTimer?.cancel();
       _reconnectTimer = Timer(const Duration(seconds: 10), () {
         if (_isEnabled && !_isConnecting) {
-          print('🔄 UniPOS attempting to reconnect WebSocket...');
           _connect();
         }
       });

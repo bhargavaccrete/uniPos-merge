@@ -771,6 +771,21 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       );
 
       if (image != null) {
+        final bytes = await image.readAsBytes();
+        
+        // Validate image size (max 2MB)
+        if (bytes.length > 2 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image is too large. Please select an image under 2MB.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+        
         // Get app's documents directory
         final Directory appDir = await getApplicationDocumentsDirectory();
         final String logoDir = '${appDir.path}/logos';

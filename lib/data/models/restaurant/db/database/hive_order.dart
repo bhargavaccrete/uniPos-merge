@@ -87,7 +87,6 @@ static Future<void> deleteOrder (String id )async{
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     await counterBox.put('lastBillDate', todayStr);
-    print('✅ Daily bill number reset to 0');
   }
 
   /// Get next daily order number (resets every day)
@@ -105,7 +104,6 @@ static Future<void> deleteOrder (String id )async{
     if (lastOrderDate != todayStr) {
       await counterBox.put('lastOrderNumber', 0);
       await counterBox.put('lastOrderDate', todayStr);
-      print('🔄 New day detected - Order number reset to 0');
     }
 
     // Get and increment the order number
@@ -113,7 +111,6 @@ static Future<void> deleteOrder (String id )async{
     int newNumber = lastNumber + 1;
     await counterBox.put('lastOrderNumber', newNumber);
 
-    print('📋 Order Number Generated: #$newNumber');
     return newNumber;
   }
 
@@ -125,7 +122,6 @@ static Future<void> deleteOrder (String id )async{
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     await counterBox.put('lastOrderDate', todayStr);
-    print('✅ Daily order number reset to 0');
   }
 
   static Future<List<OrderModel>> getAllActiveOrders() async {
@@ -179,16 +175,12 @@ static Future<void> deleteOrder (String id )async{
     final box = _getOrderBox(); // Your function to open the order box
     dynamic orderKey;
 
-    print('🔍 Looking for order with ID: ${updatedOrder.id}');
-    print('📦 Total orders in box: ${box.length}');
 
     // Loop through the box to find the key of the order with a matching ID
     for (var key in box.keys) {
       final order = box.get(key) as OrderModel?;
-      print('   Checking key: $key, Order ID: ${order?.id}, TableNo: ${order?.tableNo}');
       if (order?.id == updatedOrder.id) {
         orderKey = key;
-        print('   ✅ Found matching order!');
         break; // Found the key, no need to continue looping
       }
     }
@@ -196,16 +188,12 @@ static Future<void> deleteOrder (String id )async{
     if (orderKey != null) {
       // Use the found key to overwrite the old order with the updated one
       final oldOrder = box.get(orderKey) as OrderModel?;
-      print('📝 Updating order: Old TableNo=${oldOrder?.tableNo}, New TableNo=${updatedOrder.tableNo}');
       await box.put(orderKey, updatedOrder);
-      print('✅ Order updated successfully with key: $orderKey');
 
       // Verify the update
       final verifyOrder = box.get(orderKey) as OrderModel?;
-      print('🔍 Verification - Updated TableNo: ${verifyOrder?.tableNo}');
     } else {
       // This can happen if the order was deleted elsewhere
-      print("❌ Error: Could not find order with ID ${updatedOrder.id} to update.");
     }
   }
 
@@ -245,9 +233,6 @@ static Future<void> deleteOrder (String id )async{
     // Save to database
     await updateOrder(updatedOrder);
 
-    print('✅ Order ${existingOrder.id} updated with ${newItems.length} new items');
-    print('   New KOT #$newKotNumber generated');
-    print('   Status: ${existingOrder.status} → ${updatedOrder.status}');
 
     // Broadcast update via WebSocket if requested
     if (broadcastUpdate) {
@@ -262,9 +247,7 @@ static Future<void> deleteOrder (String id )async{
           'newItemCount': newItems.length,
           'allKotNumbers': updatedKotNumbers,
         });
-        print('📡 WebSocket event broadcast: ${needsStatusReset ? "ORDER_UPDATED" : "NEW_ITEMS_ADDED"}');
       } catch (e) {
-        print('⚠️ Failed to broadcast WebSocket event: $e');
       }
     }
 

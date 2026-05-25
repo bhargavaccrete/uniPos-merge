@@ -13,6 +13,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 class Companyregister extends StatefulWidget {
   const Companyregister({super.key});
@@ -131,13 +132,11 @@ class _CompanyregisterState extends State<Companyregister> {
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 1;
-    // final width = MediaQuery.of(context).size.width * 1;
-    final size = MediaQuery.of(context).size;
-    final width = size.width;
+    final width = MediaQuery.of(context).size.width;
 
-    bool forMobile = width < 600;
-    bool fortablet = width >= 600 && width < 1024;
-    bool fordesktop = width >= 1024;
+    final forMobile = AppResponsive.isMobile(context);
+    final fortablet = AppResponsive.isTablet(context);
+    final fordesktop = AppResponsive.isDesktop(context);
 
     double iconSize = forMobile
         ? 24
@@ -294,8 +293,6 @@ class _CompanyregisterState extends State<Companyregister> {
                             children: [
                               CountryCodePicker(
                                 onChanged: (conuntry) {
-                                  print(
-                                      "selected country:${conuntry.dialCode}");
                                 },
                                 initialSelection: 'IN',
                                 showCountryOnly: false,
@@ -349,8 +346,6 @@ class _CompanyregisterState extends State<Companyregister> {
                             children: [
                               CountryCodePicker(
                                 onChanged: (conuntry) {
-                                  print(
-                                      "selected country:${conuntry.dialCode}");
                                 },
                                 initialSelection: 'IN',
                                 showCountryOnly: false,
@@ -843,7 +838,6 @@ class _CompanyregisterState extends State<Companyregister> {
                           height: height * 0.08,
                           width: width,
                           onTap:(){
-                            print('button pressed');
                             _saveCompanyData();
                           },
                           child: Center(

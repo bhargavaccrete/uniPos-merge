@@ -10,6 +10,7 @@ import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
+import '../../../../../util/common/app_responsive.dart';
 
 class CartItemStatus {
   final CartItem item;
@@ -41,6 +42,12 @@ class _CartScreenState extends State<CartScreen>
 
   List<CartItem> _activeList = [];
   List<CartItem> _newlyAddedList = [];
+
+  // Staged-commit tracking for existing order edits
+  List<CartItem> _originalActiveList = [];
+  Map<String, int> _originalQuantities = {};
+  List<int> _currentKotBoundaries = [];
+  List<int> _currentKotNumbers = [];
 
 
   List<CartItemStatus>
@@ -87,13 +94,18 @@ class _CartScreenState extends State<CartScreen>
       if (_isIntalizedLoad) {
         restaurantCartStore.clearCart(); // fire-and-forget, no need to await
         _isIntalizedLoad = false;
+        // Deep copy — mutations to _activeList items must not leak to the Hive-cached order
+        _originalActiveList = widget.existingOrder!.items.map((i) => i.copyWith()).toList();
+        _originalQuantities = {for (final item in _originalActiveList) item.id: item.quantity};
+        _currentKotBoundaries = List.from(widget.existingOrder!.kotBoundaries);
+        _currentKotNumbers = List.from(widget.existingOrder!.kotNumbers);
       }
 
       // Load any newly added cart items in parallel (non-blocking)
       final cartFuture = restaurantCartStore.loadCartItems();
 
       setState(() {
-        _activeList = List.from(widget.existingOrder!.items);
+        _activeList = widget.existingOrder!.items.map((i) => i.copyWith()).toList();
         isExistingOrder = true;
         selectedFilter = widget.existingOrder!.orderType;
         tableNo = widget.existingOrder!.tableNo;
@@ -185,6 +197,10 @@ class _CartScreenState extends State<CartScreen>
       isDineIn: isDineIn,
       isdelivery: isDelivery,
       cartItems: _combinedList,
+      originalActiveItems: _originalActiveList,
+      originalQuantities: _originalQuantities,
+      currentKotBoundaries: _currentKotBoundaries,
+      currentKotNumbers: _currentKotNumbers,
       onAddtoCart: (item) async {
         final result = await restaurantCartStore.addToCart(item);
         if (result['success'] == true) {
@@ -199,59 +215,62 @@ class _CartScreenState extends State<CartScreen>
         }
       },
       onIncreseQty: (item) async {
-        // Check stock availability before increasing quantity
-        Items? inventoryItem;
+        // Active (KOT'd) items: stage the change, committed on Place Order
+        if (_activeList.any((a) => a.id == item.id)) {
+          _updateActiveItemQty(item, 1);
+          return;
+        }
 
+        // New cart items — stock check then cart store update
+        Items? inventoryItem;
         try {
           inventoryItem = itemStore.items.firstWhere(
                 (invItem) => invItem.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
           );
         } catch (e) {
-          // Item not found, allow increase (no inventory tracking)
-          await restaurantCartStore.updateQuantity(item.id, item.quantity + 1);
-          await loadCartItems();
+          if (mounted) NotificationService.instance.showError('Item not found in inventory database');
           return;
         }
 
-        // Check if inventory tracking is enabled and stock is available
-        if (inventoryItem.trackInventory) {
-          if (!inventoryItem.allowOrderWhenOutOfStock) {
-            final requestedQuantity = item.quantity + 1;
-
-            if (item.variantName != null && inventoryItem.variant != null) {
-              // Check variant stock - use stockQuantity directly from ItemVariante
-              try {
-                final variant = inventoryItem.variant!.firstWhere(
-                      (v) => _getVariantName(v.variantId) == item.variantName,
-                );
-                final availableStock = variant.stockQuantity ?? 0;
-
-                if (availableStock < requestedQuantity) {
-                  NotificationService.instance.showError(
-                    'Only ${availableStock.toInt()} ${item.title} (${item.variantName}) available in stock',
-                  );
-                  return;
-                }
-              } catch (e) {
-                print('Error checking variant stock: $e');
-              }
-            } else {
-              // Check regular item stock - use stockQuantity directly from Items
-              if (inventoryItem.stockQuantity < requestedQuantity) {
+        if (inventoryItem.trackInventory && !inventoryItem.allowOrderWhenOutOfStock) {
+          final requestedQuantity = item.quantity + 1;
+          if (item.variantName != null && inventoryItem.variant != null) {
+            try {
+              final variant = inventoryItem.variant!.firstWhere(
+                    (v) => _getVariantName(v.variantId) == item.variantName,
+              );
+              final availableStock = variant.stockQuantity ?? 0;
+              if (availableStock < requestedQuantity) {
                 NotificationService.instance.showError(
-                    'Only ${inventoryItem.stockQuantity.toInt()} ${item.title} available in stock'
+                  'Only ${availableStock.toInt()} ${item.title} (${item.variantName}) available in stock',
                 );
                 return;
               }
+            } catch (e) {}
+          } else {
+            if (inventoryItem.stockQuantity < requestedQuantity) {
+              NotificationService.instance.showError(
+                  'Only ${inventoryItem.stockQuantity.toInt()} ${item.title} available in stock');
+              return;
             }
           }
         }
 
-        // If all checks pass, update quantity
         await restaurantCartStore.updateQuantity(item.id, item.quantity + 1);
         await loadCartItems();
       },
       onDecreseQty: (item) async {
+        // Active (KOT'd) items: stage the change, committed on Place Order
+        if (_activeList.any((a) => a.id == item.id)) {
+          if (item.quantity > 1) {
+            _updateActiveItemQty(item, -1);
+          } else {
+            _removeActiveItem(item);
+          }
+          return;
+        }
+
+        // New cart items — cart store update
         if (item.quantity > 1) {
           await restaurantCartStore.updateQuantity(item.id, item.quantity - 1);
         } else {
@@ -260,6 +279,38 @@ class _CartScreenState extends State<CartScreen>
         await loadCartItems();
       },
     );
+  }
+
+  /// Stage a quantity change for a KOT'd item — committed on "Place Order".
+  void _updateActiveItemQty(CartItem item, int delta) {
+    if (widget.existingOrder == null) return;
+    setState(() => item.quantity = item.quantity + delta);
+  }
+
+  /// Stage removal of a KOT'd item — boundaries updated locally, committed on "Place Order".
+  void _removeActiveItem(CartItem item) {
+    if (widget.existingOrder == null) return;
+    final idx = _activeList.indexWhere((i) => i.id == item.id);
+    if (idx == -1) return;
+
+    int kotIndex = _currentKotBoundaries.length - 1;
+    for (int i = 0; i < _currentKotBoundaries.length; i++) {
+      if (idx < _currentKotBoundaries[i]) { kotIndex = i; break; }
+    }
+
+    setState(() {
+      _activeList.removeAt(idx);
+      for (int i = kotIndex; i < _currentKotBoundaries.length; i++) {
+        _currentKotBoundaries[i]--;
+      }
+      if (_currentKotBoundaries.isNotEmpty) {
+        final prevBoundary = kotIndex == 0 ? 0 : _currentKotBoundaries[kotIndex - 1];
+        if (_currentKotBoundaries[kotIndex] == prevBoundary) {
+          _currentKotNumbers.removeAt(kotIndex);
+          _currentKotBoundaries.removeAt(kotIndex);
+        }
+      }
+    });
   }
 
   Widget _getBody() {
@@ -279,6 +330,7 @@ class _CartScreenState extends State<CartScreen>
   /// ------------------- MAIN BUILD ------------------- ///
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -287,7 +339,7 @@ class _CartScreenState extends State<CartScreen>
           isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length})',
           style: GoogleFonts.poppins(
             color: Colors.white,
-            fontSize: 17,
+            fontSize: AppResponsive.getValue(context, mobile: 17, tablet: 19),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -299,9 +351,13 @@ class _CartScreenState extends State<CartScreen>
           IconButton(
             icon: Icon(Icons.delete_outline, color: Colors.white, size: 22),
             onPressed: () {
+              final hInset = !AppResponsive.isMobile(context)
+                  ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                  : 24.0;
               showDialog(
                 context: context,
                 builder: (_) => AlertDialog(
+                  insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   title: Text('Clear Cart', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 17)),
                   content: Text('Remove all items from cart?', style: GoogleFonts.poppins(fontSize: 14)),
@@ -331,7 +387,7 @@ class _CartScreenState extends State<CartScreen>
               children: [
                 // Order type tabs
                 Container(
-                  margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  margin: EdgeInsets.symmetric(horizontal: isTablet ? 20 : 12, vertical: isTablet ? 10 : 8),
                   child: Row(
                     children: [
                       _buildTabChip('Take Away', Icons.shopping_bag_outlined, selectedFilter == "Take Away",
@@ -384,9 +440,14 @@ class _CartScreenState extends State<CartScreen>
                                 try {
                                   final oldTableNo = widget.existingOrder!.tableNo;
                                   final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
+                                  // Order write is source of truth — crash here leaves state consistent.
                                   await orderStore.updateOrder(updatedOrder);
-                                  if (oldTableNo != null && oldTableNo.isNotEmpty) await tableStore.updateTableStatus(oldTableNo, 'Available');
-                                  await tableStore.updateTableStatus(result, 'Cooking', total: updatedOrder.totalPrice, orderId: updatedOrder.id, orderTime: updatedOrder.timeStamp);
+                                  // Batch both table updates into one yield point to halve the crash window.
+                                  await Future.wait([
+                                    tableStore.updateTableStatus(result, 'Cooking', total: updatedOrder.totalPrice, orderId: updatedOrder.id, orderTime: updatedOrder.timeStamp),
+                                    if (oldTableNo != null && oldTableNo.isNotEmpty)
+                                      tableStore.updateTableStatus(oldTableNo, 'Available'),
+                                  ]);
                                   setState(() { _selectedTableNoForUI = result; tableNo = result; });
                                   NotificationService.instance.showInfo('Table changed to $result');
                                 } catch (e) {
@@ -441,7 +502,7 @@ class _CartScreenState extends State<CartScreen>
         onTap: onTap,
         child: Container(
           margin: EdgeInsets.symmetric(horizontal: 3),
-          padding: EdgeInsets.symmetric(vertical: 10),
+          padding: EdgeInsets.symmetric(vertical: AppResponsive.getValue(context, mobile: 10, tablet: 12)),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primary : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(10),
@@ -449,10 +510,10 @@ class _CartScreenState extends State<CartScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: isSelected ? Colors.white : Colors.grey.shade600),
+              Icon(icon, size: AppResponsive.getValue(context, mobile: 16, tablet: 18), color: isSelected ? Colors.white : Colors.grey.shade600),
               SizedBox(width: 6),
               Text(title, style: GoogleFonts.poppins(
-                fontSize: 12, fontWeight: FontWeight.w500,
+                fontSize: AppResponsive.getValue(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500,
                 color: isSelected ? Colors.white : Colors.grey.shade700,
               )),
             ],
@@ -504,10 +565,14 @@ class _CartScreenState extends State<CartScreen>
     }
 
     // Show dialog to select table to merge
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
           title: Text(
             'Merge Table',
             style: GoogleFonts.poppins(
@@ -595,10 +660,14 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> _confirmMerge(OrderModel sourceOrder) async {
     // Show confirmation dialog
+    final mergeHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: mergeHInset, vertical: 24),
           title: Text(
             'Confirm Merge',
             style: GoogleFonts.poppins(
@@ -677,11 +746,6 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> _mergeTables(OrderModel sourceOrder) async {
     try {
-      print('=== MERGE TABLES DEBUG ===');
-      print('Source Table: ${sourceOrder.tableNo}');
-      print('Target Table: ${widget.existingOrder!.tableNo}');
-      print('Source Items: ${sourceOrder.items.length}');
-      print('Target Items: ${widget.existingOrder!.items.length}');
 
       // 1. Combine items from both orders
       final combinedItems = [
@@ -717,32 +781,27 @@ class _CartScreenState extends State<CartScreen>
 
       // 6. Update the main order in database
       await orderStore.updateOrder(mergedOrder);
-      print('✅ Merged order updated in database');
 
       // 7. Delete the source order
       await orderStore.deleteOrder(sourceOrder.id);
-      print('✅ Source order deleted');
 
-      // 8. Update table statuses
-      // Target table keeps cooking status with updated total
-      await tableStore.updateTableStatus(
-        widget.existingOrder!.tableNo!,
-        'Cooking',
-        total: newTotal,
-        orderId: mergedOrder.id,
-        orderTime: mergedOrder.timeStamp,
-      );
-
-      // Source table becomes available
-      await tableStore.updateTableStatus(sourceOrder.tableNo!, 'Available');
-      print('✅ Table statuses updated');
+      // 8. Update table statuses in parallel
+      await Future.wait([
+        tableStore.updateTableStatus(
+          widget.existingOrder!.tableNo!,
+          'Cooking',
+          total: newTotal,
+          orderId: mergedOrder.id,
+          orderTime: mergedOrder.timeStamp,
+        ),
+        tableStore.updateTableStatus(sourceOrder.tableNo!, 'Available'),
+      ]);
 
       // 9. Update local state
       setState(() {
         _activeList = List.from(combinedItems);
       });
 
-      print('=== MERGE COMPLETE ===');
 
       // Show success message
       NotificationService.instance.showSuccess(
@@ -750,8 +809,6 @@ class _CartScreenState extends State<CartScreen>
       );
 
     } catch (e, stackTrace) {
-      print('❌ Error merging tables: $e');
-      print('Stack trace: $stackTrace');
       NotificationService.instance.showError(
         'Failed to merge tables. Please try again.',
       );

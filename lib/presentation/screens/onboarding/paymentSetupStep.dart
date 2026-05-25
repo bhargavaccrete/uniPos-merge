@@ -5,6 +5,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import '../../../util/common/app_responsive.dart';
 import 'package:unipos/stores/payment_method_store.dart';
 import '../../../util/color.dart';
+import '../../../util/common/currency_helper.dart';
 
 /// Payment Setup Step — Setup Wizard
 /// Modern UI matching TaxSetupStep style.
@@ -78,6 +79,93 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
 
   IconData _getIcon(String iconName) =>
       _availableIcons[iconName] ?? Icons.payment;
+
+  // ── Currency picker ─────────────────────────────────────────────────────────
+
+  void _showCurrencyPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.65,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.currency_exchange, color: AppColors.primary),
+                  const SizedBox(width: 10),
+                  Text('Select Currency',
+                      style: GoogleFonts.poppins(
+                          fontSize: 16, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                children: CurrencyHelper.currencies.entries.map((e) {
+                  final info = e.value;
+                  final isSelected = CurrencyHelper.currentCurrencyCode == info.code;
+                  return ListTile(
+                    leading: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary.withValues(alpha: 0.12)
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(info.symbol,
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                            )),
+                      ),
+                    ),
+                    title: Text(info.name,
+                        style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            color: AppColors.textPrimary)),
+                    subtitle: Text(info.code,
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: AppColors.textSecondary)),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: AppColors.primary)
+                        : null,
+                    onTap: () async {
+                      await CurrencyHelper.setCurrency(info.code);
+                      if (mounted) Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── Add dialog ──────────────────────────────────────────────────────────────
 
@@ -400,11 +488,21 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
 
     final hPad = AppResponsive.getValue<double>(
         context, mobile: 20, tablet: 32, desktop: 40);
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final vPad = AppResponsive.getValue<double>(
+        context, mobile: 16, tablet: 20, desktop: 24);
+    final maxWidth = AppResponsive.getValue<double>(
+        context, mobile: double.infinity, tablet: 680, desktop: 760);
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
           // ── Header ──
           Row(
             children: [
@@ -478,6 +576,69 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
           ),
           const SizedBox(height: 24),
 
+          // ── Currency selector ──
+          Text('Currency',
+              style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 10),
+          ValueListenableBuilder<String>(
+            valueListenable: CurrencyHelper.currencyNotifier,
+            builder: (_, code, __) {
+              final info = CurrencyHelper.currencies[code] ?? CurrencyHelper.currencies['INR']!;
+              return GestureDetector(
+                onTap: _showCurrencyPicker,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(info.symbol,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary)),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(info.name,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary)),
+                            Text(info.code,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+
           // ── Methods list ──
           Observer(builder: (_) {
             if (_store.isLoading && _store.paymentMethods.isEmpty) {
@@ -502,94 +663,109 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
             );
           }),
 
-          const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, vPad),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
+            ),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: _buildNavSection(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-          // ── Navigation ──
-          Observer(builder: (_) {
-            final hasEnabled = _store.enabledCount > 0;
-            return Column(
-              children: [
-                if (!hasEnabled)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.danger.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color:
-                                AppColors.danger.withValues(alpha: 0.25)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.warning_amber_rounded,
-                              color: AppColors.danger, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Enable at least one payment method to continue.',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.danger),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                Row(
+  Widget _buildNavSection() {
+    return Observer(builder: (_) {
+      final hasEnabled = _store.enabledCount > 0;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!hasEnabled)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
+                ),
+                child: Row(
                   children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        color: AppColors.danger, size: 16),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: widget.onPrevious,
-                        icon: const Icon(Icons.arrow_back, size: 16),
-                        label: Text('Back',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
-                          side: const BorderSide(color: AppColors.divider),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: hasEnabled ? widget.onNext : null,
-                        icon: const Icon(Icons.arrow_forward, size: 16),
-                        label: Text('Continue',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          disabledBackgroundColor:
-                              AppColors.primary.withValues(alpha: 0.4),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
+                      child: Text(
+                        'Enable at least one payment method to continue.',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: AppColors.danger),
                       ),
                     ),
                   ],
                 ),
-              ],
-            );
-          }),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onPrevious,
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: Text('Back',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    side: const BorderSide(color: AppColors.divider),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: hasEnabled ? widget.onNext : null,
+                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  label: Text('Continue',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    disabledBackgroundColor:
+                        AppColors.primary.withValues(alpha: 0.4),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
-      ),
-    );
+      );
+    });
   }
 
   // ── Method card ─────────────────────────────────────────────────────────────
@@ -614,7 +790,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
-        ],
+     ],
       ),
       child: Padding(
         padding:

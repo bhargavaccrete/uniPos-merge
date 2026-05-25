@@ -30,10 +30,6 @@ class RefundService {
     required PartialRefundResult refundResult,
   }) async {
     try {
-      print('🔄 RefundService: Processing refund...');
-      print('Items to refund: ${refundResult.itemsToRefund.length}');
-      print('Total refund amount: ${refundResult.totalRefundAmount}');
-      print('Items to restock: ${refundResult.itemsToRestock.length}');
 
       // Update refunded quantities for each item.
       // Items may be grouped in the refund dialog (same product across KOTs),
@@ -54,12 +50,10 @@ class RefundService {
                 refundedQuantity: (item.refundedQuantity ?? 0) + toRefund,
               );
               remaining -= toRefund;
-              print('✅ Updated refund for ${item.title} (id:${item.id}): +$toRefund');
             }
           }
         }
         if (remaining > 0) {
-          print('⚠️ Could not fully distribute refund for ${itemToRefund.title}: $remaining left');
         }
       });
 
@@ -71,7 +65,6 @@ class RefundService {
       });
 
       final newStatus = allItemsRefunded ? 'FULLY_REFUNDED' : 'PARTIALLY_REFUNDED';
-      print('📝 New order status: $newStatus');
 
       final _staffLabel = RestaurantSession.isAdmin
           ? 'Admin'
@@ -88,23 +81,28 @@ class RefundService {
         refundedBy: _staffLabel,
       );
 
-      print('💾 Saving updated order...');
       await pastOrderStore.updateOrder(updatedOrder);
-      print('✅ Order updated successfully');
 
       // Restore stock for items marked for restocking
       if (refundResult.itemsToRestock.isNotEmpty) {
-        print('📦 Starting stock restoration...');
         await InventoryService.restoreStockForRefund(refundResult.itemsToRestock);
-      } else {
-        print('⚠️ No items marked for restocking');
       }
 
-      print('✅ RefundService: Refund processing completed');
+      // Restore loyalty points proportional to refund amount
+      final cid = order.customerId;
+      final pointsUsed = order.loyaltyPointsUsed ?? 0;
+      if (cid != null && pointsUsed > 0) {
+        final refundRatio = order.totalPrice > 0
+            ? refundResult.totalRefundAmount / order.totalPrice
+            : 0.0;
+        final pointsToRestore = (pointsUsed * refundRatio).round();
+        if (pointsToRestore > 0) {
+          await restaurantCustomerStore.addLoyaltyPoints(cid, pointsToRestore);
+        }
+      }
+
       return updatedOrder;
     } catch (e, stackTrace) {
-      print('❌ RefundService: Error processing refund: $e');
-      print('Stack trace: $stackTrace');
       rethrow; // Rethrow so caller can handle and show error to user
     }
   }
@@ -196,7 +194,6 @@ class RefundService {
     required String reason,
   }) async {
     try {
-      print('🔄 RefundService: Voiding order...');
 
       final _staffLabel = RestaurantSession.isAdmin
           ? 'Admin'
@@ -211,11 +208,10 @@ class RefundService {
 
       await pastOrderStore.updateOrder(voidedOrder);
 
-      print('✅ RefundService: Order voided successfully');
+      // Past orders (already served/paid) — stock was legitimately consumed, no restore.
+
       return voidedOrder;
     } catch (e, stackTrace) {
-      print('❌ RefundService: Error voiding order: $e');
-      print('Stack trace: $stackTrace');
       rethrow;
     }
   }

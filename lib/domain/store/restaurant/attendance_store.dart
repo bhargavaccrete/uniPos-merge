@@ -1,7 +1,5 @@
-import 'package:hive/hive.dart';
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
-import '../../../core/constants/hive_box_names.dart';
 import '../../../data/models/restaurant/db/attendance_model.dart';
 import '../../../data/repositories/restaurant/attendance_repository.dart';
 

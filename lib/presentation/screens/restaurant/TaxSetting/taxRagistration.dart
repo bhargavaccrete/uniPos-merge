@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class Taxragistration extends StatefulWidget {
   @override
@@ -15,9 +16,14 @@ class _TaxragistrationState extends State<Taxragistration> {
     final nameController = TextEditingController();
     final numberController = TextEditingController();
 
+    final isTabletDialog = !AppResponsive.isMobile(context);
+    final hInset = isTabletDialog
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Add Tax Registration',
@@ -89,8 +95,7 @@ class _TaxragistrationState extends State<Taxragistration> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -102,7 +107,7 @@ class _TaxragistrationState extends State<Taxragistration> {
         title: Text(
           'Tax Registration',
           style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
+            fontSize: AppResponsive.headingFontSize(context),
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
@@ -110,20 +115,20 @@ class _TaxragistrationState extends State<Taxragistration> {
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
+              horizontal: AppResponsive.mediumSpacing(context),
               vertical: 8,
             ),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(isTablet ? 10 : 8),
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.person,
-                    size: isTablet ? 22 : 20,
+                    size: AppResponsive.iconSize(context),
                     color: AppColors.primary,
                   ),
                 ),
@@ -153,14 +158,14 @@ class _TaxragistrationState extends State<Taxragistration> {
                       children: [
                         Icon(
                           Icons.receipt_long_outlined,
-                          size: isTablet ? 80 : 64,
+                          size: AppResponsive.largeAvatarSize(context),
                           color: Colors.grey.shade400,
                         ),
-                        SizedBox(height: isTablet ? 20 : 16),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
                         Text(
                           'No tax registrations added yet',
                           style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 18 : 16,
+                            fontSize: AppResponsive.subheadingFontSize(context),
                             fontWeight: FontWeight.w500,
                             color: Colors.grey.shade600,
                           ),
@@ -169,7 +174,7 @@ class _TaxragistrationState extends State<Taxragistration> {
                         Text(
                           'Tap the button below to add one',
                           style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 14 : 13,
+                            fontSize: AppResponsive.bodyFontSize(context),
                             color: Colors.grey.shade500,
                           ),
                         ),
@@ -177,13 +182,13 @@ class _TaxragistrationState extends State<Taxragistration> {
                     ),
                   )
                 : ListView.builder(
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
+                    padding: AppResponsive.padding(context),
                     itemCount: _registrations.length,
                     itemBuilder: (context, index) {
                       final entry = _registrations[index];
                       return Container(
-                        margin: EdgeInsets.only(bottom: isTablet ? 12 : 10),
-                        padding: EdgeInsets.all(isTablet ? 16 : 14),
+                        margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+                        padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
@@ -206,11 +211,11 @@ class _TaxragistrationState extends State<Taxragistration> {
                               ),
                               child: Icon(
                                 Icons.receipt_long_rounded,
-                                size: isTablet ? 26 : 22,
+                                size: AppResponsive.iconSize(context),
                                 color: Colors.blue,
                               ),
                             ),
-                            SizedBox(width: isTablet ? 16 : 12),
+                            SizedBox(width: AppResponsive.mediumSpacing(context)),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,7 +223,7 @@ class _TaxragistrationState extends State<Taxragistration> {
                                   Text(
                                     entry['name']!,
                                     style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 16 : 15,
+                                      fontSize: AppResponsive.bodyFontSize(context),
                                       fontWeight: FontWeight.w600,
                                       color: Colors.black87,
                                     ),
@@ -227,7 +232,7 @@ class _TaxragistrationState extends State<Taxragistration> {
                                   Text(
                                     'Reg. No: ${entry['number']!}',
                                     style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 13 : 12,
+                                      fontSize: AppResponsive.smallFontSize(context),
                                       color: Colors.grey.shade600,
                                     ),
                                   ),
@@ -254,7 +259,7 @@ class _TaxragistrationState extends State<Taxragistration> {
             padding: EdgeInsets.all(isTablet ? 20 : 16),
             child: SizedBox(
               width: double.infinity,
-              height: isTablet ? 54 : 50,
+              height: AppResponsive.buttonHeight(context),
               child: ElevatedButton.icon(
                 onPressed: _showAddDialog,
                 style: ElevatedButton.styleFrom(
@@ -265,12 +270,11 @@ class _TaxragistrationState extends State<Taxragistration> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                icon:
-                    Icon(Icons.add_circle_rounded, size: isTablet ? 24 : 22),
+                icon: Icon(Icons.add_circle_rounded, size: AppResponsive.iconSize(context)),
                 label: Text(
                   'Add Tax Name & Number',
                   style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 17 : 16,
+                    fontSize: AppResponsive.buttonFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),

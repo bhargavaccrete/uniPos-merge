@@ -5,6 +5,7 @@ import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';
+import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../common/app_text_field.dart';
@@ -26,7 +27,7 @@ class AddCategoryDialog extends StatefulWidget {
   static Future<bool> show(BuildContext context,
       {VoidCallback? onCategoryAdded, Category? editCategory}) async {
     bool wasAdded = false;
-    final isWide = MediaQuery.of(context).size.width >= 850;
+    final isWide = !AppResponsive.isMobile(context);
 
     if (isWide) {
       await showDialog<void>(

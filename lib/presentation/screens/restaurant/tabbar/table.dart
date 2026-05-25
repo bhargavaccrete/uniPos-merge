@@ -34,9 +34,13 @@ class _TableScreenState extends State<TableScreen> {
 
   void _addTable() {
     final controller = TextEditingController();
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Add New Table',
@@ -211,9 +215,13 @@ class _TableScreenState extends State<TableScreen> {
 
   void _renameTable(TableModel table) {
     final controller = TextEditingController(text: table.id);
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Rename Table', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
         content: SizedBox(
@@ -273,9 +281,13 @@ class _TableScreenState extends State<TableScreen> {
   // ── Delete ──────────────────────────────────────────────────────────────────
 
   void _deleteTable(TableModel table) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Delete Table',
@@ -527,7 +539,7 @@ class _TableScreenState extends State<TableScreen> {
                       crossAxisCount: crossAxisCount,
                       crossAxisSpacing: AppResponsive.gridSpacing(context),
                       mainAxisSpacing: AppResponsive.gridSpacing(context),
-                      childAspectRatio: AppResponsive.gridAspectRatio(context),
+                      childAspectRatio: AppResponsive.getValue(context, mobile: 1.1, tablet: 1.0, desktop: 1.0),
                     ),
                     itemCount: allTables.length,
                     itemBuilder: (context, index) {
@@ -564,9 +576,13 @@ class _TableScreenState extends State<TableScreen> {
                               );
                             } else {
                               // Orphaned table — status is occupied but no order exists
+                              final orphanHInset = !AppResponsive.isMobile(context)
+                                  ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                                  : 24.0;
                               showDialog(
                                 context: context,
                                 builder: (ctx) => AlertDialog(
+                                  insetPadding: EdgeInsets.symmetric(horizontal: orphanHInset, vertical: 24),
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16)),
                                   title: Text(

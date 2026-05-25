@@ -42,15 +42,15 @@ class PaymentEntry {
   /// Check if this is a cash payment
   bool get isCash => method == 'cash';
 
-  /// For cash: the actual amount that goes into the drawer (full received amount)
-  double get cashInDrawer => isCash ? cashReceived : amount;
+  /// For cash: the actual amount that goes into the drawer (received, or exact if split mode)
+  double get cashInDrawer => isCash ? (cashReceived > 0 ? cashReceived : amount) : amount;
 
   /// For cash: validate if sufficient amount received
   bool get isCashSufficient => !isCash || cashReceived >= amount;
 
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
-      'method': method,
+      'method': method.trim(),
       'amount': amount,
     };
 
@@ -58,11 +58,12 @@ class PaymentEntry {
       map['ref'] = referenceId;
     }
 
-    // Add cash-specific fields
-    if (isCash && cashReceived > 0) {
-      map['received'] = cashReceived;
-      map['cashInDrawer'] = cashInDrawer;
-      map['change'] = cashChange;
+    if (isCash) {
+      // In split mode the cashReceived field is hidden — assume exact amount paid
+      final received = cashReceived > 0 ? cashReceived : amount;
+      map['received'] = received;
+      map['cashInDrawer'] = received;
+      map['change'] = received > amount ? received - amount : 0;
     }
 
     return map;
@@ -164,7 +165,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   }
 
   double get _totalPaid {
-    return _payments.fold(0.0, (sum, p) => sum + p.amount);
+    // Use cashInDrawer (actual received) not amount (bill allocation),
+    // so single-cash payments with overpayment compute change correctly.
+    return _payments.fold(0.0, (sum, p) => sum + p.cashInDrawer);
   }
 
   double get _remaining {
@@ -181,6 +184,8 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   }
 
   bool get _isValid {
+    // Bill fully covered by loyalty points / discount — no payment entry needed.
+    if (widget.billTotal <= 0) return true;
     if (_payments.isEmpty) return false;
     if (_totalPaid < widget.billTotal) return false;
     for (var payment in _payments) {

@@ -12,6 +12,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/drawer
 import 'package:uuid/uuid.dart';
 import '../../../../data/models/restaurant/db/staffModel_310.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
+import '../../../../util/common/app_responsive.dart';
 
 class manageStaff extends StatefulWidget {
   const manageStaff({super.key});
@@ -21,14 +22,28 @@ class manageStaff extends StatefulWidget {
 }
 
 class _manageStaffState extends State<manageStaff> {
+  TextEditingController userNameController = TextEditingController();
+  TextEditingController firstNameController = TextEditingController();
+
+  bool _usernameManuallyEdited = false;
+
   @override
   void initState() {
     super.initState();
     staffStore.loadStaff();
+    firstNameController.addListener(_syncUsernameFromFirstName);
   }
 
-  TextEditingController userNameController = TextEditingController();
-  TextEditingController firstNameController = TextEditingController();
+  void _syncUsernameFromFirstName() {
+    if (_usernameManuallyEdited) return;
+    final generated = firstNameController.text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    if (userNameController.text != generated) {
+      userNameController.value = userNameController.value.copyWith(
+        text: generated,
+        selection: TextSelection.collapsed(offset: generated.length),
+      );
+    }
+  }
   TextEditingController lastNameController = TextEditingController();
   TextEditingController mobileController = TextEditingController();
   TextEditingController mailController = TextEditingController();
@@ -153,6 +168,7 @@ class _manageStaffState extends State<manageStaff> {
   }
 
   void _clear() {
+    _usernameManuallyEdited = false;
     userNameController.clear();
     firstNameController.clear();
     lastNameController.clear();
@@ -172,8 +188,7 @@ class _manageStaffState extends State<manageStaff> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -534,9 +549,17 @@ class _manageStaffState extends State<manageStaff> {
                     AppTextField(
                       controller: userNameController,
                       label: 'Username',
-                      hint: 'e.g. john_cashier',
+                      hint: 'Auto from first name',
                       icon: Icons.alternate_email_rounded,
                       required: true,
+                      onChanged: (v) {
+                        if (v.trim().isEmpty) {
+                          _usernameManuallyEdited = false;
+                          _syncUsernameFromFirstName();
+                        } else {
+                          _usernameManuallyEdited = true;
+                        }
+                      },
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Username is required' : null,
                     ),
                     const SizedBox(height: 14),
@@ -1004,22 +1027,26 @@ class _manageStaffState extends State<manageStaff> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: isTablet ? 60 : 40,
+            vertical: 24,
+          ),
           title: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(8),
+                padding: EdgeInsets.all(isTablet ? 10 : 8),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.person, color: AppColors.primary, size: 24),
+                child: Icon(Icons.person, color: AppColors.primary, size: isTablet ? 28 : 24),
               ),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
                   "Staff Details",
                   style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 20 : 18,
+                    fontSize: isTablet ? 22 : 18,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1042,12 +1069,12 @@ class _manageStaffState extends State<manageStaff> {
             TextButton(
               onPressed: () => Navigator.pop(context),
               style: TextButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 20, vertical: isTablet ? 14 : 12),
               ),
               child: Text(
                 'Close',
                 style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 15 : 14,
+                  fontSize: isTablet ? 16 : 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1060,16 +1087,16 @@ class _manageStaffState extends State<manageStaff> {
 
   Widget _buildDetailRow(String label, String value, bool isTablet) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: isTablet ? 16 : 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 80,
+            width: isTablet ? 110 : 80,
             child: Text(
               '$label:',
               style: GoogleFonts.poppins(
-                fontSize: isTablet ? 14 : 13,
+                fontSize: isTablet ? 15 : 13,
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w500,
               ),
@@ -1079,7 +1106,7 @@ class _manageStaffState extends State<manageStaff> {
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: isTablet ? 14 : 13,
+                fontSize: isTablet ? 15 : 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1101,9 +1128,13 @@ class _manageStaffState extends State<manageStaff> {
       );
 
   void _showDeleteConfirmation(BuildContext context, String staffId) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),

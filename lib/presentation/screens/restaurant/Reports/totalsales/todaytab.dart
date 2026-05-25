@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -142,7 +143,7 @@ class _TodaytabState extends State<Todaytab> {
                   )),
               const SizedBox(height: 25),
               Text(
-                'Total Sales Of Today (Rs.) = ${NumberFormat.currency(locale: 'en_IN', symbol: '₹').format(totalSales)}',
+                'Total Sales Of Today = ${NumberFormat.currency(locale: 'en_IN', symbol: CurrencyHelper.currentSymbol).format(totalSales)}',
                 style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black),
               ),
               const SizedBox(height: 25),

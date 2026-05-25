@@ -32,6 +32,8 @@ class ReceiptData {
   final String? orderType; // e.g., "Dine In", "Takeaway", "Delivery"
   final String? tableNo; // Table number for dine-in orders
   final int? kotNumber; // KOT number for kitchen orders (single KOT prints)
+  final String? kotStatus; // Status of this KOT (e.g. "CANCEL")
+  final String? cancelReference; // Reference to original KOT (e.g. "KOT #013")
   final List<int>? kotNumbers; // All KOT numbers for this order (customer bill)
   final DateTime? orderTimestamp; // Order timestamp for KOT
   final String? orderNo; // Order number/ID for KOT
@@ -70,6 +72,8 @@ class ReceiptData {
     this.orderType,
     this.tableNo,
     this.kotNumber,
+    this.kotStatus,
+    this.cancelReference,
     this.kotNumbers,
     this.orderTimestamp,
     this.orderNo,
@@ -290,10 +294,27 @@ class ReceiptPdfService {
         // Receipt Info / KOT Info
         if (data.kotNumber != null) ...[
           // KOT Format (simplified for kitchen)
+          if (data.kotStatus?.toUpperCase() == 'CANCEL') ...[
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              child: pw.Text(
+                '******** CANCEL KOT ********',
+                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.SizedBox(height: 4),
+          ],
           pw.Text(
             'KOT #: ${data.kotNumber.toString().padLeft(3, '0')}',
             style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
           ),
+          if (data.cancelReference != null && data.kotStatus?.toUpperCase() == 'CANCEL') ...[
+            pw.Text(
+              'Reference: ${data.cancelReference}',
+              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+            ),
+          ],
           if (data.tableNo != null && data.tableNo!.isNotEmpty) ...[
             pw.Text(
               'Table: ${data.tableNo}',
@@ -308,7 +329,7 @@ class ReceiptPdfService {
           ],
           if (data.orderType != null) ...[
             pw.Text(
-              'Type: ${data.orderType!.toUpperCase()}${data.isAddonKot == true ? ' (ADD-ON)' : ''}',
+              'Type: ${data.orderType!.toUpperCase()}${(data.isAddonKot == true && data.kotStatus?.toUpperCase() != 'CANCEL') ? ' (ADD-ON)' : ''}',
               style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
@@ -417,7 +438,7 @@ class ReceiptPdfService {
         // Items List - Different format for KOT vs Regular Receipt
         if (data.kotNumber != null) ...[
           // KOT Format: Just item name and quantity (no prices)
-          ...data.items.map((item) => _buildKOTItemRow(item)),
+          ...data.items.map((item) => _buildKOTItemRow(item, data)),
           pw.SizedBox(height: 4),
           _buildDashedLine(),
           // No footer for KOT - just end here
@@ -1032,10 +1053,15 @@ class ReceiptPdfService {
   }
 
   /// Build item row for KOT (Kitchen Order Ticket) - Simple format without prices
-  pw.Widget _buildKOTItemRow(SaleItemModel item) {
+  pw.Widget _buildKOTItemRow(SaleItemModel item, ReceiptData data) {
     final name = item.productName ?? 'Unknown';
     // Format item name with variant in parentheses: "Veg Pizza (Medium)"
     final displayName = item.size != null ? '$name (${item.size})' : name;
+
+    String prefix = '';
+    if (data.kotStatus?.toUpperCase() == 'CANCEL') {
+      prefix = '❌ ';
+    }
 
     return pw.Container(
       padding: const pw.EdgeInsets.only(top: 3, bottom: 3),
@@ -1048,7 +1074,7 @@ class ReceiptPdfService {
             children: [
               pw.Expanded(
                 child: pw.Text(
-                  displayName,
+                  '$prefix$displayName',
                   style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
                 ),
               ),

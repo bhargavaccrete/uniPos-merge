@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/print_settings.dart';
+import '../../../../util/common/app_responsive.dart';
 
 class CustomizationPrinter extends StatefulWidget {
   const CustomizationPrinter({super.key});
@@ -47,9 +48,13 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
   };
 
   Future<void> _resetSettings() async {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -98,9 +103,8 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
-    final isTablet = width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
     final deepBlue = Color(0xFF0D47A1);
 
     return Scaffold(

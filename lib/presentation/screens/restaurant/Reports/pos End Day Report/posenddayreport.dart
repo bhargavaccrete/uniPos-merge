@@ -264,9 +264,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final isDesktop = size.width > 1200;
+    final isTablet = !AppResponsive.isMobile(context);
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return SingleChildScrollView(
       padding: AppResponsive.padding(context),

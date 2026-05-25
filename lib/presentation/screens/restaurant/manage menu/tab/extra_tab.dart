@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
@@ -83,14 +84,14 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
       editingId = null;
     }
 
-    final isWide = MediaQuery.of(context).size.width >= 850;
+    final isWide = !AppResponsive.isMobile(context);
     if (isWide) {
       showDialog<void>(
         context: context,
         barrierDismissible: true,
         builder: (ctx) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 40),
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 520,
@@ -332,14 +333,14 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
       _selectedVariants.clear();
     }
 
-    final isWide = MediaQuery.of(context).size.width >= 850;
+    final isWide = !AppResponsive.isMobile(context);
     if (isWide) {
       showDialog<void>(
         context: context,
         barrierDismissible: true,
         builder: (ctx) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 40),
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 560,
@@ -953,9 +954,13 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
 
   Future<void> _deleteTopping(Extramodel extra, int toppingIndex) async {
     final topping = extra.topping![toppingIndex];
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${topping.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
         content: Text('This topping will be removed from ${extra.Ename}.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
@@ -971,9 +976,13 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   }
 
   Future<void> _deleteExtra(Extramodel extra) async {
+    final deleteHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${extra.Ename}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
         content: Text('This extra and its ${extra.topping?.length ?? 0} toppings will be removed.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
@@ -988,18 +997,13 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
     }
   }
 
-  int _getGridColumns(double width) {
-    if (width > 1200) return 3;
-    else if (width > 800) return 2;
-    else return 2;
-  }
 
   @override
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -1067,7 +1071,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
         return GridView.builder(
           padding: EdgeInsets.all(24),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _getGridColumns(size.width),
+            crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 2, desktop: 3),
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             childAspectRatio: 2.5,
@@ -1266,19 +1270,20 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildAddButton() {
+    final isTablet = !AppResponsive.isMobile(context);
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(isTablet ? 20 : 16),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: _openExtraBottomSheet,
-          icon: Icon(Icons.add, size: 20),
-          label: Text('Add Extra', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+          label: Text('Add Extra', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: 14),
+            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),

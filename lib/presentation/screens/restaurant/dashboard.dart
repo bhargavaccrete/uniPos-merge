@@ -21,7 +21,6 @@ class Dashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print("this is the device cat ---- ${appStore.deviceCategory}");
     Future<void> logout() async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('restaurant_is_logged_in', false);
@@ -196,9 +195,13 @@ class Dashboard extends StatelessWidget {
                   Expanded(
                     child: InkWell(
                       onTap: () {
+                        final hInset = !AppResponsive.isMobile(context)
+                            ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                            : 24.0;
                         showDialog(
                             context: context,
                             builder: (BuildContext context) => AlertDialog(
+                              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
                               title: Text('Are you sure you want to logout?',
                                   style: TextStyle(
                                     fontSize: AppResponsive.getValue(context, mobile: 15.0, tablet: 16.5, desktop: 18.0),

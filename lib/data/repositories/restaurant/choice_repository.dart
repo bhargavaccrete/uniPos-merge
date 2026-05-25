@@ -48,7 +48,6 @@ class ChoiceRepository {
       }
       return false;
     } catch (e) {
-      print('Error adding option: $e');
       return false;
     }
   }
@@ -65,7 +64,6 @@ class ChoiceRepository {
       }
       return false;
     } catch (e) {
-      print('Error removing option: $e');
       return false;
     }
   }
@@ -84,7 +82,6 @@ class ChoiceRepository {
       }
       return false;
     } catch (e) {
-      print('Error updating option: $e');
       return false;
     }
   }

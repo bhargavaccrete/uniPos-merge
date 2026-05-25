@@ -12,6 +12,11 @@ nul
 *.md
 *.txt
 *.xlsx
+
+# Licensing plan documents
+*.docx
+*.html
+*.ps1
 /lib/presentation/screens/restaurant/Reports/customer list by revenue/customerlistbyrevenue.dart.backup
 /lib/presentation/screens/restaurant/Reports/expenseReport/expensereport.dart.backup
 /lib/presentation/screens/restaurant/Reports/pos End Day Report/posenddayreport.dart.backup

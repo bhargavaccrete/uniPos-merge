@@ -119,10 +119,8 @@ Future<void> setupServiceLocator() async {
   );
 
   // Initialize PaymentMethodStore (load payment methods from Hive)
-  print('💳 Initializing PaymentMethodStore...');
   final paymentStore = locator<PaymentMethodStore>();
   await paymentStore.init();
-  print('💳 PaymentMethodStore initialized with ${paymentStore.paymentMethods.length} methods');
 
   // Register PrintService as a common dependency for both Retail and Restaurant
   locator.registerLazySingleton<PrintService>(() => PrintService());
@@ -166,7 +164,6 @@ Future<void> _registerRetailDependencies() async {
 
   // Ensure default admin account exists
   await locator<AuthService>().ensureDefaultAdmin();
-  print('✓ Default admin account initialized (username: admin, password: admin123)');
 
   // Register Stores (Singletons - lazy loaded)
   locator.registerLazySingleton<retail.CartStore>(() => retail.CartStore());
@@ -203,7 +200,6 @@ Future<void> _registerRestaurantDependencies() async {
   // Skip if already registered
   if (locator.isRegistered<CategoryStore>()) return;
 
-  print('🍽️ Registering restaurant dependencies...');
 
   // ==================== RESTAURANT REPOSITORIES ====================
   locator.registerLazySingleton<CategoryRepository>(() => CategoryRepository());
@@ -304,26 +300,20 @@ Future<void> _registerRestaurantDependencies() async {
   // Without this, printKOT() would find null defaults and fall through to PDF.
   await locator<PrinterStore>().loadSavedPrinters();
 
-  print('✅ Restaurant dependencies registered successfully');
 }
 
 /// Register business dependencies dynamically (called during setup wizard)
 /// This is called when user selects a business type
 Future<void> registerBusinessDependencies(BusinessMode mode) async {
   // ignore: avoid_print
-  print('registerBusinessDependencies: mode=$mode');
   if (mode == BusinessMode.retail) {
     // ignore: avoid_print
-    print('registerBusinessDependencies: calling _registerRetailDependencies');
     await _registerRetailDependencies();
     // ignore: avoid_print
-    print('registerBusinessDependencies: _registerRetailDependencies completed');
   } else if (mode == BusinessMode.restaurant) {
     // ignore: avoid_print
-    print('registerBusinessDependencies: calling _registerRestaurantDependencies');
     await _registerRestaurantDependencies();
     // ignore: avoid_print
-    print('registerBusinessDependencies: _registerRestaurantDependencies completed');
   }
 }
 
@@ -435,7 +425,6 @@ EodRepository get eodRepository => locator<EodRepository>();
 /// Call this after modifying data directly in Hive (e.g., from test data generator)
 /// to ensure all stores reload their cached data
 Future<void> refreshAllRestaurantStores() async {
-  print('🔄 Global refresh: reloading all restaurant stores');
   await Future.wait([
     categoryStore.loadCategories(),
     itemStore.loadItems(),
@@ -446,5 +435,4 @@ Future<void> refreshAllRestaurantStores() async {
     orderStore.loadOrders(),
     restaurantCartStore.loadCartItems(),
   ]);
-  print('✅ Global refresh complete');
 }

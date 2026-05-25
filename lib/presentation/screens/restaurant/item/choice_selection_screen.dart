@@ -359,7 +359,11 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final hInset = !AppResponsive.isMobile(context)
+                ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                : 24.0;
             return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
               title: Text(
                 'Add New Choice',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600),

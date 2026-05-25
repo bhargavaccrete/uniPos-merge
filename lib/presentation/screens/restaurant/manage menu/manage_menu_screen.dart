@@ -9,6 +9,7 @@ import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/extra_t
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/items_tab.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/variant_tab.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../import/bulk_import_test_screen_v3.dart';
 
@@ -77,10 +78,10 @@ class _ManagemenuState extends State<Managemenu>
       },
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: isTablet ? 24 : 20,
-          vertical: isTablet ? 14 : 12,
+          horizontal: isTablet ? 16 : 20,
+          vertical: isTablet ? 10 : 12,
         ),
-        margin: EdgeInsets.only(right: isTablet ? 12 : 8),
+        margin: EdgeInsets.only(right: isTablet ? 8 : 8),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -96,7 +97,7 @@ class _ManagemenuState extends State<Managemenu>
             Text(
               label,
               style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 14,
+                fontSize: isTablet ? 13 : 14,
                 fontWeight: FontWeight.w600,
                 color: isSelected ? Colors.white : Colors.grey.shade700,
               ),
@@ -104,8 +105,8 @@ class _ManagemenuState extends State<Managemenu>
             SizedBox(width: isTablet ? 8 : 6),
             Container(
               padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 10 : 8,
-                vertical: isTablet ? 3 : 2,
+                horizontal: isTablet ? 8 : 8,
+                vertical: isTablet ? 2 : 2,
               ),
               decoration: BoxDecoration(
                 color: isSelected
@@ -116,7 +117,7 @@ class _ManagemenuState extends State<Managemenu>
               child: Text(
                 '$count',
                 style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 13 : 12,
+                  fontSize: isTablet ? 11 : 12,
                   fontWeight: FontWeight.w600,
                   color: isSelected ? Colors.white : AppColors.primary,
                 ),
@@ -130,9 +131,8 @@ class _ManagemenuState extends State<Managemenu>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final isDesktop = size.width > 1200;
+    final isTablet = !AppResponsive.isMobile(context);
+    final isDesktop = AppResponsive.isDesktop(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -182,12 +182,12 @@ class _ManagemenuState extends State<Managemenu>
                 return AnimatedBuilder(
                   animation: tabController.animation!,
                   builder: (_, __) {
-                    // For desktop/large tablets, show tabs in a centered row
+                    // For desktop only, show tabs in a centered wrap (no scroll)
                     if (isDesktop) {
                       return Center(
                         child: Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
+                          spacing: 8,
+                          runSpacing: 8,
                           alignment: WrapAlignment.center,
                           children: [
                             _buildTabButton(0, 'All', totalCount, isTablet),
@@ -201,7 +201,7 @@ class _ManagemenuState extends State<Managemenu>
                       );
                     }
 
-                    // For mobile and tablet, show horizontal scroll
+                    // Mobile + tablet: horizontal scroll
                     return SingleChildScrollView(
                       controller: _tabScrollController,
                       scrollDirection: Axis.horizontal,

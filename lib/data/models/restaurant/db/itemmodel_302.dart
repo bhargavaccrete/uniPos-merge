@@ -265,7 +265,6 @@ class Items extends HiveObject {
           parsedImageBytes = file.readAsBytesSync();
         }
       } catch (e) {
-        print('Warning: Could not load image from path: $e');
       }
     }
 

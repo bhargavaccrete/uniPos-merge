@@ -28,7 +28,6 @@ class DecimalSettings {
 
     precisionNotifier.value = newPrecision;
     await _save();
-    print('💰 Decimal precision updated to: $newPrecision places');
   }
 
   /// Reset to default precision
@@ -48,7 +47,6 @@ class DecimalSettings {
     final prefs = await SharedPreferences.getInstance();
     final savedPrecision = prefs.getInt(_storageKey) ?? _defaultPrecision;
     precisionNotifier.value = savedPrecision;
-    print('💰 Decimal precision loaded: $savedPrecision places');
   }
 
   /// Format amount according to current precision

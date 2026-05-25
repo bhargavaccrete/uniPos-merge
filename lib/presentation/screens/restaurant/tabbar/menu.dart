@@ -120,19 +120,18 @@ class _MenuScreenState extends State<MenuScreen> {
       final result = await showModalBottomSheet<CartItem>(
         context: context,
         isScrollControlled: true,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
+        backgroundColor: Colors.transparent,
         builder: (context) {
           return DraggableScrollableSheet(
             expand: false,
-            initialChildSize: 0.4,
+            initialChildSize: 0.5,
             minChildSize: 0.3,
-            maxChildSize: 0.5,
+            maxChildSize: 0.85,
             builder: (_, controller) {
-              return SingleChildScrollView(
-                controller: controller,
-                child: ItemOptionsDialog(item: item, categoryName: categoryName),
+              return ItemOptionsDialog(
+                item: item,
+                categoryName: categoryName,
+                scrollController: controller,
               );
             },
           );
@@ -596,10 +595,13 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildTabletLayout(BuildContext context, Size size) {
     return Row(
       children: [
-        // Left Sidebar
+        // Left Sidebar — category navigation
         Container(
-          width: 200,
-          color: AppColors.white,
+          width: 220,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            border: Border(right: BorderSide(color: AppColors.divider)),
+          ),
           child: Observer(
             builder: (_) {
               final allCategories = categoryStore.categories;
@@ -607,10 +609,10 @@ class _MenuScreenState extends State<MenuScreen> {
                 children: [
                   // Search Bar
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(12.0),
                     child: AppTextField(
                       controller: _searchController,
-                      hint: 'Search menu items…',
+                      hint: 'Search items…',
                       icon: Icons.search_rounded,
                     ),
                   ),
@@ -620,11 +622,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     icon: Icons.grid_view,
                     label: 'All Items',
                     isSelected: activeCategory == null,
-                    onTap: () {
-                      setState(() {
-                        activeCategory = null;
-                      });
-                    },
+                    onTap: () => setState(() => activeCategory = null),
                   ),
 
                   // Category List
@@ -637,11 +635,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           icon: Icons.folder_outlined,
                           label: category.name,
                           isSelected: activeCategory == category.id,
-                          onTap: () {
-                            setState(() {
-                              activeCategory = category.id;
-                            });
-                          },
+                          onTap: () => setState(() => activeCategory = category.id),
                         );
                       },
                     ),
@@ -662,90 +656,79 @@ class _MenuScreenState extends State<MenuScreen> {
                       CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       Text(
                         'Loading menu...',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600], fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
                 )
               : Stack(
-            children: [
-              Observer(
-                builder: (_) {
-                  final hasItems = restaurantCartStore.cartItems.isNotEmpty;
-                  final allItems = itemStore.items;
-                  var filteredItems = allItems.where((item) => item.isEnabled).toList();
+                  children: [
+                    Observer(
+                      builder: (_) {
+                        final hasItems = restaurantCartStore.cartItems.isNotEmpty;
+                        final allItems = itemStore.items;
+                        var filteredItems = allItems.where((item) => item.isEnabled).toList();
 
-                  if (activeCategory != null) {
-                    filteredItems = filteredItems.where((item) => item.categoryOfItem == activeCategory).toList();
-                  }
+                        if (activeCategory != null) {
+                          filteredItems = filteredItems.where((item) => item.categoryOfItem == activeCategory).toList();
+                        }
 
-                  if (query.isNotEmpty) {
-                    final lowerQuery = query.toLowerCase();
-                    filteredItems = filteredItems.where((item) {
-                      return item.name.toLowerCase().contains(lowerQuery);
-                    }).toList();
-                  }
+                        if (query.isNotEmpty) {
+                          final lowerQuery = query.toLowerCase();
+                          filteredItems = filteredItems.where((item) => item.name.toLowerCase().contains(lowerQuery)).toList();
+                        }
 
-                  if (filteredItems.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off, size: 64, color: AppColors.divider),
-                          SizedBox(height: 16),
-                          Text(
-                            'No items found',
-                            style: GoogleFonts.poppins(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                        if (filteredItems.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off, size: 64, color: AppColors.divider),
+                                const SizedBox(height: 16),
+                                Text('No items found', style: GoogleFonts.poppins(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          );
+                        }
+
+                        final gridColumns = AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4);
+                        final aspectRatio = AppResponsive.getValue(context, mobile: 0.75, tablet: 0.70, desktop: 0.75);
+
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: hasItems ? 80 : 16),
+                          child: GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: gridColumns,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: aspectRatio,
+                            ),
+                            itemCount: filteredItems.length,
+                            itemBuilder: (context, index) => _buildGridItemCard(filteredItems[index]),
                           ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  final gridColumns = AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4);
-
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: hasItems ? 80 : 16),
-                    child: GridView.builder(
-                      padding: EdgeInsets.all(16),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: gridColumns,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 0.75,
-                      ),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (context, index) {
-                        final item = filteredItems[index];
-                        return _buildGridItemCard(item);
+                        );
                       },
                     ),
-                  );
-                },
-              ),
 
-              // Fixed Cart Bar at Bottom
-              Observer(
-                builder: (_) {
-                  if (restaurantCartStore.cartItems.isEmpty) return SizedBox.shrink();
-                  return Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: _buildCartBar(context, size),
-                  );
-                },
-              ),
-            ],
-          ), // closes Stack
-        ), // closes Expanded child (_isLoadingData ? Center : Stack)
+                    // Fixed Cart Bar at Bottom
+                    Observer(
+                      builder: (_) {
+                        if (restaurantCartStore.cartItems.isEmpty) return const SizedBox.shrink();
+                        return Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: _buildCartBar(context, size),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+        ),
       ],
     );
   }
@@ -831,7 +814,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 Expanded(
                   flex: showImage ? 2 : 1,
                   child: Padding(
-                    padding: const EdgeInsets.all(12.0),
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -853,7 +836,7 @@ class _MenuScreenState extends State<MenuScreen> {
                               Text(
                                 _getPriceDisplayForGrid(item),
                                 style: GoogleFonts.poppins(
-                                  fontSize: 16,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.primary,
                                 ),

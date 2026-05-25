@@ -15,7 +15,24 @@ class RestaurantSession {
   static const _currentShiftIdKey = 'restaurant_current_shift_id';
 
   // ── Inactivity timeout ────────────────────────────────────────────────────
-  static const _timeoutDuration = Duration(minutes: 15);
+  static const String _timeoutMinutesKey = 'restaurant_inactivity_timeout_minutes';
+  static const int _defaultTimeoutMinutes = 15;
+
+  static final ValueNotifier<int> timeoutMinutesNotifier =
+      ValueNotifier(_defaultTimeoutMinutes);
+
+  static int get timeoutMinutes => timeoutMinutesNotifier.value;
+  static Duration get _timeoutDuration =>
+      Duration(minutes: timeoutMinutesNotifier.value);
+
+  static Future<void> setTimeoutMinutes(int minutes) async {
+    timeoutMinutesNotifier.value = minutes;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_timeoutMinutesKey, minutes);
+    // Restart timer with the new duration immediately
+    if (_isLoggedIn) resetInactivityTimer();
+  }
+
   static Timer? _inactivityTimer;
 
   /// Fires true when the session expires due to inactivity.
@@ -130,6 +147,8 @@ class RestaurantSession {
     staffRoleNotifier.value = prefs.getString(_staffRoleKey);
     staffNameNotifier.value = prefs.getString(_staffNameKey);
     _currentShiftId = prefs.getString(_currentShiftIdKey);
+    timeoutMinutesNotifier.value =
+        prefs.getInt(_timeoutMinutesKey) ?? _defaultTimeoutMinutes;
     if (_isLoggedIn) resetInactivityTimer();
   }
 

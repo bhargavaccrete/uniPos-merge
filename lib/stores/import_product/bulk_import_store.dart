@@ -75,7 +75,6 @@ abstract class _BulkImportStore with Store {
         // For now, we'll use the app's private directory which doesn't require permissions
         // Or request manageExternalStorage for Android 11+
         final androidVersion = Platform.version;
-        print('Android version: $androidVersion');
 
         // Try to request storage permission (works for Android 10 and below)
         var status = await Permission.storage.status;
@@ -92,7 +91,6 @@ abstract class _BulkImportStore with Store {
 
           // If still no permission, we'll save to app's private directory
           if (!manageStatus.isGranted) {
-            print('No storage permission granted. Will save to app private directory.');
           }
         }
       } else if (!kIsWeb && Platform.isIOS) {
@@ -228,33 +226,27 @@ abstract class _BulkImportStore with Store {
         if (extension == 'csv') {
           // --- CSV Parsing ---
           String fileContent = utf8.decode(fileBytes);
-          print('CSV file content length: ${fileContent.length} bytes');
-          print('CSV first 200 chars: ${fileContent.substring(0, fileContent.length > 200 ? 200 : fileContent.length)}');
 
           // Normalize line endings - replace \r\n with \n, then split by \n
           fileContent = fileContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
           // Check if file has proper line breaks
           int lineBreaks = '\n'.allMatches(fileContent).length;
-          print('CSV has $lineBreaks line breaks');
 
           List<List<dynamic>> csvTable = const CsvToListConverter(
             eol: '\n',
             shouldParseNumbers: false, // Keep all as strings to preserve formatting
           ).convert(fileContent);
-          print('CSV parsed into ${csvTable.length} rows');
 
           // Filter out completely empty rows
           for (var row in csvTable) {
             // Skip rows that are completely empty
             if (row.every((cell) => cell.toString().trim().isEmpty)) {
-              print('Skipping completely empty row');
               continue;
             }
             parsedRows.add(row);
           }
 
-          print('After filtering: ${parsedRows.length} rows');
 
         } else if (extension == 'xlsx' || extension == 'xls') {
           // --- Excel Parsing ---
@@ -307,11 +299,8 @@ abstract class _BulkImportStore with Store {
         }
 
         // Debug: Print parsed data
-        print('Parsed ${parsedRows.length} rows (including header)');
         if (parsedRows.isNotEmpty) {
-          print('Header row: ${parsedRows.first}');
           if (parsedRows.length > 1) {
-            print('First data row: ${parsedRows[1]}');
           }
         }
 
@@ -327,10 +316,8 @@ abstract class _BulkImportStore with Store {
   /// Execute Import Process
   @action
   Future<void> importData() async {
-    print('importData: Starting import process...');
     if (parsedRows.isEmpty) {
       errorMessage = "No data to import";
-      print('importData: ERROR - No data to import');
       return;
     }
 
@@ -339,27 +326,22 @@ abstract class _BulkImportStore with Store {
     logMessages.clear();
     errorMessage = null;
     successMessage = null;
-    print('importData: Set isProcessing=true, cleared messages');
 
     // Ensure AttributeStore has loaded existing attributes before we start importing
     try {
       await _attributeStore.loadAttributes();
-      print('importData: Loaded existing attributes from AttributeStore');
     } catch (e) {
-      print('importData: Warning - could not preload attributes: $e');
       // Continue anyway - attributes will be created as needed
     }
 
     try {
       // 1. Group rows by 'Handle' (Column 0)
       final dataRows = parsedRows.skip(1).toList();
-      print('importData: Processing ${dataRows.length} data rows (excluding header)');
 
       Map<String, List<List<dynamic>>> groups = {};
 
       for (var row in dataRows) {
         if (row.isEmpty) {
-          print('importData: Skipping empty row');
           continue;
         }
 
@@ -371,10 +353,8 @@ abstract class _BulkImportStore with Store {
         }
 
         String handle = row[0].toString().trim();
-        print('importData: Processing row with handle: "$handle"');
 
         if (handle.isEmpty) {
-          print('importData: Skipping row with empty handle');
           continue;
         }
 
@@ -384,7 +364,6 @@ abstract class _BulkImportStore with Store {
         groups[handle]!.add(row);
       }
 
-      print('importData: Grouped into ${groups.length} product groups');
 
       int totalGroups = groups.length;
       int processedGroups = 0;
@@ -414,11 +393,8 @@ abstract class _BulkImportStore with Store {
       } else {
         successMessage = "Import completed with errors. Success: $successCount, Failed: $errorCount";
       }
-      print('importData: Import complete. Success: $successCount, Failed: $errorCount');
-      print('importData: Keeping isProcessing=true to show results screen');
     } catch (e) {
       errorMessage = "Import failed: $e";
-      print('importData: Import FAILED with error: $e');
     }
     // Note: We keep isProcessing=true so the user stays on the results screen
     // It will be set to false when they click "Done" and clear() is called
@@ -456,10 +432,8 @@ abstract class _BulkImportStore with Store {
     );
 
     // Debug: Print product details
-    print('Creating product: ${product.productName} (ID: $productId, Category: $categoryName, HasVariants: $hasVariants)');
 
     await _productRepository.addProduct(product);
-    print('Product saved to repository');
 
     // Collect all unique attributes from all variants
     Set<String> allAttributeNames = {};
@@ -477,7 +451,6 @@ abstract class _BulkImportStore with Store {
     for (var row in rows) {
       await _createVariant(productId, row);
     }
-    print('Created ${rows.length} variant(s) for $name');
   }
 
   bool _rowHasVariants(List<dynamic> row) {
@@ -497,11 +470,9 @@ abstract class _BulkImportStore with Store {
       );
 
       if (existingAttr != null) {
-        print('✓ Using existing attribute: $trimmedName (ID: ${existingAttr.attributeId})');
         return existingAttr.attributeId;
       }
     } catch (e) {
-      print('⚠️ Could not check existing attributes: $e');
     }
 
     // Create new attribute using AttributeStore (updates both DB and observable list)
@@ -514,11 +485,9 @@ abstract class _BulkImportStore with Store {
           orElse: () => null,
         );
         if (newAttr != null) {
-          print('✅ Created new attribute: $trimmedName (ID: ${newAttr.attributeId})');
           return newAttr.attributeId;
         }
       } else {
-        print('⚠️ Attribute "$trimmedName" already exists or failed to create');
         // Try to find it again in case it already existed
         final existingAttr = _attributeStore.attributes.cast<AttributeModel?>().firstWhere(
           (attr) => attr != null && attr.name.toLowerCase() == trimmedName.toLowerCase(),
@@ -527,7 +496,6 @@ abstract class _BulkImportStore with Store {
         return existingAttr?.attributeId;
       }
     } catch (e) {
-      print('❌ Error creating attribute "$trimmedName": $e');
     }
     return null;
   }
@@ -544,12 +512,10 @@ abstract class _BulkImportStore with Store {
       // Check if value already exists (case-insensitive)
       for (var value in existingValues) {
         if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
-          print('✓ Using existing value: $trimmedValue (ID: ${value.valueId})');
           return value.valueId;
         }
       }
     } catch (e) {
-      print('⚠️ Could not check existing values for "$trimmedValue": $e');
     }
 
     // Create new value using AttributeStore (updates both DB and observable list)
@@ -560,12 +526,10 @@ abstract class _BulkImportStore with Store {
         final values = _attributeStore.getValuesForAttribute(attributeId);
         for (var value in values) {
           if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
-            print('✅ Created new attribute value: $trimmedValue (ID: ${value.valueId})');
             return value.valueId;
           }
         }
       } else {
-        print('⚠️ Value "$trimmedValue" already exists or failed to create');
         // Try to find it again
         final values = _attributeStore.getValuesForAttribute(attributeId);
         for (var value in values) {
@@ -575,7 +539,6 @@ abstract class _BulkImportStore with Store {
         }
       }
     } catch (e) {
-      print('❌ Error creating attribute value "$trimmedValue": $e');
     }
     return null;
   }
@@ -640,7 +603,6 @@ abstract class _BulkImportStore with Store {
       }
 
       if (attributeValueMap.isEmpty) {
-        print('⚠️ No attributes could be synced to global system (data might be corrupted)');
         return false;
       }
 
@@ -662,18 +624,14 @@ abstract class _BulkImportStore with Store {
           attributeAssignments,
         );
         if (success) {
-          print('✅ Linked ${attributeAssignments.length} attribute(s) to product $productId');
           return true;
         } else {
-          print('⚠️ Failed to link attributes to product');
           return false;
         }
       } catch (e) {
-        print('❌ Error assigning attributes to product: $e');
         return false;
       }
     } catch (e) {
-      print('❌ Error linking attributes to product: $e');
       return false;
     }
   }

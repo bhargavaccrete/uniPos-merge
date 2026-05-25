@@ -6,6 +6,7 @@ import 'package:unipos/stores/payment_method_store.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class Paymentsmethods extends StatefulWidget {
   @override
@@ -49,9 +50,13 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
 
   void _showAddDialog() {
     _nameController.clear();
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: EdgeInsets.zero,
         content: Column(
@@ -146,9 +151,13 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
 
   void _showEditDialog(String id, String currentName) {
     _nameController.text = currentName;
+    final editHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: editHInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: EdgeInsets.zero,
         content: Column(
@@ -244,9 +253,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-    final width = size.width;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -414,30 +421,31 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                 }
 
                 return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(isTablet ? 20 : 16),
                     child: Container(
-                      width: width > 800 ? width : 800,
-                      padding: EdgeInsets.all(isTablet ? 20 : 16),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: double.infinity,
                           child: DataTable(
                             headingRowColor: WidgetStateProperty.all(AppColors.primary),
                             headingRowHeight: isTablet ? 56 : 50,
                             dataRowMinHeight: isTablet ? 60 : 56,
                             dataRowMaxHeight: isTablet ? 70 : 65,
+                            columnSpacing: isTablet ? 20 : 10,
+                            horizontalMargin: isTablet ? 16 : 10,
                             columns: [
                               DataColumn(
                                 label: Text(
@@ -576,9 +584,13 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                                           child: IconButton(
                                             onPressed: () async {
                                               // Show confirmation dialog
+                                              final deleteHInset = !AppResponsive.isMobile(context)
+                                                  ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                                                  : 24.0;
                                               final confirm = await showDialog<bool>(
                                                 context: context,
                                                 builder: (context) => AlertDialog(
+                                                  insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(12),
                                                   ),

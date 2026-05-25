@@ -329,12 +329,14 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
             children: [
               _buildDesktopHeader(),
               Expanded(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: _buildSteps(),
+                child: Center(
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: AppResponsive.maxFormWidth(context)),
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: _buildSteps(),
+                    ),
                   ),
                 ),
               ),
@@ -411,7 +413,10 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
   Widget _buildHeader() {
     return Container(
-      padding: EdgeInsets.all(AppResponsive.isMobile(context) ? 14 : 20),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0, desktop: 16.0),
+      ),
       child: Row(
         children: [
           if (_store.currentStep > 0)
@@ -450,8 +455,8 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
   Widget _buildProgressBar() {
     return Container(
-      height: 4,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      height: 5,
+      margin: EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.grey[300],
         borderRadius: BorderRadius.circular(2),
@@ -1008,102 +1013,161 @@ class WelcomeStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = AppResponsive.isMobile(context);
-    final iconSize = isMobile ? 100.0 : 120.0;
+    final iconSize = AppResponsive.getValue(context, mobile: 88.0, tablet: 104.0, desktop: 120.0);
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 20 : 30),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: iconSize,
-              height: iconSize,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            // minHeight fills the available space so mainAxisAlignment.center works
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: AppResponsive.screenPadding(context),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                // NO mainAxisSize.min — column must fill height for centering to work
+                children: [
+                  // Icon
+                  Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.rocket_launch, size: iconSize * 0.5, color: AppColors.primary),
+                  ),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
+
+                  // Title
+                  Text(
+                    'Welcome to UniPOS Setup',
+                    style: TextStyle(
+                      fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 30.0),
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkNeutral,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  Text(
+                    "Let's get your store up and running in just a few minutes",
+                    style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
+
+                  // Feature cards
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildFeatureItem(context, Icons.timer, 'Quick Setup', 'Complete setup in under 10 minutes', showDivider: true),
+                        _buildFeatureItem(context, Icons.security, 'Secure & Private', 'Your data is encrypted and stored locally', showDivider: true),
+                        _buildFeatureItem(context, Icons.support_agent, 'Support Available', 'Get help anytime during setup', showDivider: false),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
+
+                  // Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppResponsive.buttonHeight(context),
+                    child: ElevatedButton(
+                      onPressed: onNext,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                        ),
+                      ),
+                      child: Text(
+                        "Let's Start",
+                        style: TextStyle(
+                          fontSize: AppResponsive.buttonFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                ],
               ),
-              child: Icon(Icons.rocket_launch, size: iconSize * 0.5, color: AppColors.primary),
             ),
-            SizedBox(height: isMobile ? 20 : 30),
-            Text(
-              'Welcome to UniPOS Setup',
-              style: TextStyle(
-                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 28.0),
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkNeutral,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: isMobile ? 10 : 15),
-            Text(
-              "Let's get your store up and running in just a few minutes",
-              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: isMobile ? 24 : 40),
-            _buildFeatureItem(context, Icons.timer, 'Quick Setup', 'Complete setup in under 10 minutes'),
-            _buildFeatureItem(context, Icons.security, 'Secure & Private', 'Your data is encrypted and stored locally'),
-            _buildFeatureItem(context, Icons.support_agent, 'Support Available', 'Get help anytime during setup'),
-            SizedBox(height: isMobile ? 30 : 50),
-            ElevatedButton(
-              onPressed: onNext,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 36 : 50,
-                  vertical: isMobile ? 12 : 15,
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text(
-                "Let's Start",
-                style: TextStyle(fontSize: AppResponsive.buttonFontSize(context), fontWeight: FontWeight.w600, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildFeatureItem(BuildContext context, IconData icon, String title, String description) {
-    final isMobile = AppResponsive.isMobile(context);
-    final boxSize = isMobile ? 42.0 : 50.0;
+  Widget _buildFeatureItem(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String description, {
+    required bool showDivider,
+  }) {
+    final boxSize = AppResponsive.getValue(context, mobile: 42.0, tablet: 48.0, desktop: 52.0);
 
-    return Container(
-      margin: EdgeInsets.only(bottom: isMobile ? 14 : 20),
-      child: Row(
-        children: [
-          Container(
-            width: boxSize,
-            height: boxSize,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: AppResponsive.iconSize(context)),
-          ),
-          SizedBox(width: isMobile ? 12 : 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: AppResponsive.subheadingFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.darkNeutral,
-                  ),
+    return Column(
+      children: [
+        Padding(
+          padding: AppResponsive.cardPadding(context),
+          child: Row(
+            children: [
+              Container(
+                width: boxSize,
+                height: boxSize,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                 ),
-                Text(description, style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600])),
-              ],
-            ),
+                child: Icon(icon, color: AppColors.primary, size: AppResponsive.iconSize(context)),
+              ),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.darkNeutral,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        if (showDivider)
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+      ],
     );
   }
 }
@@ -1126,16 +1190,24 @@ class ReviewStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = AppResponsive.isMobile(context);
-    final iconSize = isMobile ? 80.0 : 100.0;
+    final iconSize = AppResponsive.getValue(context, mobile: 72.0, tablet: 90.0, desktop: 100.0);
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        child: Column(
-          children: [
-            Container(
-              width: iconSize,
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.getValue(context, mobile: 460.0, tablet: 540.0, desktop: 620.0),
+              ),
+              padding: AppResponsive.padding(context),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+              Container(
+                width: iconSize,
               height: iconSize,
               decoration: BoxDecoration(
                 color: AppColors.success.withOpacity(0.1),
@@ -1143,26 +1215,26 @@ class ReviewStep extends StatelessWidget {
               ),
               child: Icon(Icons.check_circle, size: iconSize * 0.6, color: AppColors.success),
             ),
-            SizedBox(height: isMobile ? 20 : 30),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             Text(
               'Setup Complete!',
               style: TextStyle(
-                fontSize: AppResponsive.getValue(context, mobile: 24.0, tablet: 26.0, desktop: 28.0),
+                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 28.0),
                 fontWeight: FontWeight.bold,
                 color: AppColors.darkNeutral,
               ),
             ),
-            SizedBox(height: isMobile ? 10 : 15),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               'Your store is ready to use',
               style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Colors.grey[600]),
             ),
-            SizedBox(height: isMobile ? 24 : 40),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             Container(
-              padding: EdgeInsets.all(isMobile ? 16 : 20),
+              padding: AppResponsive.cardPadding(context),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
@@ -1180,14 +1252,14 @@ class ReviewStep extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(height: isMobile ? 24 : 40),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             ElevatedButton(
               onPressed: onComplete,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
                 padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 36 : 50,
-                  vertical: isMobile ? 12 : 15,
+                  horizontal: AppResponsive.getValue(context, mobile: 32.0, tablet: 44.0, desktop: 50.0),
+                  vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 15.0),
                 ),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -1199,7 +1271,10 @@ class ReviewStep extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+      ),
+    ),
+  );
   }
 
   Widget _buildSummaryItem(BuildContext context, String label, String value) {

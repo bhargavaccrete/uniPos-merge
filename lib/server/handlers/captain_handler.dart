@@ -75,7 +75,6 @@ Future<Response> captainAuthHandler(Request request) async {
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in captainAuthHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -110,7 +109,6 @@ Future<Response> getCaptainMenuHandler(Request request) async {
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in getCaptainMenuHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -133,7 +131,6 @@ Future<Response> getCaptainTablesHandler(Request request) async {
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in getCaptainTablesHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -160,14 +157,12 @@ Future<Response> captainSendOrderHandler(Request request) async {
       _pruneExpiredRequests();
       final cached = _orderRequestCache[requestId];
       if (cached != null && !cached.isExpired) {
-        print('⚠️ Duplicate order rejected — requestId: $requestId (staffId: $staffId)');
         return Response.ok(
           jsonEncode({...cached.response, 'duplicate': true}),
           headers: {'Content-Type': 'application/json'},
         );
       }
     } else {
-      print('⚠️ captainSendOrderHandler: missing requestId (staffId: $staffId)');
     }
 
     final tableNo = data['tableNo'] as String?;
@@ -285,7 +280,6 @@ Future<Response> captainSendOrderHandler(Request request) async {
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in captainSendOrderHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -380,7 +374,6 @@ Future<Response> captainModifyOrderHandler(Request request, String orderId) asyn
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in captainModifyOrderHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -424,7 +417,6 @@ Future<Response> getCaptainActiveOrdersHandler(Request request) async {
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in getCaptainActiveOrdersHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},
@@ -485,7 +477,6 @@ Future<Response> captainUpdateOrderStatusHandler(Request request, String orderId
       headers: {'Content-Type': 'application/json'},
     );
   } catch (e) {
-    print('❌ Error in captainUpdateOrderStatusHandler: $e');
     return Response.internalServerError(
       body: jsonEncode({'success': false, 'error': e.toString()}),
       headers: {'Content-Type': 'application/json'},

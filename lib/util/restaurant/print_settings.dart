@@ -58,7 +58,6 @@ class PrintSettings {
     updated[key] = newValue;
     settingsNotifier.value = updated;
     await _save();
-    print('🖨️  PrintSettings: $key = $newValue (saved)');
   }
 
   static Future<void> resetToDefaults() async {

@@ -31,16 +31,11 @@ abstract class _PaymentMethodStore with Store {
   /// Initialize repository and load payment methods
   @action
   Future<void> init() async {
-    print('💳 PaymentMethodStore: init() called');
     isLoading = true;
     try {
-      print('💳 PaymentMethodStore: Initializing repository...');
       await _repository.init();
-      print('💳 PaymentMethodStore: Repository initialized');
       await loadPaymentMethods();
-      print('💳 PaymentMethodStore: init() complete, loaded ${paymentMethods.length} methods');
     } catch (e) {
-      print('❌ PaymentMethodStore: Error in init(): $e');
       errorMessage = 'Failed to initialize: $e';
     } finally {
       isLoading = false;
@@ -50,17 +45,13 @@ abstract class _PaymentMethodStore with Store {
   /// Load all payment methods from repository
   @action
   Future<void> loadPaymentMethods() async {
-    print('💳 PaymentMethodStore: loadPaymentMethods() called');
     isLoading = true;
     errorMessage = null;
     try {
       final methods = _repository.getAll();
-      print('💳 PaymentMethodStore: Got ${methods.length} methods from repository');
       paymentMethods.clear();
       paymentMethods.addAll(methods);
-      print('💳 PaymentMethodStore: Observable list now has ${paymentMethods.length} methods');
     } catch (e) {
-      print('❌ PaymentMethodStore: Error loading methods: $e');
       errorMessage = 'Failed to load payment methods: $e';
     } finally {
       isLoading = false;

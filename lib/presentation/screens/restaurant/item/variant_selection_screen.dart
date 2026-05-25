@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/app_text_field.dart';
@@ -310,7 +311,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                       hint: '0.00',
                       prefixWidget: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        child: Text('₹', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                        child: Text(CurrencyHelper.currentSymbol, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
                       ),
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
                     ),
@@ -391,10 +392,14 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   void _showAddVariantDialog() {
     final variantNameController = TextEditingController();
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
           title: Text(
             'Add New Variant',
             style: GoogleFonts.poppins(

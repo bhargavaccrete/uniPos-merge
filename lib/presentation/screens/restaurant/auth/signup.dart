@@ -200,8 +200,6 @@ class _signUpState extends State<Signup> {
                               children: [
                                 CountryCodePicker(
                                   onChanged: (conuntry) {
-                                    print(
-                                        "selected country:${conuntry.dialCode}");
                                   },
                                   initialSelection: 'IN',
                                   showCountryOnly: false,

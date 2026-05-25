@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:uuid/uuid.dart';
-
-import '../../../../core/constants/hive_box_names.dart';
 
 class StaffAttendanceDetailScreen extends StatefulWidget {
   final String staffName;
@@ -56,7 +54,12 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
+        builder: (ctx, setState) {
+          final hInset = !AppResponsive.isMobile(ctx)
+              ? ((AppResponsive.screenWidth(ctx) - AppResponsive.dialogWidth(ctx)) / 2).clamp(40.0, 200.0)
+              : 24.0;
+          return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
           title: Text('Add Missing Shift\n${_fullDayLabel(day)}', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -112,7 +115,8 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
               child: Text('Add Shift', style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
-        ),
+        );
+        },
       ),
     );
   }
@@ -124,7 +128,12 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
+        builder: (ctx, setState) {
+          final hInset = !AppResponsive.isMobile(ctx)
+              ? ((AppResponsive.screenWidth(ctx) - AppResponsive.dialogWidth(ctx)) / 2).clamp(40.0, 200.0)
+              : 24.0;
+          return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
           title: Text('Edit Timesheet', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -153,9 +162,13 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
           actions: [
             TextButton.icon(
               onPressed: () async {
+                final deleteHInset = !AppResponsive.isMobile(context)
+                    ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                    : 24.0;
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (c) => AlertDialog(
+                    insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
                     title: const Text('Delete Record?'),
                     content: const Text('This action cannot be undone.'),
                     actions: [
@@ -208,7 +221,8 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
               ],
             ),
           ],
-        ),
+        );
+        },
       ),
     );
   }
@@ -239,7 +253,20 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
 
   int get _presentCount => _days.where((d) => _dayRecords(d).isNotEmpty).length;
   int get _absentCount => _days.length - _presentCount;
-  int get _totalMinutes => records.fold(0, (s, r) => s + (r.totalMinutes ?? 0));
+  int get _totalMinutes {
+    final now = DateTime.now();
+    return records.fold(0, (s, r) {
+      if (r.totalMinutes != null) return s + r.totalMinutes!;
+      if (!r.isOpen) return s;
+      final gross = now.difference(r.clockIn).inMinutes;
+      final breaks = (r.breakTotalMinutes ?? 0) +
+          (r.isOnBreak && r.breakStartTime != null
+              ? now.difference(r.breakStartTime!).inMinutes
+              : 0);
+      final active = gross - breaks;
+      return s + (active < 0 ? 0 : active);
+    });
+  }
 
   String _fmtMins(int mins) {
     final h = mins ~/ 60;
@@ -445,7 +472,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(color: r.isOpen ? Colors.orange.shade200 : Colors.blue.shade200),
                                       ),
-                                      child: Text(r.isOpen ? 'Still In' : r.formattedDuration, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade800 : Colors.blue.shade700)),
+                                      child: Text(_openShiftLabel(r), style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade800 : Colors.blue.shade700)),
                                     ),
                                   ],
                                 ),
@@ -474,6 +501,18 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
         ],
       ),
     );
+  }
+
+  String _openShiftLabel(AttendanceModel r) {
+    if (!r.isOpen) return r.formattedDuration;
+    final now = DateTime.now();
+    // Same day → simple "Still In"
+    if (now.day == r.clockIn.day && now.month == r.clockIn.month && now.year == r.clockIn.year) {
+      return 'Still In';
+    }
+    // Crossed midnight — show date range e.g. "Still In\nApr 21→22"
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return 'Still In\n${months[r.clockIn.month - 1]} ${r.clockIn.day}→${now.day}';
   }
 
   Widget _summaryTile(String value, String label, Color color, IconData icon) {

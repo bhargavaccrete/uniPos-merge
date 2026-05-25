@@ -146,8 +146,18 @@ class _AddProductScreenState extends State<AddProductScreen>
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
-      _formStore.setImagePath(image.path);
       final bytes = await image.readAsBytes();
+      
+      // Validate image size (max 2MB)
+      final int maxSizeInBytes = 2 * 1024 * 1024; // 2MB
+      if (bytes.length > maxSizeInBytes) {
+        if (mounted) {
+          NotificationService.instance.showError('Image is too large. Please select an image under 2MB.');
+        }
+        return;
+      }
+      
+      _formStore.setImagePath(image.path);
       _formStore.setImageBytes(bytes);
     }
   }
@@ -336,7 +346,6 @@ class _AddProductScreenState extends State<AddProductScreen>
             imageBytes = await file.readAsBytes();
           }
         } catch (e) {
-          print('Error reading image bytes: $e');
         }
       }
 
@@ -2569,7 +2578,6 @@ class _AddProductScreenState extends State<AddProductScreen>
                       try {
                         navigator.pop();
                       } catch (e) {
-                        print('Error closing loading dialog: $e');
                       }
 
                       if (!mounted) return;
@@ -3297,7 +3305,6 @@ class _AddProductScreenState extends State<AddProductScreen>
         }
       }
     } catch (e) {
-      print('❌ Error in _createDefaultAttributes: $e');
       if (mounted) {
         NotificationService.instance.showError('Error creating attributes: $e');
       }

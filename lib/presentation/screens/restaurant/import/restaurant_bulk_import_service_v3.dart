@@ -35,7 +35,9 @@ class RestaurantBulkImportServiceV3 {
   Map<String, ChoicesModel> _choiceCache = {};
   Map<String, Extramodel> _extraCache = {};
   Map<String, VariantModel> _variantCache = {};
+  Map<String, VariantModel> _variantByNameCache = {}; // For auto-create by name
   Map<double, Tax> _taxByRateCache = {}; // Cache taxes by percentage rate
+  Map<String, Items> _itemByNameCache = {}; // For duplicate detection (name → item)
 
   RestaurantBulkImportServiceV3({this.onProgress});
 
@@ -69,7 +71,6 @@ class RestaurantBulkImportServiceV3 {
       // This ensures Sheet1 doesn't appear in the final file
       if (excel.sheets.containsKey('Sheet1')) {
         excel.delete('Sheet1');
-        print('🗑️ Removed default Sheet1');
       }
 
       return await _saveExcelFile(excel, 'unipos_restaurant_import_template_v3.xlsx');
@@ -163,12 +164,15 @@ class RestaurantBulkImportServiceV3 {
       'Optional: Image path/URL'
     ]);
 
-    // Sample data
-    _addRow(sheet, 2, ['cat_burgers', 'Burgers', '']);
-    _addRow(sheet, 3, ['cat_pizza', 'Pizza', '']);
-    _addRow(sheet, 4, ['cat_drinks', 'Drinks', '']);
-    _addRow(sheet, 5, ['cat_appetizers', 'Appetizers', '']);
-    _addRow(sheet, 6, ['cat_desserts', 'Desserts', '']);
+    // Sample data — 8 veg-friendly categories
+    _addRow(sheet, 2, ['cat_starters',   'Starters',       '']);
+    _addRow(sheet, 3, ['cat_soups',      'Soups',          '']);
+    _addRow(sheet, 4, ['cat_main',       'Main Course',    '']);
+    _addRow(sheet, 5, ['cat_breads',     'Breads',         '']);
+    _addRow(sheet, 6, ['cat_rice',       'Rice & Biryani', '']);
+    _addRow(sheet, 7, ['cat_desserts',   'Desserts',       '']);
+    _addRow(sheet, 8, ['cat_beverages',  'Beverages',      '']);
+    _addRow(sheet, 9, ['cat_pizza',      'Pizza',          '']);
   }
 
   void _createVariantsSheet(Excel excel) {
@@ -184,25 +188,42 @@ class RestaurantBulkImportServiceV3 {
     ]);
 
     // Sample data
-    _addRow(sheet, 2, ['var_small', 'Small']);
-    _addRow(sheet, 3, ['var_medium', 'Medium']);
-    _addRow(sheet, 4, ['var_large', 'Large']);
-    _addRow(sheet, 5, ['var_regular', 'Regular']);
-    _addRow(sheet, 6, ['var_family', 'Family Size']);
+    _addRow(sheet, 2, ['var_half',   'Half']);
+    _addRow(sheet, 3, ['var_full',   'Full']);
+    _addRow(sheet, 4, ['var_small',  'Small']);
+    _addRow(sheet, 5, ['var_medium', 'Medium']);
+    _addRow(sheet, 6, ['var_large',  'Large']);
+    _addRow(sheet, 7, ['var_regular', 'Regular']);
+    _addRow(sheet, 8, ['var_family', 'Family Size']);
   }
 
   void _createExtrasSheet(Excel excel) {
     var sheet = excel[SHEET_EXTRAS];
     _addHeader(sheet, 0, ['id', 'name', 'isEnabled', 'minimum', 'maximum']);
-    _addRow(sheet, 1, ['extra_toppings', 'Toppings', 'Yes', 0, 5]);
-    _addRow(sheet, 2, ['extra_sauces', 'Sauces', 'Yes', 1, 2]);
+    // No instruction row — data starts at row 1
+    _addRow(sheet, 1, ['extra_toppings', 'Toppings',      'Yes', 0, 5]);
+    _addRow(sheet, 2, ['extra_cheese',   'Cheese Options', 'Yes', 0, 3]);
+    _addRow(sheet, 3, ['extra_sauces',   'Sauces',         'Yes', 0, 2]);
   }
 
   void _createToppingsSheet(Excel excel) {
     var sheet = excel[SHEET_TOPPINGS];
     _addHeader(sheet, 0, ['extraId', 'name', 'isveg', 'price', 'isContainSize', 'variantId', 'variantPrice']);
-    _addRow(sheet, 1, ['extra_toppings', 'Olives', 'Yes', 15, 'No', '', '']);
-    _addRow(sheet, 2, ['extra_toppings', 'Pepperoni', 'No', 25, 'No', '', '']);
+    // No instruction row — data starts at row 1
+    // Toppings group
+    _addRow(sheet, 1, ['extra_toppings', 'Olives',     'Yes', 15, 'No', '', '']);
+    _addRow(sheet, 2, ['extra_toppings', 'Mushrooms',  'Yes', 20, 'No', '', '']);
+    _addRow(sheet, 3, ['extra_toppings', 'Jalapenos',  'Yes', 15, 'No', '', '']);
+    _addRow(sheet, 4, ['extra_toppings', 'Corn',       'Yes', 15, 'No', '', '']);
+    _addRow(sheet, 5, ['extra_toppings', 'Capsicum',   'Yes', 15, 'No', '', '']);
+    // Cheese group
+    _addRow(sheet, 6, ['extra_cheese',   'Mozzarella',    'Yes', 30, 'No', '', '']);
+    _addRow(sheet, 7, ['extra_cheese',   'Cheddar',        'Yes', 35, 'No', '', '']);
+    _addRow(sheet, 8, ['extra_cheese',   'Double Cheese',  'Yes', 50, 'No', '', '']);
+    // Sauces group
+    _addRow(sheet, 9,  ['extra_sauces', 'Tomato Base',  'Yes', 0,  'No', '', '']);
+    _addRow(sheet, 10, ['extra_sauces', 'Pesto',        'Yes', 20, 'No', '', '']);
+    _addRow(sheet, 11, ['extra_sauces', 'BBQ Sauce',    'Yes', 20, 'No', '', '']);
   }
 
   void _createChoicesSheet(Excel excel) {
@@ -220,7 +241,7 @@ class RestaurantBulkImportServiceV3 {
     // Sample data with options listed
     _addRow(sheet, 2, ['choice_crust', 'Crust Type', 'No', 'Thin Crust, Thick Crust, Stuffed Crust']);
     _addRow(sheet, 3, ['choice_spice', 'Spice Level', 'No', 'Mild, Medium, Hot, Extra Hot']);
-    _addRow(sheet, 4, ['choice_toppings', 'Extra Toppings', 'Yes', 'Cheese, Olives, Pepperoni, Mushrooms']);
+    _addRow(sheet, 4, ['choice_toppings', 'Extra Toppings', 'Yes', 'Cheese, Olives, Mushrooms, Jalapenos']);
   }
 
   void _createChoiceOptionsSheet(Excel excel) {
@@ -234,21 +255,26 @@ class RestaurantBulkImportServiceV3 {
       'Display name (e.g., Thin Crust)'
     ]);
 
-    // Sample data - Crust options
-    _addRow(sheet, 2, ['choice_crust', 'opt_thin', 'Thin Crust']);
-    _addRow(sheet, 3, ['choice_crust', 'opt_thick', 'Thick Crust']);
+    // Crust options (single selection)
+    _addRow(sheet, 2, ['choice_crust', 'opt_thin',    'Thin Crust']);
+    _addRow(sheet, 3, ['choice_crust', 'opt_thick',   'Thick Crust']);
     _addRow(sheet, 4, ['choice_crust', 'opt_stuffed', 'Stuffed Crust']);
 
-    // Sample data - Spice options
-    _addRow(sheet, 5, ['choice_spice', 'opt_mild', 'Mild']);
-    _addRow(sheet, 6, ['choice_spice', 'opt_medium', 'Medium']);
-    _addRow(sheet, 7, ['choice_spice', 'opt_hot', 'Hot']);
+    // Spice options (single selection)
+    _addRow(sheet, 5, ['choice_spice', 'opt_mild',      'Mild']);
+    _addRow(sheet, 6, ['choice_spice', 'opt_medium',    'Medium']);
+    _addRow(sheet, 7, ['choice_spice', 'opt_hot',       'Hot']);
     _addRow(sheet, 8, ['choice_spice', 'opt_extra_hot', 'Extra Hot']);
+
+    // Extra Toppings options (multiple selection)
+    _addRow(sheet, 9,  ['choice_toppings', 'opt_t_cheese',    'Cheese']);
+    _addRow(sheet, 10, ['choice_toppings', 'opt_t_olives',    'Olives']);
+    _addRow(sheet, 11, ['choice_toppings', 'opt_t_mushrooms', 'Mushrooms']);
+    _addRow(sheet, 12, ['choice_toppings', 'opt_t_jalapenos', 'Jalapenos']);
   }
 
   /// Enhanced Items sheet with CategoryName and ImageURL - USER FRIENDLY VERSION
   void _createEnhancedItemsSheet(Excel excel) {
-    print('📝 Creating Enhanced Items sheet...');
     var sheet = excel[SHEET_ITEMS];
 
     // Row 0: Enhanced headers
@@ -258,7 +284,6 @@ class RestaurantBulkImportServiceV3 {
       'StockQuantity', 'AllowOutOfStock', 'TaxRate', 'IsEnabled',
       'HasVariants', 'ChoiceIds', 'ExtraIds'
     ]);
-    print('   ✅ Added headers (16 columns)');
 
     // Row 1: Instructions row (colored differently)
     _addInstructionRow(sheet, 1, [
@@ -280,25 +305,57 @@ class RestaurantBulkImportServiceV3 {
       'Comma separated IDs'
     ]);
 
-    // Row 2-4: Sample data with better examples
-    print('   📝 Adding sample row 2: Chicken Burger');
-    _addRow(sheet, 2, [
-      'Chicken Burger', 150, 'Burgers', 'Non-Veg', 'Delicious chicken burger with lettuce',
-      '', 'No', 'pcs', 'Yes', 50, 'No', 5, 'Yes', 'No', '', 'extra_sauces'
-    ]);
+    // Row 2-20: 19 all-Veg sample items across 7 categories
+    // Format: ItemName, Price, CategoryName, VegType, Description,
+    //         ImageURL, IsSoldByWeight, Unit, TrackInventory,
+    //         StockQuantity, AllowOutOfStock, TaxRate, IsEnabled,
+    //         HasVariants, ChoiceIds, ExtraIds
 
-    print('   📝 Adding sample row 3: Veg Pizza');
-    _addRow(sheet, 3, [
-      'Veg Pizza', 200, 'Pizza', 'Veg', 'Fresh vegetable pizza',
-      '', 'No', 'pcs', 'Yes', 30, 'Yes', 5, 'Yes', 'Yes', 'choice_crust', 'extra_toppings'
-    ]);
+    // — Starters —
+    _addRow(sheet, 2,  ['Veg Spring Rolls',   120, 'Starters',       'Veg', 'Crispy rolls filled with mixed vegetables',         '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 3,  ['Paneer Tikka',          0, 'Starters',       'Veg', 'Marinated cottage cheese grilled to perfection',    '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', '', '']);
+    _addRow(sheet, 4,  ['Veg Manchurian',      140, 'Starters',       'Veg', 'Crispy vegetable balls in tangy Manchurian sauce',  '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
 
-    print('   📝 Adding sample row 4: Cold Drink');
-    _addRow(sheet, 4, [
-      'Cold Drink', 50, 'Drinks', 'Veg', 'Chilled soft drink',
-      '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', ''
-    ]);
-    print('✅ Enhanced Items sheet created successfully');
+    // — Soups —
+    _addRow(sheet, 5,  ['Sweet Corn Soup',      90, 'Soups',          'Veg', 'Classic sweet corn soup with vegetables',           '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 6,  ['Tomato Soup',          80, 'Soups',          'Veg', 'Fresh tomato soup with herbs and cream',            '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+
+    // — Main Course —
+    _addRow(sheet, 7,  ['Paneer Butter Masala', 220, 'Main Course',   'Veg', 'Cottage cheese in rich tomato cream sauce',         '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 8,  ['Dal Makhani',          180, 'Main Course',   'Veg', 'Slow-cooked black lentils in buttery sauce',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 9,  ['Mixed Veg Curry',       160, 'Main Course',  'Veg', 'Seasonal vegetables in spiced tomato gravy',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 10, ['Palak Paneer',          200, 'Main Course',  'Veg', 'Cottage cheese cubes in creamy spinach gravy',      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 11, ['Chana Masala',          170, 'Main Course',  'Veg', 'Spiced chickpeas in tangy onion-tomato masala',     '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+
+    // — Breads —
+    _addRow(sheet, 12, ['Butter Naan',           40, 'Breads',        'Veg', 'Soft leavened flatbread baked in tandoor',          '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 13, ['Garlic Naan',            50, 'Breads',       'Veg', 'Naan topped with garlic butter and cilantro',       '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 14, ['Tandoori Roti',          30, 'Breads',       'Veg', 'Whole wheat bread baked in clay tandoor',           '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+
+    // — Rice & Biryani —
+    _addRow(sheet, 15, ['Veg Biryani',             0, 'Rice & Biryani', 'Veg', 'Fragrant basmati rice layered with vegetables',  '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', '', '']);
+    _addRow(sheet, 16, ['Jeera Rice',             120, 'Rice & Biryani', 'Veg', 'Cumin-tempered long-grain basmati rice',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+    _addRow(sheet, 17, ['Veg Fried Rice',         150, 'Rice & Biryani', 'Veg', 'Wok-tossed rice with mixed vegetables',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
+
+    // — Desserts —
+    _addRow(sheet, 18, ['Gulab Jamun',            80, 'Desserts',     'Veg', 'Soft milk dumplings soaked in rose sugar syrup',    '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
+    _addRow(sheet, 19, ['Rasmalai',              100, 'Desserts',     'Veg', 'Soft spongy cheese patties in sweetened saffron milk', '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
+
+    // — Beverages —
+    _addRow(sheet, 20, ['Mango Lassi',            80, 'Beverages',    'Veg', 'Chilled mango blended with yogurt and milk',        '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
+    _addRow(sheet, 21, ['Masala Chai',            40, 'Beverages',    'Veg', 'Spiced Indian tea brewed with ginger and cardamom', '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
+
+    // — Pizza (HasVariants=Yes, with Choices + Extras) —
+    // Margherita: Single crust choice + single spice choice + topping extras + cheese extras
+    _addRow(sheet, 22, ['Margherita Pizza',  0, 'Pizza', 'Veg', 'Classic tomato base with fresh mozzarella',
+      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'choice_crust,choice_spice', 'extra_toppings,extra_cheese']);
+    // Paneer Pizza: All choices (crust single + spice single + toppings multiple) + extras
+    _addRow(sheet, 23, ['Paneer Pizza',      0, 'Pizza', 'Veg', 'Spiced paneer chunks on a tangy tomato base',
+      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'choice_crust,choice_spice,choice_toppings', 'extra_toppings,extra_cheese']);
+    // Farmhouse: Choices + sauce extra to show all three extra groups
+    _addRow(sheet, 24, ['Farmhouse Pizza',   0, 'Pizza', 'Veg', 'Loaded with seasonal vegetables and herbs',
+      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'choice_crust,choice_spice,choice_toppings', 'extra_toppings,extra_cheese,extra_sauces']);
+
   }
 
   /// Add instruction row with different styling
@@ -329,14 +386,27 @@ class RestaurantBulkImportServiceV3 {
       'Number (0 if not tracking)'
     ]);
 
-    // Sample data - Pizza with 3 sizes
-    _addRow(sheet, 2, ['Veg Pizza', 'Small', 200, 'Yes', 10]);
-    _addRow(sheet, 3, ['Veg Pizza', 'Medium', 300, 'Yes', 15]);
-    _addRow(sheet, 4, ['Veg Pizza', 'Large', 400, 'Yes', 20]);
+    // Veg Biryani — 3 sizes
+    _addRow(sheet, 2, ['Veg Biryani', 'Small',  160, 'No', 0]);
+    _addRow(sheet, 3, ['Veg Biryani', 'Medium', 200, 'No', 0]);
+    _addRow(sheet, 4, ['Veg Biryani', 'Large',  280, 'No', 0]);
 
-    // Sample data - Another item
-    _addRow(sheet, 5, ['Chicken Burger', 'Regular', 150, 'No', 0]);
-    _addRow(sheet, 6, ['Chicken Burger', 'Large', 200, 'No', 0]);
+    // Paneer Tikka — Half & Full
+    _addRow(sheet, 5, ['Paneer Tikka', 'Half', 120, 'No', 0]);
+    _addRow(sheet, 6, ['Paneer Tikka', 'Full', 220, 'No', 0]);
+
+    // Pizza — Small / Medium / Large (with choices + extras, see Items sheet)
+    _addRow(sheet, 7,  ['Margherita Pizza', 'Small',  199, 'No', 0]);
+    _addRow(sheet, 8,  ['Margherita Pizza', 'Medium', 299, 'No', 0]);
+    _addRow(sheet, 9,  ['Margherita Pizza', 'Large',  399, 'No', 0]);
+
+    _addRow(sheet, 10, ['Paneer Pizza', 'Small',  229, 'No', 0]);
+    _addRow(sheet, 11, ['Paneer Pizza', 'Medium', 329, 'No', 0]);
+    _addRow(sheet, 12, ['Paneer Pizza', 'Large',  429, 'No', 0]);
+
+    _addRow(sheet, 13, ['Farmhouse Pizza', 'Small',  249, 'No', 0]);
+    _addRow(sheet, 14, ['Farmhouse Pizza', 'Medium', 349, 'No', 0]);
+    _addRow(sheet, 15, ['Farmhouse Pizza', 'Large',  449, 'No', 0]);
   }
 
   void _addHeader(Sheet sheet, int rowIndex, List<String> headers) {
@@ -448,7 +518,6 @@ class RestaurantBulkImportServiceV3 {
         return allSheets;
       }
     } catch (e) {
-      print('Error parsing file: $e');
       throw Exception('Failed to parse file: $e');
     }
     return {};
@@ -475,7 +544,6 @@ class RestaurantBulkImportServiceV3 {
     ImportResultV3 result = ImportResultV3();
 
     try {
-      print('🔄 Starting enhanced import process...');
 
       // Step 1: Load all data into memory caches (ONE TIME)
       onProgress?.call(0, 100, 'Loading existing data...');
@@ -525,11 +593,8 @@ class RestaurantBulkImportServiceV3 {
       result.success = result.errors.isEmpty;
       onProgress?.call(100, 100, 'Import complete!');
 
-      print('✅ Enhanced import complete! Success: ${result.success}');
       return result;
     } catch (e, stackTrace) {
-      print('❌ Fatal error: $e');
-      print('Stack trace: $stackTrace');
       result.errors.add('Fatal error: $e');
       result.success = false;
       return result;
@@ -538,7 +603,6 @@ class RestaurantBulkImportServiceV3 {
 
   /// Load all data into in-memory caches using stores
   Future<void> _loadAllCaches() async {
-    print('📂 Loading caches...');
 
     try {
       // Load categories with case-insensitive name matching
@@ -547,9 +611,7 @@ class RestaurantBulkImportServiceV3 {
       _categoryCache = {for (var cat in categories) cat.id: cat};
       // ✅ IMPROVED: Trim and lowercase for consistent matching (Pizza, pizza, " Pizza " all match)
       _categoryByNameCache = {for (var cat in categories) cat.name.toLowerCase().trim(): cat};
-      print('✅ Cached ${categories.length} categories (case-insensitive matching enabled)');
     } catch (e) {
-      print('⚠️ Error loading categories: $e');
       // Continue with empty cache
     }
 
@@ -558,9 +620,7 @@ class RestaurantBulkImportServiceV3 {
       await choiceStore.loadChoices();
       final choices = choiceStore.choices;
       _choiceCache = {for (var choice in choices) choice.id: choice};
-      print('✅ Cached ${choices.length} choices');
     } catch (e) {
-      print('⚠️ Error loading choices: $e');
     }
 
     try {
@@ -568,9 +628,15 @@ class RestaurantBulkImportServiceV3 {
       await extraStore.loadExtras();
       final extras = extraStore.extras;
       _extraCache = {for (var extra in extras) extra.Id: extra};
-      print('✅ Cached ${extras.length} extras');
     } catch (e) {
-      print('⚠️ Error loading extras: $e');
+    }
+
+    try {
+      // Load existing items for duplicate detection
+      await itemStore.loadItems();
+      final existingItems = itemStore.items;
+      _itemByNameCache = {for (var item in existingItems) item.name.toLowerCase().trim(): item};
+    } catch (e) {
     }
 
     try {
@@ -578,9 +644,8 @@ class RestaurantBulkImportServiceV3 {
       await variantStore.loadVariants();
       final variants = variantStore.variants;
       _variantCache = {for (var variant in variants) variant.id: variant};
-      print('✅ Cached ${variants.length} variants');
+      _variantByNameCache = {for (var variant in variants) variant.name.toLowerCase().trim(): variant};
     } catch (e) {
-      print('⚠️ Error loading variants: $e');
     }
 
     try {
@@ -592,9 +657,7 @@ class RestaurantBulkImportServiceV3 {
         for (var tax in taxes)
           if (tax.taxperecentage != null) tax.taxperecentage!: tax
       };
-      print('✅ Cached ${taxes.length} taxes');
     } catch (e) {
-      print('⚠️ Error loading taxes: $e');
     }
   }
 
@@ -661,12 +724,10 @@ class RestaurantBulkImportServiceV3 {
     // Check cache first (O(1) lookup) - prevents duplicates
     if (_categoryByNameCache.containsKey(nameLower)) {
       final existingCategory = _categoryByNameCache[nameLower]!;
-      print('✅ Reusing existing category: "${existingCategory.name}" for input "$categoryName"');
       return existingCategory.id;
     }
 
     // Category doesn't exist - create it
-    print('📝 Auto-creating new category: $categoryName');
 
     final newCategory = Category(
       id: const Uuid().v4(),
@@ -693,12 +754,10 @@ class RestaurantBulkImportServiceV3 {
     // Check cache first (O(1) lookup) - prevents duplicates
     if (_taxByRateCache.containsKey(taxRate)) {
       final existingTax = _taxByRateCache[taxRate]!;
-      print('✅ Reusing existing tax: "${existingTax.taxname}" (${existingTax.taxperecentage}%) for rate $taxRate%');
       return existingTax.id;
     }
 
     // Tax doesn't exist - create it
-    print('📝 Auto-creating new tax: $taxRate%');
 
     final newTax = Tax(
       id: const Uuid().v4(),
@@ -717,6 +776,32 @@ class RestaurantBulkImportServiceV3 {
     return newTax.id;
   }
 
+  /// ✅ Auto-create variant by name (case-insensitive, duplicate-safe)
+  /// Allows ItemVariants sheet to reference names like "Half" or "Full"
+  /// without requiring them to be pre-defined in the Variants sheet.
+  Future<VariantModel> _getOrCreateVariant(String variantName, ImportResultV3 result) async {
+    final nameLower = variantName.toLowerCase().trim();
+
+    // Check by-name cache first
+    if (_variantByNameCache.containsKey(nameLower)) {
+      return _variantByNameCache[nameLower]!;
+    }
+
+    // Not found — auto-create
+    final newVariant = VariantModel(
+      id: const Uuid().v4(),
+      name: variantName.trim(),
+      createdTime: DateTime.now(),
+    );
+
+    await variantStore.addVariant(newVariant);
+    _variantCache[newVariant.id] = newVariant;
+    _variantByNameCache[nameLower] = newVariant;
+    result.variantsImported++;
+    result.warnings.add('✨ Auto-created variant: ${newVariant.name}');
+    return newVariant;
+  }
+
   /// ✅ CRITICAL: Download image from URL
   Future<String?> _downloadImage(String imageUrl, String itemId, ImportResultV3 result) async {
     if (imageUrl.isEmpty || !imageUrl.startsWith('http')) {
@@ -724,7 +809,6 @@ class RestaurantBulkImportServiceV3 {
     }
 
     try {
-      print('⬇️ Downloading image: $imageUrl');
 
       final response = await http.get(Uri.parse(imageUrl));
       if (response.statusCode != 200) {
@@ -748,12 +832,10 @@ class RestaurantBulkImportServiceV3 {
       final file = File('${productImagesDir.path}/$fileName');
       await file.writeAsBytes(response.bodyBytes);
 
-      print('✅ Image saved: $fileName');
       result.imagesDownloaded++;
 
       return file.path;
     } catch (e) {
-      print('⚠️ Image download error: $e');
       result.warnings.add('Failed to download image: $imageUrl ($e)');
       return null;
     }
@@ -1007,11 +1089,9 @@ class RestaurantBulkImportServiceV3 {
         var choice = _choiceCache[choiceId];
         if (choice == null) {
           result.errors.add('Choice "$choiceId" not found for options. Make sure the choice ID exists in Choices sheet.');
-          print('❌ Choice "$choiceId" not found. Available choices: ${_choiceCache.keys.join(", ")}');
           continue;
         }
 
-        print('✅ Found choice "$choiceId" (${choice.name}), adding ${optionGroups[choiceId]!.length} options');
 
         List<ChoiceOption> options = choice.choiceOption.toList();
 
@@ -1053,8 +1133,6 @@ class RestaurantBulkImportServiceV3 {
 
     // Get header row to map columns - STRIP ASTERISKS from required field markers
     final headers = rows[0].map((e) => e.toString().trim().replaceAll('*', '')).toList();
-    print('📋 Headers from Excel (cleaned): ${headers.take(5).join(", ")}');
-    print('   Will map to: ItemName, Price, CategoryName, VegType, Description');
 
     // Start from row 2 to skip the instruction row (row 1)
     for (int i = 2; i < rows.length; i++) {
@@ -1063,9 +1141,7 @@ class RestaurantBulkImportServiceV3 {
 
         // Debug: Print raw row data
         if (i <= 4) {
-          print('🔍 Row $i RAW: length=${row.length}, isEmpty=${row.isEmpty}');
           if (row.isNotEmpty) {
-            print('   First 3 cells: [${row.length > 0 ? row[0] : "N/A"}, ${row.length > 1 ? row[1] : "N/A"}, ${row.length > 2 ? row[2] : "N/A"}]');
           }
         }
 
@@ -1079,7 +1155,6 @@ class RestaurantBulkImportServiceV3 {
 
         // Debug: Print mapped data
         if (i <= 4) {
-          print('📋 Row $i MAPPED: ItemName="${rowData['ItemName']}", Price="${rowData['Price']}", Category="${rowData['CategoryName']}"');
         }
 
         // Step 1: Validate row
@@ -1093,11 +1168,18 @@ class RestaurantBulkImportServiceV3 {
           continue;
         }
 
-        // Step 2: Get or create category
+        // Step 2: Duplicate check — skip if item with same name already exists
+        final itemNameLower = (rowData['ItemName']?.toString().trim() ?? '').toLowerCase();
+        if (_itemByNameCache.containsKey(itemNameLower)) {
+          result.warnings.add('Row ${i + 1}: Item "${rowData['ItemName']}" already exists, skipping');
+          continue;
+        }
+
+        // Step 3: Get or create category
         final categoryName = rowData['CategoryName']?.toString().trim() ?? '';
         final categoryId = await _getOrCreateCategory(categoryName, result);
 
-        // Step 3: Download image if URL provided and convert to bytes
+        // Step 4: Download image if URL provided and convert to bytes
         Uint8List? imageBytes;
         final imageUrl = rowData['ImageURL']?.toString().trim() ?? '';
         if (imageUrl.isNotEmpty && imageUrl.startsWith('http')) {
@@ -1110,12 +1192,11 @@ class RestaurantBulkImportServiceV3 {
                 imageBytes = await file.readAsBytes();
               }
             } catch (e) {
-              print('⚠️ Failed to read downloaded image: $e');
             }
           }
         }
 
-        // Step 4: Parse comma-separated IDs and validate
+        // Step 5: Parse comma-separated IDs and validate
         final choiceIdsStr = rowData['ChoiceIds']?.toString().trim() ?? '';
         List<String> choiceIds = choiceIdsStr.isEmpty
             ? []
@@ -1140,7 +1221,7 @@ class RestaurantBulkImportServiceV3 {
                 return true;
               }).toList();
 
-        // Step 5: Auto-create tax if tax rate is specified
+        // Step 6: Auto-create tax if tax rate is specified
         final rawTaxRate = _getDoubleFromValue(rowData['TaxRate']);
         final taxRateValue = _normalizeTaxRate(rawTaxRate);
         String? taxId;
@@ -1149,7 +1230,7 @@ class RestaurantBulkImportServiceV3 {
           taxId = await _getOrCreateTax(rawTaxRate, result);
         }
 
-        // Step 6: Create item
+        // Step 7: Create item
         final hasVariants = _parseBool(rowData['HasVariants']?.toString() ?? '', false);
 
         Items item = Items(
@@ -1179,6 +1260,8 @@ class RestaurantBulkImportServiceV3 {
         final success = await itemStore.addItem(item);
         if (success) {
           result.itemsImported++;
+          // Update cache so duplicate rows within this same import batch are also skipped
+          _itemByNameCache[item.name.toLowerCase().trim()] = item;
         }
 
         // Progress update
@@ -1237,12 +1320,8 @@ class RestaurantBulkImportServiceV3 {
               ? item.stockQuantity
               : variantStock;
 
-          // Find variant by name
-          var variant = _variantCache.values.where((v) => v.name == variantName).firstOrNull;
-          if (variant == null) {
-            result.warnings.add('Variant "$variantName" not found, skipping');
-            continue;
-          }
+          // Find or auto-create variant by name
+          final variant = await _getOrCreateVariant(variantName, result);
 
           variants.add(ItemVariante(
             variantId: variant.id,
@@ -1253,7 +1332,15 @@ class RestaurantBulkImportServiceV3 {
           result.itemVariantsImported++;
         }
 
-        var updatedItem = item.copyWith(variant: variants);
+        // Set base price = minimum variant price so menu always shows a display price
+        final minVariantPrice = variants.isNotEmpty
+            ? variants.map((v) => v.price).reduce((a, b) => a < b ? a : b)
+            : null;
+
+        var updatedItem = item.copyWith(
+          variant: variants,
+          price: minVariantPrice,
+        );
         await itemStore.updateItem(updatedItem);
       } catch (e) {
         result.errors.add('Error importing variants for item $itemName: $e');

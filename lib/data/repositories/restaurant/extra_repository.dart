@@ -49,7 +49,6 @@ class ExtraRepository {
       }
       return false;
     } catch (e) {
-      print("Error adding topping: $e");
       return false;
     }
   }
@@ -69,7 +68,6 @@ class ExtraRepository {
       }
       return false;
     } catch (e) {
-      print("Error removing topping: $e");
       return false;
     }
   }
@@ -90,7 +88,6 @@ class ExtraRepository {
       }
       return false;
     } catch (e) {
-      print("Error updating topping: $e");
       return false;
     }
   }

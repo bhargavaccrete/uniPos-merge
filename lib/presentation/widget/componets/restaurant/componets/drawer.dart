@@ -32,7 +32,6 @@ class _DrawerrState extends State<Drawerr> {
         NotificationService.instance.showSuccess('Cart cleared successfully');
       }
     } catch (e) {
-      print('Error clearing cart: $e');
       if (mounted) {
         NotificationService.instance.showError('Error clearing cart');
       }
@@ -461,9 +460,13 @@ class _DrawerrState extends State<Drawerr> {
   }
 
   void _showClearCartDialog(BuildContext context) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -552,11 +555,15 @@ class _DrawerrState extends State<Drawerr> {
       },
     );
 
+    final syncHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: syncHInset, vertical: 24),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           content: Container(
             padding: EdgeInsets.all(10),
@@ -592,12 +599,16 @@ class _DrawerrState extends State<Drawerr> {
   }
 
   void _showImportExportDialog(BuildContext context) {
+    final importExportHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(horizontal: importExportHInset, vertical: 24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: Center(
                 child: Text(
@@ -636,6 +647,9 @@ class _DrawerrState extends State<Drawerr> {
 
                         final navigatorState =
                             Navigator.of(outerContext, rootNavigator: true);
+                        final backupHInset = !AppResponsive.isMobile(outerContext)
+                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
+                            : 24.0;
                         showDialog(
                           context: outerContext,
                           barrierDismissible: false,
@@ -643,6 +657,7 @@ class _DrawerrState extends State<Drawerr> {
                             return WillPopScope(
                               onWillPop: () async => false,
                               child: AlertDialog(
+                                insetPadding: EdgeInsets.symmetric(horizontal: backupHInset, vertical: 24),
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -714,6 +729,9 @@ class _DrawerrState extends State<Drawerr> {
 
                         final navigatorState =
                             Navigator.of(outerContext, rootNavigator: true);
+                        final shareHInset = !AppResponsive.isMobile(outerContext)
+                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
+                            : 24.0;
                         showDialog(
                           context: outerContext,
                           barrierDismissible: false,
@@ -721,6 +739,7 @@ class _DrawerrState extends State<Drawerr> {
                             return PopScope(
                               canPop: false,
                               child: AlertDialog(
+                                insetPadding: EdgeInsets.symmetric(horizontal: shareHInset, vertical: 24),
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -795,6 +814,9 @@ class _DrawerrState extends State<Drawerr> {
                         final navigatorState =
                             Navigator.of(context, rootNavigator: true);
 
+                        final importHInset = !AppResponsive.isMobile(context)
+                            ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+                            : 24.0;
                         showDialog(
                           context: context,
                           barrierDismissible: false,
@@ -802,6 +824,7 @@ class _DrawerrState extends State<Drawerr> {
                             return WillPopScope(
                               onWillPop: () async => false,
                               child: AlertDialog(
+                                insetPadding: EdgeInsets.symmetric(horizontal: importHInset, vertical: 24),
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -836,11 +859,15 @@ class _DrawerrState extends State<Drawerr> {
                             final globalContext =
                                 main_app.navigatorKey.currentContext;
                             if (globalContext != null) {
-                              showDialog(
+                              final importDoneHInset = !AppResponsive.isMobile(globalContext)
+                                ? ((AppResponsive.screenWidth(globalContext) - AppResponsive.dialogWidth(globalContext)) / 2).clamp(40.0, 200.0)
+                                : 24.0;
+                            showDialog(
                                 context: globalContext,
                                 barrierDismissible: false,
                                 builder: (BuildContext dialogContext) {
                                   return AlertDialog(
+                                    insetPadding: EdgeInsets.symmetric(horizontal: importDoneHInset, vertical: 24),
                                     title: Text(
                                       'Import Completed',
                                       style: GoogleFonts.poppins(),

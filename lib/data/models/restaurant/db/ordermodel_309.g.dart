@@ -1,4 +1,5 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// Legacy null-safety patches applied manually — do not re-run build_runner without re-applying.
 
 part of 'ordermodel_309.dart';
 
@@ -21,7 +22,7 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       customerName: fields[1] as String,
       customerNumber: fields[2] as String,
       customerEmail: fields[3] as String,
-      items: (fields[4] as List).cast<CartItem>(),
+      items: (fields[4] as List?)?.cast<CartItem>() ?? [],
       status: fields[5] as String,
       timeStamp: fields[6] as DateTime,
       orderType: fields[7] as String,
@@ -38,9 +39,9 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       gstRate: fields[18] as double?,
       gstAmount: fields[19] as double?,
       remark: fields[20] as String?,
-      kotNumbers: (fields[21] as List).cast<int>(),
-      itemCountAtLastKot: fields[22] as int,
-      kotBoundaries: (fields[23] as List).cast<int>(),
+      kotNumbers: (fields[21] as List?)?.cast<int>() ?? [0],
+      itemCountAtLastKot: (fields[22] as int?) ?? 0,
+      kotBoundaries: (fields[23] as List?)?.cast<int>() ?? [0],
       kotStatuses: (fields[24] as Map?)?.cast<int, String>(),
       orderNumber: fields[25] as int?,
       customerId: fields[26] as String?,
@@ -51,13 +52,15 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       isTaxInclusive: fields[31] as bool?,
       billNumber: fields[32] as int?,
       sessionId: fields[33] as String?,
+      lastModifiedBy: fields[34] as String?,
+      lastModifiedAt: fields[35] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, OrderModel obj) {
     writer
-      ..writeByte(34)
+      ..writeByte(36)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -125,7 +128,11 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       ..writeByte(32)
       ..write(obj.billNumber)
       ..writeByte(33)
-      ..write(obj.sessionId);
+      ..write(obj.sessionId)
+      ..writeByte(34)
+      ..write(obj.lastModifiedBy)
+      ..writeByte(35)
+      ..write(obj.lastModifiedAt);
   }
 
   @override

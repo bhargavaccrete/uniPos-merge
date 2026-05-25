@@ -15,6 +15,7 @@ import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import '../../../../util/restaurant/staticswitch.dart';
+import '../../../../util/common/app_responsive.dart';
 class Orderdetails extends StatefulWidget {
   final PastOrderModel? Order;
   const Orderdetails({super.key, this.Order});
@@ -610,18 +611,28 @@ class _OrderdetailsState extends State<Orderdetails> {
                     // Payment method / Split payment breakdown
                     const Divider(height: 20),
                     if (currentOrder.isSplitPayment == true) ...[
-                      // Split payment — show each method
-                      ...currentOrder.paymentList.map((p) {
+                      // Split payment — show each method with cash detail
+                      ...currentOrder.paymentList.expand((p) {
                         final method = (p['method'] as String? ?? 'Unknown').toUpperCase();
                         final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: _totalRow(
-                            method,
-                            _money(amount),
-                            color: Colors.blue.shade700,
+                        final received = (p['received'] as num?)?.toDouble() ?? 0.0;
+                        final change = (p['change'] as num?)?.toDouble() ?? 0.0;
+                        return [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: _totalRow(method, _money(amount), color: Colors.blue.shade700),
                           ),
-                        );
+                          if (received > amount)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2, left: 12),
+                              child: _totalRow('  Received', _money(received), color: Colors.grey.shade600),
+                            ),
+                          if (change > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4, left: 12),
+                              child: _totalRow('  Change', _money(change), color: Colors.orange.shade700),
+                            ),
+                        ];
                       }),
                     ] else ...[
                       // Single payment
@@ -659,7 +670,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         tableNo: currentOrder.tableNo, // Preserved from original order
         totalPrice: currentOrder.totalPrice ?? 0,
         discount: currentOrder.Discount,
-        serviceCharge: 0, // pastOrderModel doesn't store service charge separately
+        serviceCharge: currentOrder.serviceCharge,
         paymentMethod: currentOrder.paymentmode,
         paymentStatus: 'PAID',
         isPaid: true,
@@ -673,17 +684,13 @@ class _OrderdetailsState extends State<Orderdetails> {
         kotBoundaries: currentOrder.kotBoundaries,
       );
 
-      // Detect if it's a delivery order
-      final bool isDelivery = (currentOrder.orderType ?? '').toLowerCase().contains('delivery');
-
       // Create calculations with saved values from the order
       final calculations = CartCalculationService(
         items: currentOrder.items ?? [],
         discountType: DiscountType.amount,
         discountValue: currentOrder.Discount ?? 0,
-        serviceChargePercentage: 0, // Not stored in pastOrderModel
-        deliveryCharge: 0, // Not stored in pastOrderModel
-        isDeliveryOrder: isDelivery,
+        isDeliveryOrder: true,
+        deliveryCharge: currentOrder.serviceCharge ?? 0,
         isTaxInclusive: currentOrder.isTaxInclusive, // Use stored tax mode from order
       );
 
@@ -755,12 +762,10 @@ class _OrderdetailsState extends State<Orderdetails> {
   }
 
   Future<void> _showRefundDialog(BuildContext context) async {
-    print('🔔 Refund button clicked');
 
     // Validate refund eligibility using store
     final eligibilityError = pastOrderStore.validateRefundEligibility(currentOrder);
     if (eligibilityError != null) {
-      print('❌ $eligibilityError');
       NotificationService.instance.showInfo(eligibilityError);
       return;
     }
@@ -769,9 +774,6 @@ class _OrderdetailsState extends State<Orderdetails> {
     final refundableItems = pastOrderStore.getRefundableItems(currentOrder);
     final remainingTotal = pastOrderStore.getRemainingRefundableAmount(currentOrder);
 
-    print('📝 Refundable items: ${refundableItems.length}');
-    print('💰 Remaining refundable total: $remainingTotal');
-    print('📋 Opening refund dialog...');
 
     // Calculate GST rate for dialog
     final subTotal = currentOrder.subTotal ?? 0;
@@ -791,12 +793,9 @@ class _OrderdetailsState extends State<Orderdetails> {
       ),
     );
 
-    print('🔙 Dialog closed');
     if (result != null) {
-      print('✅ Result received, processing refund...');
       await _processPartialRefund(result);
     } else {
-      print('❌ Dialog was cancelled (result is null)');
     }
   }
 
@@ -830,9 +829,13 @@ class _OrderdetailsState extends State<Orderdetails> {
     // Show dialog to get void reason
     final TextEditingController reasonController = TextEditingController();
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [

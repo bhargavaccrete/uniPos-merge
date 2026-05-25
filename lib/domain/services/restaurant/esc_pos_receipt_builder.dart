@@ -74,6 +74,16 @@ class EscPosReceiptBuilder {
     // Initialize printer — clears any previous formatting
     bytes.addAll(_init);
 
+    if (receiptData.kotStatus?.toUpperCase() == 'CANCEL') {
+      bytes.addAll(_alignCenter);
+      bytes.addAll(_boldOn);
+      bytes.addAll(_sizeDouble);
+      bytes.addAll(_text('******** CANCEL KOT ********'));
+      bytes.addAll(_sizeNormal);
+      bytes.addAll(_boldOff);
+      bytes.addAll(_text('\n'));
+    }
+
     // ── HEADER: Store name + KOT number ──
     bytes.addAll(_alignCenter);
     if (PrintSettings.showRestaurantName && receiptData.storeName != null) {
@@ -88,12 +98,18 @@ class EscPosReceiptBuilder {
     bytes.addAll(_boldOn);
     bytes.addAll(_sizeDoubleHeight);
     String kotLabel = 'KOT #${receiptData.kotNumber ?? 0}';
-    if (receiptData.isAddonKot == true) {
+    if (receiptData.isAddonKot == true && receiptData.kotStatus?.toUpperCase() != 'CANCEL') {
       kotLabel += ' (ADD-ON)'; // Tells kitchen this isn't the first KOT
     }
     bytes.addAll(_text(kotLabel));
     bytes.addAll(_sizeNormal);
     bytes.addAll(_boldOff);
+
+    // Reference KOT
+    if (receiptData.cancelReference != null && receiptData.kotStatus?.toUpperCase() == 'CANCEL') {
+      bytes.addAll(_alignCenter);
+      bytes.addAll(_text('Reference: ${receiptData.cancelReference}'));
+    }
 
     // ── ORDER INFO: Table, type, order#, time ──
     bytes.addAll(_alignLeft);
@@ -136,8 +152,14 @@ class EscPosReceiptBuilder {
         // size field contains variant name for KOT
         itemName += ' (${item.size})';
       }
+      
+      String prefix = '${qty}x ';
+      if (receiptData.kotStatus?.toUpperCase() == 'CANCEL') {
+        prefix = 'X ${qty}x '; // ESC/POS fallback for Cross symbol
+      }
+      
       bytes.addAll(_boldOn);
-      bytes.addAll(_text('${qty}x $itemName'));
+      bytes.addAll(_text('$prefix$itemName'));
       bytes.addAll(_boldOff);
 
       // Additional info (choices, extras, instructions) stored in weight field

@@ -27,6 +27,7 @@ class RestaurantPrintHelper {
     required OrderModel order,
     required int kotNumber,
     bool autoPrint = false,
+    String? cancelReference,
   }) async {
     try {
       final storeSettings = StoreSettingsService();
@@ -137,6 +138,7 @@ class RestaurantPrintHelper {
           ? '${order.orderNumber}' 
           : order.id.substring(0, 8).toUpperCase();
       final isAddonKot = order.kotNumbers.length > 1 && order.kotNumbers.first != kotNumber;
+      final kotStatus = order.getKotStatus(kotNumber);
 
       // 6. Create ReceiptData for KOT
       final receiptData = ReceiptData(
@@ -152,6 +154,7 @@ class RestaurantPrintHelper {
         tableNo: order.tableNo,
         // Add KOT-specific info
         kotNumber: kotNumber,
+        kotStatus: kotStatus,
         orderTimestamp: order.timeStamp,
         orderNo: orderNo,
         isAddonKot: isAddonKot,
@@ -201,11 +204,12 @@ class RestaurantPrintHelper {
           orderType: receiptData.orderType,
           tableNo: receiptData.tableNo,
           kotNumber: kotNumber,
+          kotStatus: receiptData.kotStatus,
+          cancelReference: receiptData.cancelReference,
           orderTimestamp: order.timeStamp,
           orderNo: orderNo,
           isAddonKot: isAddonKot,
         );
-
         if (context.mounted) {
           NotificationService.instance.showSuccess(
             'KOT #$kotNumber sent to printer',
@@ -224,6 +228,8 @@ class RestaurantPrintHelper {
           orderType: receiptData.orderType,
           tableNo: receiptData.tableNo,
           kotNumber: kotNumber,
+          kotStatus: receiptData.kotStatus,
+          cancelReference: receiptData.cancelReference,
           orderTimestamp: order.timeStamp,
           orderNo: orderNo,
           isAddonKot: isAddonKot,
@@ -389,9 +395,6 @@ class RestaurantPrintHelper {
       // Note: calculations.subtotal is already the base price (without tax)
       // CartCalculationService handles tax extraction for tax-inclusive mode
       // ✅ FIX: Determine payment type based on payment status
-      print('🔍 DEBUG PRINT: order.isPaid = ${order.isPaid}');
-      print('🔍 DEBUG PRINT: order.paymentMethod = ${order.paymentMethod}');
-      print('🔍 DEBUG PRINT: order.isSplitPayment = ${order.isSplitPayment}');
 
       String paymentType;
       String? paymentBreakdown; // For split payment display
@@ -409,13 +412,11 @@ class RestaurantPrintHelper {
             return '$method: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(amount)}';
           }).join(', ');
           paymentBreakdown = breakdown;
-          print('🔍 DEBUG PRINT: Payment breakdown = $paymentBreakdown');
         }
       } else {
         // Order is unpaid (running order) - show NOT PAID status
         paymentType = 'NOT PAID';
       }
-      print('🔍 DEBUG PRINT: Final paymentType = $paymentType');
 
       final saleModel = SaleModel.createWithGst(
         saleId: invoiceId,
@@ -536,8 +537,6 @@ class RestaurantPrintHelper {
       printKotNumbers.add(tempKotNumber);
       printKotBoundaries.add(currentItemCount);
 
-      print('🖨️ Temporary KOT #$tempKotNumber for bill preview');
-      print('   Previous items: $previousItemCount, Current items: $currentItemCount');
     }
 
     // Create updated order with current items and KOT info for printing
@@ -600,9 +599,9 @@ class RestaurantPrintHelper {
         items: pastOrder.items,
         discountType: DiscountType.amount,
         discountValue: pastOrder.Discount ?? 0,
-        serviceChargePercentage: 0,
-        deliveryCharge: 0,
-        isDeliveryOrder: isDelivery,
+        // Use stored service charge amount directly via deliveryCharge path
+        isDeliveryOrder: true,
+        deliveryCharge: pastOrder.serviceCharge ?? 0,
         isTaxInclusive: pastOrder.isTaxInclusive,
       );
 

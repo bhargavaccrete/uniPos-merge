@@ -79,7 +79,6 @@ class HiveInit {
   /// Initialize Hive with Flutter
   static Future<void> init() async {
     if (_isHiveInitialized) {
-      print('⚠️ HiveInit.init() already called - skipping');
       return;
     }
     await Hive.initFlutter();
@@ -114,7 +113,6 @@ class HiveInit {
   /// Open common boxes (needed regardless of business mode)
   static Future<void> openCommonBoxes() async {
     if (_areCommonBoxesOpen) {
-      print('⚠️ Common boxes already open - skipping');
       return;
     }
     await Hive.openBox(HiveBoxNames.storeBox);
@@ -125,19 +123,14 @@ class HiveInit {
 
     // Open and initialize payment methods box with defaults
     final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
-    print('📦 HiveInit: Opened paymentMethodsBox, has ${paymentBox.length} items');
 
     // Initialize with defaults if empty
     if (paymentBox.isEmpty) {
-      print('📦 HiveInit: Payment box is empty, initializing defaults...');
       await _initializeDefaultPaymentMethods(paymentBox);
-      print('📦 HiveInit: Initialized ${paymentBox.length} default payment methods');
     } else {
-      print('📦 HiveInit: Payment box already has ${paymentBox.length} methods');
     }
 
     _areCommonBoxesOpen = true;
-    print('✅ Common boxes opened and guard flag set');
   }
 
   /// Initialize default payment methods
@@ -353,10 +346,8 @@ class HiveInit {
           // await Hive.box(boxName).close();
         }
         await Hive.deleteBoxFromDisk(boxName);
-        print('🗑️ Deleted old attribute box: $boxName');
       }
     } catch (e) {
-      print('⚠️ Error cleaning up old boxes (may not exist): $e');
       // It's okay if boxes don't exist
     }
   }
@@ -364,7 +355,6 @@ class HiveInit {
   /// Open all retail Hive boxes
   static Future<void> openRetailBoxes() async {
     if (_areRetailBoxesOpen) {
-      print('⚠️ Retail boxes already open - skipping');
       return;
     }
 
@@ -402,24 +392,18 @@ class HiveInit {
     try {
       await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
     } catch (e) {
-      print('⚠️ billingTabs box corrupted (typeId 252 error), fixing...');
       try {
         // Close the box if it's somehow open
         if (Hive.isBoxOpen(HiveBoxNames.billingTabs)) {
           await Hive.box(HiveBoxNames.billingTabs).close();
-          print('✅ Closed corrupted billingTabs box');
         }
 
         // Delete the corrupted box from disk
         await Hive.deleteBoxFromDisk(HiveBoxNames.billingTabs);
-        print('✅ Deleted corrupted billingTabs box');
 
         // Create a fresh box
         await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
-        print('✅ Recreated billingTabs box');
       } catch (deleteError) {
-        print('❌ Failed to fix billingTabs: $deleteError');
-        print('💡 Please manually delete: C:\\Users\\Hp\\OneDrive - Accrete Infosolution Technologies llp\\Documents\\billingtabs.hive');
         rethrow;
       }
     }
@@ -435,7 +419,6 @@ class HiveInit {
     await Hive.openBox<Expense>(HiveBoxNames.retailExpense);
 
     _areRetailBoxesOpen = true;
-    print('✅ All retail boxes opened successfully and guard flag set');
   }
 
   /// Register all restaurant adapters (typeIds: 100-149)
@@ -569,7 +552,6 @@ class HiveInit {
   /// Open all restaurant Hive boxes
   static Future<void> openRestaurantBoxes() async {
     if (_areRestaurantBoxesOpen) {
-      print('⚠️ Restaurant boxes already open - skipping');
       return;
     }
 
@@ -629,7 +611,6 @@ class HiveInit {
     await Hive.openBox<AttendanceModel>(HiveBoxNames.restaurantAttendance);
 
     _areRestaurantBoxesOpen = true;
-    print('✅ All restaurant boxes opened successfully with correct names and guard flag set');
   }
 
   /// Initialize boxes based on business mode
@@ -701,7 +682,6 @@ class HiveInit {
   /// WARNING: This will delete ALL attribute data!
   static Future<void> resetAttributeBoxes() async {
     try {
-      print('🔄 Resetting attribute boxes...');
 
       final boxNames = [
         'attributes',
@@ -717,12 +697,9 @@ class HiveInit {
             final box = Hive.box(boxName);
             await box.clear();
             await box.close();
-            print('  ✓ Cleared and closed: $boxName');
           }
           await Hive.deleteBoxFromDisk(boxName);
-          print('  ✓ Deleted from disk: $boxName');
         } catch (e) {
-          print('  ⚠️ Error with box $boxName: $e');
         }
       }
 
@@ -734,9 +711,7 @@ class HiveInit {
       await Hive.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
       await Hive.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
 
-      print('✅ Attribute boxes reset complete!');
     } catch (e) {
-      print('❌ Error resetting attribute boxes: $e');
       rethrow;
     }
   }

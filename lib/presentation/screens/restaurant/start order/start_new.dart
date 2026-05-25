@@ -138,7 +138,6 @@ class _POSMainScreenState extends State<POSMainScreen> with TickerProviderStateM
         isCartShow = items.isNotEmpty;
       });
     } catch (e) {
-      print('Error loading cart items: $e');
     }
   }
 
@@ -266,7 +265,6 @@ class _POSMainScreenState extends State<POSMainScreen> with TickerProviderStateM
         _HeaderActionButton(
           icon: Icons.menu,
           onTap: () {
-            print("button is getting pessed ---------> ");
             _scaffoldKey.currentState?.openDrawer();
           },
         ),
@@ -777,7 +775,7 @@ class _MenuTabContentState extends State<_MenuTabContent> {
 
                   return GridView.builder(
                     padding: EdgeInsets.only(top: 16, bottom: widget.isCartShow ? 120 : 24, left: 16, right: 16),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: size.width > 900 ? 4 : 3, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.85),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4), crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.85),
                     itemCount: items.length,
                     itemBuilder: (context, index) => _ItemCard(item: items[index], onTap: () => _handleItemTap(items[index]), formatStock: _formatStockDisplay, getStockStatus: _getStockStatus),
                   );
@@ -848,7 +846,6 @@ class _OrdersTabContentState extends State<_OrdersTabContent> {
         final status = message['status'] as String?;
         final tableNo = message['tableNo'] as String?;
 
-        print('🔔 UniPOS: Order status updated - KOT #$kotNumber (Table $tableNo) → $status');
 
         // Show notification to user
         if (mounted && status != null) {
@@ -859,7 +856,6 @@ class _OrdersTabContentState extends State<_OrdersTabContent> {
         final newItemCount = message['newItemCount'];
         final tableNo = message['tableNo'];
 
-        print('🔔 UniPOS: Order updated - KOT #$kotNumber with $newItemCount new items');
 
         if (mounted) {
           NotificationService.instance.showSuccess('New KOT #$kotNumber: $newItemCount items added to Table $tableNo');
@@ -868,7 +864,6 @@ class _OrdersTabContentState extends State<_OrdersTabContent> {
         final kotNumber = message['kotNumber'];
         final tableNo = message['tableNo'];
 
-        print('🔔 UniPOS: New order received - KOT #$kotNumber (Table $tableNo)');
 
         if (mounted) {
           NotificationService.instance.showSuccess('New Order: KOT #$kotNumber - Table $tableNo');
@@ -1162,7 +1157,6 @@ class _ActiveOrdersContentState extends State<_ActiveOrdersContent> {
 
   Future<void> _updateKotStatus(OrderModel order, int kotNumber, String newStatus) async {
     try {
-      print('🔄 Updating KOT #$kotNumber to $newStatus');
 
       Map<int, String> updatedKotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
       updatedKotStatuses[kotNumber] = newStatus;
@@ -1175,7 +1169,6 @@ class _ActiveOrdersContentState extends State<_ActiveOrdersContent> {
       );
       await HiveOrders.updateOrder(updatedOrder);
 
-      print('✅ KOT #$kotNumber updated to $newStatus (Overall: $overallStatus)');
 
       try {
         final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
@@ -1190,16 +1183,13 @@ class _ActiveOrdersContentState extends State<_ActiveOrdersContent> {
           'allKotNumbers': order.kotNumbers,
           'kotStatuses': kotStatusesJson,
         });
-        print('📡 Status update broadcast to KDS');
       } catch (e) {
-        print('⚠️ Failed to broadcast to KDS: $e');
       }
 
       if (mounted) {
         NotificationService.instance.showSuccess('KOT #$kotNumber updated to $newStatus');
       }
     } catch (e) {
-      print('❌ Error updating KOT status: $e');
       if (mounted) {
         NotificationService.instance.showError('Failed to update status: $e');
       }
@@ -1240,7 +1230,6 @@ class _ActiveOrdersContentState extends State<_ActiveOrdersContent> {
     await HiveOrders.deleteOrder(order.id);
     await HiveTables.updateTableStatus(order.tableNo!, 'Available');
 
-    print("Order ${order.kotNumbers.isNotEmpty ? order.kotNumbers.first : order.id} moved to past orders.");
   }
 
   // Future<void> _openBox() async {

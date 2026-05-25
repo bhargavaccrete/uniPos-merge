@@ -7,6 +7,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
@@ -319,9 +320,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     final notesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         title: Text(
           'Add New Customer',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -451,9 +456,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     final notesController = TextEditingController(text: customer.notes);
     final formKey = GlobalKey<FormState>();
 
+    final dialogHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: dialogHInset, vertical: 24),
         title: Text(
           'Edit Customer',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -565,9 +574,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   }
 
   void _showCustomerDetailsDialog(BuildContext context, CustomerModel customer) {
+    final detailsHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: detailsHInset, vertical: 24),
         title: Row(
           children: [
             CircleAvatar(
@@ -674,9 +687,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   }
 
   void _confirmDeleteCustomer(BuildContext context, CustomerModel customer) {
+    final deleteHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
         title: Text(
           'Delete Customer',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),

@@ -14,6 +14,7 @@ import '../../../../../domain/services/restaurant/cart_calculation_service.dart'
 import '../../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
@@ -88,6 +89,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   double _totalPaid = 0;
   double _changeReturn = 0;
   bool _isPaymentValid = false;
+  bool _isProcessing = false;
   bool discountApply = false;
   String? SelectedRemark = 'Old Customer';
   final List<String> remarkList = [
@@ -147,7 +149,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
         }
       }
     } catch (e) {
-      print('⚠️ Could not auto-load customer: $e');
     }
   }
 
@@ -214,7 +215,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // ✅ Step 4: Build the UI using the final, calculated values.
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
-    final isTablet = width > 600;
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -233,12 +234,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Container(
-          padding: EdgeInsets.all(isTablet ? 20 : 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                padding: EdgeInsets.all(isTablet ? 20 : 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               // Show selected customer info
               if (selectedCustomer != null)
                 Container(
@@ -952,36 +956,45 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 ),
               ),
 
-              SizedBox(height: 20),
-
-              // Proceed Button
-              SizedBox(
-                width: double.infinity,
-                height: isTablet ? 54 : 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isPaymentValid ? AppColors.primary : Colors.grey.shade400,
-                    foregroundColor: Colors.white,
-                    elevation: _isPaymentValid ? 2 : 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _isPaymentValid ? () => _submitOrder(calculations) : () {},
-                  child: Text(
-                    'Proceed to Checkout',
-                    style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 17 : 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  ],
                 ),
               ),
-
-              SizedBox(height: 20),
-            ],
+            ),
           ),
-        ),
+          // Proceed Button — pinned at bottom
+          Container(
+            color: Colors.grey.shade50,
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              height: isTablet ? 54 : 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isPaymentValid ? AppColors.primary : Colors.grey.shade400,
+                  foregroundColor: Colors.white,
+                  elevation: _isPaymentValid ? 2 : 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: (_isPaymentValid && !_isProcessing) ? () => _submitOrder(calculations) : null,
+                child: _isProcessing
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : Text(
+                        'Proceed to Checkout',
+                        style: GoogleFonts.poppins(
+                          fontSize: isTablet ? 17 : 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1148,7 +1161,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   Future<void> proceed(CartCalculationService calculations, {int pointsUsed = 0}) async {
-    print('============THis is PRocced Function=============');
     if (widget.existingModel == null || widget.tableid == null) {
       // _showSnackBar('Error: No active order or table found.', isError: true);
       NotificationService.instance.showError(
@@ -1177,14 +1189,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
       finalKotNumbers.add(newKotNumber);
       finalKotBoundaries.add(currentItemCount);
 
-      print('🎫 Generated new KOT #$newKotNumber during settlement');
-      print('   Previous items: $previousItemCount, Current items: $currentItemCount');
-      print('   All KOTs: $finalKotNumbers, Boundaries: $finalKotBoundaries');
 
       // Deduct stock for newly added items
       final newlyAddedItems = itemsToSettle.skip(previousItemCount).toList();
       await InventoryService.deductStockForOrder(newlyAddedItems);
-      print('✅ Stock deducted for ${newlyAddedItems.length} newly added items during settlement');
 
       // Print KOT for the new items — kitchen needs to know what was added.
       // Build a temporary OrderModel containing only the new items for this KOT.
@@ -1203,7 +1211,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
             autoPrint: true,
           );
         } catch (e) {
-          print("⚠️ KOT print failed for new items during settle: $e");
         }
       }
     }
@@ -1281,7 +1288,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
       // Clear the cart after successful settlement
       await restaurantCartStore.clearCart();
-      print('✅ Cart cleared after settling order');
 
       await tableStore.updateTableStatus(widget.tableid!, 'Available');
 
@@ -1300,14 +1306,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   Future<int> completeOrder(
       OrderModel activeModel, CartCalculationService calculations, {int pointsUsed = 0}) async {
-    print('============this is complete order function=============');
 
     // Note: calculations.subtotal is already the base price (without tax)
     // CartCalculationService handles tax extraction for tax-inclusive mode
 
     // Generate daily bill number for completed order
     final int billNumber = await orderStore.getNextBillNumber();
-    print('✅ Bill number generated: $billNumber');
 
     // Get current session ID or fallback to order's session
     final currentSessionId = await DayManagementService.getCurrentSessionId();
@@ -1340,16 +1344,26 @@ class _CustomerdetailsState extends State<Customerdetails> {
       discountAppliedBy: (activeModel.discount != null && activeModel.discount! > 0)
           ? (RestaurantSession.isAdmin ? 'Admin' : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})')
           : null,
+      customerId: activeModel.customerId,
+      serviceCharge: activeModel.serviceCharge,
+      paymentListJson: activeModel.paymentListJson,
+      isSplitPayment: activeModel.isSplitPayment,
+      totalPaid: activeModel.totalPaid,
+      changeReturn: activeModel.changeReturn,
     );
-    await pastOrderStore.addOrder(pastOrder);
+    // Idempotency guard: if this order is already in pastOrderBox (crash on previous
+    // attempt between addOrder and deleteOrder), skip the write and just clean up.
+    final alreadySettled = await pastOrderStore.getOrderById(activeModel.id);
+    if (alreadySettled == null) {
+      await pastOrderStore.addOrder(pastOrder);
+    }
+    // Always attempt delete — harmless if already deleted after a crash.
     await orderStore.deleteOrder(activeModel.id);
 
     return billNumber; // Return the generated bill number
   }
 
   Future<void> _placeOrder(CartCalculationService calculations, {int pointsUsed = 0}) async {
-    print('============this is place order function=============');
-    print(widget.orderType);
 
     // Note: calculations.subtotal is already the base price (without tax)
     // CartCalculationService handles tax extraction for tax-inclusive mode
@@ -1370,10 +1384,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
     if (widget.isSettle == true) {
       // Generate bill number for immediate settlement
       final int billNumber = await orderStore.getNextBillNumber();
-      print('✅ Bill number generated for settle & print: $billNumber');
 
       // Create completed order directly (skip active orders)
-      print('🔍 DEBUG: Creating pastOrder with payment method: $paymentMethodDisplay');
       final pastOrder = PastOrderModel(
         id: newId,
         customerName: _nameController.text.trim(),
@@ -1403,15 +1415,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
         discountAppliedBy: calculations.discountAmount > 0.009
             ? (RestaurantSession.isAdmin ? 'Admin' : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})')
             : null,
+        customerId: selectedCustomer?.customerId,
+        serviceCharge: calculations.serviceChargeAmount,
       );
-      print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
 
       try {
         await pastOrderStore.addOrder(pastOrder);
 
         // Deduct stock for direct settlement (order not placed first)
         await InventoryService.deductStockForOrder(orderItems);
-        print("✅ Stock deducted for settle & print bill");
 
         // Update customer stats if customer is linked
         if (selectedCustomer != null) {
@@ -1454,7 +1466,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
               autoPrint: true,
             );
           } catch (e) {
-            print("⚠️ KOT print failed for direct settle: $e");
           }
         }
 
@@ -1502,6 +1513,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       itemCountAtLastKot: orderItems.length,
       kotBoundaries: [orderItems.length], // First KOT boundary at item count
       customerId: selectedCustomer?.customerId, // Link to customer
+      sessionId: currentSessionId, // Stamp session at placement so settlement always has a reference
       // Split payment fields
       paymentListJson: jsonEncode(paymentList),
       isSplitPayment: isSplit,
@@ -1691,8 +1703,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
     if (!mounted) return;
 
     // Convert pastOrderModel to OrderModel for printing
-    print('🔍 DEBUG: Converting pastOrder to OrderModel');
-    print('🔍 DEBUG: pastOrder.paymentmode = ${pastOrder.paymentmode}');
     final orderForPrint = OrderModel(
       id: pastOrder.id,
       customerName: pastOrder.customerName,
@@ -1717,8 +1727,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
       completedAt: DateTime.now(),
       isTaxInclusive: pastOrder.isTaxInclusive, // Use stored tax mode from past order
     );
-    print('🔍 DEBUG: orderForPrint.paymentMethod = ${orderForPrint.paymentMethod}');
-    print('🔍 DEBUG: orderForPrint.isPaid = ${orderForPrint.isPaid}');
 
     await showDialog(
       context: context,
@@ -1876,7 +1884,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
         );
       }
     } catch (e) {
-      print('Error clearing cart: $e');
       if (mounted) {
         NotificationService.instance.showError(
           'Error clearing cart',
@@ -1888,8 +1895,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
   // Update customer statistics (visits, loyalty points, last visit, etc.)
   Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
     try {
-      print('🔍 Updating customer stats for: ${customer.name} (ID: ${customer.customerId})');
-      print('🔍 Current visits: ${customer.totalVisites}, Current points: ${customer.loyaltyPoints}');
 
       await restaurantCustomerStore.updateCustomerVisit(
         customerId: customer.customerId,
@@ -1900,13 +1905,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
       // Verify the update
       final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
       if (updatedCustomer != null) {
-        print('✅ Customer stats updated successfully!');
-        print('✅ New visits: ${updatedCustomer.totalVisites}, New points: ${updatedCustomer.loyaltyPoints}');
       } else {
-        print('❌ Failed to verify customer update');
       }
     } catch (e) {
-      print('❌ Error updating customer stats: $e');
     }
   }
 
@@ -1926,7 +1927,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
         final match = results.where((c) => c.phone == phone).firstOrNull;
         if (match != null) {
           if (mounted) setState(() => selectedCustomer = match);
-          print('✅ Linked to existing customer by phone: ${match.name}');
           return;
         }
       }
@@ -1940,7 +1940,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
         ).firstOrNull;
         if (match != null) {
           if (mounted) setState(() => selectedCustomer = match);
-          print('✅ Linked to existing customer by name: ${match.name}');
           return;
         }
       }
@@ -1954,15 +1953,32 @@ class _CustomerdetailsState extends State<Customerdetails> {
       final saved = await restaurantCustomerStore.addCustomer(newCustomer);
       if (saved && mounted) {
         setState(() => selectedCustomer = newCustomer);
-        print('✅ New customer auto-saved: $name ($phone)');
       }
     } catch (e) {
-      print('⚠️ Failed to auto-save customer: $e');
       // Non-fatal — order proceeds even if customer save fails
     }
   }
 
   Future<void> _submitOrder(CartCalculationService calculations) async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      await _doSubmitOrder(calculations);
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _doSubmitOrder(CartCalculationService calculations) async {
+    // Block if no active day session — orders placed without a session are excluded from EOD
+    final bool sessionOpen = await DayManagementService.isSessionOpen();
+    if (!sessionOpen) {
+      NotificationService.instance.showError(
+        'No active session. Please start the day from the End Day menu first.',
+      );
+      return;
+    }
+
     // Validate mobile number if entered
     final phone = _mobileController.text.trim();
     if (phone.isNotEmpty) {
@@ -1980,13 +1996,18 @@ class _CustomerdetailsState extends State<Customerdetails> {
         ? availablePoints.clamp(0, calculations.grandTotal.floor())
         : 0;
 
+    // Guard: re-check payment validity. Skip when bill is fully covered by loyalty points.
+    final bool fullyCoveredByPoints = (calculations.grandTotal - pointsUsed) <= 0;
+    if (!_isPaymentValid && !fullyCoveredByPoints) {
+      NotificationService.instance.showError('Please complete payment details before proceeding.');
+      return;
+    }
+
     // Auto-save customer if name/phone was typed but not picked from list
     await _autoSaveNewCustomer();
 
     if (selectedCustomer != null) {
-      print('📋 Order being placed for customer: ${selectedCustomer!.name} (ID: ${selectedCustomer!.customerId})');
     } else {
-      print('📋 Order being placed without customer selection');
     }
 
     if (widget.isSettle == true) {
