@@ -8,6 +8,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 // ── Computed data class ───────────────────────────────────────────────────────
 
@@ -281,6 +282,47 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     });
   }
 
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  Future<void> _doExport(BuildContext context) async {
+    final currency = CurrencyHelper.currentSymbol;
+    final headers = [
+      'Rank', 'Staff', 'Role', 'Shifts', 'Hours', 'Orders',
+      'Orders/Hr', 'Sales', 'Avg Order', 'Discounts', 'Refunds',
+      'Expenses', 'Net Revenue',
+    ];
+    final data = _perfList.map((p) => <dynamic>[
+      p.rank,
+      p.staffName,
+      p.role,
+      p.totalShifts,
+      p.durationLabel,
+      p.totalOrders,
+      p.ordersPerHour.toStringAsFixed(2),
+      p.totalSales,
+      p.avgOrderValue,
+      p.totalDiscounts,
+      p.totalRefunds,
+      p.totalExpenses,
+      p.totalSales - p.totalExpenses,
+    ]).toList();
+
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'staff_performance',
+      reportTitle: 'Staff Performance',
+      headers: headers,
+      data: data,
+      summary: {
+        'Filter Period': _filterPeriod,
+        'Total Staff': '${_perfList.length}',
+        'Total Shifts': '$_totalShifts',
+        'Total Orders': '$_totalOrders',
+        'Total Revenue': '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
+      },
+    );
+  }
+
   // ── Date pickers ─────────────────────────────────────────────────────────
 
   Future<void> _pickFrom() async {
@@ -433,6 +475,22 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
               ],
             ),
           ),
+          // Export button
+          GestureDetector(
+            onTap: () => _doExport(context),
+            child: Container(
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius:
+                    BorderRadius.circular(AppResponsive.borderRadius(context)),
+              ),
+              child: Icon(Icons.file_download_outlined,
+                  color: AppColors.primary,
+                  size: AppResponsive.iconSize(context)),
+            ),
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           // Refresh button
           GestureDetector(
             onTap: () => _load(forceReload: true),

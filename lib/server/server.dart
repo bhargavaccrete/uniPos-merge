@@ -16,7 +16,8 @@ Middleware corsHeaders() {
         return Response.ok('', headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Origin, Content-Type, Accept, Authorization',
+          'Access-Control-Allow-Headers': 'Origin, Content-Type, Accept, Authorization, Access-Control-Request-Private-Network',
+          'Access-Control-Allow-Private-Network': 'true',
           'Access-Control-Max-Age': '86400',
         });
       }
@@ -27,6 +28,7 @@ Middleware corsHeaders() {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Origin, Content-Type, Accept, Authorization',
+        'Access-Control-Allow-Private-Network': 'true',
       });
     };
   };

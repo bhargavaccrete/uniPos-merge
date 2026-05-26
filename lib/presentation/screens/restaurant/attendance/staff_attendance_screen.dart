@@ -10,6 +10,7 @@ import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 
 import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
 class StaffAttendanceScreen extends StatefulWidget {
   const StaffAttendanceScreen({super.key});
@@ -50,26 +51,32 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                AppTextField(
                   controller: pinController,
+                  label: 'PIN',
+                  hint: 'Enter PIN',
+                  icon: Icons.lock_outline_rounded,
                   obscureText: _obscureText,
                   keyboardType: TextInputType.number,
                   maxLength: 6,
                   autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: 'ENTER PIN',
-                    errorText: _hasError ? 'Incorrect PIN' : null,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureText ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () {
-                        setDialogState(() {
-                          _obscureText = !_obscureText;
-                        });
-                      },
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureText ? Icons.visibility_off : Icons.visibility,
+                      size: 20,
+                      color: Colors.grey.shade600,
                     ),
+                    onPressed: () => setDialogState(() => _obscureText = !_obscureText),
                   ),
                 ),
+                if (_hasError)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, left: 4),
+                    child: Text(
+                      'Incorrect PIN',
+                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade600),
+                    ),
+                  ),
               ],
             ),
             actions: [

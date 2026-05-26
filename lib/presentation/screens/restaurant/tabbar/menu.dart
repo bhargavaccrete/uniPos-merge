@@ -116,27 +116,46 @@ class _MenuScreenState extends State<MenuScreen> {
       categoryName = 'Uncategorized';
     }
 
-    if (hasVariants||hasExtra||hasChoice) {
-      final result = await showModalBottomSheet<CartItem>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) {
-          return DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.5,
-            minChildSize: 0.3,
-            maxChildSize: 0.85,
-            builder: (_, controller) {
-              return ItemOptionsDialog(
-                item: item,
-                categoryName: categoryName,
-                scrollController: controller,
-              );
-            },
-          );
-        },
-      );
+    if (hasVariants || hasExtra || hasChoice) {
+      CartItem? result;
+
+      if (AppResponsive.isMobile(context)) {
+        result = await showModalBottomSheet<CartItem>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) {
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.5,
+              minChildSize: 0.3,
+              maxChildSize: 0.85,
+              builder: (_, controller) {
+                return ItemOptionsDialog(
+                  item: item,
+                  categoryName: categoryName,
+                  scrollController: controller,
+                );
+              },
+            );
+          },
+        );
+      } else {
+        final hInset = ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2)
+            .clamp(40.0, 300.0);
+        result = await showDialog<CartItem>(
+          context: context,
+          builder: (_) => Dialog(
+            insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 40),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            clipBehavior: Clip.antiAlias,
+            child: ItemOptionsDialog(
+              item: item,
+              categoryName: categoryName,
+            ),
+          ),
+        );
+      }
 
       if (result != null) {
         await _addItemToCart(result);

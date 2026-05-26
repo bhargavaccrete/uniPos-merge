@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'staff_attendance_detail_screen.dart';
 
 class AttendanceReportScreen extends StatefulWidget {
@@ -219,6 +219,42 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     return months[m - 1];
   }
 
+  Future<void> _doExport(BuildContext context) async {
+    final allStaff = _staffNames;
+    final isCurrentMonth = _selectedMonth.year == DateTime.now().year &&
+        _selectedMonth.month == DateTime.now().month;
+    final periodEnd = isCurrentMonth
+        ? DateTime.now()
+        : DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+    final workingDays = _workingDaysInPeriod(_selectedMonth, periodEnd);
+
+    final headers = ['Staff Name', 'Role', 'Days Present', 'Days Absent', 'Total Hours'];
+    final data = allStaff.map((name) {
+      final presentDays = _presentDays(name);
+      final absentDays = (workingDays - presentDays).clamp(0, workingDays);
+      final totalMins = _totalMinutes(name);
+      final staffModel = staffStore.staff
+          .where((s) => '${s.firstName} ${s.lastName}'.trim() == name)
+          .firstOrNull;
+      final role = staffModel?.isCashier ??
+          (_records.where((r) => r.staffName == name).firstOrNull?.staffRole ?? '');
+      return <dynamic>[name, role, presentDays, absentDays, _fmtMins(totalMins)];
+    }).toList();
+
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'attendance_${_monthName(_selectedMonth.month)}_${_selectedMonth.year}',
+      reportTitle: 'Monthly Attendance — ${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
+      headers: headers,
+      data: data,
+      summary: {
+        'Month': '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
+        'Total Staff': '${allStaff.length}',
+        'Working Days': '$workingDays',
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final allStaff = _staffNames;
@@ -246,8 +282,14 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                 color: Colors.white, fontWeight: FontWeight.w600)),
         actions: [
           IconButton(
+            icon: const Icon(Icons.file_download_outlined, color: Colors.white),
+            onPressed: () => _doExport(context),
+            tooltip: 'Export',
+          ),
+          IconButton(
             icon: const Icon(Icons.print, color: Colors.white),
             onPressed: _printReport,
+            tooltip: 'Print',
           ),
         ],
       ),
@@ -256,7 +298,9 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
           // ── Month selector ───────────────────────────────────────────
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.largeSpacing(context),
+                vertical: AppResponsive.mediumSpacing(context)),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -267,19 +311,23 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                 GestureDetector(
                   onTap: _pickMonth,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.largeSpacing(context),
+                        vertical: AppResponsive.smallSpacing(context)),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_month, size: 18, color: AppColors.primary),
-                        const SizedBox(width: 10),
+                        Icon(Icons.calendar_month,
+                            size: AppResponsive.smallIconSize(context),
+                            color: AppColors.primary),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Text(
                           '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
                           style: GoogleFonts.poppins(
-                            fontSize: 15,
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                             color: AppColors.primary,
                           ),
@@ -289,7 +337,8 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.chevron_right, color: isCurrentMonth ? Colors.grey.shade300 : AppColors.primary),
+                  icon: Icon(Icons.chevron_right,
+                      color: isCurrentMonth ? Colors.grey.shade300 : AppColors.primary),
                   onPressed: isCurrentMonth ? null : _nextMonth,
                 ),
               ],
@@ -309,9 +358,9 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
           else
             Expanded(
               child: ListView.separated(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
                 itemCount: allStaff.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, __) => SizedBox(height: AppResponsive.smallSpacing(context)),
                 itemBuilder: (_, i) {
                   final name = allStaff[i];
                   
@@ -345,10 +394,10 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(14),
+                      padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                         border: Border.all(color: Colors.grey.shade200),
                         boxShadow: [
                           BoxShadow(
@@ -362,8 +411,10 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                         children: [
                           // Avatar
                           Container(
-                            width: 46,
-                            height: 46,
+                            width: AppResponsive.getValue<double>(context,
+                                mobile: 44, tablet: 48, desktop: 52),
+                            height: AppResponsive.getValue<double>(context,
+                                mobile: 44, tablet: 48, desktop: 52),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withOpacity(0.1),
                               shape: BoxShape.circle,
@@ -372,13 +423,13 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                               child: Text(
                                 name.isNotEmpty ? name[0].toUpperCase() : '?',
                                 style: GoogleFonts.poppins(
-                                    fontSize: 18,
+                                    fontSize: AppResponsive.bodyFontSize(context),
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.primary),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 14),
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
                           // Name + role
                           Expanded(
                             child: Column(
@@ -386,43 +437,46 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                               children: [
                                 Text(name,
                                     style: GoogleFonts.poppins(
-                                        fontSize: 15,
+                                        fontSize: AppResponsive.bodyFontSize(context),
                                         fontWeight: FontWeight.w700)),
                                 Text(role,
                                     style: GoogleFonts.poppins(
-                                        fontSize: 11,
+                                        fontSize: AppResponsive.captionFontSize(context),
                                         color: Colors.grey.shade500)),
-                                const SizedBox(height: 6),
+                                SizedBox(height: AppResponsive.smallSpacing(context)),
                                 Row(
                                   children: [
-                                    _miniChip('${presentDays}P', Colors.green.shade600),
-                                    const SizedBox(width: 4),
-                                    _miniChip('${absentDays}A', absentDays > 0 ? Colors.red.shade400 : Colors.grey.shade400),
+                                    _miniChip(context, '${presentDays}P', Colors.green.shade600),
+                                    SizedBox(width: AppResponsive.smallSpacing(context) * 0.5),
+                                    _miniChip(context, '${absentDays}A',
+                                        absentDays > 0 ? Colors.red.shade400 : Colors.grey.shade400),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                          // Status chip + hours
+                          // Hours + arrow
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
                                 'Total Hours',
                                 style: GoogleFonts.poppins(
-                                    fontSize: 11,
+                                    fontSize: AppResponsive.captionFontSize(context),
                                     color: Colors.grey.shade500),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 _fmtMins(totalMins),
                                 style: GoogleFonts.poppins(
-                                    fontSize: 15,
+                                    fontSize: AppResponsive.bodyFontSize(context),
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.primary),
                               ),
                               const SizedBox(height: 4),
-                              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
+                              Icon(Icons.arrow_forward_ios,
+                                  size: AppResponsive.smallIconSize(context),
+                                  color: Colors.grey.shade400),
                             ],
                           ),
                         ],
@@ -437,16 +491,20 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     );
   }
 
-  Widget _miniChip(String label, Color color) {
+  Widget _miniChip(BuildContext context, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.smallSpacing(context),
+          vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(label,
           style: GoogleFonts.poppins(
-              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+              fontSize: AppResponsive.captionFontSize(context),
+              fontWeight: FontWeight.w700,
+              color: color)),
     );
   }
 }

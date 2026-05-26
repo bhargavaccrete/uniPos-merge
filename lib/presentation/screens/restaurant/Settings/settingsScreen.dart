@@ -138,23 +138,27 @@ class _settingsScreenState extends State<Settingsscreen> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  Widget _sectionHeader(String title, IconData icon) {
+  Widget _sectionHeader(BuildContext context, String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      padding: EdgeInsets.only(
+          left: AppResponsive.smallSpacing(context),
+          bottom: AppResponsive.smallSpacing(context)),
       child: Row(children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
           ),
-          child: Icon(icon, size: 14, color: AppColors.primary),
+          child: Icon(icon,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.primary),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         Text(
           title,
           style: GoogleFonts.poppins(
-            fontSize: 13,
+            fontSize: AppResponsive.smallFontSize(context),
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
             letterSpacing: 0.3,
@@ -186,6 +190,7 @@ class _settingsScreenState extends State<Settingsscreen> {
   }
 
   Widget _navTile(
+    BuildContext context,
     String title,
     String subtitle,
     IconData icon,
@@ -195,36 +200,38 @@ class _settingsScreenState extends State<Settingsscreen> {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.largeSpacing(context),
+            vertical: AppResponsive.mediumSpacing(context)),
         child: Row(children: [
           Container(
-            padding: const EdgeInsets.all(9),
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
             ),
-            child: Icon(icon, size: 18, color: color),
+            child: Icon(icon, size: AppResponsive.iconSize(context), color: color),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
                     style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w500,
                         color: AppColors.textPrimary)),
                 const SizedBox(height: 2),
                 Text(subtitle,
                     style: GoogleFonts.poppins(
-                        fontSize: 12, color: AppColors.textSecondary)),
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary)),
               ],
             ),
           ),
           Icon(Icons.chevron_right_rounded,
-              size: 20,
+              size: AppResponsive.iconSize(context),
               color: AppColors.textSecondary.withValues(alpha: 0.5)),
         ]),
       ),
@@ -232,6 +239,7 @@ class _settingsScreenState extends State<Settingsscreen> {
   }
 
   Widget _expandableTile({
+    required BuildContext context,
     required String title,
     required String subtitle,
     required IconData icon,
@@ -244,31 +252,32 @@ class _settingsScreenState extends State<Settingsscreen> {
       InkWell(
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.largeSpacing(context),
+              vertical: AppResponsive.mediumSpacing(context)),
           child: Row(children: [
             Container(
-              padding: const EdgeInsets.all(9),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
               ),
-              child: Icon(icon, size: 18, color: color),
+              child: Icon(icon, size: AppResponsive.iconSize(context), color: color),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
                       style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w500,
                           color: AppColors.textPrimary)),
                   const SizedBox(height: 2),
                   Text(subtitle,
                       style: GoogleFonts.poppins(
-                          fontSize: 12,
+                          fontSize: AppResponsive.smallFontSize(context),
                           color: AppColors.textSecondary)),
                 ],
               ),
@@ -277,7 +286,7 @@ class _settingsScreenState extends State<Settingsscreen> {
               isExpanded
                   ? Icons.keyboard_arrow_up_rounded
                   : Icons.keyboard_arrow_down_rounded,
-              size: 20,
+              size: AppResponsive.iconSize(context),
               color: AppColors.textSecondary,
             ),
           ]),
@@ -286,7 +295,11 @@ class _settingsScreenState extends State<Settingsscreen> {
       if (isExpanded) ...[
         Divider(height: 1, color: AppColors.divider),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          padding: EdgeInsets.fromLTRB(
+              AppResponsive.largeSpacing(context),
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.largeSpacing(context),
+              AppResponsive.mediumSpacing(context)),
           child: expandedChild,
         ),
       ],
@@ -300,8 +313,6 @@ class _settingsScreenState extends State<Settingsscreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.surfaceLight,
@@ -312,7 +323,7 @@ class _settingsScreenState extends State<Settingsscreen> {
         title: Text(
           'Settings',
           style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
+            fontSize: AppResponsive.headingFontSize(context),
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
@@ -320,17 +331,18 @@ class _settingsScreenState extends State<Settingsscreen> {
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
+              horizontal: AppResponsive.mediumSpacing(context),
               vertical: 8,
             ),
             child: Container(
-              padding: EdgeInsets.all(isTablet ? 10 : 8),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
               ),
               child: Icon(Icons.person_rounded,
-                  size: isTablet ? 22 : 20, color: AppColors.primary),
+                  size: AppResponsive.iconSize(context),
+                  color: AppColors.primary),
             ),
           ),
         ],
@@ -342,13 +354,19 @@ class _settingsScreenState extends State<Settingsscreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: AppResponsive.maxFormWidth(context)),
             child: ListView(
-              padding: AppResponsive.padding(context),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.isMobile(context)
+                    ? AppResponsive.largeSpacing(context)
+                    : 0,
+                vertical: AppResponsive.largeSpacing(context),
+              ),
           children: [
 
             // ── 1. Account & Security ───────────────────────────────────
-            _sectionHeader('Account & Security', Icons.security_rounded),
+            _sectionHeader(context, 'Account & Security', Icons.security_rounded),
             _sectionCard([
               _navTile(
+                context,
                 'Password Change',
                 'Update your login password',
                 Icons.lock_reset_rounded,
@@ -357,38 +375,40 @@ class _settingsScreenState extends State<Settingsscreen> {
                     context, RouteNames.restaurantChangePassword),
               ),
               _tileDivider(),
+
               // Backup Password row
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
+                padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.largeSpacing(context),
+                    vertical: AppResponsive.mediumSpacing(context)),
                 child: Row(children: [
                   Container(
-                    padding: const EdgeInsets.all(9),
+                    padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                     decoration: BoxDecoration(
                       color: (_hasBackupPassword
                               ? Colors.green
                               : Colors.orange)
                           .withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     ),
                     child: Icon(
                       _hasBackupPassword
                           ? Icons.lock_rounded
                           : Icons.lock_open_rounded,
-                      size: 18,
+                      size: AppResponsive.iconSize(context),
                       color: _hasBackupPassword
                           ? Colors.green
                           : Colors.orange,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Backup Password',
                             style: GoogleFonts.poppins(
-                                fontSize: 14,
+                                fontSize: AppResponsive.bodyFontSize(context),
                                 fontWeight: FontWeight.w500,
                                 color: AppColors.textPrimary)),
                         const SizedBox(height: 2),
@@ -397,7 +417,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                               ? 'Backups are password-protected'
                               : 'No password — backups are unprotected',
                           style: GoogleFonts.poppins(
-                              fontSize: 12,
+                              fontSize: AppResponsive.smallFontSize(context),
                               color: _hasBackupPassword
                                   ? Colors.green.shade700
                                   : Colors.orange.shade800),
@@ -406,26 +426,27 @@ class _settingsScreenState extends State<Settingsscreen> {
                     ),
                   ),
                   if (!_hasBackupPassword)
-                    _actionChip('Set', Colors.green,
+                    _actionChip(context, 'Set', Colors.green,
                         () => _showSetPasswordDialog())
                   else ...[
-                    _actionChip('Change', Colors.orange,
+                    _actionChip(context, 'Change', Colors.orange,
                         () => _showSetPasswordDialog(isChange: true)),
-                    const SizedBox(width: 4),
+                    SizedBox(width: AppResponsive.smallSpacing(context) * 0.5),
                     InkWell(
                       onTap: () async {
                         await BackupEncryptionService.clearPassword();
                         setState(() => _hasBackupPassword = false);
                       },
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                       child: Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                         decoration: BoxDecoration(
                           color: Colors.red.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                         ),
-                        child: const Icon(Icons.delete_outline_rounded,
-                            size: 18, color: Colors.red),
+                        child: Icon(Icons.delete_outline_rounded,
+                            size: AppResponsive.smallIconSize(context),
+                            color: Colors.red),
                       ),
                     ),
                   ],
@@ -435,11 +456,12 @@ class _settingsScreenState extends State<Settingsscreen> {
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 2. Display ──────────────────────────────────────────────
-            _sectionHeader('Display', Icons.palette_outlined),
+            _sectionHeader(context, 'Display', Icons.palette_outlined),
             _sectionCard([
               ValueListenableBuilder<String>(
                 valueListenable: CurrencyHelper.currencyNotifier,
                 builder: (context, _, __) => _expandableTile(
+                  context: context,
                   title: 'Currency Symbol',
                   subtitle:
                       '${CurrencyHelper.currentSymbol}  ${CurrencyHelper.currentCurrencyCode}',
@@ -470,6 +492,7 @@ class _settingsScreenState extends State<Settingsscreen> {
               ValueListenableBuilder<int>(
                 valueListenable: DecimalSettings.precisionNotifier,
                 builder: (context, prec, __) => _expandableTile(
+                  context: context,
                   title: 'Decimal Precision',
                   subtitle:
                       'Current: ${_getDecimalFilter(prec)}',
@@ -510,10 +533,10 @@ class _settingsScreenState extends State<Settingsscreen> {
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 3. Orders & Payments ────────────────────────────────────
-            _sectionHeader(
-                'Orders & Payments', Icons.shopping_bag_outlined),
+            _sectionHeader(context, 'Orders & Payments', Icons.shopping_bag_outlined),
             _sectionCard([
               _navTile(
+                context,
                 'Payment Methods',
                 'Manage accepted payment types',
                 Icons.payment_rounded,
@@ -523,6 +546,7 @@ class _settingsScreenState extends State<Settingsscreen> {
               ),
               _tileDivider(),
               _navTile(
+                context,
                 'Order Settings',
                 'Configure order behaviour & notifications',
                 Icons.receipt_long_rounded,
@@ -534,6 +558,7 @@ class _settingsScreenState extends State<Settingsscreen> {
               ValueListenableBuilder<int>(
                 valueListenable: AppSettings.refundWindowNotifier,
                 builder: (context, win, __) => _expandableTile(
+                  context: context,
                   title: 'Refund Window',
                   subtitle: 'Current: ${_getRefundWindowLabel(win)}',
                   icon: Icons.undo_rounded,
@@ -589,11 +614,12 @@ class _settingsScreenState extends State<Settingsscreen> {
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 4. Staff & Shifts ───────────────────────────────────────
-            _sectionHeader('Staff & Shifts', Icons.people_rounded),
+            _sectionHeader(context, 'Staff & Shifts', Icons.people_rounded),
             _sectionCard([
               ValueListenableBuilder<int>(
                 valueListenable: RestaurantSession.timeoutMinutesNotifier,
                 builder: (context, minutes, __) => _expandableTile(
+                  context: context,
                   title: 'Auto Logout Timeout',
                   subtitle: 'Current: ${_getTimeoutLabel(minutes)}',
                   icon: Icons.lock_clock_rounded,
@@ -615,76 +641,37 @@ class _settingsScreenState extends State<Settingsscreen> {
                   ),
                 ),
               ),
-              _tileDivider(),
-              ValueListenableBuilder<Map<String, bool>>(
-                valueListenable: AppSettings.settingsNotifier,
-                builder: (context, _, __) {
-                  final enabled = AppSettings.shiftHandover;
-                  return SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
-                    secondary: Container(
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: (enabled ? Colors.indigo : Colors.grey)
-                            .withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.swap_horiz_rounded,
-                          size: 18,
-                          color:
-                              enabled ? Colors.indigo : Colors.grey),
-                    ),
-                    title: Text('Shift Handover',
-                        style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary)),
-                    subtitle: Text(
-                      enabled
-                          ? 'Staff must count & hand over cash between shifts'
-                          : 'Off — use End Day only (single-shift setup)',
-                      style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: AppColors.textSecondary),
-                    ),
-                    value: enabled,
-                    activeColor: Colors.indigo,
-                    onChanged: (val) =>
-                        AppSettings.updateSetting('Shift Handover', val),
-                  );
-                },
-              ),
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 5. Backup ───────────────────────────────────────────────
-            _sectionHeader('Backup', Icons.backup_rounded),
+            _sectionHeader(context, 'Backup', Icons.backup_rounded),
             _sectionCard([
               SwitchListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 4),
+                contentPadding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.largeSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context) * 0.5),
                 secondary: Container(
-                  padding: const EdgeInsets.all(9),
+                  padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                   decoration: BoxDecoration(
                     color: (_backupEnabled ? Colors.green : Colors.grey)
                         .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                   ),
                   child: Icon(Icons.backup_rounded,
-                      size: 18,
-                      color:
-                          _backupEnabled ? Colors.green : Colors.grey),
+                      size: AppResponsive.iconSize(context),
+                      color: _backupEnabled ? Colors.green : Colors.grey),
                 ),
                 title: Text('Daily Backup Reminder',
                     style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w500,
                         color: AppColors.textPrimary)),
                 subtitle: Text(
                   'Show backup prompt at the start of each day',
                   style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.textSecondary),
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary),
                 ),
                 value: _backupEnabled,
                 activeColor: Colors.green,
@@ -697,14 +684,15 @@ class _settingsScreenState extends State<Settingsscreen> {
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 6. About / Device ───────────────────────────────────────
-            _sectionHeader('About This Device', Icons.info_outline_rounded),
-            _buildDeviceIdCard(),
+            _sectionHeader(context, 'About This Device', Icons.info_outline_rounded),
+            _buildDeviceIdCard(context),
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── 7. Developer ────────────────────────────────────────────
-            _sectionHeader('Developer', Icons.code_rounded),
+            _sectionHeader(context, 'Developer', Icons.code_rounded),
             _sectionCard([
               _navTile(
+                context,
                 'Performance Test Data Generator',
                 'Generate sample data for load testing',
                 Icons.science_rounded,
@@ -722,44 +710,48 @@ class _settingsScreenState extends State<Settingsscreen> {
     );
   }
 
-  Widget _buildDeviceIdCard() {
+  Widget _buildDeviceIdCard(BuildContext context) {
     final id = _deviceIdResult?.id ?? 'Loading...';
     return _sectionCard([
       Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.largeSpacing(context),
+            vertical: AppResponsive.mediumSpacing(context)),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
               ),
-              child: const Icon(Icons.fingerprint_rounded,
-                  color: AppColors.primary, size: 22),
+              child: Icon(Icons.fingerprint_rounded,
+                  color: AppColors.primary,
+                  size: AppResponsive.iconSize(context)),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Device ID',
                       style: GoogleFonts.poppins(
-                          fontSize: 13,
+                          fontSize: AppResponsive.smallFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary)),
                   const SizedBox(height: 2),
                   Text(id,
                       style: GoogleFonts.poppins(
-                          fontSize: 12,
+                          fontSize: AppResponsive.smallFontSize(context),
                           color: AppColors.textSecondary,
                           letterSpacing: 1.2)),
                 ],
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.copy_rounded,
-                  size: 18, color: AppColors.textSecondary),
+              icon: Icon(Icons.copy_rounded,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.textSecondary),
               tooltip: 'Copy Device ID',
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: id));
@@ -778,21 +770,22 @@ class _settingsScreenState extends State<Settingsscreen> {
   }
 
   Widget _actionChip(
-      String label, Color color, VoidCallback onTap) {
+      BuildContext context, String label, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context)),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Text(label,
             style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: color)),
       ),

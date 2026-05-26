@@ -11,6 +11,7 @@ import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/domain/services/common/report_export_service.dart';
 
 class ShiftReportScreen extends StatefulWidget {
   const ShiftReportScreen({super.key});
@@ -130,6 +131,54 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     return {for (final k in sorted) k: map[k]!};
   }
 
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  Future<void> _doExport(BuildContext context) async {
+    final currency = CurrencyHelper.currentSymbol;
+    final shifts = shiftStore.filteredShifts;
+    final expenses = _cachedExpenses;
+
+    final headers = ['Staff', 'Date', 'Start', 'End', 'Duration', 'Orders', 'Sales', 'Expenses', 'Net Revenue', 'Status'];
+    final data = shifts.map((s) {
+      final shiftEnd = s.endTime ?? DateTime.now();
+      final shiftExp = expenses
+          .where((e) =>
+              !e.dateandTime.isBefore(s.startTime) &&
+              !e.dateandTime.isAfter(shiftEnd))
+          .fold<double>(0.0, (sum, e) => sum + e.amount);
+      return <dynamic>[
+        s.staffName,
+        DateFormat('dd MMM yyyy').format(s.startTime),
+        DateFormat('HH:mm').format(s.startTime),
+        s.endTime != null ? DateFormat('HH:mm').format(s.endTime!) : '-',
+        '${s.duration.inHours}h ${s.duration.inMinutes.remainder(60)}m',
+        s.orderCount,
+        s.totalSales,
+        shiftExp,
+        s.totalSales - shiftExp,
+        s.isOpen ? 'Active' : 'Closed',
+      ];
+    }).toList();
+
+    final totalSales = shifts.fold<double>(0.0, (sum, s) => sum + s.totalSales);
+    final totalOrders = shifts.fold<int>(0, (sum, s) => sum + s.orderCount);
+    final totalMins = shifts.fold<int>(0, (sum, s) => sum + s.duration.inMinutes);
+
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'shift_report',
+      reportTitle: 'Shift Report',
+      headers: headers,
+      data: data,
+      summary: {
+        'Total Shifts': '${shifts.length}',
+        'Total Orders': '$totalOrders',
+        'Total Sales': '$currency${DecimalSettings.formatAmount(totalSales)}',
+        'Total Hours': '${totalMins ~/ 60}h ${totalMins.remainder(60)}m',
+      },
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -237,6 +286,20 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                     );
                   }),
                 ],
+              ),
+            ),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            GestureDetector(
+              onTap: () => _doExport(context),
+              child: Container(
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                ),
+                child: Icon(Icons.file_download_outlined,
+                    color: AppColors.primary,
+                    size: AppResponsive.iconSize(context)),
               ),
             ),
           ],

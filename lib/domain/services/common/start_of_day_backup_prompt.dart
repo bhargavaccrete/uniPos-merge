@@ -20,6 +20,10 @@ class StartOfDayBackupPrompt {
   static Future<void> show(BuildContext context) async {
     if (_shownThisSession) return;
 
+    // Respect the Daily Backup Reminder toggle in Settings
+    final isEnabled = await AutoBackupService.isAutoBackupEnabled();
+    if (!isEnabled) return;
+
     // Skip if today's backup is already done
     final lastBackup = await AutoBackupService.getLastBackupDate();
     final today = DateTime.now().toIso8601String().substring(0, 10);
