@@ -79,6 +79,8 @@ import 'package:unipos/domain/store/restaurant/eod_store.dart';
 import 'package:unipos/domain/store/restaurant/appStore.dart';
 import 'package:unipos/domain/store/restaurant/printer_store.dart';
 import 'package:unipos/domain/store/restaurant/attendance_store.dart';
+import 'package:unipos/domain/store/restaurant/license_store.dart';
+import 'package:unipos/domain/services/common/license_api_service.dart';
 import 'package:unipos/domain/services/restaurant/thermal_printer_service.dart';
 
 import 'package:unipos/data/repositories/restaurant/attendance_repository.dart';
@@ -124,6 +126,12 @@ Future<void> setupServiceLocator() async {
 
   // Register PrintService as a common dependency for both Retail and Restaurant
   locator.registerLazySingleton<PrintService>(() => PrintService());
+
+  // LicenseStore is common — needed in setup wizard before business mode is selected
+  locator.registerLazySingleton<LicenseApiService>(() => LicenseApiService());
+  locator.registerLazySingleton<LicenseStore>(
+    () => LicenseStore(locator<LicenseApiService>()),
+  );
 
   // Register business-specific dependencies based on mode
   // If mode is not set yet (during setup), we'll register them later
@@ -401,6 +409,7 @@ EodStore get eodStore => locator<EodStore>();
 AppStore get appStore => locator<AppStore>();
 PrinterStore get printerStore => locator<PrinterStore>();
 AttendanceStore get attendanceStore => locator<AttendanceStore>();
+LicenseStore get licenseStore => locator<LicenseStore>();
 
 /// Restaurant Repositories
 CategoryRepository get categoryRepository => locator<CategoryRepository>();

@@ -683,7 +683,21 @@ class _settingsScreenState extends State<Settingsscreen> {
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
-            // ── 6. About / Device ───────────────────────────────────────
+            // ── 6. License & Subscription ───────────────────────────────
+            _sectionHeader(context, 'License & Subscription', Icons.verified_outlined),
+            _sectionCard([
+              _navTile(
+                context,
+                'License Management',
+                'View status, activate or manage your license key',
+                Icons.verified_rounded,
+                AppColors.primary,
+                () => Navigator.pushNamed(context, RouteNames.restaurantLicensing),
+              ),
+            ]),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+
+            // ── 7. About / Device ───────────────────────────────────────
             _sectionHeader(context, 'About This Device', Icons.info_outline_rounded),
             _buildDeviceIdCard(context),
             SizedBox(height: AppResponsive.largeSpacing(context)),

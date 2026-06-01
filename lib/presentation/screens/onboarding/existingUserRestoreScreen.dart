@@ -3,12 +3,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:unipos/domain/store/restaurant/license_store.dart';
 import 'package:unipos/domain/store/retail/customer_store.dart';
 import 'package:unipos/domain/store/retail/product_store.dart';
 import 'package:unipos/domain/store/retail/purchase_store.dart';
 import 'package:unipos/domain/store/retail/sale_store.dart';
 import 'package:unipos/domain/store/retail/supplier_store.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
 import '../../../domain/services/common/unified_backup_service.dart';
@@ -35,6 +39,12 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  // License store
+  final LicenseStore _licenseStore = locator<LicenseStore>();
+  final _licenseKeyController = TextEditingController();
+  bool _licenseLoading = false;
+  String? _licenseErrorMsg;
 
   // State variables
   int _currentStep = 0;
@@ -85,6 +95,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   void dispose() {
     _pageController.dispose();
     _animationController.dispose();
+    _licenseKeyController.dispose();
     super.dispose();
   }
 
@@ -214,7 +225,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   void _nextStep() {
-    if (_currentStep < 1) {
+    if (_currentStep < 2) {
       setState(() {
         _currentStep++;
       });
@@ -300,12 +311,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         _isRestoring = false;
       });
 
-      // Show success dialog
+      // Advance to license activation step
       if (mounted) {
-        _showSuccessDialog(
-          message: 'All your store data has been successfully restored!',
-          errors: null,
-        );
+        _nextStep();
       }
     } catch (e) {
       setState(() {
@@ -370,131 +378,29 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     }
   }
 
-  void _showSuccessDialog({String? message, List<dynamic>? errors}) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          padding: const EdgeInsets.all(30),
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  size: 50,
-                  color: AppColors.success,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Data Restored Successfully!',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkNeutral,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                message ?? 'Your store data has been restored',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
+  Future<void> _activateLicense() async {
+    final key = _licenseKeyController.text.trim();
+    if (key.isEmpty) {
+      setState(() => _licenseErrorMsg = 'Please enter your license key');
+      return;
+    }
+    setState(() {
+      _licenseLoading = true;
+      _licenseErrorMsg = null;
+    });
+    final success = await _licenseStore.activateLicense(key);
+    setState(() => _licenseLoading = false);
+    if (success) {
+      _goToDashboard();
+    } else {
+      setState(
+          () => _licenseErrorMsg = _licenseStore.errorMessage ?? 'Activation failed');
+    }
+  }
 
-              if (errors != null && errors.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.warning, color: Colors.orange.shade700, size: 18),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Some items had issues:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ...errors.take(3).map((error) => Padding(
-                        padding: const EdgeInsets.only(left: 26, top: 4),
-                        child: Text(
-                          '• $error',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      )),
-                      if (errors.length > 3)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 26, top: 4),
-                          child: Text(
-                            '...and ${errors.length - 3} more',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  // Navigate based on business mode
-                  final route = AppConfig.isRetail
-                      ? '/retail-billing'
-                      : '/restaurant-home';
-                  Navigator.pushReplacementNamed(context, route);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  'Go to Dashboard',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  void _goToDashboard() {
+    final route = AppConfig.isRetail ? '/retail-billing' : '/restaurant-home';
+    Navigator.pushReplacementNamed(context, route);
   }
 
   @override
@@ -543,6 +449,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
             children: [
               _buildFileUploadStep(),
               _buildConfirmationStep(),
+              _buildLicenseActivationStep(),
             ],
           ),
         ),
@@ -564,6 +471,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                 children: [
                   _buildFileUploadStep(),
                   _buildConfirmationStep(),
+                  _buildLicenseActivationStep(),
                 ],
               ),
             ),
@@ -587,8 +495,10 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildStepIndicator(0, 'Select Backup', Icons.upload_file),
-                  _buildStepConnector(),
+                  _buildStepConnector(afterStep: 0),
                   _buildStepIndicator(1, 'Confirm & Restore', Icons.restore),
+                  _buildStepConnector(afterStep: 1),
+                  _buildStepIndicator(2, 'Activate License', Icons.key_rounded),
                 ],
               ),
             ),
@@ -603,6 +513,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   children: [
                     _buildFileUploadStep(),
                     _buildConfirmationStep(),
+                    _buildLicenseActivationStep(),
                   ],
                 ),
               ),
@@ -622,6 +533,8 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
           _buildProgressStep(0, 'Select File'),
           _buildProgressLine(0),
           _buildProgressStep(1, 'Restore'),
+          _buildProgressLine(1),
+          _buildProgressStep(2, 'License'),
         ],
       ),
     );
@@ -720,12 +633,12 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     );
   }
 
-  Widget _buildStepConnector() {
+  Widget _buildStepConnector({int afterStep = 0}) {
     return Container(
       margin: const EdgeInsets.only(left: 25),
       width: 2,
       height: 30,
-      color: _currentStep >= 1 ? AppColors.primary : Colors.grey[300],
+      color: _currentStep > afterStep ? AppColors.primary : Colors.grey[300],
     );
   }
 
@@ -852,7 +765,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                 children: [
                   if (_selectedFileName != null)
                     Expanded(
-                      child: OutlinedButton(
+                      child: ElevatedButton(
                         onPressed: () {
                           setState(() {
                             _selectedFileName = null;
@@ -861,17 +774,19 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                             _fileMetadata = null;
                           });
                         },
-                        style: OutlinedButton.styleFrom(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.danger,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 15),
-                          side: BorderSide(color: AppColors.danger),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
+                          elevation: 0,
                         ),
                         child: Text(
                           'Remove File',
                           style: TextStyle(
-                            color: AppColors.danger,
+                            color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -885,16 +800,19 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       onPressed: _fileValidated ? _nextStep : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
+                        elevation: 0,
                       ),
                       child: const Text(
                         'Continue',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -1010,16 +928,18 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
+                    child: ElevatedButton(
                       onPressed: _previousStep,
-                      style: OutlinedButton.styleFrom(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                        foregroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 15),
-                        side: BorderSide(color: AppColors.primary),
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Back',
                         style: TextStyle(
                           color: AppColors.primary,
@@ -1036,7 +956,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       onPressed: (_isLoading || _isRestoring) ? null : _restoreData,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 15),
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -1055,12 +977,192 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLicenseActivationStep() {
+    final alreadyActive = _licenseStore.licenseInfo?.isActive == true;
+
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Success banner
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded,
+                        color: AppColors.success, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Data restored successfully!',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              Text(
+                alreadyActive ? 'License Already Active' : 'Activate Your License',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkNeutral,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                alreadyActive
+                    ? 'This device already has an active license.'
+                    : 'Your backup is restored. Enter your license key to unlock the app.',
+                style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+              ),
+
+              const SizedBox(height: 30),
+
+              if (alreadyActive) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        Border.all(color: AppColors.success.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.verified_rounded,
+                          color: AppColors.success, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        _licenseStore.licenseInfo!.planName.isNotEmpty
+                            ? _licenseStore.licenseInfo!.planName
+                            : 'Licensed',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.darkNeutral,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: AppResponsive.buttonHeight(context),
+                  child: ElevatedButton(
+                    onPressed: _goToDashboard,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      'Go to Dashboard',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                AppTextField(
+                  controller: _licenseKeyController,
+                  label: 'License Key',
+                  hint: 'e.g. XXXX-XXXX-XXXX-XXXX',
+                  icon: Icons.vpn_key_rounded,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                ),
+                if (_licenseErrorMsg != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.error_outline_rounded,
+                          size: 14, color: AppColors.danger),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _licenseErrorMsg!,
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.danger),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: AppResponsive.buttonHeight(context),
+                  child: ElevatedButton(
+                    onPressed: _licenseLoading ? null : _activateLicense,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: _licenseLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(
+                            'Activate & Continue',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: _goToDashboard,
+                  child: Text(
+                    'Skip for now',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

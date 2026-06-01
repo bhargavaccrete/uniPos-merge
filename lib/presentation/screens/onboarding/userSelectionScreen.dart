@@ -70,7 +70,7 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
   }
 
   void _navigateToSetupWizard() {
-    Navigator.pushNamed(context, '/setup-wizard');
+    Navigator.pushNamed(context, '/license-key-entry');
   }
 
   void _showRestoreDialog() {

@@ -21,11 +21,18 @@ class CustomerDetailScreen extends StatefulWidget {
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   late RestaurantCustomer _customer;
   bool _isLoading = false;
+  final _pointsController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _customer = widget.customer;
+  }
+
+  @override
+  void dispose() {
+    _pointsController.dispose();
+    super.dispose();
   }
 
   Future<void> _refreshCustomerData() async {
@@ -55,7 +62,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
   Future<void> _addLoyaltyPoints() async {
     if (_isLoading) return;
-    final pointsController = TextEditingController();
+    _pointsController.clear();
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
         : 24.0;
@@ -66,7 +73,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Add Loyalty Points', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
         content: AppTextField(
-          controller: pointsController,
+          controller: _pointsController,
           label: 'Points',
           hint: 'Enter points to add',
           icon: Icons.add_circle_outline_rounded,
@@ -79,8 +86,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       ),
     );
 
-    final rawText = pointsController.text.trim();
-    pointsController.dispose();
+    final rawText = _pointsController.text.trim();
 
     if (result != true) return;
     if (rawText.isEmpty) {

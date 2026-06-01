@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/store/restaurant/license_store.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/presentation/screens/onboarding/storeDetailsScreen.dart';
 import 'package:unipos/presentation/screens/onboarding/taxSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/paymentSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/staffSetupStep.dart';
+import 'package:unipos/presentation/screens/onboarding/license_activated_screen.dart';
 
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/color.dart';
@@ -118,42 +120,45 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
   void _completeSetup() async {
     try {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Complete setup (this registers business dependencies)
       await _store.completeSetup();
 
-      if (mounted) {
-        // Close loading indicator
-        Navigator.pop(context);
+      final hasPendingKey =
+          await locator<LicenseStore>().getPendingKey() != null;
 
-        // Navigate to appropriate screen based on business mode
+      if (mounted) {
+        Navigator.pop(context); // dismiss loading indicator
+
         if (AppConfig.isRestaurant) {
-          // Mark session as logged in so RestaurantGuard doesn't redirect to login
           await RestaurantSession.saveAdminSession();
-          // Navigate to Restaurant Admin Welcome screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const AdminWelcome()),
-          );
+          if (hasPendingKey) {
+            // Hand off activation to the success screen — it fires the API
+            // and shows the result before the user reaches the dashboard.
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    LicenseActivatedScreen(businessName: _store.storeName),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminWelcome()),
+            );
+          }
         } else {
-          // Navigate to Retail POS screen
           Navigator.pushReplacementNamed(context, '/retail-billing');
         }
       }
     } catch (e) {
       if (mounted) {
-        // Close loading indicator
         Navigator.pop(context);
-
-        // Show error
         NotificationService.instance.showError('Error completing setup: $e');
       }
     }
@@ -535,7 +540,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child:  Observer(
+          child: Observer(
             builder: (_) => AppConfig.isRestaurant
                 ? SetupAddItemScreen(
                     onNext: _nextStep,

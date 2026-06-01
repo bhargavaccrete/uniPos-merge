@@ -23,6 +23,7 @@ import 'package:unipos/presentation/screens/onboarding/splashScreen.dart';
 import 'package:unipos/presentation/screens/onboarding/walkthroughScreen.dart';
 import 'package:unipos/presentation/screens/onboarding/userSelectionScreen.dart';
 import 'package:unipos/presentation/screens/onboarding/existingUserRestoreScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/license_key_entry_screen.dart';
 import 'package:unipos/presentation/screens/onboarding/setupWizardScreen.dart';
 
 // Restaurant - Auth
@@ -85,6 +86,7 @@ import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.
 import 'package:unipos/presentation/screens/restaurant/Settings/orderNotificationSetting.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/changePassword.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/addressCustomizationScreen.dart';
+import 'package:unipos/presentation/screens/restaurant/Settings/licensing_screen.dart';
 
 // Restaurant - Tax
 import 'package:unipos/presentation/screens/restaurant/TaxSetting/taxSettings.dart';
@@ -127,6 +129,7 @@ class RestaurantRoutes {
     RouteNames.walkthrough: (_) => const WalkthroughScreen(),
     RouteNames.userSelection: (_) => const UserSelectionScreen(),
     RouteNames.restore: (_) => const ExistingUserRestoreScreen(),
+    RouteNames.licenseKeyEntry: (_) => const LicenseKeyEntryScreen(),
     RouteNames.setupWizard: (_) => const SetupWizardScreen(),
 
     // Restaurant - Auth
@@ -207,6 +210,7 @@ class RestaurantRoutes {
 
     // Restaurant - Settings
     RouteNames.restaurantSettings: _guard(const Settingsscreen(), 'settings'),
+    RouteNames.restaurantLicensing: _guard(const LicensingScreen(), 'settings'),
     RouteNames.restaurantOrderSettings: _guard(Ordersettings(), 'settings'),
     RouteNames.restaurantPaymentMethods: _guard(Paymentsmethods(), 'settings'),
     RouteNames.restaurantChangePassword: _guard(Changepassword(), 'settings'),

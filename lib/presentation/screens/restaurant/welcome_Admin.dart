@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/util/color.dart';
 import '../../../core/routes/routes_name.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
 import '../../../domain/services/retail/store_settings_service.dart';
+import '../../../domain/store/restaurant/license_store.dart';
 import '../../../util/restaurant/restaurant_session.dart';
-import '../../../core/di/service_locator.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../util/common/app_responsive.dart';
@@ -143,6 +145,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
+
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
@@ -266,6 +269,76 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                 ],
               ),
             ),
+          ),
+
+          // License expiry warning banner (7 days or less remaining)
+          Observer(
+            builder: (_) {
+              final licStore = locator<LicenseStore>();
+              if (!licStore.isExpiringSoon) return const SizedBox.shrink();
+              final days = licStore.licenseInfo!.daysRemaining;
+              return Container(
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.timer_outlined,
+                          color: Colors.orange.shade700, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            days == 0
+                                ? 'License expires today!'
+                                : 'License expires in $days day${days == 1 ? '' : 's'}',
+                            style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.orange.shade800),
+                          ),
+                          Text(
+                            'Renew your license to avoid service interruption.',
+                            style: GoogleFonts.poppins(
+                                fontSize: 11, color: Colors.orange.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => Navigator.pushNamed(
+                          context, RouteNames.restaurantLicensing),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        backgroundColor: Colors.orange.shade100,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text('Renew',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange.shade800)),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
 
           // Pending EOD warning banner

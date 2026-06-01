@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
+import 'package:unipos/domain/store/restaurant/license_store.dart';
+import 'package:unipos/presentation/screens/restaurant/auth/license_lock_screen.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 
 /// Wraps protected restaurant screens.
@@ -37,11 +41,10 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
 
   void _checkAuth() {
     if (!RestaurantSession.isLoggedIn) {
-      // Defer navigation — context not ready for navigation in initState
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.pushNamedAndRemoveUntil(
-            context, RouteNames.restaurantLogin, (_) => false);
+              context, RouteNames.restaurantLogin, (_) => false);
         }
       });
       return;
@@ -66,16 +69,26 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_state == 'denied') return const _AccessDeniedScreen();
-    if (_state != true) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    // Reset inactivity timer on any touch interaction
-    return GestureDetector(
-      onTap: RestaurantSession.resetInactivityTimer,
-      onPanUpdate: (_) => RestaurantSession.resetInactivityTimer(),
-      behavior: HitTestBehavior.translucent,
-      child: widget.child,
+    // Observer makes this subtree reactive — rebuilds instantly whenever
+    // licenseStore.isLicensed flips (e.g. expiry, injection, deactivation).
+    return Observer(
+      builder: (_) {
+        final licStore = locator<LicenseStore>();
+        if (!licStore.isLicensed) {
+          return LicenseLockScreen(onActivated: () {});
+        }
+        if (_state == 'denied') return const _AccessDeniedScreen();
+        if (_state != true) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
+        return GestureDetector(
+          onTap: RestaurantSession.resetInactivityTimer,
+          onPanUpdate: (_) => RestaurantSession.resetInactivityTimer(),
+          behavior: HitTestBehavior.translucent,
+          child: widget.child,
+        );
+      },
     );
   }
 }

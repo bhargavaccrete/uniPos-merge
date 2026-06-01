@@ -10,6 +10,7 @@ import 'package:unipos/server/server.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 
 import 'domain/store/restaurant/appStore.dart';
+import 'domain/store/restaurant/license_store.dart';
 import 'domain/services/common/notification_service.dart';
 import 'util/common/decimal_settings.dart';
 import 'util/restaurant/staticswitch.dart';
@@ -96,6 +97,14 @@ Future<void> _initializeApp() async {
   print('💉 Step 5/7: Setting up service locator...');
   await setupServiceLocator();
   print('✅ Service locator ready');
+
+  // Pre-load license cache so RestaurantGuard can check synchronously.
+  await locator<LicenseStore>().loadCachedLicense();
+  print('🔑 License cache loaded');
+
+  // Fire server validation in background — does not block startup.
+  // The RestaurantGuard Observer reacts automatically if status changes.
+  locator<LicenseStore>().checkStatusInBackground();
 
 
   // Load restaurant customization settings from SharedPreferences

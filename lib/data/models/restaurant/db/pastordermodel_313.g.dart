@@ -1,5 +1,4 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Legacy null-safety patches applied manually — do not re-run build_runner without re-applying.
 
 part of 'pastordermodel_313.dart';
 
@@ -21,7 +20,7 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       id: fields[0] as String,
       customerName: fields[1] as String,
       totalPrice: fields[2] as double,
-      items: (fields[3] as List?)?.cast<CartItem>() ?? [],
+      items: (fields[3] as List).cast<CartItem>(),
       orderAt: fields[4] as DateTime?,
       kotNumber: fields[5] as int?,
       orderType: fields[6] as String?,
@@ -36,8 +35,8 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       refundAmount: fields[15] as double?,
       refundedAt: fields[16] as DateTime?,
       orderStatus: fields[17] as String?,
-      kotNumbers: (fields[18] as List?)?.cast<int>() ?? [0],
-      kotBoundaries: (fields[19] as List?)?.cast<int>() ?? [0],
+      kotNumbers: (fields[18] as List).cast<int>(),
+      kotBoundaries: (fields[19] as List).cast<int>(),
       billNumber: fields[20] as int?,
       paymentListJson: fields[21] as String?,
       isSplitPayment: fields[22] as bool?,

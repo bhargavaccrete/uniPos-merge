@@ -4,6 +4,7 @@ class RouteNames {
   static const walkthrough = '/walkthrough';
   static const userSelection = '/userSelectionScreen';
   static const restore = '/existingUserRestoreScreen';
+  static const licenseKeyEntry = '/license-key-entry';
   static const setupWizard = '/setup-wizard';
 
   // Restaurant - Auth
@@ -88,6 +89,7 @@ class RouteNames {
 
   // Restaurant - Settings
   static const restaurantSettings = '/restaurant-settings';
+  static const restaurantLicensing = '/restaurant-licensing';
   static const restaurantOrderSettings = '/restaurant-order-settings';
   static const restaurantPaymentMethods = '/restaurant-payment-methods';
   static const restaurantOrderNotifications = '/restaurant-order-notifications';

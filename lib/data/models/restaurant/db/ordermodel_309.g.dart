@@ -1,5 +1,4 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// Legacy null-safety patches applied manually — do not re-run build_runner without re-applying.
 
 part of 'ordermodel_309.dart';
 
@@ -22,7 +21,7 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       customerName: fields[1] as String,
       customerNumber: fields[2] as String,
       customerEmail: fields[3] as String,
-      items: (fields[4] as List?)?.cast<CartItem>() ?? [],
+      items: (fields[4] as List).cast<CartItem>(),
       status: fields[5] as String,
       timeStamp: fields[6] as DateTime,
       orderType: fields[7] as String,
@@ -39,9 +38,9 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       gstRate: fields[18] as double?,
       gstAmount: fields[19] as double?,
       remark: fields[20] as String?,
-      kotNumbers: (fields[21] as List?)?.cast<int>() ?? [0],
-      itemCountAtLastKot: (fields[22] as int?) ?? 0,
-      kotBoundaries: (fields[23] as List?)?.cast<int>() ?? [0],
+      kotNumbers: (fields[21] as List).cast<int>(),
+      itemCountAtLastKot: fields[22] as int,
+      kotBoundaries: (fields[23] as List).cast<int>(),
       kotStatuses: (fields[24] as Map?)?.cast<int, String>(),
       orderNumber: fields[25] as int?,
       customerId: fields[26] as String?,

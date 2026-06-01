@@ -59,6 +59,9 @@ class AppTextField extends StatefulWidget {
   /// Optional prefix widget (e.g. currency symbol text).
   final Widget? prefixWidget;
 
+  final bool enableSuggestions;
+  final bool autocorrect;
+
   const AppTextField({
     super.key,
     this.controller,
@@ -82,6 +85,8 @@ class AppTextField extends StatefulWidget {
     this.onTap,
     this.inputFormatters,
     this.prefixWidget,
+    this.enableSuggestions = true,
+    this.autocorrect = true,
   });
 
   @override
@@ -145,6 +150,8 @@ class _AppTextFieldState extends State<AppTextField> {
       enabled: widget.enabled,
       readOnly: widget.readOnly || useVK,
       autofocus: widget.autofocus,
+      enableSuggestions: widget.enableSuggestions,
+      autocorrect: widget.autocorrect,
       validator: widget.validator,
       onChanged: useVK ? null : widget.onChanged,
       onFieldSubmitted: widget.onFieldSubmitted,

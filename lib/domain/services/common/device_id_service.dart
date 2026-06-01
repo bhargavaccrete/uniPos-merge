@@ -107,7 +107,10 @@ class DeviceIdService {
 
   static Future<DeviceIdResult> _fromAndroid() async {
     final info = await DeviceInfoPlugin().androidInfo;
-    return DeviceIdResult(_format(info.id), DeviceIdSource.androidId);
+    // Build.FINGERPRINT = brand/product:version/id:incremental/tags
+    // Unique per device model + firmware. Requires no permissions.
+    // device_info_plus v10 removed androidId (needed READ_PRIVILEGED_PHONE_STATE).
+    return DeviceIdResult(_format(info.fingerprint), DeviceIdSource.androidId);
   }
 
   /// iOS: identifierForVendor (IDFV) — assigned by Apple per device per vendor.
