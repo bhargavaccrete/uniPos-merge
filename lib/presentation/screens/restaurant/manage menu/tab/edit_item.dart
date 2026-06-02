@@ -13,6 +13,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/ad
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -284,20 +285,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
+      appBar: buildPrimaryAppBar(
+        title: 'Edit Item',
+        titleFontSize: 18,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Edit Item',
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
       body: FutureBuilder<EditScreenData>(

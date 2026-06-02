@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -30,10 +31,16 @@ class _PrintersettingState extends State<Printersetting> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        surfaceTintColor: AppColors.primary,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: const BackButton(color: Colors.white),
         title: Text('Printer Settings',
-            style: GoogleFonts.poppins(fontSize: 20)),
-        leading: const BackButton(),
+            style: GoogleFonts.poppins(fontSize: 20, color: Colors.white, fontWeight: FontWeight.w600)),
         actions: [
           // Customize receipt fields button
           TextButton.icon(
@@ -41,9 +48,9 @@ class _PrintersettingState extends State<Printersetting> {
               Navigator.pushNamed(
                   context, RouteNames.restaurantPrinterCustomization);
             },
-            icon: const Icon(Icons.tune, size: 20),
+            icon: const Icon(Icons.tune, size: 20, color: Colors.white),
             label: Text('Customize',
-                style: GoogleFonts.poppins(fontSize: 13)),
+                style: GoogleFonts.poppins(fontSize: 13, color: Colors.white)),
           ),
         ],
       ),

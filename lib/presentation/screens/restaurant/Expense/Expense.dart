@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/addexpence.dart';
 import 'package:unipos/presentation/screens/restaurant/Expense/viewexpense.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -60,34 +61,23 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       drawer: DrawerManage(issync: false, isDelete: false, islogout: false),
+      appBar: buildPrimaryAppBar(
+        title: 'Expenses',
+        leading: Builder(
+          builder: (context) => IconButton(
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu),
+          ),
+        ),
+      ),
       body: Column(
         children: [
-          // Header
-          Container(
-            padding: EdgeInsets.fromLTRB(AppResponsive.mediumSpacing(context), 16, 20, 12),
-            color: AppColors.white,
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  Builder(
-                    builder: (context) => IconButton(
-                      onPressed: () => Scaffold.of(context).openDrawer(),
-                      icon: Icon(Icons.menu, size: AppResponsive.iconSize(context)),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Text('Expense', style: GoogleFonts.poppins(fontSize: AppResponsive.headingFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                ],
-              ),
-            ),
-          ),
-
           // Tabs
           Container(
             color: AppColors.white,
             padding: EdgeInsets.fromLTRB(
-              AppResponsive.largeSpacing(context), 0,
+              AppResponsive.largeSpacing(context),
+              AppResponsive.mediumSpacing(context),
               AppResponsive.largeSpacing(context),
               AppResponsive.mediumSpacing(context),
             ),

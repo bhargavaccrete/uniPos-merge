@@ -7,6 +7,7 @@ import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
@@ -50,23 +51,15 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+      appBar: buildPrimaryAppBar(
+        title: 'Add Choices',
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Add Choices',
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
+            icon: Icon(Icons.add_circle_outline),
             onPressed: () => _showAddChoiceDialog(),
             tooltip: 'Add New Choice',
           ),

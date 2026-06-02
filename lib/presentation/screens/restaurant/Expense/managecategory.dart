@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class ManageCategory extends StatefulWidget {
   const ManageCategory({super.key});
@@ -80,21 +81,12 @@ class _ManageCategoryState extends State<ManageCategory> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
+      appBar: buildPrimaryAppBar(
+        title: 'Manage Categories',
+        titleFontSize: isTablet ? 22 : 20,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back, color: Colors.black87),
-        ),
-        title: Text(
-          'Manage Categories',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+          icon: Icon(Icons.arrow_back),
         ),
         actions: [
           Padding(
@@ -107,13 +99,13 @@ class _ManageCategoryState extends State<ManageCategory> {
                 Container(
                   padding: EdgeInsets.all(isTablet ? 10 : 8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha:0.1),
+                    color: Colors.white.withValues(alpha:0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.person,
                     size: isTablet ? 22 : 20,
-                    color: AppColors.primary,
+                    color: Colors.white,
                   ),
                 ),
                 if (isTablet) ...[
@@ -123,7 +115,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                     style: GoogleFonts.poppins(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                   ),
                 ],

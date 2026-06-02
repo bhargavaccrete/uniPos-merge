@@ -10,8 +10,9 @@ import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/items_t
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/variant_tab.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
-import '../import/bulk_import_test_screen_v3.dart';
+import '../import/bulk_import_screen.dart';
 
 class Managemenu extends StatefulWidget {
   const Managemenu({super.key});
@@ -73,57 +74,25 @@ class _ManagemenuState extends State<Managemenu>
     final isSelected = tabController.animation!.value.round() == index;
     return GestureDetector(
       key: _tabKeys[index],
-      onTap: () {
-        tabController.animateTo(index);
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isTablet ? 16 : 20,
-          vertical: isTablet ? 10 : 12,
-        ),
-        margin: EdgeInsets.only(right: isTablet ? 8 : 8),
+      onTap: () => tabController.animateTo(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey.shade300,
-            width: 2,
+            color: isSelected ? AppColors.primary : AppColors.divider,
           ),
-          boxShadow: [],
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 13 : 14,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
-              ),
-            ),
-            SizedBox(width: isTablet ? 8 : 6),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 8 : 8,
-                vertical: isTablet ? 2 : 2,
-              ),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$count',
-                style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 11 : 12,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : AppColors.primary,
-                ),
-              ),
-            ),
-          ],
+        child: Text(
+          count > 0 ? '$label · $count' : label,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+          ),
         ),
       ),
     );
@@ -136,24 +105,15 @@ class _ManagemenuState extends State<Managemenu>
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Menu Management',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Menu Management',
+        titleFontSize: isTablet ? 22 : 20,
         actions: [
           IconButton(
-            icon: Icon(Icons.upload_file, color: Colors.black87),
+            icon: Icon(Icons.upload_file),
             tooltip: 'Import',
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const BulkImportTestScreenV3()));
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const RestaurantBulkImportScreen()));
             },
           ),
           SizedBox(width: 4),

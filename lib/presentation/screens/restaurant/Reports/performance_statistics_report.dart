@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:unipos/domain/services/restaurant/comprehensive_data_generator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class PerformanceStatisticsReport extends StatefulWidget {
   const PerformanceStatisticsReport({super.key});
@@ -50,8 +51,9 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
     final totalRecords = _stats.values.fold(0, (sum, count) => sum + count);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Performance Statistics Report'),
+      appBar: buildPrimaryAppBar(
+        title: 'Performance Statistics',
+        titleFontSize: 18,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

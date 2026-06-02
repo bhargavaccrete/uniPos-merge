@@ -5,6 +5,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/togglelist.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class CustomizationDrawer extends StatefulWidget {
   const CustomizationDrawer({super.key});
@@ -53,15 +54,14 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
 
     // Use a ListenableBuilder to listen for changes in AppSettings
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        automaticallyImplyLeading: false,
+      appBar: buildPrimaryAppBar(
         leading: InkWell(
             onTap: (){
               Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
             },
-            child: Icon(Icons.arrow_back,color: Colors.white,)),
-        title:  Text('Setting & Customization',style: GoogleFonts.poppins(color: Colors.white,fontSize:  16, fontWeight: FontWeight.w600),),
+            child: Icon(Icons.arrow_back,)),
+        title: 'Setting & Customization',
+        titleFontSize: 16,
       ),
       // body: ListenableBuilder(
       //   listenable: AppSettings.settingsNotifier,

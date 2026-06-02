@@ -42,6 +42,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   final Map<String, GlobalKey> _categoryKeys = {};
   final Map<String, ExpansibleController> _expansionControllers = {};
+  final ScrollController _listScrollController = ScrollController();
   bool _isLoadingData = false;
 
 
@@ -93,6 +94,7 @@ class _MenuScreenState extends State<MenuScreen> {
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _listScrollController.dispose();
     super.dispose();
   }
 
@@ -395,40 +397,25 @@ class _MenuScreenState extends State<MenuScreen> {
                             separatorBuilder: (_, __) => const SizedBox(width: 8),
                             itemBuilder: (context, i) {
                               final cat = cats[i];
+                              final isActive = activeCategory == cat.id;
                               return GestureDetector(
-                                onTap: () {
-                                  // Expand the category tile first
-                                  final controller = _expansionControllers[cat.id];
-                                  if (controller != null) {
-                                    try { controller.expand(); } catch (_) {}
-                                  }
-                                  // Scroll to the category after a short delay to let it expand
-                                  final key = _categoryKeys[cat.id];
-                                  if (key?.currentContext != null) {
-                                    Future.delayed(const Duration(milliseconds: 150), () {
-                                      if (key?.currentContext != null) {
-                                        Scrollable.ensureVisible(
-                                          key!.currentContext!,
-                                          duration: const Duration(milliseconds: 400),
-                                          curve: Curves.easeInOut,
-                                        );
-                                      }
-                                    });
-                                  }
-                                },
-                                child: Container(
+                                onTap: () => _selectStripCategory(cat.id),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
                                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: AppColors.white,
+                                    color: isActive ? AppColors.primary : AppColors.white,
                                     borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: AppColors.divider),
+                                    border: Border.all(
+                                      color: isActive ? AppColors.primary : AppColors.divider,
+                                    ),
                                   ),
                                   child: Text(
                                     cat.name,
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      color: isActive ? Colors.white : AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -487,6 +474,7 @@ class _MenuScreenState extends State<MenuScreen> {
                           final lowerQuery = query.toLowerCase();
 
                           return ListView.builder(
+                            controller: _listScrollController,
                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             itemCount: allCategories.length,
                             itemBuilder: (context, index) {
@@ -895,6 +883,50 @@ class _MenuScreenState extends State<MenuScreen> {
     if (item.price != null) return '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}';
     if (item.variant != null && item.variant!.isNotEmpty) return '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.variant!.first.price)}+';
     return 'N/A';
+  }
+
+  void _selectStripCategory(String categoryId) {
+    // Collapse the previously active category
+    if (activeCategory != null && activeCategory != categoryId) {
+      final prev = _expansionControllers[activeCategory];
+      if (prev != null) try { prev.collapse(); } catch (_) {}
+    }
+
+    setState(() => activeCategory = categoryId);
+
+    // Phase 1: jumpTo estimated offset so ListView.builder renders the item.
+    // Off-screen items have null currentContext — ensureVisible is a no-op without this.
+    final cats = categoryStore.categories;
+    final idx = cats.indexWhere((c) => c.id == categoryId);
+    if (idx >= 0 && _listScrollController.hasClients) {
+      try {
+        final max = _listScrollController.position.maxScrollExtent;
+        _listScrollController.jumpTo((idx * 72.0).clamp(0.0, max));
+      } catch (_) {}
+    }
+
+    // Phase 2: expand the tile, then wait for its animation to finish before
+    // scrolling — ExpansionTile animates over ~300ms, so ensureVisible must
+    // fire after that or the card height is still mid-animation and the
+    // scroll target position is wrong.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctrl = _expansionControllers[categoryId];
+      if (ctrl != null) try { ctrl.expand(); } catch (_) {}
+
+      Future.delayed(const Duration(milliseconds: 320), () {
+        if (!mounted) return;
+        final key = _categoryKeys[categoryId];
+        if (key?.currentContext != null) {
+          Scrollable.ensureVisible(
+            key!.currentContext!,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            alignment: 0.0,
+            alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+          );
+        }
+      });
+    });
   }
 
   Widget _buildCartBar(BuildContext context, Size size) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
@@ -61,10 +62,10 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
             Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppColors.warning.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.refresh, color: Colors.orange.shade700),
+              child: Icon(Icons.refresh, color: AppColors.warning),
             ),
             SizedBox(width: 12),
             Text(
@@ -80,12 +81,12 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade600,
+              backgroundColor: AppColors.warning,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: Text('Reset', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
@@ -103,140 +104,77 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
     final isTablet = !AppResponsive.isMobile(context);
-    final deepBlue = Color(0xFF0D47A1);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
-        elevation: 8,
-        shadowColor: deepBlue.withOpacity(0.5),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [deepBlue, Color(0xFF1565C0), deepBlue.withOpacity(0.8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+        backgroundColor: AppColors.primary,
+        surfaceTintColor: AppColors.primary,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(
+            Text(
+              'Print Customization',
+              style: GoogleFonts.poppins(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
+                fontSize: isTablet ? 20 : 18,
+                fontWeight: FontWeight.w700,
               ),
-              child: Icon(Icons.print_outlined, color: deepBlue, size: 24),
             ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Print Customization',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: isTablet ? 20 : 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  Text(
-                    'Configure receipt fields',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
+            Text(
+              'Configure receipt fields',
+              style: GoogleFonts.poppins(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],
         ),
-        leading: IconButton(
-          icon: Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-            ),
-            child: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: IconButton(
-              icon: Container(
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade400,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.orange.withOpacity(0.4),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Icon(Icons.refresh, color: Colors.white, size: 22),
-              ),
-              tooltip: 'Reset to Defaults',
-              onPressed: _resetSettings,
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Reset to Defaults',
+            onPressed: _resetSettings,
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: ValueListenableBuilder<Map<String, bool>>(
         valueListenable: PrintSettings.settingsNotifier,
         builder: (context, settings, child) {
-          return SingleChildScrollView(
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isTablet ? 700 : double.infinity),
+              child: SingleChildScrollView(
             padding: EdgeInsets.all(isTablet ? 20 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Info Banner
                 Container(
-                  width: width,
+                  width: double.infinity,
                   padding: EdgeInsets.all(isTablet ? 16 : 14),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade50, Colors.blue.shade100],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AppColors.info.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
+                    border: Border.all(color: AppColors.info.withOpacity(0.25)),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade600,
+                          color: AppColors.info,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(Icons.info, color: Colors.white, size: 24),
@@ -251,7 +189,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                               style: GoogleFonts.poppins(
                                 fontSize: isTablet ? 15 : 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.blue.shade900,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             SizedBox(height: 4),
@@ -259,7 +197,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                               'Toggle options to show or hide information on printed bills and KOTs',
                               style: GoogleFonts.poppins(
                                 fontSize: 12,
-                                color: Colors.blue.shade700,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -283,25 +221,25 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                 }),
 
                 // Footer
-                SizedBox(height: 24),
+                SizedBox(height: 8),
                 Center(
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: AppColors.surfaceMedium,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: AppColors.divider),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_done, color: Colors.green.shade600, size: 18),
+                        Icon(Icons.cloud_done, color: AppColors.success, size: 18),
                         SizedBox(width: 8),
                         Text(
                           'Settings auto-save',
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: Colors.grey.shade700,
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -309,8 +247,9 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                     ),
                   ),
                 ),
-                SizedBox(height: 20),
               ],
+            ),
+              ),
             ),
           );
         },
@@ -347,7 +286,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                 style: GoogleFonts.poppins(
                   fontSize: isTablet ? 17 : 16,
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -368,7 +307,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isEnabled ? AppColors.primary.withOpacity(0.3) : Colors.grey.shade200,
+                color: isEnabled ? AppColors.primary.withOpacity(0.3) : AppColors.divider,
                 width: isEnabled ? 1.5 : 1,
               ),
               boxShadow: [
@@ -398,12 +337,12 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                         decoration: BoxDecoration(
                           color: isEnabled
                               ? AppColors.primary.withOpacity(0.1)
-                              : Colors.grey.shade100,
+                              : AppColors.surfaceMedium,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           icon,
-                          color: isEnabled ? AppColors.primary : Colors.grey.shade500,
+                          color: isEnabled ? AppColors.primary : AppColors.textSecondary,
                           size: 22,
                         ),
                       ),
@@ -419,7 +358,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                               style: GoogleFonts.poppins(
                                 fontSize: isTablet ? 15 : 14,
                                 fontWeight: FontWeight.w600,
-                                color: isEnabled ? Colors.grey.shade900 : Colors.grey.shade700,
+                                color: isEnabled ? AppColors.textPrimary : AppColors.textSecondary,
                               ),
                             ),
                             SizedBox(height: 3),
@@ -427,7 +366,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                               description,
                               style: GoogleFonts.poppins(
                                 fontSize: 12,
-                                color: Colors.grey.shade600,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ],

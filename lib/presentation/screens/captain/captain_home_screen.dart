@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
+import '../../widget/componets/common/primary_app_bar.dart';
 import 'captain_login_screen.dart';
 
 class CaptainHomeScreen extends StatefulWidget {
@@ -615,10 +616,8 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
   }
 
   AppBar _buildAppBar() {
-    return AppBar(
-      backgroundColor: AppColors.accent,
-      elevation: 0,
-      title: Column(
+    return buildPrimaryAppBar(
+      titleWidget: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Captain App',

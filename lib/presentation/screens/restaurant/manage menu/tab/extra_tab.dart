@@ -1130,11 +1130,18 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
 
   Widget _buildMobileExtraCard(Extramodel extra) {
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1143,19 +1150,26 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
-                Icon(Icons.star_outline, color: Colors.green.shade700, size: 20),
-                SizedBox(width: 10),
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.star_outline, color: AppColors.primary, size: 22),
+                ),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(extra.Ename, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
-                      Text('${extra.topping?.length ?? 0} toppings', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500)),
+                      Text(extra.Ename, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text('${extra.topping?.length ?? 0} toppings', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
                 if (_canEdit) ...[
-                  InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+                  InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary))),
                   InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
                 ],
               ],
@@ -1173,9 +1187,9 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                     Container(width: 8, height: 8, decoration: BoxDecoration(color: topping.isveg ? Colors.green : Colors.red, shape: BoxShape.circle)),
                     SizedBox(width: 10),
                     Expanded(child: Text(topping.name, style: GoogleFonts.poppins(fontSize: 13))),
-                    Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+                    Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
                     if (_canEdit) ...[
-                      InkWell(onTap: () => _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 14, color: Colors.blue))),
+                      InkWell(onTap: () => _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 14, color: AppColors.primary))),
                       InkWell(onTap: () => _deleteTopping(extra, toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close, size: 14, color: Colors.red))),
                     ],
                   ],
@@ -1207,28 +1221,35 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.star_outline, color: Colors.green.shade700, size: 20),
+              Icon(Icons.star_outline, color: AppColors.primary, size: 20),
               SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(extra.Ename, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${extra.topping?.length ?? 0} toppings', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500)),
+                    Text(extra.Ename, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${extra.topping?.length ?? 0} toppings', style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
               if (_canEdit) ...[
-                InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
+                InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: AppColors.primary))),
                 InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
               ],
             ],
@@ -1271,20 +1292,33 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
 
   Widget _buildAddButton() {
     final isTablet = !AppResponsive.isMobile(context);
-    return Padding(
+    return Container(
       padding: EdgeInsets.all(isTablet ? 20 : 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: _openExtraBottomSheet,
-          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
-          label: Text('Add Extra', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _openExtraBottomSheet,
+            icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+            label: Text('Add Extra', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
           ),
         ),
       ),

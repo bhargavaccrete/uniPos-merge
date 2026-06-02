@@ -10,6 +10,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class CustomerListReport extends StatefulWidget {
   const CustomerListReport({super.key});
@@ -244,84 +245,54 @@ class _CustomerListReportState extends State<CustomerListReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Customer List Report',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            Text(
+              'View all registered customers',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'ADMIN',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Modern Header
-            Container(
-              width: double.infinity,
-              padding: AppResponsive.padding(context),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                      ),
-                      child: Icon(
-                        Icons.arrow_back_ios_new,
-                        size: AppResponsive.iconSize(context),
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: AppResponsive.mediumSpacing(context)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Customer List Report',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.headingFontSize(context),
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          'View all registered customers',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.mediumSpacing(context),
-                      vertical: AppResponsive.smallSpacing(context),
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                    ),
-                    child: Text(
-                      'ADMIN',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             // Content
             Expanded(
               child: _isLoading

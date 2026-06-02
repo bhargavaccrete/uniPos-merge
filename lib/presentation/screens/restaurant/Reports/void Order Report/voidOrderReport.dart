@@ -6,6 +6,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
+import '../../../../widget/componets/common/primary_app_bar.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
@@ -28,96 +29,32 @@ class _VoidOrderReportState extends State<VoidOrderReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Custom Header
-          Container(
-            padding: EdgeInsets.fromLTRB(
-              AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0),
-              AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
-              AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0),
-              AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  // Back Button
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: EdgeInsets.all(
-                        AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(
-                          AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.arrow_back_ios_new,
-                        color: AppColors.textSecondary,
-                        size: AppResponsive.getValue(context, mobile: 18.0, desktop: 20.0),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: AppResponsive.getValue(context, mobile: 16.0, desktop: 20.0)),
-                  // Title Section
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Void Order Report',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0),
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Track and analyze void orders',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Icon
-                  Container(
-                    padding: EdgeInsets.all(
-                      AppResponsive.getValue(context, mobile: 10.0, desktop: 14.0),
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(
-                        AppResponsive.getValue(context, mobile: 10.0, desktop: 12.0),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.cancel_outlined,
-                      color: Colors.red,
-                      size: AppResponsive.getValue(context, mobile: 24.0, desktop: 28.0),
-                    ),
-                  ),
-                ],
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Void Order Report',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 20,
               ),
             ),
-          ),
-
+            Text(
+              'Track and analyze void orders',
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
           // Period Selection Buttons
           Container(
             width: double.infinity,

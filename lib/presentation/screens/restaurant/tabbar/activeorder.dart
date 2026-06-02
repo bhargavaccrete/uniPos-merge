@@ -219,10 +219,10 @@ class _ActiveorderState extends State<Activeorder> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: AppColors.danger.withOpacity(0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.block, size: 18, color: Colors.red.shade600),
+                        child: Icon(Icons.block, size: 18, color: AppColors.danger),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -313,7 +313,7 @@ class _ActiveorderState extends State<Activeorder> {
                         child: ElevatedButton(
                           onPressed: () => Navigator.pop(ctx, reasonCtrl.text.trim()),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade600,
+                            backgroundColor: AppColors.danger,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 13),
@@ -340,15 +340,15 @@ class _ActiveorderState extends State<Activeorder> {
   Color _getColorForStatus(String? status) {
     switch (status) {
       case 'Processing':
-        return Colors.red.shade500; // Red for Processing (new orders)
+        return AppColors.danger; // New orders — needs attention
       case 'Cooking':
-        return Colors.red.shade500; // Red for Cooking
+        return AppColors.danger; // Still in kitchen
       case 'Ready':
-        return Colors.orange.shade300; // Orange for Ready
+        return AppColors.warning; // Ready for pickup/serve
       case 'Served':
-        return Colors.green.shade300; // Green for Served (awaiting payment)
+        return AppColors.success; // Served (awaiting payment)
       default:
-        return Colors.grey.shade400; // Default color for unknown status
+        return AppColors.textSecondary; // Unknown status
     }
   }
 
@@ -358,10 +358,10 @@ class _ActiveorderState extends State<Activeorder> {
   static const _statusFlow = ['Processing', 'Cooking', 'Ready', 'Served'];
 
   static const _statusColors = {
-    'Processing': Colors.grey,
-    'Cooking': Colors.orange,
-    'Ready': Colors.blue,
-    'Served': Colors.green,
+    'Processing': AppColors.textSecondary,
+    'Cooking': AppColors.warning,
+    'Ready': AppColors.info,
+    'Served': AppColors.success,
   };
 
   static const _statusIcons = {
@@ -522,19 +522,19 @@ class _ActiveorderState extends State<Activeorder> {
                                 padding: const EdgeInsets.all(16),
                                 margin: const EdgeInsets.only(bottom: 16),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
+                                  color: AppColors.success.withOpacity(0.08),
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: Colors.green.shade200),
+                                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: Colors.green.shade100,
+                                        color: AppColors.success.withOpacity(0.15),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Icon(Icons.check_rounded, color: Colors.green.shade700, size: 20),
+                                      child: Icon(Icons.check_rounded, color: AppColors.success, size: 20),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
@@ -546,14 +546,14 @@ class _ActiveorderState extends State<Activeorder> {
                                             style: GoogleFonts.poppins(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
-                                              color: Colors.green.shade800,
+                                              color: AppColors.success,
                                             ),
                                           ),
                                           Text(
                                             'Order is ready for settlement',
                                             style: GoogleFonts.poppins(
                                               fontSize: 12,
-                                              color: Colors.green.shade600,
+                                              color: AppColors.success,
                                             ),
                                           ),
                                         ],
@@ -576,11 +576,11 @@ class _ActiveorderState extends State<Activeorder> {
                               const SizedBox(height: 8),
                               Row(
                                 children: [
-                                  _buildBulkChip('All Cooking', Colors.orange, Icons.local_fire_department_rounded, () => updateAll('Cooking')),
+                                  _buildBulkChip('All Cooking', AppColors.warning, Icons.local_fire_department_rounded, () => updateAll('Cooking')),
                                   const SizedBox(width: 8),
-                                  _buildBulkChip('All Ready', Colors.blue, Icons.room_service_rounded, () => updateAll('Ready')),
+                                  _buildBulkChip('All Ready', AppColors.info, Icons.room_service_rounded, () => updateAll('Ready')),
                                   const SizedBox(width: 8),
-                                  _buildBulkChip('All Served', Colors.green, Icons.check_circle_rounded, () => updateAll('Served')),
+                                  _buildBulkChip('All Served', AppColors.success, Icons.check_circle_rounded, () => updateAll('Served')),
                                 ],
                               ),
                               const SizedBox(height: 20),
@@ -603,7 +603,7 @@ class _ActiveorderState extends State<Activeorder> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: isServed ? Colors.green.shade200 : Colors.grey.shade200,
+                                    color: isServed ? AppColors.success.withOpacity(0.4) : AppColors.divider,
                                     width: 1.5,
                                   ),
                                   boxShadow: [
@@ -807,7 +807,7 @@ class _ActiveorderState extends State<Activeorder> {
                                                       borderRadius: BorderRadius.circular(12),
                                                       child: Padding(
                                                         padding: const EdgeInsets.all(4),
-                                                        child: Icon(Icons.cancel_outlined, size: 18, color: Colors.red.shade300),
+                                                        child: Icon(Icons.cancel_outlined, size: 18, color: AppColors.danger.withOpacity(0.6)),
                                                       ),
                                                     ),
                                                 ],
@@ -1055,7 +1055,7 @@ class _ActiveorderState extends State<Activeorder> {
             child: Text('Keep', style: GoogleFonts.poppins()),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Cancel Item', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
           ),
@@ -1158,7 +1158,7 @@ class _ActiveorderState extends State<Activeorder> {
                 final itemCount = endIndex - startIndex;
 
                 return ListTile(
-                  leading: Icon(Icons.receipt_long, color: Colors.blue),
+                  leading: Icon(Icons.receipt_long, color: AppColors.info),
                   title: Text('KOT #$kotNum', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                   subtitle: Text('$itemCount items', style: GoogleFonts.poppins(fontSize: 12)),
                   trailing: Icon(Icons.print, color: Colors.grey),
@@ -1279,7 +1279,7 @@ class _ActiveorderState extends State<Activeorder> {
                       children: [
                         Icon(
                           Icons.receipt_long_outlined,
-                          size: 80,
+                          size: 64,
                           color: AppColors.divider,
                         ),
                         SizedBox(height: 16),
@@ -1319,7 +1319,7 @@ class _ActiveorderState extends State<Activeorder> {
                       children: [
                         Icon(
                           Icons.receipt_long_outlined,
-                          size: 80,
+                          size: 64,
                           color: AppColors.divider,
                         ),
                         SizedBox(height: 16),

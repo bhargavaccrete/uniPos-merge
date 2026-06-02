@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
 import 'package:unipos/util/color.dart';
@@ -335,6 +336,7 @@ class _CartScreenState extends State<CartScreen>
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         title: Text(
           isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length})',
           style: GoogleFonts.poppins(
@@ -387,7 +389,8 @@ class _CartScreenState extends State<CartScreen>
               children: [
                 // Order type tabs
                 Container(
-                  margin: EdgeInsets.symmetric(horizontal: isTablet ? 20 : 12, vertical: isTablet ? 10 : 8),
+                  color: AppColors.white,
+                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 12, vertical: isTablet ? 10 : 8),
                   child: Row(
                     children: [
                       _buildTabChip('Take Away', Icons.shopping_bag_outlined, selectedFilter == "Take Away",

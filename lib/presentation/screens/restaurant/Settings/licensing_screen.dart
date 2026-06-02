@@ -11,6 +11,7 @@ import 'package:unipos/domain/store/restaurant/license_store.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class LicensingScreen extends StatefulWidget {
   const LicensingScreen({super.key});
@@ -118,18 +119,9 @@ class _LicensingScreenState extends State<LicensingScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
-        title: Text(
-          'License & Subscription',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'License & Subscription',
+        titleFontSize: isTablet ? 22 : 20,
       ),
       body: SafeArea(
         child: Observer(

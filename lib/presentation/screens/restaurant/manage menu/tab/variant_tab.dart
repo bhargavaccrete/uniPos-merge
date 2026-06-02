@@ -426,17 +426,24 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
       return Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.shade200),
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Icon(Icons.tune, color: AppColors.primary, size: 18),
             SizedBox(width: 8),
-            Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
             if (_canEdit) ...[
-              InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 15, color: Colors.blue))),
+              InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 15, color: AppColors.primary))),
               InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
             ],
           ],
@@ -445,20 +452,34 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
-      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(Icons.tune, color: AppColors.primary, size: 20),
-          SizedBox(width: 10),
-          Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          Container(
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.tune, color: AppColors.primary, size: 22),
+          ),
+          SizedBox(width: 12),
+          Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
           if (_canEdit) ...[
-            InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+            InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary))),
             InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
           ],
         ],
@@ -468,20 +489,33 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
 
   Widget _buildAddButton() {
     final isTablet = !AppResponsive.isMobile(context);
-    return Padding(
+    return Container(
       padding: EdgeInsets.all(isTablet ? 20 : 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () => openBottomSheet(),
-          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
-          label: Text('Add Variant', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => openBottomSheet(),
+            icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+            label: Text('Add Variant', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
           ),
         ),
       ),

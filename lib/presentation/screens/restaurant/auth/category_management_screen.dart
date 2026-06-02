@@ -6,6 +6,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 
@@ -172,21 +173,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        // leading: IconButton(
-        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
-        //   onPressed: () => Navigator.pop(context),
-        // ),
-        title: Text(
-          'Category Management',
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Category Management',
+        titleFontSize: 18,
         actions: const [],
       ),
       body: _isLoading

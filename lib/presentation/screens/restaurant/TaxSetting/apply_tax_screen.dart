@@ -10,6 +10,7 @@ import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 
 class ApplyTaxScreen extends StatefulWidget {
@@ -111,18 +112,9 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          "Apply ${widget.taxToApply.taxname}",
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: "Apply ${widget.taxToApply.taxname}",
+        titleFontSize: isTablet ? 22 : 20,
         actions: [
           Observer(
             builder: (context) {
@@ -138,13 +130,15 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: isTablet ? 14 : 13,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: Colors.white,
                       ),
                     ),
                     Checkbox(
                       value: isAllSelected,
                       onChanged: (value) => _onSelectedAllChecked(value, items),
-                      activeColor: AppColors.primary,
+                      activeColor: Colors.white,
+                      checkColor: AppColors.primary,
+                      side: const BorderSide(color: Colors.white),
                     ),
                   ],
                 ),

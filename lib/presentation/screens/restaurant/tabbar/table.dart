@@ -14,6 +14,7 @@ import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class TableScreen extends StatefulWidget {
   final bool? isfromcart;
@@ -333,23 +334,14 @@ class _TableScreenState extends State<TableScreen> {
         backgroundColor: AppColors.surfaceLight,
 
         appBar: widget.isfromcart == true
-            ? AppBar(
-                backgroundColor: AppColors.white,
-                surfaceTintColor: AppColors.white,
-                elevation: 0.5,
+            ? buildPrimaryAppBar(
+                title: 'Select Table',
+                titleFontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
+                centerTitle: false,
                 leading: IconButton(
-                  icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                  icon: const Icon(Icons.arrow_back),
                   onPressed: () => Navigator.pop(context),
                 ),
-                title: Text(
-                  'Select Table',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                centerTitle: false,
               )
             : null,
         body: Column(
@@ -506,7 +498,7 @@ class _TableScreenState extends State<TableScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.table_restaurant_outlined, size: 80, color: AppColors.divider),
+                          Icon(Icons.table_restaurant_outlined, size: 64, color: AppColors.divider),
                           SizedBox(height: 16),
                           Text(
                             'No tables found.',
@@ -738,11 +730,11 @@ class TableCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: statusColor, width: 2),
           boxShadow: [
             BoxShadow(
-              color: statusColor.withOpacity(0.1),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 8,
               offset: Offset(0, 2),
             ),

@@ -7,6 +7,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
@@ -151,23 +152,15 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+      appBar: buildPrimaryAppBar(
+        title: 'Add Variants',
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Add Variants',
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
+            icon: Icon(Icons.add_circle_outline),
             onPressed: () => _showAddVariantDialog(),
             tooltip: 'Add New Variant',
           ),

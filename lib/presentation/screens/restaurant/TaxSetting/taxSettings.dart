@@ -5,6 +5,7 @@ import 'package:unipos/presentation/screens/restaurant/TaxSetting/addMultipleTax
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 
+import '../../../widget/componets/common/primary_app_bar.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 
 //main screeen of the texes
@@ -15,18 +16,9 @@ class taxSetting extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Tax Settings',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Tax Settings',
+        titleFontSize: isTablet ? 22 : 20,
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
@@ -38,13 +30,13 @@ class taxSetting extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(isTablet ? 10 : 8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.person,
                     size: isTablet ? 22 : 20,
-                    color: AppColors.primary,
+                    color: Colors.white,
                   ),
                 ),
                 if (isTablet) ...[
@@ -54,7 +46,7 @@ class taxSetting extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                   ),
                 ],

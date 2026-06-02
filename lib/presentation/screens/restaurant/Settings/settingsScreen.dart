@@ -16,6 +16,7 @@ import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../../util/common/app_responsive.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 
 class Settingsscreen extends StatefulWidget {
   const Settingsscreen({super.key});
@@ -316,18 +317,9 @@ class _settingsScreenState extends State<Settingsscreen> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
-        title: Text(
-          'Settings',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.headingFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Settings',
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(

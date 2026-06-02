@@ -5,6 +5,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/domain/store/restaurant/license_store.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/license_lock_screen.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 
 /// Wraps protected restaurant screens.
@@ -99,11 +100,8 @@ class _AccessDeniedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: buildPrimaryAppBar(
         leading: BackButton(onPressed: () => Navigator.pop(context)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
       ),
       backgroundColor: Colors.grey.shade50,
       body: Center(

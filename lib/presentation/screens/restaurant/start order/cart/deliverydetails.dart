@@ -5,6 +5,7 @@ import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class DeliveryDetails extends StatefulWidget {
   const DeliveryDetails({super.key});
@@ -46,16 +47,14 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
     final heigth = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title:Text('Due',style: GoogleFonts.poppins(fontWeight: FontWeight.w600,fontSize: 16),),
+      appBar: buildPrimaryAppBar(
+        title: 'Due',
+        titleFontSize: 16,
         centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios, ),
           onPressed: () => Navigator.pop(context),
         ),
-
-
       ),
       body: SingleChildScrollView(
         child: Container(

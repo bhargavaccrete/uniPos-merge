@@ -69,31 +69,7 @@ class _TakeawayState extends State<Takeaway> {
 
 
 
-  /* double get totalPrice {
-
-    // This print statement tells us the function is running.
-
-    final double originalTotal = widget.cartItems.fold(0.0, (sum, item) => sum + item.item.totalPrice);
-
-
-    // This will print true, false, or null, telling us what the app sees.
-
-    if (AppSettings.values['Round Off'] == true) {
-
-      final String roundOffSettingValue = AppSettings.selectedRoundOffValue;
-
-      final double roundTO = double.tryParse(roundOffSettingValue) ?? 1.0;
-
-      if (roundTO > 0) {
-        final double finalPrice = (originalTotal / roundTO).round() * roundTO;
-        return finalPrice;
-      }
-    }
-
-    return originalTotal;
-  }*/
-
-  // Active/NEW Lable
+  // Active/NEW Label
   Widget _buildGroupedCartItems() {
     // If viewing an existing order, group by KOT number
     if (widget.isexisting && widget.existingModel != null) {
@@ -108,7 +84,7 @@ class _TakeawayState extends State<Takeaway> {
       children: [
         // Active Items Section (always at top)
         if (activeItems.isNotEmpty)
-          _buildItemSection('ACTIVE', Colors.green, activeItems),
+          _buildItemSection('ACTIVE', AppColors.success, activeItems),
 
         // Add spacing between sections
         if (activeItems.isNotEmpty && newItems.isNotEmpty)
@@ -116,7 +92,7 @@ class _TakeawayState extends State<Takeaway> {
 
         // New Items Section
         if (newItems.isNotEmpty)
-          _buildItemSection('NEW', Colors.blue, newItems),
+          _buildItemSection('NEW', AppColors.info, newItems),
       ],
     );
   }
@@ -153,7 +129,7 @@ class _TakeawayState extends State<Takeaway> {
           // Show ACTIVE items for this KOT
           if (activeKotItems.isNotEmpty) {
             kotSections.add(
-                _buildItemSection('KOT #$kotNum - ACTIVE${isCooked ? ' (Cooked)' : ''}', isCooked ? Colors.orange : Colors.green, activeKotItems, isCooked: isCooked)
+                _buildItemSection('KOT #$kotNum - ACTIVE${isCooked ? ' (Cooked)' : ''}', isCooked ? AppColors.warning : AppColors.success, activeKotItems, isCooked: isCooked)
             );
             kotSections.add(SizedBox(height: 16));
           }
@@ -176,7 +152,7 @@ class _TakeawayState extends State<Takeaway> {
       List<CartItemStatus> newItems = allItems.sublist(startIndex);
       if (newItems.isNotEmpty) {
         kotSections.add(
-            _buildItemSection('NEW ITEMS (Pending KOT)', Colors.orange, newItems)
+            _buildItemSection('NEW ITEMS (Pending KOT)', AppColors.warning, newItems)
         );
       }
     }
@@ -447,86 +423,6 @@ class _TakeawayState extends State<Takeaway> {
       },
     );
   }
-/*
-  void _showCancelDialog(BuildContext context, CartItem item) {
-    int cancelQty = 1;
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                  SizedBox(width: 8),
-                  Text('Cancel Item', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('How many "${item.title}" do you want to cancel?', style: GoogleFonts.poppins(fontSize: 14)),
-                  SizedBox(height: 20),
-                  if (item.quantity > 1)
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: cancelQty > 1 ? () => setState(() => cancelQty--) : null,
-                            icon: Icon(Icons.remove_circle_outline, color: cancelQty > 1 ? AppColors.primary : Colors.grey),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Text('$cancelQty', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
-                          ),
-                          IconButton(
-                            onPressed: cancelQty < item.quantity ? () => setState(() => cancelQty++) : null,
-                            icon: Icon(Icons.add_circle_outline, color: cancelQty < item.quantity ? AppColors.primary : Colors.grey),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    Text('Cancel 1x ${item.title}?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
-                  SizedBox(height: 10),
-                  Text('This will print a Cancel KOT for the kitchen.', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text('Keep Item', style: GoogleFonts.poppins(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    for (int i = 0; i < cancelQty; i++) {
-                      widget.onDecreseQty(item);
-                    }
-                  },
-                  child: Text('Confirm Cancel', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500)),
-                )
-              ],
-            );
-          },
-        );
-      },
-    );
-  }*/
-
   Future<void> clearCart() async {
     try {
       await restaurantCartStore.clearCart();
@@ -652,58 +548,7 @@ class _TakeawayState extends State<Takeaway> {
   bool showNameSuggestions = false;
   bool showPhoneSuggestions = false;
 
-/*
-  Future<void> _placeOrder() async {
-    final plainItems  = widget.cartItems.map((w)=> w.item).toList();
-    final gstDetails = _calculateGst(plainItems);
-    final int newKotNumber = await orderStore.getNextKotNumber();
-    final neworder = OrderModel(
-      id: Uuid().v4(),
-      customerName: nameController.text,
-      customerNumber: mobileController.text,
-      customerEmail: emailController.text,
-      items: plainItems,
-      status: 'Processing',
-      timeStamp: DateTime.now(),
-      orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
-      totalPrice: totalPrice,
-      kotNumber: newKotNumber,
-      tableNo: widget.selectedTableNo ?? '',
-      remark: remarkController.text ?? '',
-
-      // ✅ 2. Save the calculated GST details to the active order
-      gstRate: gstDetails['gstRate'],
-      gstAmount: gstDetails['totalGstAmount'],
-    );
-
-    await orderStore.addOrder(neworder);
-
-    if (widget.isDineIn && widget.selectedTableNo != null) {
-      await tableStore.updateTableStatus(
-        widget.selectedTableNo!,
-        'Reserved',
-        total: totalPrice,
-        orderId: neworder.id,
-        orderTime: neworder.timeStamp,
-      );
-    }
-
-    await clearCart();
-    // print(pastOrder);
-    if (mounted) {
-      Navigator.of(context).pop();
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => Startorder()),
-        (Route<dynamic> route) => false,
-      );
-      NotificationService.instance.showSuccess('Order Placed Successfully');
-    }
-  }
-
-
-*/
-
-  // NEW ORDER // This is the corrected and reliable version of your function
+  // NEW ORDER
   Future<void> _placeOrder(CartCalculationService calculations) async {
     // Block if no active day session — orders placed without a session are excluded from EOD
     final bool sessionOpen = await DayManagementService.isSessionOpen();
@@ -1176,11 +1021,13 @@ class _TakeawayState extends State<Takeaway> {
         ),
 
         // Bottom: total + buttons
-        Container(
+        SafeArea(
+          top: false,
+          child: Container(
           padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+            color: AppColors.white,
+            border: Border(top: BorderSide(color: AppColors.divider)),
           ),
           child: Column(
             children: [
@@ -1199,6 +1046,7 @@ class _TakeawayState extends State<Takeaway> {
             ],
           ),
         ),
+        ), // SafeArea
       ],
     );
   }
@@ -1496,38 +1344,6 @@ class _TakeawayState extends State<Takeaway> {
     );
   }
 
-/*
-  Future<void> completeOrder(OrderModel activeModel) async {
-
-    // ✅ 1. Calculate the GST from the items
-    // final gstDetails = _calculateGst(activeModel.items);
-    final pastOrder = pastOrderModel(
-        id: activeModel.id,
-        customerName: activeModel.customerName,
-        totalPrice: activeModel.totalPrice,
-        items: activeModel.items,
-        orderAt: activeModel.timeStamp,
-        kotNumber: activeModel.kotNumber,
-        orderType: activeModel.orderType,
-        paymentmode: 'Cash',
-      gstRate: activeModel.gstRate,
-      gstAmount: activeModel.gstAmount,
-    subTotal: activeModel.subTotal,
-      );
-
-    await pastOrderStore.addOrder(pastOrder);
-    // print("✅ Order saved to past orders history with GST: ${gstDetails['totalGstAmount']}");
-
-
-    // 3. IMPORTANT: Now, delete the original order from the ACTIVE orders box
-    await clearCart();
-    // await HiveOrders.deleteOrder(activeModel.id);
-    // await HiveOrders.deleteOrder(c);
-
-  }
-*/
-
-  // Replace your completeOrder function with this simplified version
   Future<void> completeOrder(OrderModel activeModel) async {
 
     // Generate daily bill number for completed order
@@ -1558,50 +1374,6 @@ class _TakeawayState extends State<Takeaway> {
     // This is the critical missing step: delete the order from the ACTIVE list.
     await orderStore.deleteOrder(activeModel.id);
   }
-
-/*
-  Future<void>  _qucikSettleNewOrder( double gtotal , CartCalculationService calculations) async {
-    final plainItems  = widget.cartItems.map((w)=> w.item).toList();
-
-    final int newKotNumber = await orderStore.getNextKotNumber();
-    // Step 1: Calculate the GST amount from the cart items first.
-    final gstDetails = _calculateGst(plainItems);
-    final double gstAmount = gstDetails['totalGstAmount'] ?? 0;
-    final double gstRate = gstDetails['gstRate'] ?? 0;
-
-    final double finalGrandTotal = AppSettings.isTaxInclusive
-        ? totalPrice // If tax is included, the subtotal IS the grand total.
-        : totalPrice + gstAmount; // If tax is exclusive, add it on top.
-
-
-    final newOrder = OrderModel(
-        id: Uuid().v4(),
-        customerName: 'Quick Settle',
-        customerNumber: '',
-        customerEmail: '',
-        items: plainItems,
-        status: 'completed',
-        timeStamp: DateTime.now(),
-        orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
-        totalPrice: gtotal,
-        kotNumber: newKotNumber,
-        subTotal: totalPrice,
-        gstAmount: calculations.totalGST,
-        gstRate: 0,
-    );
-
-    await completeOrder(newOrder);
-
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const Startorder()),
-        (Route<dynamic> route) => false,
-      );
-      NotificationService.instance.showSuccess('Quick Settle Successful');
-    }
-  }
-
-*/
 
   void _showQuickSettleSheet(CartCalculationService calculations) {
     final methods = _paymentMethodStore.enabledMethods;
@@ -1838,41 +1610,6 @@ class _TakeawayState extends State<Takeaway> {
       );
     }
   }
-
-
-// Add this helper method inside your _TakeawayState class
-// Place this method inside your _CustomerdetailsState class
-//   Map<String, double> _calculateGst(List<CartItem> items) {
-//     double totalGstAmount = 0;
-//     double gstRate = 0;
-//
-//     for (final cartItem in items) {
-//       // Get the tax rate that was locked into the cart item (e.g., 0.18)
-//       final itemTaxRateDecimal = cartItem.taxRate ?? 0;
-//
-//       if (itemTaxRateDecimal > 0) {
-//         // Get the total final price for this line item (e.g., 2 pizzas * 150 = 300)
-//         final lineItemFinalPrice = cartItem.totalPrice;
-//
-//         // This is the core formula to find the tax included in the price
-//         final lineItemBasePrice = lineItemFinalPrice / (1 + itemTaxRateDecimal);
-//         final lineItemTaxAmount = lineItemFinalPrice - lineItemBasePrice;
-//
-//         // Add the tax from this line item to the grand total
-//         totalGstAmount += lineItemTaxAmount;
-//
-//         // Store the rate for display purposes (e.g., 18%)
-//         if (gstRate == 0) {
-//           gstRate = itemTaxRateDecimal * 100;
-//         }
-//       }
-//     }
-//
-//     return {
-//       'totalGstAmount': totalGstAmount,
-//       'gstRate': gstRate,
-//     };
-//   }
 
 
 }

@@ -729,25 +729,39 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
 
   Widget _buildMobileChoiceCard(ChoicesModel choice) {
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           childrenPadding: EdgeInsets.only(bottom: 8),
-          leading: Icon(Icons.checklist, color: AppColors.primary, size: 20),
-          title: Text(choice.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-          subtitle: Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500)),
+          leading: Container(
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.checklist, color: AppColors.primary, size: 22),
+          ),
+          title: Text(choice.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          subtitle: Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_canEdit) ...[
-                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue))),
+                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary))),
                 InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
               ],
             ],
@@ -775,9 +789,16 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     return Container(
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,13 +811,13 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(choice.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500)),
+                    Text(choice.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
               if (_canEdit) ...[
-                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: Colors.blue))),
+                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: AppColors.primary))),
                 InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
               ],
             ],
@@ -827,20 +848,33 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
 
   Widget _buildAddButton() {
     final isTablet = !AppResponsive.isMobile(context);
-    return Padding(
+    return Container(
       padding: EdgeInsets.all(isTablet ? 20 : 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () => openBottomSheet(),
-          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
-          label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => openBottomSheet(),
+            icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+            label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
           ),
         ),
       ),

@@ -108,6 +108,7 @@ import 'package:unipos/presentation/screens/restaurant/online%20Order/Completed.
 import 'package:unipos/presentation/screens/restaurant/online%20Order/inProgress.dart';
 import 'package:unipos/presentation/screens/restaurant/online%20Order/missed.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/filterButton.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 import 'order.dart';
 
@@ -145,16 +146,15 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: Text("Orange", style: GoogleFonts.poppins(color: Colors.black)),
+      appBar: buildPrimaryAppBar(
+        titleWidget: Text("Orange", style: GoogleFonts.poppins(color: Colors.white)),
         leading: IconButton(
             onPressed: () {
               Navigator.pop(context);
             },
             icon: Icon(
               Icons.arrow_back_ios,
-              color: Colors.black,
+              color: Colors.white,
             )),
         actions: [
           Card(

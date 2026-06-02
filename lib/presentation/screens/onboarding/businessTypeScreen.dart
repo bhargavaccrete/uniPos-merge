@@ -28,29 +28,18 @@ class BusinessTypeStep extends StatelessWidget {
     final hPad = AppResponsive.getValue<double>(context, mobile: 20, tablet: 40, desktop: 56);
     final vPad = AppResponsive.getValue<double>(context, mobile: 20, tablet: 28, desktop: 32);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const navBarHeight = 72.0;
-
-        return Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, 0),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - navBarHeight,
-                  ),
-                  child: isWide
-                      ? _buildWideContent(context)
-                      : _buildMobileContent(context),
-                ),
-              ),
-            ),
-            _buildNavBar(context, hPad, vPad),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, 0),
+            child: isWide
+                ? _buildWideContent(context)
+                : _buildMobileContent(context),
+          ),
+        ),
+        _buildNavBar(context, hPad, vPad),
+      ],
     );
   }
 
@@ -60,8 +49,6 @@ class BusinessTypeStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildBadge(context),
-        const SizedBox(height: 14),
         _buildTitle(context, compact: true),
         const SizedBox(height: 6),
         _buildHint(context),
@@ -85,8 +72,6 @@ class BusinessTypeStep extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildBadge(context),
-            const SizedBox(height: 16),
             _buildTitle(context, compact: false),
             const SizedBox(height: 8),
             _buildHint(context),
@@ -101,38 +86,6 @@ class BusinessTypeStep extends StatelessWidget {
     );
   }
 
-  // ── Step badge ────────────────────────────────────────────────────────────────
-
-  Widget _buildBadge(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            'Setup · Business Type',
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── Title ─────────────────────────────────────────────────────────────────────
 
   Widget _buildTitle(BuildContext context, {required bool compact}) {
@@ -140,7 +93,7 @@ class BusinessTypeStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'What kind of business\nare you running?',
+          'What kind of business are you running?',
           style: GoogleFonts.poppins(
             fontSize: compact
                 ? AppResponsive.getValue<double>(context, mobile: 22, tablet: 26, desktop: 28)

@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 class Support extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: Padding(
+      appBar: buildPrimaryAppBar(
+        titleWidget: Padding(
           padding: const EdgeInsets.only(left: 10),
           child: Text(
             "Need Help?",
-            style: TextStyle(fontSize: 20.0),
+            style: TextStyle(fontSize: 20.0, color: Colors.white),
           ),
         ),
       ),

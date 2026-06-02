@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 
 class Taxragistration extends StatefulWidget {
@@ -99,19 +100,9 @@ class _TaxragistrationState extends State<Taxragistration> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        automaticallyImplyLeading: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Tax Registration',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.headingFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Tax Registration',
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
@@ -123,13 +114,13 @@ class _TaxragistrationState extends State<Taxragistration> {
                 Container(
                   padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.person,
                     size: AppResponsive.iconSize(context),
-                    color: AppColors.primary,
+                    color: Colors.white,
                   ),
                 ),
                 if (isTablet) ...[
@@ -139,7 +130,7 @@ class _TaxragistrationState extends State<Taxragistration> {
                     style: GoogleFonts.poppins(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                   ),
                 ],

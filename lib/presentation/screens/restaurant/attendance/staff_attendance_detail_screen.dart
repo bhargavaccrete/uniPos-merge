@@ -5,6 +5,7 @@ import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:uuid/uuid.dart';
 
 class StaffAttendanceDetailScreen extends StatefulWidget {
@@ -294,16 +295,13 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
+      appBar: buildPrimaryAppBar(
+        title: widget.staffName,
         centerTitle: true,
-        automaticallyImplyLeading: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(widget.staffName,
-            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(20),
           child: Padding(

@@ -120,7 +120,7 @@ class RouteNames {
   static const restaurantCustomizationDrawer = '/restaurant-customization';
   static const restaurantTestData = '/restaurant-testdatascreen';
   static const restaurantAddPrinter = '/restaurant-addprinter';
-  static const restaurantBulkImportTestScreen = '/restaurant-bulkimporttestscreen';
+  static const restaurantBulkImport = '/restaurant-bulk-import';
   static const restaurantDataGenratorScreen = '/restaurant-datageneratorscreen';
   static const restaurantlogin  = '/restaurant-login';
 

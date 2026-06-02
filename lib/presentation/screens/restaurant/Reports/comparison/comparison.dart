@@ -7,6 +7,7 @@ import 'package:unipos/domain/services/common/report_export_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 enum ComparisonPeriod { Week, WeekYoY, Month, MonthYoY, Year }
 
@@ -25,11 +26,56 @@ class _SalesComparisonState extends State<SalesComparison> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sales Comparison',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            Text(
+              'Compare sales performance over time',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'ADMIN',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Modern Header
+            // Period Filter Bar
             Container(
               width: double.infinity,
               padding: AppResponsive.padding(context),
@@ -46,67 +92,6 @@ class _SalesComparisonState extends State<SalesComparison> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                          ),
-                          child: Icon(
-                            Icons.arrow_back_ios_new,
-                            size: AppResponsive.iconSize(context),
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: AppResponsive.mediumSpacing(context)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sales Comparison',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.headingFontSize(context),
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            Text(
-                              'Compare sales performance over time',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.mediumSpacing(context),
-                          vertical: AppResponsive.smallSpacing(context),
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                        ),
-                        child: Text(
-                          'ADMIN',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   // Period Filter Chips
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,

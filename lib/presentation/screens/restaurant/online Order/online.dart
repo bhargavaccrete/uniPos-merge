@@ -102,10 +102,10 @@
 //   }
 // }
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/screens/restaurant/online%20Order/Completed.dart';
 import 'package:unipos/presentation/screens/restaurant/online%20Order/inProgress.dart';
 import 'package:unipos/presentation/screens/restaurant/online%20Order/missed.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/filterButton.dart';
 
 import 'order.dart';
@@ -140,16 +140,14 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: Text("Orange", style: GoogleFonts.poppins(color: Colors.black)),
+      appBar: buildPrimaryAppBar(
+        title: "Orange",
         leading: IconButton(
             onPressed: () {
               Navigator.pop(context);
             },
             icon: Icon(
               Icons.arrow_back_ios,
-              color: Colors.black,
             )),
         actions: [
           Padding(
@@ -162,8 +160,8 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
                 ),
                 Column(
                   children: [
-                    Text('Admin'),
-                    Text('Admin'),
+                    Text('Admin', style: TextStyle(color: Colors.white)),
+                    Text('Admin', style: TextStyle(color: Colors.white)),
                   ],
                 )
               ],

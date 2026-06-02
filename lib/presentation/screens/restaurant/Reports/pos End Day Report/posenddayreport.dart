@@ -10,6 +10,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
+import '../../../../widget/componets/common/primary_app_bar.dart';
 
 class Posenddayreport extends StatefulWidget {
   const Posenddayreport({super.key});
@@ -182,84 +183,31 @@ class _PosenddayreportState extends State<Posenddayreport> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Header
-          Container(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.arrow_back, color: AppColors.white, size: 24),
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'End of Day Reports',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.headingFontSize(context),
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          'View daily closing reports',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.event_available,
-                      size: AppResponsive.iconSize(context),
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'End of Day Reports',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 20,
               ),
             ),
-          ),
-
-          AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-          Expanded(
-            child: _buildContent(context),
-          ),
-        ],
+            Text(
+              'View daily closing reports',
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
+      body: _buildContent(context),
     );
   }
 

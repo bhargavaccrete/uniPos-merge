@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../constants/restaurant/color.dart';
 class NeedhelpDrawer extends StatelessWidget {
   const NeedhelpDrawer({super.key});
@@ -11,14 +12,12 @@ class NeedhelpDrawer extends StatelessWidget {
     final width= MediaQuery.of(context).size.width * 1;
     final heigth = MediaQuery.of(context).size.height * 1;
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
+      appBar: buildPrimaryAppBar(
         leading: IconButton(onPressed: (){
           Navigator.pop(context);
         },
-            icon:Icon(Icons.arrow_back_ios_new,color: Colors.white,)),
-        title:Text('Need Help?',                          textScaler: TextScaler.linear(1),
-          style: GoogleFonts.poppins(color: Colors.white),),
+            icon:Icon(Icons.arrow_back_ios_new,)),
+        title: 'Need Help?',
         centerTitle: true,
       ),
       body: SingleChildScrollView(

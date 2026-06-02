@@ -25,6 +25,7 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/services/restaurant/inventory_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/core/routes/routes_name.dart';
 import '../../../widget/restaurant/opening_balance_dialog.dart';
 
@@ -1165,57 +1166,9 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   // ── UI helpers ────────────────────────────────────────────────────────────
 
   AppBar _buildAppBar(bool isTablet) {
-    return AppBar(
-      elevation: 0,
-      backgroundColor: AppColors.white,
-      iconTheme: IconThemeData(color: AppColors.textPrimary),
-      title: Text(
-        'End of Day Settlement',
-        style: GoogleFonts.poppins(
-          fontSize: isTablet ? 22 : 20,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      actions: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 10, vertical: 8),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(isTablet ? 10 : 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.person_outline_rounded,
-                    size: isTablet ? 22 : 20, color: AppColors.primary),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
-                    style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 13 : 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary),
-                  ),
-                  Text(
-                    RestaurantSession.effectiveRole,
-                    style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 11 : 10,
-                        color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 4),
-            ],
-          ),
-        ),
-      ],
+    return buildPrimaryAppBar(
+      title: 'End of Day Settlement',
+      titleFontSize: isTablet ? 20 : 18,
     );
   }
 

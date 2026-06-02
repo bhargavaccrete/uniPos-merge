@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 import '../../../../util/restaurant/order_settings.dart';
 
@@ -33,18 +34,9 @@ class _orderSettingsState extends State<Ordersettings>
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
-        title: Text(
-          'Order Settings',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Order Settings',
+        titleFontSize: isTablet ? 22 : 20,
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
@@ -62,9 +54,9 @@ class _orderSettingsState extends State<Ordersettings>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: AppColors.primary,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
           indicatorWeight: 3,
           labelStyle: GoogleFonts.poppins(
               fontWeight: FontWeight.w600, fontSize: isTablet ? 14 : 13),

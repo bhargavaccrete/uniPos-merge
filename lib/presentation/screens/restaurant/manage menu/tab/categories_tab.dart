@@ -76,7 +76,7 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
         children: [
           // Modern Search Bar
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(16),
             child: AppTextField(
               controller: _searchController,
               hint: 'Search categories…',
@@ -205,12 +205,19 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
   Widget _buildCategoryCard(Category category, List<Items> items, {required bool isGrid}) {
     return Container(
-      margin: isGrid ? EdgeInsets.zero : EdgeInsets.only(bottom: 8),
-      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: isGrid ? EdgeInsets.zero : EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,14 +226,21 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
           // Main row: name + item count + actions
           Row(
             children: [
-              Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
-              SizedBox(width: 10),
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.category_rounded, color: AppColors.primary, size: 22),
+              ),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(category.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    Text('${items.length} items', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500)),
+                    Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text('${items.length} items', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -234,7 +248,7 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
               if (_canEdit) ...[
                 InkWell(
                   onTap: () => AddCategoryDialog.show(context, editCategory: category),
-                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
+                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary)),
                 ),
                 InkWell(
                   onTap: () => _showDeleteDialog(category),
@@ -317,20 +331,33 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
   Widget _buildAddButton() {
     final isTablet = !AppResponsive.isMobile(context);
-    return Padding(
+    return Container(
       padding: EdgeInsets.all(isTablet ? 20 : 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: _showAddCategoryBottomSheet,
-          icon: Icon(Icons.add, size: isTablet ? 22 : 20),
-          label: Text('Add Category', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _showAddCategoryBottomSheet,
+            icon: Icon(Icons.add, size: isTablet ? 22 : 20),
+            label: Text('Add Category', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
           ),
         ),
       ),

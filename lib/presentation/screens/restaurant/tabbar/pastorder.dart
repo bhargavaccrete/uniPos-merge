@@ -89,114 +89,116 @@ class _PastorderState extends State<Pastorder> {
 
   @override
   Widget build(BuildContext context) {
-    final inputBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: Color(0xFFDEE1E6)),
-    );
-
     return Column(
       children: [
-        // 🔽 Filters row (Order Type, Search, Date Range) — no AppBar
+        // 🔽 Filter header — matches Active Orders style (search-forward + compact dropdown)
         Container(
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: AppColors.white,
+          child: Column(
             children: [
-              // Order Type
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _orderType,
-                  items: _orderTypeOptions
-                      .map((e) => DropdownMenuItem<String>(
-                    value: e,
-                    child: Text(e, style: GoogleFonts.poppins(fontSize: 14)),
-                  ))
-                      .toList(),
-                  onChanged: (val) => setState(() => _orderType = val ?? 'All'),
-                  decoration: InputDecoration(
-                    labelText: 'Order Type',
-                    labelStyle: GoogleFonts.poppins(fontSize: 12),
-                    border: inputBorder,
-                    enabledBorder: inputBorder,
-                    focusedBorder: inputBorder,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              // Row 1: search + compact order-type dropdown
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(
+                      controller: _searchCtrl,
+                      hint: 'Search name / KOT / bill no',
+                      icon: Icons.search_rounded,
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                              onPressed: () => _searchCtrl.clear(),
+                            )
+                          : null,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Search
-              Expanded(
-                flex: 1,
-                child: AppTextField(
-                  controller: _searchCtrl,
-                  hint: 'Search name / KOT / bill no',
-                  icon: Icons.search,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // 🔽 Date range row
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: _pickDateRange,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFDEE1E6)),
-                      color: Colors.white,
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.divider, width: 1.5),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today_outlined, size: 18, color: Colors.black54),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _dateRange == null
-                                ? 'Date range'
-                                : '${_fmtDate(_dateRange!.start)} — ${_fmtDate(_dateRange!.end)}',
-                            style: GoogleFonts.poppins(fontSize: 13, color: Colors.black87),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (_dateRange != null)
-                          InkWell(
-                            onTap: () => setState(() => _dateRange = null),
-                            child: const Padding(
-                              padding: EdgeInsets.only(left: 8.0),
-                              child: Icon(Icons.close_rounded, size: 18),
-                            ),
-                          ),
-                      ],
+                    child: DropdownButton<String>(
+                      value: _orderType,
+                      isDense: true,
+                      underline: const SizedBox(),
+                      icon: const Icon(Icons.keyboard_arrow_down, size: 20, color: AppColors.textPrimary),
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                      items: _orderTypeOptions
+                          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _orderType = val ?? 'All'),
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 10),
-              // Quick "Today" shortcut (optional, handy)
-              SizedBox(
-                height: 44,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    final now = DateTime.now();
-                    final start = DateTime(now.year, now.month, now.day);
-                    final end = DateTime(now.year, now.month, now.day);
-                    setState(() => _dateRange = DateTimeRange(start: start, end: end));
-                  },
-                  icon: const Icon(Icons.today_outlined, size: 18),
-                  label: Text('Today', style: GoogleFonts.poppins(fontSize: 13)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFDEE1E6)),
-                    foregroundColor: Colors.black87,
+              const SizedBox(height: 10),
+              // Row 2: date range + Today shortcut
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: _pickDateRange,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.divider),
+                          color: AppColors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _dateRange == null
+                                    ? 'Date range'
+                                    : '${_fmtDate(_dateRange!.start)} — ${_fmtDate(_dateRange!.end)}',
+                                style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_dateRange != null)
+                              InkWell(
+                                onTap: () => setState(() => _dateRange = null),
+                                child: const Padding(
+                                  padding: EdgeInsets.only(left: 8.0),
+                                  child: Icon(Icons.close_rounded, size: 18),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 44,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final now = DateTime.now();
+                        final start = DateTime(now.year, now.month, now.day);
+                        final end = DateTime(now.year, now.month, now.day);
+                        setState(() => _dateRange = DateTimeRange(start: start, end: end));
+                      },
+                      icon: const Icon(Icons.today_outlined, size: 18),
+                      label: Text('Today', style: GoogleFonts.poppins(fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.divider),
+                        foregroundColor: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -213,7 +215,23 @@ class _PastorderState extends State<Pastorder> {
               }
 
               if (all.isEmpty) {
-                return Center(child: Text('No past orders found', style: GoogleFonts.poppins()));
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.divider),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No past orders found',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               }
 
               // newest first
@@ -241,9 +259,21 @@ class _PastorderState extends State<Pastorder> {
 
               if (filtered.isEmpty) {
                 return Center(
-                  child: Text(
-                    'No matching orders for selected filters',
-                    style: GoogleFonts.poppins(),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 64, color: AppColors.divider),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No matching orders for selected filters',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 );
               }
@@ -290,12 +320,12 @@ class _PastorderState extends State<Pastorder> {
                                     ...o.getKotNumbers().map((kotNum) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade100,
+                                        color: AppColors.primary.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.blue.shade300),
+                                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                                       ),
                                       child: Text('#$kotNum',
-                                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blue.shade700)),
+                                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
                                     )),
                                     if (o.billNumber != null)
                                       Container(

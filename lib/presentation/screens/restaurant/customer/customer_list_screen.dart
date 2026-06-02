@@ -9,6 +9,7 @@ import 'add_edit_customer_screen.dart';
 import 'customer_detail_screen.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -141,21 +142,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Customers',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Customers',
         actions: [
           PopupMenuButton<String>(
-            icon: Icon(Icons.sort_rounded, color: Colors.black87),
+            icon: Icon(Icons.sort_rounded),
             tooltip: 'Sort by',
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),

@@ -5,13 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../data/models/restaurant/db/companymodel_301.dart';
+import '../../widget/componets/common/primary_app_bar.dart';
 class CompanyListScreen extends StatelessWidget {
   final Box companyBox = Hive.box<Company>('companybox');
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Registered Companies')),
+      appBar: buildPrimaryAppBar(title: 'Registered Companies'),
       body: ValueListenableBuilder(
         valueListenable: companyBox.listenable(),
         builder: (context, Box box, _) {

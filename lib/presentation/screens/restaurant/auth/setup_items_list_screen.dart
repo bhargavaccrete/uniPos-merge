@@ -8,6 +8,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 /// Full-detail item list opened from the Setup Wizard "View Added Items" banner.
 /// Shows every item in itemStore with variants, choices, extras, stock, tax.
@@ -139,25 +140,23 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
   }
 
   PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: AppColors.white,
-      elevation: 1,
+    return buildPrimaryAppBar(
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black),
+        icon: const Icon(Icons.arrow_back),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Observer(
+      titleWidget: Observer(
         builder: (_) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Menu Items',
                 style: GoogleFonts.poppins(
-                    color: Colors.black,
+                    color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w600)),
             Text('${itemStore.items.length} item(s) in database',
                 style: GoogleFonts.poppins(
-                    color: AppColors.success,
+                    color: Colors.white70,
                     fontSize: 12,
                     fontWeight: FontWeight.w500)),
           ],

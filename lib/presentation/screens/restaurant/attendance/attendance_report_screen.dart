@@ -9,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'staff_attendance_detail_screen.dart';
 
 class AttendanceReportScreen extends StatefulWidget {
@@ -269,25 +270,22 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
+      appBar: buildPrimaryAppBar(
+        title: 'Monthly Attendance',
+        titleFontSize: 18,
         centerTitle: true,
-        automaticallyImplyLeading: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Monthly Attendance Report',
-            style: GoogleFonts.poppins(
-                color: Colors.white, fontWeight: FontWeight.w600)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.file_download_outlined, color: Colors.white),
+            icon: const Icon(Icons.file_download_outlined),
             onPressed: () => _doExport(context),
             tooltip: 'Export',
           ),
           IconButton(
-            icon: const Icon(Icons.print, color: Colors.white),
+            icon: const Icon(Icons.print),
             onPressed: _printReport,
             tooltip: 'Print',
           ),

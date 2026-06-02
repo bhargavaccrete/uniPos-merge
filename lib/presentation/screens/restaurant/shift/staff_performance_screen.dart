@@ -8,6 +8,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 
 // ── Computed data class ───────────────────────────────────────────────────────
@@ -403,9 +404,35 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Staff Performance',
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 20)),
+            Text(
+                '${_perfList.length} staff member${_perfList.length != 1 ? 's' : ''}',
+                style: GoogleFonts.poppins(
+                    color: Colors.white70, fontSize: 12)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: () => _doExport(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _load(forceReload: true),
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          _buildHeader(context),
           _buildFilterRow(context),
           if (_filterPeriod == 'Custom') _buildCustomDateRow(context),
           _buildSortRow(context),
@@ -417,96 +444,6 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
                     : _buildBody(context, currency),
           ),
         ],
-      ),
-    );
-  }
-
-  // ── Header ────────────────────────────────────────────────────────────────
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: AppResponsive.shadowBlurRadius(context),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Row(children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.arrow_back,
-                  color: Colors.white,
-                  size: AppResponsive.iconSize(context)),
-            ),
-          ),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Staff Performance',
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.headingFontSize(context),
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                Text('${_perfList.length} staff member${_perfList.length != 1 ? 's' : ''}',
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          // Export button
-          GestureDetector(
-            onTap: () => _doExport(context),
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.file_download_outlined,
-                  color: AppColors.primary,
-                  size: AppResponsive.iconSize(context)),
-            ),
-          ),
-          SizedBox(width: AppResponsive.smallSpacing(context)),
-          // Refresh button
-          GestureDetector(
-            onTap: () => _load(forceReload: true),
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.refresh,
-                  color: AppColors.primary,
-                  size: AppResponsive.iconSize(context)),
-            ),
-          ),
-        ]),
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 enum ItemPeriod { Today, ThisWeek, ThisMonth, ThisYear, Custom }
 
@@ -28,77 +29,41 @@ class _SalesbyitemState extends State<Salesbyitem> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Header
-          Container(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.arrow_back, color: AppColors.white, size: 24),
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sales By Items',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.headingFontSize(context),
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          'Item-wise sales breakdown',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1 * AppColors.primary.a),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.inventory_2_rounded,
-                      size: AppResponsive.iconSize(context),
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sales By Items',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
+            Text(
+              'Item-wise sales breakdown',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Icon(
+              Icons.inventory_2_rounded,
+              size: AppResponsive.iconSize(context),
+              color: Colors.white,
+            ),
           ),
-
+        ],
+      ),
+      body: Column(
+        children: [
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
 
           // Filter Buttons

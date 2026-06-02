@@ -14,7 +14,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/totalsales/totals
 import 'package:unipos/presentation/screens/restaurant/Settings/data_generator_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/attendance/staff_attendance_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/attendance/attendance_report_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
+import 'package:unipos/presentation/screens/restaurant/import/bulk_import_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/tabbar/order.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
 
@@ -237,7 +237,7 @@ class RestaurantRoutes {
     RouteNames.restaurantNeedHelp: _guard(const NeedhelpDrawer()),
     RouteNames.restaurantCustomizationDrawer: _guard(const CustomizationDrawer(), 'settings'),
     RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
-    RouteNames.restaurantBulkImportTestScreen: _guard(const BulkImportTestScreenV3(), 'settings'),
+    RouteNames.restaurantBulkImport: _guard(const RestaurantBulkImportScreen(), 'settings'),
     RouteNames.restaurantDataGenratorScreen: _guard(const DataGeneratorScreen(), 'settings'),
 
   };

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../util/common/app_responsive.dart';
+import '../../../../../util/color.dart';
 
 
 class OrderCard extends StatelessWidget {
@@ -50,10 +51,11 @@ class OrderCard extends StatelessWidget {
 
     return InkWell(
       onTap: ontap,
-      child: Card                                                                                                                                                                                                                                                                                                                                                                                              (
-        elevation: 10,
+      child: Card(
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.08),
         margin: const EdgeInsets.symmetric(vertical: 8.0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
@@ -140,14 +142,14 @@ class OrderCard extends StatelessWidget {
                   Text(order.customerName.isEmpty ? 'Guest' : order.customerName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                   Row(
                     children: [
-                      Text(order.paymentStatus ?? 'unPaid', style: GoogleFonts.poppins(color: order.isPaid == true ? Colors.green:Colors.red, fontWeight: FontWeight.bold)),
+                      Text(order.paymentStatus ?? 'unPaid', style: GoogleFonts.poppins(color: order.isPaid == true ? AppColors.success : AppColors.danger, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
 
                       InkWell(
                         onTap: () => onDelete(order.id),
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                          decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
                           child: const Icon(Icons.delete, color: Colors.white, size: 16),
                         ),
                       ),
@@ -163,7 +165,7 @@ class OrderCard extends StatelessWidget {
               color: Colors.white,
               child: Row(
                 children: [
-                  Icon(Icons.person_outline, color: Colors.teal.shade700, size: 20),
+                  Icon(Icons.person_outline, color: AppColors.secondary, size: 20),
                   const SizedBox(width: 4),
                   Text(
                     (order.tableNo != null && order.tableNo!.isNotEmpty)
@@ -177,14 +179,14 @@ class OrderCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade100,
+                        color: AppColors.success.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.green.shade400),
+                        border: Border.all(color: AppColors.success.withOpacity(0.4)),
                       ),
                       child: Text(
                         'PAID',
                         style: GoogleFonts.poppins(
-                          color: Colors.green.shade700,
+                          color: AppColors.success,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -196,13 +198,13 @@ class OrderCard extends StatelessWidget {
                   if (onPrintBill != null)
                     InkWell(
                       onTap: onPrintBill,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         margin: const EdgeInsets.only(right: 6),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade600,
-                          borderRadius: BorderRadius.circular(4),
+                          color: AppColors.info,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           children: [
@@ -216,12 +218,12 @@ class OrderCard extends StatelessWidget {
                   // KOT print button
                   InkWell(
                     onTap: onPrintKot,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(8),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xff12b294),
-                        borderRadius: BorderRadius.circular(4),
+                        color: AppColors.secondary,
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
@@ -326,7 +328,7 @@ class OrderCard extends StatelessWidget {
                                       'Extras: $extrasDisplay',
                                       style: GoogleFonts.poppins(
                                         fontSize: isTablet ? 13 : 12,
-                                        color: Colors.orange.shade700,
+                                        color: AppColors.orange,
                                         fontStyle: FontStyle.italic,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -345,7 +347,7 @@ class OrderCard extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor:color,
                       minimumSize: Size(double.infinity, isTablet ? 46 : 40),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     child: Text(order.status, style: GoogleFonts.poppins(color: Colors.white, fontSize: isTablet ? 14 : 13)),
                   ),

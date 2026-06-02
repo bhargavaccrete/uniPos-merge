@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'variant_selection_screen.dart';
 import 'choice_selection_screen.dart';
 import 'extra_selection_screen.dart';
@@ -45,19 +46,11 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        elevation: 0,
+      appBar: buildPrimaryAppBar(
+        title: 'Add More Info',
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Add More Info',
-          style: GoogleFonts.poppins(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
       body: Padding(

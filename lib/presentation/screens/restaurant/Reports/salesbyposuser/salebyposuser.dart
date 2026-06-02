@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyposuser/todayByPosUser.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 class SalesByPOsUSer extends StatefulWidget {
   const SalesByPOsUSer({super.key});
 
@@ -62,14 +63,8 @@ class _SalesByPOsUSerState extends State<SalesByPOsUSer> {
 
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: Text(
-          "Sales By Pos User",
-          textScaler: TextScaler.linear(1),
-          style: GoogleFonts.poppins(
-              fontSize: 20, color: Colors.white, fontWeight: FontWeight.w500),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: "Sales By Pos User",
         centerTitle: true,
         leading: IconButton(
             onPressed: () {
@@ -77,7 +72,6 @@ class _SalesByPOsUSerState extends State<SalesByPOsUSer> {
             },
             icon: Icon(
               Icons.arrow_back_ios,
-              color: Colors.white,
             )),
       ),
       body: Container(

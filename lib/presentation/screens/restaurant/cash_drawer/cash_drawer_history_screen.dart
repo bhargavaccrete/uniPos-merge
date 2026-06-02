@@ -16,6 +16,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 
 // ─── Draft model (pre-sort, no running balance yet) ──────────────────────────
@@ -611,8 +612,29 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     final currency = CurrencyHelper.currentSymbol;
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Cash Drawer History',
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 20)),
+            Text('Full audit trail — every cash movement',
+                style: GoogleFonts.poppins(
+                    color: Colors.white70, fontSize: 12)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print_outlined),
+            onPressed: _filteredRows.isEmpty ? null : _printReport,
+          ),
+        ],
+      ),
       body: Column(children: [
-        _buildHeader(context),
         if (!_isLoading) ...[
           _buildFilterBar(context),
           _buildSummaryBar(context, currency),
@@ -625,81 +647,6 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                   : _buildTable(context, currency),
         ),
       ]),
-    );
-  }
-
-  // ── Header ───────────────────────────────────────────────────────────────────
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: AppResponsive.shadowBlurRadius(context),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Row(children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.arrow_back,
-                  color: Colors.white, size: AppResponsive.iconSize(context)),
-            ),
-          ),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Cash Drawer History',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.headingFontSize(context),
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  )),
-              Text('Full audit trail — every cash movement',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    color: AppColors.textSecondary,
-                  )),
-            ]),
-          ),
-          GestureDetector(
-            onTap: _filteredRows.isEmpty ? null : _printReport,
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: _filteredRows.isEmpty
-                    ? Colors.grey.shade100
-                    : AppColors.primary.withValues(alpha: 0.1),
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.print_outlined,
-                  color: _filteredRows.isEmpty
-                      ? Colors.grey.shade400
-                      : AppColors.primary,
-                  size: AppResponsive.iconSize(context)),
-            ),
-          ),
-        ]),
-      ),
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/drag&droplist.dart';
 
 class AddressCustomizationScreen extends StatefulWidget {
@@ -12,14 +13,13 @@ class _addressCustomizationScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          elevation: 1,
-          title: Text("Address Customization",style: TextStyle(fontSize: 20.0,fontWeight: FontWeight.bold)),
+        appBar: buildPrimaryAppBar(
+          title: "Address Customization",
           actions: [
             Row(
               children: [
-                Icon(Icons.person),
-                Text("admin"),
+                Icon(Icons.person, color: Colors.white),
+                Text("admin", style: TextStyle(color: Colors.white)),
               ],
             )
           ],

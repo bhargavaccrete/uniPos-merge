@@ -6,6 +6,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
@@ -27,78 +28,32 @@ class _TotalsalesState extends State<Totalsales> {
   Widget build(BuildContext context) {
   return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Header
-          Container(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  GestureDetector(
-
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.arrow_back, color: AppColors.white, size: 24),
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Total Sales',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.headingFontSize(context),
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          'View sales across different periods',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0)),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.bar_chart_rounded,
-                      size: AppResponsive.iconSize(context),
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Total Sales',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 20,
               ),
             ),
-          ),
-
+            Text(
+              'View sales across different periods',
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
 
           // Filter Buttons

@@ -8,6 +8,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../data/models/restaurant/db/staffModel_310.dart';
@@ -191,20 +192,9 @@ class _manageStaffState extends State<manageStaff> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Staff Management',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        actions: [SizedBox(width: 4)],
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Staff Management',
       ),
       drawer: DrawerManage(
         isDelete: true,
@@ -276,8 +266,8 @@ class _manageStaffState extends State<manageStaff> {
                       children: [
                         Icon(
                           Icons.people_outline,
-                          size: isTablet ? 80 : 64,
-                          color: Colors.grey.shade400,
+                          size: 64,
+                          color: AppColors.divider,
                         ),
                         SizedBox(height: 16),
                         Text(
@@ -286,7 +276,7 @@ class _manageStaffState extends State<manageStaff> {
                               : 'No staff found',
                           style: GoogleFonts.poppins(
                             fontSize: isTablet ? 18 : 16,
-                            color: Colors.grey.shade600,
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -296,7 +286,7 @@ class _manageStaffState extends State<manageStaff> {
                             'Add your first staff member',
                             style: GoogleFonts.poppins(
                               fontSize: isTablet ? 14 : 13,
-                              color: Colors.grey.shade500,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -364,10 +354,17 @@ class _manageStaffState extends State<manageStaff> {
         child: Container(
           decoration: BoxDecoration(
             color: (staff.isActive ?? true) == false
-                ? Colors.grey.shade100
-                : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade200),
+                ? AppColors.surfaceMedium
+                : AppColors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
           padding: EdgeInsets.all(isTablet ? 14 : 12),
           child: Row(
@@ -392,7 +389,7 @@ class _manageStaffState extends State<manageStaff> {
                       style: GoogleFonts.poppins(
                         fontSize: isTablet ? 16 : 15,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     SizedBox(height: 4),
@@ -400,7 +397,7 @@ class _manageStaffState extends State<manageStaff> {
                       "${staff.firstName} ${staff.lastName}",
                       style: GoogleFonts.poppins(
                         fontSize: isTablet ? 14 : 13,
-                        color: Colors.grey.shade600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     SizedBox(height: 6),
@@ -450,18 +447,18 @@ class _manageStaffState extends State<manageStaff> {
                   IconButton(
                     onPressed: () => _showStaffDetails(context, staff, isTablet),
                     icon: Icon(Icons.visibility_rounded),
-                    color: Colors.blue,
+                    color: AppColors.info,
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                      backgroundColor: AppColors.info.withValues(alpha: 0.1),
                     ),
                   ),
                   SizedBox(width: 8),
                   IconButton(
                     onPressed: () => _showEditStaffDialog(context, staff, isTablet),
                     icon: Icon(Icons.edit_rounded),
-                    color: Colors.orange,
+                    color: AppColors.primary,
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.orange.withValues(alpha: 0.1),
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                     ),
                   ),
                 ],
@@ -486,7 +483,8 @@ class _manageStaffState extends State<manageStaff> {
           child: Form(
             key: _formKey,
             child: SingleChildScrollView(
-              child: Padding(
+              child: Container(
+                width: isTablet ? 520 : double.infinity,
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

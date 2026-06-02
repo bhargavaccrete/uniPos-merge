@@ -17,6 +17,7 @@ import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 // ─── Entry type for the merged activity log ───────────────────────────────────
 
@@ -606,8 +607,50 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Cash Drawer',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white)),
+            Builder(
+              builder: (context) {
+                if (_dayStart == null) {
+                  return Text(DateFormat('dd MMM yyyy').format(DateTime.now()),
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: Colors.white70));
+                }
+
+                final now = DateTime.now();
+                final isSameDay = _dayStart!.year == now.year &&
+                    _dayStart!.month == now.month &&
+                    _dayStart!.day == now.day;
+
+                final dateText = isSameDay
+                    ? DateFormat('dd MMM yyyy').format(_dayStart!)
+                    : 'Session: ${DateFormat('dd MMM').format(_dayStart!)} - ${DateFormat('dd MMM').format(now)}';
+
+                return Text(dateText,
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: Colors.white70));
+              },
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: _loadAll,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: Column(children: [
-        _buildHeader(context),
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -620,100 +663,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                     ),
         ),
       ]),
-    );
-  }
-
-  // ── Header ───────────────────────────────────────────────────────────────
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: AppResponsive.shadowBlurRadius(context),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Row(children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.arrow_back,
-                  color: Colors.white,
-                  size: AppResponsive.iconSize(context)),
-            ),
-          ),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Cash Drawer',
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.headingFontSize(context),
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                Builder(
-                  builder: (context) {
-                    if (_dayStart == null) {
-                      return Text(DateFormat('dd MMM yyyy').format(DateTime.now()),
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          color: AppColors.textSecondary));
-                    }
-                    
-                    final now = DateTime.now();
-                    final isSameDay = _dayStart!.year == now.year && 
-                                      _dayStart!.month == now.month && 
-                                      _dayStart!.day == now.day;
-                                      
-                    final dateText = isSameDay 
-                        ? DateFormat('dd MMM yyyy').format(_dayStart!)
-                        : 'Session: ${DateFormat('dd MMM').format(_dayStart!)} - ${DateFormat('dd MMM').format(now)}';
-                        
-                    return Text(dateText,
-                        style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            color: AppColors.textSecondary));
-                  }
-                ),
-              ],
-            ),
-          ),
-          // Refresh button
-          GestureDetector(
-            onTap: _loadAll,
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.refresh,
-                  color: AppColors.primary,
-                  size: AppResponsive.iconSize(context)),
-            ),
-          ),
-        ]),
-      ),
     );
   }
 

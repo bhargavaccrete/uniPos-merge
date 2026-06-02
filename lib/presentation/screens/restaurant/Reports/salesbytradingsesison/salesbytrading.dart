@@ -6,6 +6,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingses
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/thisweekbytrading.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/todaybytrading.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/yearwisebytrading.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class Salesbytrading extends StatefulWidget {
   const Salesbytrading({super.key});
@@ -41,16 +42,12 @@ class _SalesbytradingState extends State<Salesbytrading> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: Text("Sales by Trading Session",
-            textScaler: TextScaler.linear(1),
-            style: GoogleFonts.poppins(fontSize:20,color: Colors.white,fontWeight: FontWeight.w500)
-        ),
+      appBar: buildPrimaryAppBar(
+        title: "Sales by Trading Session",
         centerTitle: true,
         leading: IconButton(onPressed: (){
           Navigator.pop(context);
-        }, icon: Icon(Icons.arrow_back_ios,color: Colors.white,)),
+        }, icon: Icon(Icons.arrow_back_ios,)),
       ),
       body: Container(
         padding: EdgeInsets.symmetric(horizontal: 10,vertical: 10),

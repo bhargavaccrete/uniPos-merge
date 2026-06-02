@@ -7,6 +7,7 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class Paymentsmethods extends StatefulWidget {
   @override
@@ -257,18 +258,9 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Payment Methods',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Payment Methods',
+        titleFontSize: isTablet ? 22 : 20,
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
@@ -296,7 +288,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                     style: GoogleFonts.poppins(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: Colors.white,
                     ),
                   ),
                 ],

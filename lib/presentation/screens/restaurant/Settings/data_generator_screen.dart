@@ -6,6 +6,7 @@ import 'package:unipos/presentation/widget/componets/common/app_text_field.dart'
 import '../../../../domain/services/restaurant/comprehensive_data_generator.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class DataGeneratorScreen extends StatefulWidget {
   const DataGeneratorScreen({super.key});
@@ -150,23 +151,14 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Performance Test Data Generator',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Performance Test Data Generator',
+        titleFontSize: isTablet ? 22 : 18,
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: isTablet ? 12 : 8),
             child: IconButton(
-              icon: Icon(Icons.refresh, color: AppColors.primary),
+              icon: const Icon(Icons.refresh),
               onPressed: _isLoadingStats ? null : _loadStats,
               tooltip: 'Refresh Stats',
             ),

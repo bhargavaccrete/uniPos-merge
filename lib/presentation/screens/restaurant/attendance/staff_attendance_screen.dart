@@ -11,6 +11,7 @@ import 'package:unipos/util/restaurant/restaurant_session.dart';
 
 import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class StaffAttendanceScreen extends StatefulWidget {
   const StaffAttendanceScreen({super.key});
@@ -169,19 +170,16 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
+      appBar: buildPrimaryAppBar(
+        title: 'Staff Attendance',
         centerTitle: true,
-        automaticallyImplyLeading: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Staff Attendance',
-            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: const Icon(Icons.refresh),
             onPressed: () {
               staffStore.loadStaff();
               attendanceStore.loadTodayRecords();

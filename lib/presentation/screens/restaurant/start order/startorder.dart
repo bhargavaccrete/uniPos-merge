@@ -7,6 +7,7 @@ import '../../../../util/color.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../../util/restaurant/order_settings.dart';
 import '../../../widget/componets/restaurant/componets/drawer.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 import '../../../../domain/services/common/auto_backup_service.dart';
 import '../tabbar/menu.dart';
 import '../tabbar/order.dart';
@@ -267,6 +268,30 @@ class _StartorderState extends State<Startorder>
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       drawer: Drawerr(),
+      appBar: buildPrimaryAppBar(
+        titleWidget: Row(
+          children: [
+            Text(
+              'UniPOS',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 22),
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            if (widget.newOrderForTableId != null) ...[
+              SizedBox(width: 8),
+              Text(
+                '• Table ${widget.newOrderForTableId}',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14),
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
       body: Column(
         children: [
           // Auto-backup progress indicator — thin bar at the very top
@@ -279,43 +304,6 @@ class _StartorderState extends State<Startorder>
                     valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
                   )
                 : const SizedBox.shrink(),
-          ),
-          // Header
-          Container(
-            padding: EdgeInsets.fromLTRB(4, 8, 16, 8),
-            color: AppColors.white,
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  Builder(
-                    builder: (context) => IconButton(
-                      onPressed: () => Scaffold.of(context).openDrawer(),
-                      icon: Icon(Icons.menu, size: 24),
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'UniPOS',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 22),
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (widget.newOrderForTableId != null) ...[
-                    SizedBox(width: 8),
-                    Text(
-                      '• Table ${widget.newOrderForTableId}',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14),
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
           ),
 
           // Horizontal Tabs for Tablet

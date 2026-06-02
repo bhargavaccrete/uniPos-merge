@@ -20,7 +20,7 @@ import '../../../domain/store/retail/attribute_store.dart';
 import '../../../util/responsive.dart';
 import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
-import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
+import 'package:unipos/presentation/screens/restaurant/import/bulk_import_screen.dart';
 import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
@@ -2461,35 +2461,22 @@ class _AddProductScreenState extends State<AddProductScreen>
             ),
           ),
           const SizedBox(width: 12),
-          if (AppConfig.isRestaurant) ...[
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BulkImportTestScreenV3(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.science, size: 18),
-              label: const Text('Test V3'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           ElevatedButton.icon(
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const BulkImportScreen()),
+                MaterialPageRoute(
+                  builder: (context) => AppConfig.isRestaurant
+                      ? const RestaurantBulkImportScreen()
+                      : const BulkImportScreen(),
+                ),
               );
             },
             icon: const Icon(Icons.upload_file, size: 18),
             label: const Text('Start Import'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
             ),
           ),
         ],

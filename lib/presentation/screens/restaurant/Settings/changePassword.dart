@@ -6,6 +6,7 @@ import 'package:unipos/util/color.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../../util/common/app_responsive.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 
 class Changepassword extends StatefulWidget {
   @override
@@ -159,18 +160,9 @@ class _ChangepasswordState extends State<Changepassword> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
-        title: Text(
-          'Change Password',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Change Password',
+        titleFontSize: isTablet ? 22 : 20,
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(

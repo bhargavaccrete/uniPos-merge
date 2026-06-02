@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class OrderNotificationsettings extends StatefulWidget {
   @override
@@ -14,17 +15,16 @@ class _ordernotificationsettingsState extends State<OrderNotificationsettings> {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-        appBar: AppBar(
-          elevation: 1,
-          title: Text(
-            'Order Notification Settings',
-            style: TextStyle(fontSize: 20.0),
-          ),
+        appBar: buildPrimaryAppBar(
+          title: 'Order Notification Settings',
           actions: [
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Row(
-                children: [Icon(Icons.person), Text('Admin')],
+                children: [
+                  Icon(Icons.person, color: Colors.white),
+                  Text('Admin', style: TextStyle(color: Colors.white)),
+                ],
               ),
             )
           ],

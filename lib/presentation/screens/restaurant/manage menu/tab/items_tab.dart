@@ -229,12 +229,19 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                         .name;
 
                     return Container(
-                      margin: EdgeInsets.only(bottom: 8),
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      margin: EdgeInsets.only(bottom: 12),
+                      padding: EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: item.isEnabled ? Colors.grey.shade200 : Colors.red.shade100),
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,11 +269,11 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(item.name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    Text(item.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
                                     SizedBox(height: 2),
                                     Text(
                                       '$categoryName  •  ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}',
-                                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
+                                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                                     ),
                                   ],
                                 ),
@@ -275,7 +282,7 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                               if (_canEdit) ...[
                                 InkWell(
                                   onTap: () => editItems(item),
-                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: Colors.blue)),
+                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary)),
                                 ),
                                 InkWell(
                                   onTap: () => _deleteItem(item.id),
@@ -384,9 +391,16 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
             return Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: item.isEnabled ? Colors.grey.shade200 : Colors.red.shade100),
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,7 +422,7 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                         ),
                       ),
                       Expanded(
-                        child: Text(item.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        child: Text(item.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
                       ),
                       Transform.scale(
                         scale: 0.7,
@@ -428,12 +442,12 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                       Expanded(
                         child: Text(
                           '$categoryName  •  ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}',
-                          style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+                          style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (_canEdit) ...[
-                        InkWell(onTap: () => editItems(item), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: 15, color: Colors.blue))),
+                        InkWell(onTap: () => editItems(item), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: 15, color: AppColors.primary))),
                         InkWell(onTap: () => _deleteItem(item.id), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
                       ],
                     ],

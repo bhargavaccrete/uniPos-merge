@@ -9,6 +9,7 @@ import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/util/color.dart';
 
 // Export PartialRefundResult so UI screens can use it
 export '../../../../domain/services/restaurant/refund_service.dart' show PartialRefundResult;
@@ -186,7 +187,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
                   label: const Text('Refund Entire Bill'),
                   onPressed: _selectAllForFullRefund,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),

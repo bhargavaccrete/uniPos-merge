@@ -15,6 +15,7 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Textfo
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 class Companyregister extends StatefulWidget {
   const Companyregister({super.key});
 
@@ -159,12 +160,9 @@ class _CompanyregisterState extends State<Companyregister> {
     ValueNotifier obsecurepass = ValueNotifier(true);
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        toolbarHeight: 100,
-        backgroundColor: AppColors.primary,
+      appBar: buildPrimaryAppBar(
         centerTitle: true,
-        title: Text(
+        titleWidget: Text(
           'Business Registration',
           textScaler: TextScaler.linear(1.2),
           style: GoogleFonts.poppins(

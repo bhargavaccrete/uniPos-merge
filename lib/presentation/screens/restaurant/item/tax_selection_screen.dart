@@ -9,6 +9,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import '../../../../util/common/app_responsive.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 class TaxSelectionScreen extends StatefulWidget {
   final String? selectedTaxId;
   final double? currentTaxRate;
@@ -47,23 +48,15 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+      appBar: buildPrimaryAppBar(
+        title: 'Select Tax',
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Select Tax',
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
+            icon: Icon(Icons.add_circle_outline),
             onPressed: () => _showAddTaxDialog(),
             tooltip: 'Add New Tax',
           ),

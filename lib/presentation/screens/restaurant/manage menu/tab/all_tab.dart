@@ -170,27 +170,26 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
 
                         return Card(
                           key: _categoryKeys[cat.id],
-                          margin: EdgeInsets.only(bottom: 16),
+                          margin: EdgeInsets.only(bottom: 12),
                           elevation: 2,
-                          shadowColor: Colors.black.withValues(alpha: 0.1),
+                          color: AppColors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Theme(
                             data: Theme.of(context).copyWith(
                               dividerColor: Colors.transparent,
                             ),
                             child: ExpansionTile(
-                              tilePadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                               childrenPadding: EdgeInsets.only(bottom: 12),
                               leading: Container(
-                                padding: EdgeInsets.all(12),
+                                padding: EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Icon(
-                                  Icons.category,
+                                  Icons.restaurant_menu,
                                   color: AppColors.primary,
                                   size: 24,
                                 ),
@@ -286,19 +285,16 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                                     ]
                                   : items.map((item) {
                                       return Container(
-                                        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                        margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: AppColors.white,
+                                          borderRadius: BorderRadius.circular(14),
                                           border: Border.all(
-                                            color: item.isEnabled
-                                                ? Colors.grey.shade200
-                                                : Colors.red.shade100,
-                                            width: 1.5,
+                                            color: AppColors.divider.withOpacity(0.5),
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.03),
+                                              color: Colors.black.withOpacity(0.03),
                                               blurRadius: 8,
                                               offset: Offset(0, 2),
                                             ),
@@ -308,22 +304,23 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                                           children: [
                                             // Item Header
                                             Padding(
-                                              padding: EdgeInsets.all(16),
+                                              padding: EdgeInsets.all(14),
                                               child: Row(
                                                 children: [
                                                   // Item Icon
                                                   Container(
-                                                    padding: EdgeInsets.all(10),
+                                                    width: 46,
+                                                    height: 46,
                                                     decoration: BoxDecoration(
-                                                      color: item.isEnabled
-                                                          ? Colors.green.withValues(alpha: 0.1)
-                                                          : Colors.red.withValues(alpha: 0.1),
-                                                      borderRadius: BorderRadius.circular(10),
+                                                      color: AppColors.surfaceMedium,
+                                                      borderRadius: BorderRadius.circular(12),
                                                     ),
-                                                    child: Icon(
-                                                      Icons.restaurant_menu,
-                                                      color: item.isEnabled ? Colors.green : Colors.red,
-                                                      size: 20,
+                                                    child: Center(
+                                                      child: Icon(
+                                                        Icons.restaurant_menu,
+                                                        color: AppColors.textSecondary,
+                                                        size: 22,
+                                                      ),
                                                     ),
                                                   ),
                                                   SizedBox(width: 12),
@@ -335,34 +332,22 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                                                       children: [
                                                         Text(
                                                           item.name,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
                                                           style: GoogleFonts.poppins(
                                                             fontSize: 15,
                                                             fontWeight: FontWeight.w600,
-                                                            color: Colors.black87,
+                                                            color: AppColors.textPrimary,
                                                           ),
                                                         ),
-                                                        SizedBox(height: 4),
-                                                        Row(
-                                                          children: [
-                                                            Container(
-                                                              padding: EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 4,
-                                                              ),
-                                                              decoration: BoxDecoration(
-                                                                color: AppColors.primary.withValues(alpha: 0.1),
-                                                                borderRadius: BorderRadius.circular(6),
-                                                              ),
-                                                              child: Text(
-                                                                "${CurrencyHelper.currentSymbol}${item.price != null ? DecimalSettings.formatAmount(item.price!) : "N/A"}",
-                                                                style: GoogleFonts.poppins(
-                                                                  fontSize: 13,
-                                                                  fontWeight: FontWeight.w600,
-                                                                  color: AppColors.primary,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
+                                                        SizedBox(height: 6),
+                                                        Text(
+                                                          "${CurrencyHelper.currentSymbol}${item.price != null ? DecimalSettings.formatAmount(item.price!) : "N/A"}",
+                                                          style: GoogleFonts.poppins(
+                                                            fontSize: 14,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: AppColors.primary,
+                                                          ),
                                                         ),
                                                       ],
                                                     ),
@@ -432,10 +417,10 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                                                           vertical: 8,
                                                         ),
                                                         decoration: BoxDecoration(
-                                                          color: Colors.white,
+                                                          color: AppColors.white,
                                                           borderRadius: BorderRadius.circular(8),
                                                           border: Border.all(
-                                                            color: Colors.grey.shade200,
+                                                            color: AppColors.divider.withOpacity(0.5),
                                                           ),
                                                         ),
                                                         child: Row(

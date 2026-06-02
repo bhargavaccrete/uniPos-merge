@@ -164,8 +164,8 @@ class _OrderdetailsState extends State<Orderdetails> {
               margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                border: Border.all(color: Colors.blue.shade200),
+                color: AppColors.primary.withOpacity(0.05),
+                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -173,14 +173,14 @@ class _OrderdetailsState extends State<Orderdetails> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.receipt_long, color: Colors.blue.shade700, size: 20),
+                      Icon(Icons.receipt_long, color: AppColors.primary, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Kitchen Order Tickets (KOT)',
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],
@@ -193,7 +193,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                       return Container(
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade700,
+                          color: AppColors.primary,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Text(
@@ -272,7 +272,7 @@ class _OrderdetailsState extends State<Orderdetails> {
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppColors.primary.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -299,15 +299,11 @@ class _OrderdetailsState extends State<Orderdetails> {
                     margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade700, Colors.blue.shade500],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.blue.withOpacity(0.3),
+                          color: AppColors.primary.withOpacity(0.2),
                           blurRadius: 8,
                           offset: Offset(0, 2),
                         ),
@@ -470,21 +466,21 @@ class _OrderdetailsState extends State<Orderdetails> {
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                               decoration: BoxDecoration(
-                                                color: Colors.blue.shade50,
+                                                color: AppColors.primary.withOpacity(0.05),
                                                 borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: Colors.blue.shade200, width: 0.5),
+                                                border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 0.5),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.restaurant_menu, size: 12, color: Colors.blue.shade700),
+                                                  Icon(Icons.restaurant_menu, size: 12, color: AppColors.primary),
                                                   SizedBox(width: 4),
                                                   Expanded(
                                                     child: Text(
                                                       'Choices: ${it.choiceNames!.join(", ")}',
                                                       style: GoogleFonts.poppins(
                                                         fontSize: 11,
-                                                        color: Colors.blue.shade900,
+                                                        color: AppColors.primary,
                                                         fontWeight: FontWeight.w500,
                                                       ),
                                                     ),
@@ -620,7 +616,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                         return [
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: _totalRow(method, _money(amount), color: Colors.blue.shade700),
+                            child: _totalRow(method, _money(amount), color: AppColors.primary),
                           ),
                           if (received > amount)
                             Padding(
@@ -639,7 +635,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                       _totalRow(
                         'Paid by',
                         (currentOrder.paymentmode ?? 'Cash').toUpperCase(),
-                        color: Colors.blue.shade700,
+                        color: AppColors.primary,
                       ),
                     ],
                   ],

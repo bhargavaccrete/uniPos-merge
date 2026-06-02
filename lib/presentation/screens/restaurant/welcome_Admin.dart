@@ -13,6 +13,7 @@ import '../../../domain/services/retail/store_settings_service.dart';
 import '../../../domain/store/restaurant/license_store.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../widget/componets/restaurant/componets/drawermanage.dart';
+import '../../widget/componets/common/primary_app_bar.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../util/common/app_responsive.dart';
 
@@ -165,112 +166,67 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       child: Scaffold(
       backgroundColor: AppColors.surfaceLight,
       drawer: DrawerManage(islogout: true, isDelete: false, issync: false),
-      body: Column(
-        children: [
-          // Header
-          Container(
-            padding: EdgeInsets.fromLTRB(isTablet ? 24 : 20, isTablet ? 20 : 16, isTablet ? 24 : 20, isTablet ? 20 : 16),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Dashboard',
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 22 : 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
             ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  Builder(
-                    builder: (context) {
-                      return GestureDetector(
-                        onTap: () => Scaffold.of(context).openDrawer(),
-                        child: Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(Icons.menu, color: AppColors.white, size: isTablet ? 26 : 24),
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            Text(
+              _storeName.isNotEmpty ? _storeName : 'Restaurant',
+              style: GoogleFonts.poppins(
+                fontSize: isTablet ? 14 : 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ValueListenableBuilder<String>(
+            valueListenable: RestaurantSession.loginTypeNotifier,
+            builder: (_, __, ___) {
+              final role = RestaurantSession.effectiveRole;
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(Icons.person, size: isTablet ? 18 : 16, color: Colors.white),
+                        SizedBox(width: 6),
                         Text(
-                          'Dashboard',
+                          role,
                           style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 22 : 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          _storeName.isNotEmpty ? _storeName : 'Restaurant',
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 14 : 13,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
+                            fontSize: isTablet ? 13 : 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  ValueListenableBuilder<String>(
-                    valueListenable: RestaurantSession.loginTypeNotifier,
-                    builder: (_, __, ___) {
-                      final role = RestaurantSession.effectiveRole;
-                      // final name = RestaurantSession.staffName;
-                      return Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.person, size: isTablet ? 18 : 16, color: AppColors.primary),
-                            SizedBox(width: 6),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  role,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: isTablet ? 13 : 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                // if (name != null && name.isNotEmpty)
-                                //   Text(
-                                //     name,
-                                //     style: GoogleFonts.poppins(
-                                //       fontSize: isTablet ? 11 : 10,
-                                //       color: AppColors.primary.withOpacity(0.7),
-                                //     ),
-                                //   ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
-
+        ],
+      ),
+      body: Column(
+          children: [
           // License expiry warning banner (7 days or less remaining)
           Observer(
             builder: (_) {
@@ -415,18 +371,18 @@ class _AdminWelcomeState extends State<AdminWelcome> {
               ),
             ),
 
-          SizedBox(height: 8),
-
           // Content
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isDesktop ? 28 : isTablet ? 24 : 16),
+              padding: EdgeInsets.fromLTRB(
+                isDesktop ? 28 : isTablet ? 24 : 16,
+                isDesktop ? 12 : isTablet ? 8 : 4,
+                isDesktop ? 28 : isTablet ? 24 : 16,
+                isDesktop ? 28 : isTablet ? 24 : 16,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
-
-                  SizedBox(height: isTablet ? 24 : 20),
                   // Menu Grid
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -456,8 +412,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
               ),
             ),
           ),
-        ],
-      ),
+          ],
+        ), // Column / body
       ), // PopScope closing
     );
   }

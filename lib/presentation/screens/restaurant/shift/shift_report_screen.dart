@@ -11,6 +11,7 @@ import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/domain/services/common/report_export_service.dart';
 
 class ShiftReportScreen extends StatefulWidget {
@@ -184,13 +185,40 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   @override
   Widget build(BuildContext context) {
     final currency = CurrencyHelper.currentSymbol;
-    final isTablet = AppResponsive.isTablet(context) || AppResponsive.isDesktop(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Shift Report',
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 20)),
+            Observer(builder: (_) {
+              final openCount = shiftStore.shifts.where((s) => s.isOpen).length;
+              return Text(
+                openCount > 0
+                    ? '$openCount shift${openCount > 1 ? 's' : ''} currently active'
+                    : 'No active shifts',
+                style: GoogleFonts.poppins(
+                    color: Colors.white70, fontSize: 12),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: () => _doExport(context),
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          _buildHeader(context, isTablet),
           _buildSearchBar(context),
           _buildFilterChips(context),
           Observer(builder: (_) {
@@ -223,87 +251,6 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ── Header ────────────────────────────────────────────────────────────────
-
-  Widget _buildHeader(BuildContext context, bool isTablet) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: AppResponsive.shadowBlurRadius(context),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                ),
-                child: Icon(Icons.arrow_back,
-                    color: Colors.white, size: AppResponsive.iconSize(context)),
-              ),
-            ),
-            SizedBox(width: AppResponsive.mediumSpacing(context)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Shift Report',
-                      style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.headingFontSize(context),
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary)),
-                  Observer(builder: (_) {
-                    final openCount =
-                        shiftStore.shifts.where((s) => s.isOpen).length;
-                    return Text(
-                      openCount > 0
-                          ? '$openCount shift${openCount > 1 ? 's' : ''} currently active'
-                          : 'No active shifts',
-                      style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          color: openCount > 0 ? Colors.green : AppColors.textSecondary),
-                    );
-                  }),
-                ],
-              ),
-            ),
-            SizedBox(width: AppResponsive.mediumSpacing(context)),
-            GestureDetector(
-              onTap: () => _doExport(context),
-              child: Container(
-                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                ),
-                child: Icon(Icons.file_download_outlined,
-                    color: AppColors.primary,
-                    size: AppResponsive.iconSize(context)),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

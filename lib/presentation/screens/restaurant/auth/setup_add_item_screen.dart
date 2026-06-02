@@ -16,12 +16,13 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/category_management_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/import/bulk_import_test_screen_v3.dart';
+import 'package:unipos/presentation/screens/restaurant/import/bulk_import_screen.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/setup_items_list_screen.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_item_form_state.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/widgets/category_selector_button.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/widgets/selling_method_selector.dart';
@@ -613,22 +614,20 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: Colors.white,
-      elevation: 1,
+    return buildPrimaryAppBar(
       leading: widget.onPrevious != null
           ? IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              icon: const Icon(Icons.arrow_back),
               onPressed: widget.onPrevious,
             )
           : null,
-      title: widget.onNext != null ? null : Column(
+      titleWidget: widget.onNext != null ? null : Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Add Menu Items',
             style: GoogleFonts.poppins(
-              color: Colors.black,
+              color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -637,7 +636,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             Text(
               '$_totalItemsInDatabase item${_totalItemsInDatabase > 1 ? 's' : ''} in database',
               style: GoogleFonts.poppins(
-                color: Colors.green,
+                color: Colors.white70,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -646,13 +645,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.upload_file, color: AppColors.primary),
+          icon: const Icon(Icons.upload_file),
           tooltip: 'Bulk Import',
           onPressed: () async {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const BulkImportTestScreenV3(),
+                builder: (context) => const RestaurantBulkImportScreen(),
               ),
             );
             // Reload item count after bulk import
@@ -792,7 +791,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const BulkImportTestScreenV3(),
+                        builder: (context) => const RestaurantBulkImportScreen(),
                       ),
                     );
                     // Reload item count after bulk import

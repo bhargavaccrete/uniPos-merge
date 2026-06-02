@@ -8,6 +8,7 @@ import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final RestaurantCustomer customer;
@@ -164,18 +165,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Customer Details',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Customer Details',
         actions: [
           IconButton(
             icon: Icon(

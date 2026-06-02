@@ -12,6 +12,7 @@ import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 
 class ManageInventory extends StatefulWidget {
@@ -580,29 +581,17 @@ class _ManageInventoryState extends State<ManageInventory> {
         isDelete: true,
         islogout: true,
       ),
+      appBar: buildPrimaryAppBar(
+        title: 'Inventory',
+        leading: Builder(
+          builder: (context) => IconButton(
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu),
+          ),
+        ),
+      ),
       body: Column(
         children: [
-          // Header
-          Container(
-            padding: EdgeInsets.fromLTRB(12, 16, 20, 12),
-            color: AppColors.white,
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  Builder(
-                    builder: (context) => IconButton(
-                      onPressed: () => Scaffold.of(context).openDrawer(),
-                      icon: Icon(Icons.menu, size: 24),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Text('Inventory', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                ],
-              ),
-            ),
-          ),
-
           // Search
           Container(
             color: AppColors.white,

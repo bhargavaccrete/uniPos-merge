@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/Blutooth.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/usb.dart';
 import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/wifi.dart';
-import 'package:unipos/util/color.dart';
 class AddPrinter extends StatefulWidget {
   const AddPrinter({super.key});
 
@@ -27,39 +27,38 @@ class _AddPrinterState extends State<AddPrinter> with SingleTickerProviderStateM
   }
   @override
   Widget build(BuildContext context) {
-
-    final height = MediaQuery.of(context).size.height * 1;
-    final width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
-        title: Text('Printer Setting',style:GoogleFonts.poppins()),
-        leading: BackButton(),
+        backgroundColor: AppColors.primary,
+        surfaceTintColor: AppColors.primary,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: const BackButton(color: Colors.white),
         centerTitle: true,
-        bottom: PreferredSize(preferredSize: Size.fromHeight(40),
-
-            child: Container(
-
-              width: width * 0.7,
-              child: TabBar(
-                  controller: tabController,
-                  dividerColor: Colors.transparent,
-                  unselectedLabelColor: Colors.grey.shade400,
-                  indicatorColor: Colors.red,
-                  indicator:  UnderlineTabIndicator(
-                      borderSide: BorderSide(width: 3.0 ,color: AppColors.primary)
-                  ),
-                  tabs:[
-                    Tab(
-                      text: "WIFI/LAN",
-                    ),
-                    Tab(
-                      text: "Blutooth",
-                    ),
-                    Tab(
-                      text: "USB",
-                    )
-                  ] ),
-            )),
+        title: Text(
+          'Printer Setting',
+          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(46),
+          child: TabBar(
+            controller: tabController,
+            dividerColor: Colors.transparent,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
+            indicatorWeight: 3,
+            labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13),
+            unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w400, fontSize: 13),
+            tabs: const [
+              Tab(text: 'WIFI/LAN'),
+              Tab(text: 'Bluetooth'),
+              Tab(text: 'USB'),
+            ],
+          ),
+        ),
       ),
       body: TabBarView(
           controller: tabController,
@@ -68,7 +67,6 @@ class _AddPrinterState extends State<AddPrinter> with SingleTickerProviderStateM
             Bluthooth(),
             Usb()
           ]),
-
     );
   }
 }

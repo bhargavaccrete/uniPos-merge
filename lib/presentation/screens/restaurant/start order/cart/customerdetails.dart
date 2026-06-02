@@ -28,6 +28,7 @@ import '../startorder.dart';
 import '../../util/restaurant_print_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 enum DiscountType { amount, percentage }
 
 class Customerdetails extends StatefulWidget {
@@ -219,19 +220,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        automaticallyImplyLeading: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Customer Details',
-          style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      appBar: buildPrimaryAppBar(
+        title: 'Customer Details',
+        titleFontSize: isTablet ? 22 : 20,
         centerTitle: true,
       ),
       body: Column(

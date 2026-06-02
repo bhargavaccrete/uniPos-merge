@@ -10,6 +10,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import '../../../widget/componets/common/primary_app_bar.dart';
 import 'apply_tax_screen.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 
@@ -140,18 +141,9 @@ class _AddtaxState extends State<Addtax> {
 
     return Scaffold(
         backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.white,
-          iconTheme: IconThemeData(color: Colors.black87),
-          title: Text(
-            'Manage Taxes',
-            style: GoogleFonts.poppins(
-              fontSize: isTablet ? 22 : 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
+        appBar: buildPrimaryAppBar(
+          title: 'Manage Taxes',
+          titleFontSize: isTablet ? 22 : 20,
           actions: [
             Padding(
               padding: EdgeInsets.symmetric(
@@ -163,13 +155,13 @@ class _AddtaxState extends State<Addtax> {
                   Container(
                     padding: EdgeInsets.all(isTablet ? 10 : 8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       Icons.person,
                       size: isTablet ? 22 : 20,
-                      color: AppColors.primary,
+                      color: Colors.white,
                     ),
                   ),
                   if (isTablet) ...[
@@ -179,7 +171,7 @@ class _AddtaxState extends State<Addtax> {
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: Colors.white,
                       ),
                     ),
                   ],

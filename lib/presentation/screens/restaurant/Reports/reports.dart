@@ -5,6 +5,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/customer%20list%2
 import 'package:unipos/presentation/screens/restaurant/Reports/expenseReport/expensereport.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../core/routes/routes_name.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -73,32 +74,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Header
-          Container(
-            padding: EdgeInsets.fromLTRB(4, 8, 16, 8),
-            color: AppColors.white,
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.arrow_back, size: 22),
-                  ),
-                  SizedBox(width: 4),
-                  Text('Reports', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                ],
-              ),
-            ),
-          ),
-
-          SizedBox(height: 8),
-
-          // Reports Grid
-          Expanded(
-            child: SingleChildScrollView(
+      appBar: buildPrimaryAppBar(title: 'Reports'),
+      body: SingleChildScrollView(
               padding: AppResponsive.padding(context),
               child: GridView.count(
                     shrinkWrap: true,
@@ -251,9 +228,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ],
                   ),
             ),
-          ),
-        ],
-      ),
     );
   }
 }

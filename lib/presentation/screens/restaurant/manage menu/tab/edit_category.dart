@@ -7,6 +7,7 @@ import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 class EditCategory extends StatefulWidget {
   final Category category;
@@ -69,21 +70,12 @@ class _EditCategoryState extends State<EditCategory> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        elevation: 1,
+      appBar: buildPrimaryAppBar(
+        title: 'Edit Category',
+        titleFontSize: 18,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-
-          'Edit Category',
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
       body: SingleChildScrollView(

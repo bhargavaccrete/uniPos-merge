@@ -1,43 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service_v3.dart';
+import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
-/// Test screen for V3 Bulk Import with Phase 1 improvements
-class BulkImportTestScreenV3 extends StatefulWidget {
-  const BulkImportTestScreenV3({Key? key}) : super(key: key);
+/// Bulk import items into the menu from an Excel spreadsheet.
+class RestaurantBulkImportScreen extends StatefulWidget {
+  const RestaurantBulkImportScreen({Key? key}) : super(key: key);
 
   @override
-  State<BulkImportTestScreenV3> createState() => _BulkImportTestScreenV3State();
+  State<RestaurantBulkImportScreen> createState() => _RestaurantBulkImportScreenState();
 }
 
-class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
-  final RestaurantBulkImportServiceV3 _importService = RestaurantBulkImportServiceV3();
+class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen> {
+  final RestaurantBulkImportService _importService = RestaurantBulkImportService();
 
   bool _isLoading = false;
   String _statusMessage = '';
   int _progressCurrent = 0;
   int _progressTotal = 100;
-  ImportResultV3? _lastResult;
+  ImportResult? _lastResult;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.black87),
-        title: Text(
-          'Bulk Import',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.headingFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Bulk Import',
+        titleFontSize: AppResponsive.headingFontSize(context),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -49,10 +41,10 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Card
+            // Hero intro
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.white,
                 borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                 boxShadow: [
                   BoxShadow(
@@ -64,40 +56,45 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
               ),
               child: Padding(
                 padding: AppResponsive.cardPadding(context),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                          ),
-                          child: Icon(
-                            Icons.rocket_launch,
-                            color: AppColors.primary,
-                            size: AppResponsive.iconSize(context),
-                          ),
-                        ),
-                        SizedBox(width: AppResponsive.mediumSpacing(context)),
-                        Text(
-                          'Enhanced Features',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.subheadingFontSize(context),
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                    Container(
+                      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                      ),
+                      child: Icon(
+                        Icons.upload_file_rounded,
+                        color: AppColors.primary,
+                        size: AppResponsive.largeIconSize(context),
+                      ),
                     ),
-                    SizedBox(height: AppResponsive.mediumSpacing(context)),
-                    _buildFeatureLine(context, Icons.check_circle, 'Row-level validation'),
-                    _buildFeatureLine(context, Icons.check_circle, 'Auto-category creation'),
-                    _buildFeatureLine(context, Icons.check_circle, 'In-memory caching'),
-                    _buildFeatureLine(context, Icons.check_circle, 'Image URL download'),
-                    _buildFeatureLine(context, Icons.check_circle, 'Progress callbacks'),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Import items from Excel',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: AppResponsive.smallSpacing(context) / 2),
+                          Text(
+                            'Add your whole menu at once. Categories are created automatically as needed.',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -160,7 +157,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
             if (_isLoading) ...[
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.white,
                   borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                   boxShadow: [
                     BoxShadow(
@@ -191,7 +188,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w500,
-                          color: Colors.black87,
+                          color: AppColors.textPrimary,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -217,7 +214,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.white,
                     borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     boxShadow: [
                       BoxShadow(
@@ -259,7 +256,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
                               style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.subheadingFontSize(context),
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],
@@ -269,13 +266,17 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
                           thickness: 1,
                           color: AppColors.divider,
                         ),
-                        Text(
-                          _lastResult!.getSummary(),
-                          style: GoogleFonts.robotoMono(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
+                        _buildResultItem(context, Icons.inventory_2_rounded, 'Items Imported',
+                            '${_lastResult!.itemsImported}', AppColors.primary),
+                        if (_lastResult!.categoriesAutoCreated > 0)
+                          _buildResultItem(context, Icons.category_rounded, 'Categories Created',
+                              '${_lastResult!.categoriesAutoCreated}', AppColors.success),
+                        if (_lastResult!.imagesDownloaded > 0)
+                          _buildResultItem(context, Icons.image_rounded, 'Images Downloaded',
+                              '${_lastResult!.imagesDownloaded}', AppColors.info),
+                        if (_lastResult!.failedRows.isNotEmpty)
+                          _buildResultItem(context, Icons.error_outline_rounded, 'Failed Rows',
+                              '${_lastResult!.failedRows.length}', AppColors.danger),
                       ],
                     ),
                   ),
@@ -319,7 +320,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
                                 style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.subheadingFontSize(context),
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -370,34 +371,6 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
     );
   }
 
-  Widget _buildFeatureLine(BuildContext context, IconData icon, String text) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: AppResponsive.smallSpacing(context),
-        top: AppResponsive.smallSpacing(context),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: AppResponsive.smallIconSize(context),
-            color: AppColors.success,
-          ),
-          SizedBox(width: AppResponsive.smallSpacing(context)),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildInstructionStep(
     BuildContext context,
     String number,
@@ -437,7 +410,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 SizedBox(height: AppResponsive.smallSpacing(context) / 2),
@@ -502,7 +475,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
 
     try {
       // Create service with progress callback
-      final serviceWithProgress = RestaurantBulkImportServiceV3(
+      final serviceWithProgress = RestaurantBulkImportService(
         onProgress: (current, total, message) {
           if (mounted) {
             setState(() {
@@ -555,7 +528,7 @@ class _BulkImportTestScreenV3State extends State<BulkImportTestScreenV3> {
     }
   }
 
-  void _showResultDialog(ImportResultV3 result) {
+  void _showResultDialog(ImportResult result) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
