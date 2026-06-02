@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobx/mobx.dart';
 import '../../../data/models/restaurant/license_model.dart';
 import '../../../domain/services/common/device_payload_service.dart';
@@ -20,9 +21,17 @@ abstract class _LicenseStore with Store {
   static const _tokenKey = 'unipos_license_token';
   static const _deviceIdKey = '_stored_device_id';
   static const _pendingKeyStorageKey = 'unipos_pending_license_key';
+  // Temporary bypass flag (e.g. web where activation is unavailable). Stored in
+  // SharedPreferences so it works on web (secure storage is unreliable there).
+  static const _bypassKey = 'unipos_license_bypass';
   static const _storage = FlutterSecureStorage();
 
   Timer? _heartbeatTimer;
+
+  /// When true, the app behaves as licensed without an actual activation.
+  /// Set via [skipLicense]; cleared via [clearBypass].
+  @observable
+  bool licenseBypassed = false;
 
   @observable
   LicenseInfo? licenseInfo;
@@ -38,7 +47,8 @@ abstract class _LicenseStore with Store {
       licenseInfo?.status ?? LicenseStatus.notActivated;
 
   @computed
-  bool get isLicensed => licenseInfo?.isValidLocally ?? false;
+  bool get isLicensed =>
+      licenseBypassed || (licenseInfo?.isValidLocally ?? false);
 
   @computed
   bool get isExpiringSoon =>
@@ -74,8 +84,41 @@ abstract class _LicenseStore with Store {
 
   // ── Load & Validate ───────────────────────────────────────────────────────
 
+  // ── License bypass (skip) ─────────────────────────────────────────────────
+
+  /// Loads the persisted bypass flag. Call at startup before guarding routes.
+  @action
+  Future<void> loadBypassFlag() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      licenseBypassed = prefs.getBool(_bypassKey) ?? false;
+    } catch (_) {}
+  }
+
+  /// Bypass the license requirement so the app is not locked. Persists across
+  /// restarts. Used as a temporary "Skip for now" escape hatch.
+  @action
+  Future<void> skipLicense() async {
+    licenseBypassed = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_bypassKey, true);
+    } catch (_) {}
+  }
+
+  /// Re-enables the license gate (clears the skip).
+  @action
+  Future<void> clearBypass() async {
+    licenseBypassed = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_bypassKey);
+    } catch (_) {}
+  }
+
   @action
   Future<void> loadCachedLicense() async {
+    await loadBypassFlag();
     try {
       final rawToken = await _storage.read(key: _tokenKey);
       if (rawToken == null) return;

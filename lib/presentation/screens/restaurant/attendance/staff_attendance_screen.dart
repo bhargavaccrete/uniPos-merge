@@ -46,7 +46,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
         builder: (context, setDialogState) {
           return AlertDialog(
             insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context))),
             title: Text('Enter PIN for ${staff.firstName}',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             content: Column(
@@ -64,8 +64,8 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscureText ? Icons.visibility_off : Icons.visibility,
-                      size: 20,
-                      color: Colors.grey.shade600,
+                      size: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0),
+                      color: AppColors.textSecondary,
                     ),
                     onPressed: () => setDialogState(() => _obscureText = !_obscureText),
                   ),
@@ -75,7 +75,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                     padding: const EdgeInsets.only(top: 4, left: 4),
                     child: Text(
                       'Incorrect PIN',
-                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.red.shade600),
+                      style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: Colors.red.shade600),
                     ),
                   ),
               ],
@@ -83,12 +83,12 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+                child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context))),
                 ),
                 onPressed: () {
                   if (RestaurantAuthHelper.verifyPassword(pinController.text.trim(), staff.pinNo.trim())) {
@@ -169,7 +169,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Staff Attendance',
         centerTitle: true,
@@ -200,7 +200,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
         if (allStaff.isEmpty) {
           return Center(
             child: Text('No staff found',
-                style: GoogleFonts.poppins(color: Colors.grey.shade500)),
+                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
           );
         }
 
@@ -218,7 +218,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -249,12 +249,12 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                   return Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                       border: Border.all(
-                        color: isOnBreak 
+                        color: isOnBreak
                             ? Colors.blue.shade200
-                            : (isIn ? Colors.green.shade200 : Colors.grey.shade200),
+                            : (isIn ? Colors.green.shade200 : AppColors.divider),
                         width: 1.2,
                       ),
                     ),
@@ -265,9 +265,9 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: isOnBreak 
+                            color: isOnBreak
                                 ? Colors.blue.shade50
-                                : (isIn ? Colors.green.shade50 : Colors.grey.shade100),
+                                : (isIn ? Colors.green.shade50 : AppColors.surfaceMedium),
                             shape: BoxShape.circle,
                           ),
                           child: Center(
@@ -276,11 +276,11 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                                   ? staff.firstName[0].toUpperCase()
                                   : '?',
                               style: GoogleFonts.poppins(
-                                fontSize: 18,
+                                fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.0, desktop: 20.0),
                                 fontWeight: FontWeight.w700,
-                                color: isOnBreak 
+                                color: isOnBreak
                                     ? Colors.blue.shade700
-                                    : (isIn ? Colors.green.shade700 : Colors.grey.shade600),
+                                    : (isIn ? Colors.green.shade700 : AppColors.textSecondary),
                               ),
                             ),
                           ),
@@ -294,17 +294,17 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                             children: [
                               Text(fullName,
                                   style: GoogleFonts.poppins(
-                                      fontSize: 14, fontWeight: FontWeight.w600)),
+                                      fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w600)),
                               Text(staff.isCashier,
                                   style: GoogleFonts.poppins(
-                                      fontSize: 11, color: Colors.grey.shade500)),
+                                      fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: AppColors.textSecondary)),
                               if (isIn)
                                 Text(
                                   isOnBreak 
                                       ? 'On Break • Worked ${_liveDuration(openRecord)}'
                                       : 'In since ${openRecord.formattedClockIn}  •  ${_liveDuration(openRecord)}',
                                   style: GoogleFonts.poppins(
-                                      fontSize: 11, color: isOnBreak ? Colors.blue.shade700 : Colors.green.shade700),
+                                      fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: isOnBreak ? Colors.blue.shade700 : Colors.green.shade700),
                                 ),
                             ],
                           ),
@@ -330,12 +330,12 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                                           color: isOnBreak
                                               ? Colors.green.shade600
                                               : Colors.blue.shade600,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                                         ),
                                         child: Text(
                                           isOnBreak ? 'RESUME' : 'BREAK',
                                           style: GoogleFonts.poppins(
-                                            fontSize: 12,
+                                            fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                                             fontWeight: FontWeight.w700,
                                             color: Colors.white,
                                           ),
@@ -351,12 +351,12 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                                         color: isIn
                                             ? Colors.orange.shade600
                                             : Colors.green.shade600,
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                                       ),
                                       child: Text(
                                         isIn ? 'OUT' : 'IN',
                                         style: GoogleFonts.poppins(
-                                          fontSize: 13,
+                                          fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
                                           fontWeight: FontWeight.w700,
                                           color: Colors.white,
                                         ),
@@ -382,9 +382,9 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
       children: [
         Text(value,
             style: GoogleFonts.poppins(
-                fontSize: 22, fontWeight: FontWeight.w800, color: valueColor)),
+                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 23.0, desktop: 24.0), fontWeight: FontWeight.w800, color: valueColor)),
         Text(label,
-            style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70)),
+            style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: Colors.white70)),
       ],
     );
   }

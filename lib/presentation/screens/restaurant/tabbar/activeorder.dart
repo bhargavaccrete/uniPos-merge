@@ -231,7 +231,7 @@ class _ActiveorderState extends State<Activeorder> {
                       ),
                       IconButton(
                         onPressed: () => Navigator.pop(ctx, null),
-                        icon: Icon(Icons.close, size: 18, color: Colors.grey.shade500),
+                        icon: Icon(Icons.close, size: 18, color: AppColors.textSecondary),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -251,17 +251,17 @@ class _ActiveorderState extends State<Activeorder> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: selected ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade100,
+                            color: selected ? AppColors.primary.withOpacity(0.1) : AppColors.surfaceMedium,
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(
-                              color: selected ? AppColors.primary : Colors.grey.shade300,
+                              color: selected ? AppColors.primary : AppColors.divider,
                             ),
                           ),
                           child: Text(r,
                               style: GoogleFonts.poppins(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: selected ? AppColors.primary : Colors.grey.shade700,
+                                color: selected ? AppColors.primary : AppColors.textSecondary,
                               )),
                         ),
                       );
@@ -273,15 +273,15 @@ class _ActiveorderState extends State<Activeorder> {
                     onChanged: (_) => setDialog(() {}),
                     decoration: InputDecoration(
                       hintText: 'Or type a reason (optional)',
-                      hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade400),
+                      hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: AppColors.divider),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: AppColors.divider),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -300,11 +300,11 @@ class _ActiveorderState extends State<Activeorder> {
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            side: BorderSide(color: Colors.grey.shade300),
+                            side: BorderSide(color: AppColors.divider),
                           ),
                           child: Text('Cancel',
                               style: GoogleFonts.poppins(
-                                  fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey.shade700)),
+                                  fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -474,7 +474,7 @@ class _ActiveorderState extends State<Activeorder> {
                                       width: 8,
                                       height: 8,
                                       decoration: BoxDecoration(
-                                        color: _statusColors[overallStatus] ?? Colors.grey,
+                                        color: _statusColors[overallStatus] ?? AppColors.textSecondary,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -484,14 +484,14 @@ class _ActiveorderState extends State<Activeorder> {
                                       style: GoogleFonts.poppins(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w500,
-                                        color: _statusColors[overallStatus] ?? Colors.grey,
+                                        color: _statusColors[overallStatus] ?? AppColors.textSecondary,
                                       ),
                                     ),
                                     Text(
                                       '  •  ${order.kotNumbers.length} KOT${order.kotNumbers.length > 1 ? 's' : ''}',
                                       style: GoogleFonts.poppins(
                                         fontSize: 12,
-                                        color: Colors.grey.shade500,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   ],
@@ -501,7 +501,7 @@ class _ActiveorderState extends State<Activeorder> {
                           ),
                           IconButton(
                             onPressed: () => Navigator.pop(dialogContext),
-                            icon: Icon(Icons.close_rounded, color: Colors.grey.shade500, size: 22),
+                            icon: Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 22),
                           ),
                         ],
                       ),
@@ -570,7 +570,7 @@ class _ActiveorderState extends State<Activeorder> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade700,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -595,7 +595,7 @@ class _ActiveorderState extends State<Activeorder> {
                               final endIndex = order.kotBoundaries[kotIndex];
                               final itemCount = endIndex - startIndex;
                               final isServed = currentStatus == 'Served';
-                              final statusColor = _statusColors[currentStatus] ?? Colors.grey;
+                              final statusColor = _statusColors[currentStatus] ?? AppColors.textSecondary;
 
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -649,7 +649,7 @@ class _ActiveorderState extends State<Activeorder> {
                                                   '$itemCount item${itemCount > 1 ? 's' : ''}',
                                                   style: GoogleFonts.poppins(
                                                     fontSize: 12,
-                                                    color: Colors.grey.shade500,
+                                                    color: AppColors.textSecondary,
                                                   ),
                                                 ),
                                               ],
@@ -707,7 +707,7 @@ class _ActiveorderState extends State<Activeorder> {
                                                     decoration: BoxDecoration(
                                                       color: (isPast || isCurrent)
                                                           ? dotColor
-                                                          : Colors.grey.shade200,
+                                                          : AppColors.divider,
                                                       borderRadius: BorderRadius.circular(7),
                                                     ),
                                                     child: (isPast || isCurrent)
@@ -724,7 +724,7 @@ class _ActiveorderState extends State<Activeorder> {
                                                       height: 2,
                                                       color: isPast
                                                           ? dotColor.withValues(alpha: 0.5)
-                                                          : Colors.grey.shade200,
+                                                          : AppColors.divider,
                                                     ),
                                                 ],
                                               );
@@ -771,7 +771,7 @@ class _ActiveorderState extends State<Activeorder> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Divider(height: 16, color: Colors.grey.shade200),
+                                          Divider(height: 16, color: AppColors.divider),
                                           ...order.items.sublist(startIndex, endIndex).asMap().entries.map((e) {
                                             final item = e.value;
                                             return Padding(
@@ -838,13 +838,13 @@ class _ActiveorderState extends State<Activeorder> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            side: BorderSide(color: Colors.grey.shade300),
+                            side: BorderSide(color: AppColors.divider),
                           ),
                           child: Text(
                             'Close',
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -1161,7 +1161,7 @@ class _ActiveorderState extends State<Activeorder> {
                   leading: Icon(Icons.receipt_long, color: AppColors.info),
                   title: Text('KOT #$kotNum', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                   subtitle: Text('$itemCount items', style: GoogleFonts.poppins(fontSize: 12)),
-                  trailing: Icon(Icons.print, color: Colors.grey),
+                  trailing: Icon(Icons.print, color: AppColors.textSecondary),
                   onTap: () {
                     Navigator.pop(context);
                     RestaurantPrintHelper.printKOT(
@@ -1459,7 +1459,7 @@ class _ActiveorderState extends State<Activeorder> {
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w500,
                           fontSize: 28,
-                          color: Colors.grey.shade800,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     );

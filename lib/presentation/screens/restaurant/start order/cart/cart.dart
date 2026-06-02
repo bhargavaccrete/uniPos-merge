@@ -366,7 +366,7 @@ class _CartScreenState extends State<CartScreen>
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+                      child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
                     ),
                     TextButton(
                       onPressed: () { Navigator.pop(context); clearCart(); },
@@ -414,7 +414,7 @@ class _CartScreenState extends State<CartScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                     child: Row(
                       children: [
-                        Icon(Icons.receipt_long, color: Colors.grey.shade600, size: 14),
+                        Icon(Icons.receipt_long, color: AppColors.textSecondary, size: 14),
                         SizedBox(width: 4),
                         Expanded(
                           child: Wrap(
@@ -433,7 +433,7 @@ class _CartScreenState extends State<CartScreen>
                           ),
                         ),
                         if (widget.existingOrder!.orderType == 'Dine In' && widget.existingOrder!.tableNo != null && widget.existingOrder!.tableNo!.isNotEmpty) ...[
-                          Container(height: 16, width: 1, color: Colors.grey.shade300, margin: EdgeInsets.symmetric(horizontal: 8)),
+                          Container(height: 16, width: 1, color: AppColors.divider, margin: EdgeInsets.symmetric(horizontal: 8)),
                           Text(tableNo ?? widget.existingOrder!.tableNo!, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
                           SizedBox(width: 6),
                           InkWell(
@@ -507,17 +507,17 @@ class _CartScreenState extends State<CartScreen>
           margin: EdgeInsets.symmetric(horizontal: 3),
           padding: EdgeInsets.symmetric(vertical: AppResponsive.getValue(context, mobile: 10, tablet: 12)),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : Colors.grey.shade100,
+            color: isSelected ? AppColors.primary : AppColors.surfaceMedium,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: AppResponsive.getValue(context, mobile: 16, tablet: 18), color: isSelected ? Colors.white : Colors.grey.shade600),
+              Icon(icon, size: AppResponsive.getValue(context, mobile: 16, tablet: 18), color: isSelected ? Colors.white : AppColors.textSecondary),
               SizedBox(width: 6),
               Text(title, style: GoogleFonts.poppins(
                 fontSize: AppResponsive.getValue(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
               )),
             ],
           ),
@@ -531,9 +531,9 @@ class _CartScreenState extends State<CartScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.grey.shade300),
+          Icon(Icons.shopping_cart_outlined, size: 56, color: AppColors.divider),
           const SizedBox(height: 12),
-          Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade500)),
+          Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary)),
         ],
       ),
     );
@@ -632,7 +632,7 @@ class _CartScreenState extends State<CartScreen>
                                 'KOTs: ${order.kotNumbers.join(", ")}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 11,
-                                  color: Colors.grey.shade600,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],

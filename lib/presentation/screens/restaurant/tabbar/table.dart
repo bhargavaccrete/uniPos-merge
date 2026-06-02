@@ -112,7 +112,7 @@ class _TableScreenState extends State<TableScreen> {
               width: 40, height: 4,
               margin: EdgeInsets.only(top: 12, bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppColors.divider,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -184,18 +184,18 @@ class _TableScreenState extends State<TableScreen> {
               enabled: !isOccupied,
               leading: Icon(
                 Icons.delete_outline,
-                color: isOccupied ? Colors.grey.shade400 : AppColors.danger,
+                color: isOccupied ? AppColors.textSecondary : AppColors.danger,
               ),
               title: Text(
                 'Delete Table',
                 style: GoogleFonts.poppins(
-                  color: isOccupied ? Colors.grey.shade400 : AppColors.danger,
+                  color: isOccupied ? AppColors.textSecondary : AppColors.danger,
                 ),
               ),
               subtitle: isOccupied
                   ? Text(
                       'Cannot delete an occupied table',
-                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade400),
+                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                     )
                   : null,
               onTap: isOccupied

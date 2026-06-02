@@ -108,13 +108,11 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+  return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: "Apply ${widget.taxToApply.taxname}",
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           Observer(
             builder: (context) {
@@ -128,7 +126,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                     Text(
                       isAllSelected ? "Deselect All" : "Select All",
                       style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 14 : 13,
+                        fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
                       ),
@@ -164,22 +162,22 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: isTablet ? 80 : 64, color: Colors.grey.shade400),
-                  SizedBox(height: isTablet ? 20 : 16),
+                  Icon(Icons.inventory_2_outlined, size: AppResponsive.getValue(context, mobile: 64.0, tablet: 80.0, desktop: 96.0), color: AppColors.divider),
+                  SizedBox(height: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
                   Text(
                     'No items available',
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 18 : 16,
+                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0),
                       fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   SizedBox(height: 8),
                   Text(
                     'Add items to your menu first',
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 14 : 13,
-                      color: Colors.grey.shade500,
+                      fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -191,7 +189,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
             children: [
               Container(
                 color: Colors.white,
-                padding: EdgeInsets.all(isTablet ? 16 : 12),
+                padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
                 child: Row(
                   children: [
                     Expanded(
@@ -203,17 +201,17 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                           disabledBackgroundColor: Colors.grey.shade300,
                           elevation: 0,
                           padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
+                            vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        icon: Icon(Icons.check_circle_rounded, size: isTablet ? 20 : 18),
+                        icon: Icon(Icons.check_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                         label: Text(
                           "Apply ${widget.taxToApply.taxperecentage}% Tax",
                           style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 15 : 14,
+                            fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -229,17 +227,17 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                           disabledBackgroundColor: Colors.grey.shade300,
                           elevation: 0,
                           padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
+                            vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        icon: Icon(Icons.remove_circle_rounded, size: isTablet ? 20 : 18),
+                        icon: Icon(Icons.remove_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                         label: Text(
                           "Remove Tax",
                           style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 15 : 14,
+                            fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -250,25 +248,25 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
               ),
               Expanded(
                 child: ListView.builder(
-                  padding: EdgeInsets.all(isTablet ? 16 : 12),
+                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
                     final isSelected = _selectedItemIds.contains(item.id);
 
                     return Container(
-                      margin: EdgeInsets.only(bottom: isTablet ? 10 : 8),
+                      margin: EdgeInsets.only(bottom: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0)),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                         border: Border.all(
-                          color: isSelected ? AppColors.primary : Colors.grey.shade200,
+                          color: isSelected ? AppColors.primary : AppColors.divider,
                           width: isSelected ? 2 : 1,
                         ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 8,
+                            blurRadius: AppResponsive.shadowBlurRadius(context),
                             offset: Offset(0, 2),
                           ),
                         ],
@@ -279,8 +277,8 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                         activeColor: AppColors.primary,
                         controlAffinity: ListTileControlAffinity.leading,
                         contentPadding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 16 : 12,
-                          vertical: isTablet ? 10 : 8,
+                          horizontal: AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
+                          vertical: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
                         ),
                         title: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -290,8 +288,8 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                 item.name,
                                 style: GoogleFonts.poppins(
                                   fontWeight: FontWeight.w600,
-                                  fontSize: isTablet ? 17 : 16,
-                                  color: Colors.black87,
+                                  fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -304,16 +302,16 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                           : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}'
                                       : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}',
                               style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 16 : 15,
+                                fontSize: AppResponsive.getValue(context, mobile: 15.0, tablet: 16.0, desktop: 17.0),
                                 fontWeight: FontWeight.bold,
-                                color: item.taxRate != null ? Colors.green : Colors.black87,
+                                color: item.taxRate != null ? AppColors.success : AppColors.textPrimary,
                               ),
                             ),
                           ],
                         ),
                         subtitle: item.taxRate != null
                             ? Padding(
-                          padding: EdgeInsets.only(top: isTablet ? 10 : 8),
+                          padding: EdgeInsets.only(top: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -323,15 +321,15 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.1),
+                                  color: AppColors.info.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   "Tax Applied: ${item.taxRate! > 1 ? DecimalSettings.formatAmount(item.taxRate!) : DecimalSettings.formatAmount(item.taxRate! * 100)}%",
                                   style: GoogleFonts.poppins(
                                     fontWeight: FontWeight.w600,
-                                    fontSize: isTablet ? 13 : 12,
-                                    color: Colors.blue,
+                                    fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
+                                    color: AppColors.info,
                                   ),
                                 ),
                               ),
@@ -342,15 +340,15 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                   Text(
                                     "Tax Amount:",
                                     style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 13 : 12,
-                                      color: Colors.grey.shade600,
+                                      fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                   Text(
                                     "Net Amount:",
                                     style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 13 : 12,
-                                      color: Colors.grey.shade600,
+                                      fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -366,9 +364,9 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                             ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.taxAmount)}'
                                             : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * item.taxRate!)}',
                                     style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 14 : 13,
+                                      fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.green,
+                                      color: AppColors.success,
                                     ),
                                   ),
                                   Text(
@@ -379,8 +377,8 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                                             : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * (1 + item.taxRate!))}',
                                     style: GoogleFonts.poppins(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: isTablet ? 15 : 14,
-                                      color: Colors.black87,
+                                      fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ],
@@ -393,8 +391,8 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                           child: Text(
                             "No tax applied",
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 13 : 12,
-                              color: Colors.grey.shade500,
+                              fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
+                              color: AppColors.textSecondary,
                               fontStyle: FontStyle.italic,
                             ),
                           ),

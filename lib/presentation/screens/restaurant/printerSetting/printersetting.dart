@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -7,6 +6,7 @@ import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 /// Printer Settings screen — shows saved printers, allows managing defaults,
 /// and provides navigation to add new printers and customize receipts.
@@ -32,15 +32,9 @@ class _PrintersettingState extends State<Printersetting> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        surfaceTintColor: AppColors.primary,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: const BackButton(color: Colors.white),
-        title: Text('Printer Settings',
-            style: GoogleFonts.poppins(fontSize: 20, color: Colors.white, fontWeight: FontWeight.w600)),
+      appBar: buildPrimaryAppBar(
+        title: 'Printer Settings',
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           // Customize receipt fields button
           TextButton.icon(
@@ -196,7 +190,7 @@ class _PrintersettingState extends State<Printersetting> {
               child: Column(
                 children: [
                   Icon(Icons.print_disabled,
-                      size: 48, color: Colors.grey.shade300),
+                      size: 48, color: AppColors.divider),
                   const SizedBox(height: 12),
                   Text('No Printers Saved',
                       style: GoogleFonts.poppins(

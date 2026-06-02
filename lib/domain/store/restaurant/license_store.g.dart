@@ -86,6 +86,46 @@ mixin _$LicenseStore on _LicenseStore, Store {
     });
   }
 
+  late final _$licenseBypassedAtom =
+      Atom(name: '_LicenseStore.licenseBypassed', context: context);
+
+  @override
+  bool get licenseBypassed {
+    _$licenseBypassedAtom.reportRead();
+    return super.licenseBypassed;
+  }
+
+  @override
+  set licenseBypassed(bool value) {
+    _$licenseBypassedAtom.reportWrite(value, super.licenseBypassed, () {
+      super.licenseBypassed = value;
+    });
+  }
+
+  late final _$loadBypassFlagAsyncAction =
+      AsyncAction('_LicenseStore.loadBypassFlag', context: context);
+
+  @override
+  Future<void> loadBypassFlag() {
+    return _$loadBypassFlagAsyncAction.run(() => super.loadBypassFlag());
+  }
+
+  late final _$skipLicenseAsyncAction =
+      AsyncAction('_LicenseStore.skipLicense', context: context);
+
+  @override
+  Future<void> skipLicense() {
+    return _$skipLicenseAsyncAction.run(() => super.skipLicense());
+  }
+
+  late final _$clearBypassAsyncAction =
+      AsyncAction('_LicenseStore.clearBypass', context: context);
+
+  @override
+  Future<void> clearBypass() {
+    return _$clearBypassAsyncAction.run(() => super.clearBypass());
+  }
+
   late final _$loadCachedLicenseAsyncAction =
       AsyncAction('_LicenseStore.loadCachedLicense', context: context);
 
@@ -165,6 +205,7 @@ mixin _$LicenseStore on _LicenseStore, Store {
   @override
   String toString() {
     return '''
+licenseBypassed: ${licenseBypassed},
 licenseInfo: ${licenseInfo},
 isLoading: ${isLoading},
 errorMessage: ${errorMessage},

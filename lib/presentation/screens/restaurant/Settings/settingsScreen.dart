@@ -169,22 +169,23 @@ class _settingsScreenState extends State<Settingsscreen> {
     );
   }
 
-  Widget _sectionCard(List<Widget> children) {
+  Widget _sectionCard(BuildContext context, List<Widget> children) {
+    final radius = AppResponsive.borderRadius(context);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppColors.divider),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(radius),
         child: Column(children: children),
       ),
     );
@@ -320,24 +321,6 @@ class _settingsScreenState extends State<Settingsscreen> {
       appBar: buildPrimaryAppBar(
         title: 'Settings',
         titleFontSize: AppResponsive.headingFontSize(context),
-        actions: [
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.mediumSpacing(context),
-              vertical: 8,
-            ),
-            child: Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Icon(Icons.person_rounded,
-                  size: AppResponsive.iconSize(context),
-                  color: AppColors.primary),
-            ),
-          ),
-        ],
       ),
       drawer:
           DrawerManage(issync: false, isDelete: true, islogout: true),
@@ -356,7 +339,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
             // ── 1. Account & Security ───────────────────────────────────
             _sectionHeader(context, 'Account & Security', Icons.security_rounded),
-            _sectionCard([
+            _sectionCard(context, [
               _navTile(
                 context,
                 'Password Change',
@@ -449,7 +432,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
             // ── 2. Display ──────────────────────────────────────────────
             _sectionHeader(context, 'Display', Icons.palette_outlined),
-            _sectionCard([
+            _sectionCard(context, [
               ValueListenableBuilder<String>(
                 valueListenable: CurrencyHelper.currencyNotifier,
                 builder: (context, _, __) => _expandableTile(
@@ -526,7 +509,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
             // ── 3. Orders & Payments ────────────────────────────────────
             _sectionHeader(context, 'Orders & Payments', Icons.shopping_bag_outlined),
-            _sectionCard([
+            _sectionCard(context, [
               _navTile(
                 context,
                 'Payment Methods',
@@ -607,7 +590,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
             // ── 4. Staff & Shifts ───────────────────────────────────────
             _sectionHeader(context, 'Staff & Shifts', Icons.people_rounded),
-            _sectionCard([
+            _sectionCard(context, [
               ValueListenableBuilder<int>(
                 valueListenable: RestaurantSession.timeoutMinutesNotifier,
                 builder: (context, minutes, __) => _expandableTile(
@@ -638,7 +621,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
             // ── 5. Backup ───────────────────────────────────────────────
             _sectionHeader(context, 'Backup', Icons.backup_rounded),
-            _sectionCard([
+            _sectionCard(context, [
               SwitchListTile(
                 contentPadding: EdgeInsets.symmetric(
                     horizontal: AppResponsive.largeSpacing(context),
@@ -646,13 +629,13 @@ class _settingsScreenState extends State<Settingsscreen> {
                 secondary: Container(
                   padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                   decoration: BoxDecoration(
-                    color: (_backupEnabled ? Colors.green : Colors.grey)
+                    color: (_backupEnabled ? Colors.green : AppColors.textSecondary)
                         .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                   ),
                   child: Icon(Icons.backup_rounded,
                       size: AppResponsive.iconSize(context),
-                      color: _backupEnabled ? Colors.green : Colors.grey),
+                      color: _backupEnabled ? Colors.green : AppColors.textSecondary),
                 ),
                 title: Text('Daily Backup Reminder',
                     style: GoogleFonts.poppins(
@@ -677,7 +660,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
             // ── 6. License & Subscription ───────────────────────────────
             _sectionHeader(context, 'License & Subscription', Icons.verified_outlined),
-            _sectionCard([
+            _sectionCard(context, [
               _navTile(
                 context,
                 'License Management',
@@ -696,7 +679,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
             // ── 7. Developer ────────────────────────────────────────────
             _sectionHeader(context, 'Developer', Icons.code_rounded),
-            _sectionCard([
+            _sectionCard(context, [
               _navTile(
                 context,
                 'Performance Test Data Generator',
@@ -718,7 +701,7 @@ class _settingsScreenState extends State<Settingsscreen> {
 
   Widget _buildDeviceIdCard(BuildContext context) {
     final id = _deviceIdResult?.id ?? 'Loading...';
-    return _sectionCard([
+    return _sectionCard(context, [
       Padding(
         padding: EdgeInsets.symmetric(
             horizontal: AppResponsive.largeSpacing(context),

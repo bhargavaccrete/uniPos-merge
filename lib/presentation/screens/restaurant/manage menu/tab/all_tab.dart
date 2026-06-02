@@ -6,6 +6,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/images.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -61,12 +62,12 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
     final height = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
           // Modern Search Bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.padding(context),
             child: AppTextField(
               controller: searchController,
               hint: 'Search categories or items…',
@@ -157,7 +158,7 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                     }
 
                     return ListView.builder(
-                      padding: EdgeInsets.all(16),
+                      padding: AppResponsive.padding(context),
                       itemCount: filtercat.length,
                       itemBuilder: (context, index) {
                         final cat = filtercat[index];
@@ -170,11 +171,11 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
 
                         return Card(
                           key: _categoryKeys[cat.id],
-                          margin: EdgeInsets.only(bottom: 12),
+                          margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
                           elevation: 2,
                           color: AppColors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                           ),
                           child: Theme(
                             data: Theme.of(context).copyWith(
@@ -183,15 +184,15 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                             child: ExpansionTile(
                               childrenPadding: EdgeInsets.only(bottom: 12),
                               leading: Container(
-                                padding: EdgeInsets.all(10),
+                                padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                                 decoration: BoxDecoration(
                                   color: AppColors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                                 ),
                                 child: Icon(
                                   Icons.restaurant_menu,
                                   color: AppColors.primary,
-                                  size: 24,
+                                  size: AppResponsive.iconSize(context),
                                 ),
                               ),
                               title: Row(
@@ -200,9 +201,9 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                                     child: Text(
                                       cat.name,
                                       style: GoogleFonts.poppins(
-                                        fontSize: 16,
+                                        fontSize: AppResponsive.bodyFontSize(context),
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                   ),
@@ -259,8 +260,8 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                               subtitle: Text(
                                 '${items.length} items',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
+                                  fontSize: AppResponsive.smallFontSize(context),
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                               children: items.isEmpty
@@ -288,14 +289,14 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                                         margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         decoration: BoxDecoration(
                                           color: AppColors.white,
-                                          borderRadius: BorderRadius.circular(14),
+                                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                                           border: Border.all(
                                             color: AppColors.divider.withOpacity(0.5),
                                           ),
                                           boxShadow: [
                                             BoxShadow(
                                               color: Colors.black.withOpacity(0.03),
-                                              blurRadius: 8,
+                                              blurRadius: AppResponsive.shadowBlurRadius(context),
                                               offset: Offset(0, 2),
                                             ),
                                           ],
@@ -335,7 +336,7 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                                                           maxLines: 1,
                                                           overflow: TextOverflow.ellipsis,
                                                           style: GoogleFonts.poppins(
-                                                            fontSize: 15,
+                                                            fontSize: AppResponsive.bodyFontSize(context),
                                                             fontWeight: FontWeight.w600,
                                                             color: AppColors.textPrimary,
                                                           ),

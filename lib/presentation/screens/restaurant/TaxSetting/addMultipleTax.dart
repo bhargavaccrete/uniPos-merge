@@ -140,45 +140,10 @@ class _AddtaxState extends State<Addtax> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: AppColors.surfaceLight,
         appBar: buildPrimaryAppBar(
           title: 'Manage Taxes',
-          titleFontSize: isTablet ? 22 : 20,
-          actions: [
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 16 : 12,
-                vertical: 8,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(isTablet ? 10 : 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      size: isTablet ? 22 : 20,
-                      color: Colors.white,
-                    ),
-                  ),
-                  if (isTablet) ...[
-                    SizedBox(width: 10),
-                    Text(
-                      'Admin',
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
+          titleFontSize: AppResponsive.headingFontSize(context),
         ),
         body: Column(
           children: [
@@ -203,24 +168,24 @@ class _AddtaxState extends State<Addtax> {
                         children: [
                           Icon(
                             Icons.calculate_outlined,
-                            size: isTablet ? 80 : 64,
-                            color: Colors.grey.shade400,
+                            size: AppResponsive.getValue(context, mobile: 64.0, tablet: 80.0, desktop: 96.0),
+                            color: AppColors.divider,
                           ),
-                          SizedBox(height: isTablet ? 20 : 16),
+                          SizedBox(height: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
                           Text(
                             'No taxes configured yet',
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 18 : 16,
+                              fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0),
                               fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           SizedBox(height: 8),
                           Text(
                             'Add your first tax to get started',
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 14 : 13,
-                              color: Colors.grey.shade500,
+                              fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -229,23 +194,23 @@ class _AddtaxState extends State<Addtax> {
                   }
 
                   return ListView.builder(
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
+                    padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
                     itemCount: allTax.length,
                     itemBuilder: (context, index) {
                       final tax = allTax[index];
                       return Container(
-                        margin: EdgeInsets.only(bottom: isTablet ? 12 : 10),
-                        padding: EdgeInsets.all(isTablet ? 16 : 14),
+                        margin: EdgeInsets.only(bottom: AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0)),
+                        padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0)),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                           border: Border.all(
-                            color: Colors.grey.shade200,
+                            color: AppColors.divider,
                           ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 8,
+                              blurRadius: AppResponsive.shadowBlurRadius(context),
                               offset: Offset(0, 2),
                             ),
                           ],
@@ -263,16 +228,16 @@ class _AddtaxState extends State<Addtax> {
                                       Text(
                                         tax.taxname,
                                         style: GoogleFonts.poppins(
-                                          fontSize: isTablet ? 17 : 16,
+                                          fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.black87,
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                       SizedBox(height: 6),
                                       Container(
                                         padding: EdgeInsets.symmetric(
-                                          horizontal: isTablet ? 10 : 8,
-                                          vertical: isTablet ? 5 : 4,
+                                          horizontal: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
+                                          vertical: AppResponsive.getValue(context, mobile: 4.0, tablet: 5.0, desktop: 6.0),
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppColors.primary.withValues(alpha: 0.1),
@@ -281,7 +246,7 @@ class _AddtaxState extends State<Addtax> {
                                         child: Text(
                                           'Tax Rate: ${DecimalSettings.formatAmount(tax.taxperecentage ?? 0)}%',
                                           style: GoogleFonts.poppins(
-                                            fontSize: isTablet ? 14 : 13,
+                                            fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
                                             color: AppColors.primary,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -295,9 +260,9 @@ class _AddtaxState extends State<Addtax> {
                                     IconButton(
                                       onPressed: () => _model(isTablet, existingTax: tax),
                                       icon: Icon(Icons.edit_rounded),
-                                      color: Colors.orange,
+                                      color: AppColors.primary,
                                       style: IconButton.styleFrom(
-                                        backgroundColor: Colors.orange.withValues(alpha: 0.1),
+                                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                                       ),
                                     ),
                                     SizedBox(width: 8),
@@ -313,10 +278,10 @@ class _AddtaxState extends State<Addtax> {
                                 ),
                               ],
                             ),
-                            SizedBox(height: isTablet ? 14 : 12),
+                            SizedBox(height: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
                             SizedBox(
                               width: double.infinity,
-                              height: isTablet ? 48 : 44,
+                              height: AppResponsive.getValue(context, mobile: 44.0, tablet: 48.0, desktop: 52.0),
                               child: ElevatedButton.icon(
                                 onPressed: () {
                                   Navigator.push(
@@ -334,11 +299,11 @@ class _AddtaxState extends State<Addtax> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                                icon: Icon(Icons.check_circle_outline_rounded, size: isTablet ? 20 : 18),
+                                icon: Icon(Icons.check_circle_outline_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                                 label: Text(
                                   'Apply Tax on Items',
                                   style: GoogleFonts.poppins(
-                                    fontSize: isTablet ? 15 : 14,
+                                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -357,10 +322,10 @@ class _AddtaxState extends State<Addtax> {
             // Add Tax Button
             Container(
               color: Colors.white,
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
               child: SizedBox(
                 width: double.infinity,
-                height: isTablet ? 54 : 50,
+                height: AppResponsive.getValue(context, mobile: 50.0, tablet: 54.0, desktop: 58.0),
                 child: ElevatedButton.icon(
                   onPressed: () => _model(isTablet),
                   style: ElevatedButton.styleFrom(
@@ -371,11 +336,11 @@ class _AddtaxState extends State<Addtax> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: Icon(Icons.add_circle_rounded, size: isTablet ? 24 : 22),
+                  icon: Icon(Icons.add_circle_rounded, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
                   label: Text(
                     'Add New Tax',
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 17 : 16,
+                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -471,15 +436,13 @@ class _AddtaxState extends State<Addtax> {
             Container(
               padding: EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isEdit
-                    ? Colors.orange.withValues(alpha: 0.1)
-                    : AppColors.primary.withValues(alpha: 0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 isEdit ? Icons.edit_rounded : Icons.add_circle_rounded,
-                size: isTablet ? 28 : 24,
-                color: isEdit ? Colors.orange : AppColors.primary,
+                size: AppResponsive.getValue(context, mobile: 24.0, tablet: 28.0, desktop: 32.0),
+                color: AppColors.primary,
               ),
             ),
             SizedBox(width: 12),
@@ -487,9 +450,9 @@ class _AddtaxState extends State<Addtax> {
               child: Text(
                 isEdit ? 'Edit Tax' : 'Add New Tax',
                 style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 20 : 18,
+                  fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0),
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -500,7 +463,7 @@ class _AddtaxState extends State<Addtax> {
             ),
           ],
         ),
-        Divider(height: 32, color: Colors.grey.shade200),
+        Divider(height: 32, color: AppColors.divider),
         Row(
           children: [
             Expanded(
@@ -532,7 +495,7 @@ class _AddtaxState extends State<Addtax> {
           Container(
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: AppColors.surfaceLight,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -548,15 +511,15 @@ class _AddtaxState extends State<Addtax> {
                   child: Text(
                     'Apply to all existing items',
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 14 : 13,
-                      color: Colors.black87,
+                      fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        SizedBox(height: isTablet ? 28 : 24),
+        SizedBox(height: AppResponsive.getValue(context, mobile: 24.0, tablet: 28.0, desktop: 32.0)),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -564,14 +527,14 @@ class _AddtaxState extends State<Addtax> {
               onPressed: () => Navigator.pop(context),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 24 : 20,
-                  vertical: isTablet ? 14 : 12,
+                  horizontal: AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0, desktop: 28.0),
+                  vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
                 ),
               ),
               child: Text(
                 'Cancel',
                 style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 15 : 14,
+                  fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
                   color: Colors.grey.shade700,
                   fontWeight: FontWeight.w500,
                 ),
@@ -581,11 +544,11 @@ class _AddtaxState extends State<Addtax> {
             ElevatedButton(
               onPressed: () => _addOrUpdateTax(existingTax: existingTax),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isEdit ? Colors.orange : AppColors.primary,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 28 : 24,
-                  vertical: isTablet ? 14 : 12,
+                  horizontal: AppResponsive.getValue(context, mobile: 24.0, tablet: 28.0, desktop: 32.0),
+                  vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -595,7 +558,7 @@ class _AddtaxState extends State<Addtax> {
               child: Text(
                 isEdit ? 'Update' : 'Add Tax',
                 style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 15 : 14,
+                  fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
                   fontWeight: FontWeight.w600,
                 ),
               ),

@@ -127,12 +127,12 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
           // Modern Search Bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.padding(context),
             child: AppTextField(
               controller: searchController,
               hint: 'Search items…',
@@ -217,7 +217,7 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
         }
 
         return ListView.builder(
-                  padding: EdgeInsets.all(16),
+                  padding: AppResponsive.padding(context),
                   itemCount: filteredItems.length,
                   itemBuilder: (context, index) {
                     final item = filteredItems[index];
@@ -229,16 +229,16 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                         .name;
 
                     return Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      padding: EdgeInsets.all(14),
+                      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+                      padding: AppResponsive.cardPadding(context),
                       decoration: BoxDecoration(
                         color: AppColors.white,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.03),
-                            blurRadius: 8,
+                            blurRadius: AppResponsive.shadowBlurRadius(context),
                             offset: Offset(0, 2),
                           ),
                         ],
@@ -269,11 +269,11 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(item.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    Text(item.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
                                     SizedBox(height: 2),
                                     Text(
                                       '$categoryName  •  ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}',
-                                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
                                     ),
                                   ],
                                 ),
@@ -282,11 +282,11 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                               if (_canEdit) ...[
                                 InkWell(
                                   onTap: () => editItems(item),
-                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary)),
+                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary)),
                                 ),
                                 InkWell(
                                   onTap: () => _deleteItem(item.id),
-                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red)),
+                                  child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red)),
                                 ),
                               ],
                               Transform.scale(
@@ -376,7 +376,8 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
             crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4),
             crossAxisSpacing: AppResponsive.gridSpacing(context),
             mainAxisSpacing: AppResponsive.gridSpacing(context),
-            childAspectRatio: 2.8,
+            // Lower ratio = taller cells, so the 2-row card never bottom-overflows.
+            childAspectRatio: AppResponsive.getValue(context, mobile: 2.6, tablet: 2.3, desktop: 2.6),
           ),
           itemCount: filteredItems.length,
           itemBuilder: (context, index) {
@@ -389,28 +390,29 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                 .name;
 
             return Container(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                 border: Border.all(color: AppColors.divider.withOpacity(0.5)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: AppResponsive.shadowBlurRadius(context),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Name + veg icon + switch
                   Row(
                     children: [
                       Container(
                         width: 16, height: 16,
-                        margin: EdgeInsets.only(right: 6),
+                        margin: const EdgeInsets.only(right: 6),
                         decoration: BoxDecoration(
                           border: Border.all(color: item.isVeg == 'Veg' ? Colors.green : Colors.red.shade800, width: 1.5),
                           borderRadius: BorderRadius.circular(3),
@@ -422,7 +424,7 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                         ),
                       ),
                       Expanded(
-                        child: Text(item.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        child: Text(item.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       Transform.scale(
                         scale: 0.7,
@@ -431,24 +433,24 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                           inactiveThumbColor: Colors.white70, inactiveTrackColor: Colors.red.shade300,
                           value: item.isEnabled,
                           onChanged: (bool value) async => await itemStore.toggleItemStatus(item.id),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 2),
                   // Category + price + actions
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           '$categoryName  •  ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}',
-                          style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                          style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (_canEdit) ...[
-                        InkWell(onTap: () => editItems(item), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: 15, color: AppColors.primary))),
-                        InkWell(onTap: () => _deleteItem(item.id), child: Padding(padding: EdgeInsets.all(4), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
+                        InkWell(onTap: () => editItems(item), child: Padding(padding: const EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+                        InkWell(onTap: () => _deleteItem(item.id), child: Padding(padding: const EdgeInsets.all(4), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
                       ],
                     ],
                   ),

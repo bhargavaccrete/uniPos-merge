@@ -6,6 +6,7 @@ import '../../../../widget/componets/restaurant/componets/filterButton.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 
 class DeliveryDetails extends StatefulWidget {
   const DeliveryDetails({super.key});
@@ -94,7 +95,7 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
               ),
               Divider(),
 
-              Text('Address',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.w600),),
+              Text('Address',style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),fontWeight: FontWeight.w600),),
               Divider(),
               AppTextField(
                 controller: houseController,
@@ -141,9 +142,9 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                   ),
 
                   CommonButton(
-                      bgcolor: Colors.grey.shade300,
+                      bgcolor: AppColors.divider,
                       bordercircular: 5,
-                      bordercolor: Colors.grey.shade300,
+                      bordercolor: AppColors.divider,
                       height: heigth * 0.05,
                       width: width *0.3,
                       onTap: (){},
@@ -161,7 +162,7 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          border: Border.all(width: 1, color: Colors.grey)
+                          border: Border.all(width: 1, color: AppColors.textSecondary)
                       ),
                       child: ListTile(
                         title: Text('Pay Now',style: GoogleFonts.poppins(fontWeight: FontWeight.w600, ),),
@@ -184,7 +185,7 @@ class _DeliveryDetailsState extends State<DeliveryDetails> {
                     child: Container(
                       padding: EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                          border: Border.all(width: 1, color: Colors.grey)
+                          border: Border.all(width: 1, color: AppColors.textSecondary)
                       ),
                       child: ListTile(
                         title: Text('Pay Later'),

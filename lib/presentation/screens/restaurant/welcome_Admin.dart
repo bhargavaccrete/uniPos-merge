@@ -373,43 +373,69 @@ class _AdminWelcomeState extends State<AdminWelcome> {
 
           // Content
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                isDesktop ? 28 : isTablet ? 24 : 16,
-                isDesktop ? 12 : isTablet ? 8 : 4,
-                isDesktop ? 28 : isTablet ? 24 : 16,
-                isDesktop ? 28 : isTablet ? 24 : 16,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Menu Grid
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final w = MediaQuery.of(context).size.width;
-                      final int columns = w >= 1024 ? 4 : w >= 600 ? 3 : 2;
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final cards = _getVisibleCards(context);
+                // Single source of truth for column count (respects AppResponsive breakpoints).
+                final columns = AppResponsive.gridColumns(context);
+                final rows = (cards.length / columns).ceil();
 
-                      final cards = _getVisibleCards(context);
-                      return GridView.count(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        crossAxisCount: columns,
-                        crossAxisSpacing: isDesktop ? 20 : isTablet ? 16 : 12,
-                        mainAxisSpacing: isDesktop ? 20 : isTablet ? 16 : 12,
-                        childAspectRatio: isDesktop ? 1.4 : isTablet ? 1.3 : 1.2,
-                        children: cards.map((card) => _buildMenuCard(
+                final spacing = isDesktop ? 20.0 : isTablet ? 16.0 : 12.0;
+                final padH = isDesktop ? 28.0 : isTablet ? 24.0 : 16.0;
+                final padTop = isDesktop ? 12.0 : isTablet ? 8.0 : 4.0;
+                final pad = EdgeInsets.fromLTRB(padH, padTop, padH, padH);
+
+                // The densest the cards should ever be (their current look).
+                final naturalRatio = isDesktop ? 1.4 : isTablet ? 1.3 : 1.2;
+
+                final availW = constraints.maxWidth - padH * 2;
+                final availH = constraints.maxHeight - padTop - padH;
+                final cellW = (availW - (columns - 1) * spacing) / columns;
+                final naturalGridH =
+                    (cellW / naturalRatio) * rows + (rows - 1) * spacing;
+
+                final children = cards
+                    .map((card) => _buildMenuCard(
                           context: context,
                           icon: card.icon,
                           title: card.title,
                           color: card.color,
                           onTap: card.onTap,
                           isTablet: isTablet,
-                        )).toList(),
-                      );
-                    },
+                        ))
+                    .toList();
+
+                // Content taller than the viewport (e.g. phone, many rows) → scroll.
+                if (naturalGridH > availH) {
+                  return SingleChildScrollView(
+                    padding: pad,
+                    child: GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: columns,
+                      crossAxisSpacing: spacing,
+                      mainAxisSpacing: spacing,
+                      childAspectRatio: naturalRatio,
+                      children: children,
+                    ),
+                  );
+                }
+
+                // Fits → stretch the rows to fill the leftover vertical space.
+                final cellH = (availH - (rows - 1) * spacing) / rows;
+                final fillRatio = (cellW / cellH).clamp(0.85, naturalRatio);
+                return Padding(
+                  padding: pad,
+                  child: GridView.count(
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: columns,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: spacing,
+                    childAspectRatio: fillRatio,
+                    children: children,
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
           ],

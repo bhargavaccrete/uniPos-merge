@@ -61,14 +61,14 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
               : 24.0;
           return AlertDialog(
           insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-          title: Text('Add Missing Shift\n${_fullDayLabel(day)}', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+          title: Text('Add Missing Shift\n${_fullDayLabel(day)}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0), fontWeight: FontWeight.w600)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
                 title: const Text('Clock In'),
                 subtitle: Text('${inTime.hour.toString().padLeft(2, '0')}:${inTime.minute.toString().padLeft(2, '0')}'),
-                trailing: const Icon(Icons.access_time, size: 18),
+                trailing: Icon(Icons.access_time, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                 onTap: () async {
                   final t = await showTimePicker(context: context, initialTime: inTime);
                   if (t != null) setState(() => inTime = t);
@@ -77,7 +77,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
               ListTile(
                 title: const Text('Clock Out'),
                 subtitle: Text('${outTime.hour.toString().padLeft(2, '0')}:${outTime.minute.toString().padLeft(2, '0')}'),
-                trailing: const Icon(Icons.access_time, size: 18),
+                trailing: Icon(Icons.access_time, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                 onTap: () async {
                   final t = await showTimePicker(context: context, initialTime: outTime);
                   if (t != null) setState(() => outTime = t);
@@ -142,7 +142,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
               ListTile(
                 title: const Text('Clock In'),
                 subtitle: Text('${newInTime!.hour.toString().padLeft(2, '0')}:${newInTime!.minute.toString().padLeft(2, '0')}'),
-                trailing: const Icon(Icons.edit, size: 18),
+                trailing: Icon(Icons.edit, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                 onTap: () async {
                   final t = await showTimePicker(context: context, initialTime: newInTime!);
                   if (t != null) setState(() => newInTime = t);
@@ -151,7 +151,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
               ListTile(
                 title: const Text('Clock Out'),
                 subtitle: Text(newOutTime == null ? 'Not Clocked Out' : '${newOutTime!.hour.toString().padLeft(2, '0')}:${newOutTime!.minute.toString().padLeft(2, '0')}'),
-                trailing: const Icon(Icons.edit, size: 18),
+                trailing: Icon(Icons.edit, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                 onTap: () async {
                   final t = await showTimePicker(context: context, initialTime: newOutTime ?? TimeOfDay.now());
                   if (t != null) setState(() => newOutTime = t);
@@ -184,7 +184,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                   _refreshRecords();
                 }
               },
-              icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+              icon: Icon(Icons.delete, color: Colors.red, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
               label: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
             Row(
@@ -294,7 +294,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
     final days = _days;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: widget.staffName,
         centerTitle: true,
@@ -307,7 +307,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(widget.staffRole,
-                style: GoogleFonts.poppins(fontSize: 12, color: Colors.white70)),
+                style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: Colors.white70)),
           ),
         ),
       ),
@@ -318,8 +318,8 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
@@ -332,7 +332,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
               children: [
                 _summaryTile('$_presentCount', 'Days Present', Colors.green.shade600, Icons.check_circle_outline),
                 _vDivider(),
-                _summaryTile('$_absentCount', 'Days Absent', _absentCount > 0 ? Colors.red.shade400 : Colors.grey.shade400, Icons.cancel_outlined),
+                _summaryTile('$_absentCount', 'Days Absent', _absentCount > 0 ? Colors.red.shade400 : AppColors.textSecondary, Icons.cancel_outlined),
                 _vDivider(),
                 _summaryTile(_fmtMins(_totalMinutes), 'Total Hours', Colors.blue.shade600, Icons.timer_outlined),
               ],
@@ -344,14 +344,14 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Icon(Icons.date_range, size: 14, color: Colors.grey.shade500),
+                Icon(Icons.date_range, size: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0), color: AppColors.textSecondary),
                 const SizedBox(width: 6),
                 Text(
                   '${widget.from.day}/${widget.from.month}/${widget.from.year}  –  ${widget.to.day}/${widget.to.month}/${widget.to.year}',
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade500),
+                  style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary),
                 ),
                 const Spacer(),
-                Text('${days.length} days', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade500)),
+                Text('${days.length} days', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -371,10 +371,10 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
 
                 return Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     border: Border.all(
-                      color: today ? AppColors.primary.withOpacity(0.5) : isPresent ? Colors.green.shade200 : Colors.grey.shade200,
+                      color: today ? AppColors.primary.withOpacity(0.5) : isPresent ? Colors.green.shade200 : AppColors.divider,
                       width: today ? 1.5 : 1,
                     ),
                   ),
@@ -383,7 +383,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: isPresent ? Colors.green.shade50 : Colors.grey.shade50,
+                          color: isPresent ? Colors.green.shade50 : AppColors.surfaceLight,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                         ),
                         child: Row(
@@ -392,14 +392,14 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: today ? AppColors.primary : isPresent ? Colors.green.shade600 : Colors.grey.shade300,
-                                borderRadius: BorderRadius.circular(8),
+                                color: today ? AppColors.primary : isPresent ? Colors.green.shade600 : AppColors.divider,
+                                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                               ),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('${day.day}', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: isPresent || today ? Colors.white : Colors.grey.shade600)),
-                                  Text(_monthShort(day.month), style: GoogleFonts.poppins(fontSize: 9, color: isPresent || today ? Colors.white70 : Colors.grey.shade500)),
+                                  Text('${day.day}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w800, color: isPresent || today ? Colors.white : AppColors.textSecondary)),
+                                  Text(_monthShort(day.month), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 9.0, tablet: 10.0, desktop: 11.0), color: isPresent || today ? Colors.white70 : AppColors.textSecondary)),
                                 ],
                               ),
                             ),
@@ -408,19 +408,19 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(_fullDayLabel(day), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: today ? AppColors.primary : Colors.grey.shade800)),
-                                  if (today) Text('Today', style: GoogleFonts.poppins(fontSize: 10, color: AppColors.primary)),
+                                  Text(_fullDayLabel(day), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w600, color: today ? AppColors.primary : AppColors.textPrimary)),
+                                  if (today) Text('Today', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0), color: AppColors.primary)),
                                 ],
                               ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: isPresent ? Colors.green.shade600 : Colors.red.shade100, borderRadius: BorderRadius.circular(6)),
-                              child: Text(isPresent ? 'Present' : 'Absent', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w700, color: isPresent ? Colors.white : Colors.red.shade700)),
+                              decoration: BoxDecoration(color: isPresent ? Colors.green.shade600 : Colors.red.shade100, borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context))),
+                              child: Text(isPresent ? 'Present' : 'Absent', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), fontWeight: FontWeight.w700, color: isPresent ? Colors.white : Colors.red.shade700)),
                             ),
                             if (RestaurantSession.isAdmin)
                               IconButton(
-                                icon: Icon(Icons.add_circle, color: AppColors.primary, size: 22),
+                                icon: Icon(Icons.add_circle, color: AppColors.primary, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
                                 onPressed: () => _showAddShiftDialog(day),
                               ),
                           ],
@@ -441,23 +441,23 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                                       Container(
                                         width: 20, height: 20,
                                         margin: const EdgeInsets.only(right: 8),
-                                        decoration: BoxDecoration(color: Colors.grey.shade200, shape: BoxShape.circle),
-                                        child: Center(child: Text('${idx + 1}', style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w700))),
+                                        decoration: BoxDecoration(color: AppColors.divider, shape: BoxShape.circle),
+                                        child: Center(child: Text('${idx + 1}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0), fontWeight: FontWeight.w700))),
                                       ),
-                                    Icon(Icons.login, size: 14, color: Colors.green.shade600),
+                                    Icon(Icons.login, size: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0), color: Colors.green.shade600),
                                     const SizedBox(width: 4),
-                                    Text(_fmtTime(r.clockIn), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.green.shade700)),
+                                    Text(_fmtTime(r.clockIn), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w600, color: Colors.green.shade700)),
                                     Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 8),
-                                      child: Text('→', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade400)),
+                                      child: Text('→', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), color: AppColors.textSecondary)),
                                     ),
-                                    Icon(Icons.logout, size: 14, color: r.isOpen ? Colors.orange.shade600 : Colors.grey.shade600),
+                                    Icon(Icons.logout, size: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0), color: r.isOpen ? Colors.orange.shade600 : AppColors.textSecondary),
                                     const SizedBox(width: 4),
-                                    Text(r.formattedClockOut, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade700 : Colors.grey.shade700)),
+                                    Text(r.formattedClockOut, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade700 : AppColors.textSecondary)),
                                     const Spacer(),
                                     if (RestaurantSession.isAdmin)
                                       IconButton(
-                                        icon: Icon(Icons.edit, size: 18, color: Colors.blue.shade600),
+                                        icon: Icon(Icons.edit, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0), color: Colors.blue.shade600),
                                         padding: EdgeInsets.zero,
                                         constraints: BoxConstraints(),
                                         onPressed: () => _showEditDialog(r),
@@ -467,10 +467,10 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
                                         color: r.isOpen ? Colors.orange.shade50 : Colors.blue.shade50,
-                                        borderRadius: BorderRadius.circular(6),
+                                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                                         border: Border.all(color: r.isOpen ? Colors.orange.shade200 : Colors.blue.shade200),
                                       ),
-                                      child: Text(_openShiftLabel(r), style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade800 : Colors.blue.shade700)),
+                                      child: Text(_openShiftLabel(r), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade800 : Colors.blue.shade700)),
                                     ),
                                   ],
                                 ),
@@ -484,9 +484,9 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.event_busy, size: 16, color: Colors.grey.shade400),
+                              Icon(Icons.event_busy, size: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0), color: AppColors.textSecondary),
                               const SizedBox(width: 6),
-                              Text('No attendance recorded', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade400)),
+                              Text('No attendance recorded', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
@@ -517,16 +517,16 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: color, size: 22),
+          Icon(icon, color: color, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
           const SizedBox(height: 4),
-          Text(value, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-          Text(label, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500)),
+          Text(value, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0), fontWeight: FontWeight.w800, color: color)),
+          Text(label, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0), color: AppColors.textSecondary)),
         ],
       ),
     );
   }
 
-  Widget _vDivider() => Container(width: 1, height: 48, color: Colors.grey.shade200);
+  Widget _vDivider() => Container(width: 1, height: 48, color: AppColors.divider);
 
   String _monthShort(int m) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

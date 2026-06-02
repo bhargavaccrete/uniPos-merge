@@ -50,7 +50,6 @@ class RouteNames {
 
   // Restaurant - Inventory
   static const restaurantInventory = '/restaurant-inventory';
-  static const restaurantStockHistory = '/restaurant-stock-history';
 
   // Restaurant - Staff
   static const restaurantStaff = '/restaurant-staff';
@@ -98,7 +97,6 @@ class RouteNames {
 
   // Restaurant - Tax
   static const restaurantTaxSettings = '/restaurant-tax-settings';
-  static const restaurantTaxRegistration = '/restaurant-tax-registration';
   static const restaurantApplyTax = '/restaurant-apply-tax';
   static const restaurantAddMultipleTax = '/restaurant-add-multiple-tax';
 

@@ -442,7 +442,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                     'Loading menu...',
                                     style: GoogleFonts.poppins(
                                       fontSize: 14,
-                                      color: Colors.grey[600],
+                                      color: AppColors.textSecondary,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -458,11 +458,11 @@ class _MenuScreenState extends State<MenuScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.category_outlined, size: 64, color: Colors.grey),
+                                  Icon(Icons.category_outlined, size: 64, color: AppColors.textSecondary),
                                   SizedBox(height: 16),
                                   Text(
                                     'No Categories Found',
-                                    style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500),
+                                    style: GoogleFonts.poppins(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                                   ),
                                 ],
                               ),
@@ -537,7 +537,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                       '${searchFilteredItems.length} items',
                                       style: GoogleFonts.poppins(
                                         fontSize: 12,
-                                        color: Colors.grey[600],
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                     children: [
@@ -548,7 +548,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                             'No items in this category',
                                             style: GoogleFonts.poppins(
                                               fontSize: 12,
-                                              color: Colors.grey,
+                                              color: AppColors.textSecondary,
                                             ),
                                           ),
                                         )
@@ -666,7 +666,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       const SizedBox(height: 16),
                       Text(
                         'Loading menu...',
-                        style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600], fontWeight: FontWeight.w500),
+                        style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -1105,7 +1105,7 @@ class _ItemListTileState extends State<_ItemListTile> {
                   Container(
                     padding: const EdgeInsets.all(11),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [AppColors.primary, AppColors.primary]),
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
                     ),

@@ -14,6 +14,7 @@ import 'partial_refund_dialog.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../util/common/app_responsive.dart';
 class Orderdetails extends StatefulWidget {
@@ -65,18 +66,14 @@ class _OrderdetailsState extends State<Orderdetails> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Order Details',
         centerTitle: true,
-        automaticallyImplyLeading: false,
-        leading:
-        IconButton(onPressed: (){
-          Navigator.pop(context);
-
-        }, icon: Icon(Icons.arrow_back,color: Colors.white,)),
-
-        backgroundColor: AppColors.primary,
-        title: Text('Order Details', style: GoogleFonts.poppins(color: Colors.white)),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back),
+        ),
       ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -96,7 +93,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                   message: isRefundEligible ? '' : AppSettings.refundWindowMinutes == 0 ? '' : 'Refund window has passed',
                   child: _ActionBtn(
                     label: 'Refund',
-                    color: isRefundEligible ? Colors.orange : Colors.grey,
+                    color: isRefundEligible ? Colors.orange : AppColors.textSecondary,
                     onTap: isRefundEligible ? () => _showRefundDialog(context) : () {
                       final w = AppSettings.refundWindowMinutes;
                       final label = w < 60 ? '$w min' : w == 60 ? '1 hour' : '${(w / 60).toStringAsFixed(w % 60 == 0 ? 0 : 1)} hours';
@@ -121,12 +118,12 @@ class _OrderdetailsState extends State<Orderdetails> {
                 decoration: BoxDecoration(
                   color: Colors.red.shade50,
                   border: Border.all(color: Colors.red.shade300),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 20),
+                    Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -135,7 +132,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                           Text(
                             'This order was voided (deleted before payment). No refund is applicable.',
                             style: GoogleFonts.poppins(
-                              fontSize: 13,
+                              fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
                               fontWeight: FontWeight.w500,
                               color: Colors.red.shade700,
                             ),
@@ -145,7 +142,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                             Text(
                               'Voided by: ${currentOrder.voidedBy}',
                               style: GoogleFonts.poppins(
-                                fontSize: 12,
+                                fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                                 color: Colors.red.shade600,
                               ),
                             ),
@@ -166,19 +163,19 @@ class _OrderdetailsState extends State<Orderdetails> {
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.05),
                 border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.receipt_long, color: AppColors.primary, size: 20),
+                      Icon(Icons.receipt_long, color: AppColors.primary, size: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0)),
                       SizedBox(width: 8),
                       Text(
                         'Kitchen Order Tickets (KOT)',
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
                           fontWeight: FontWeight.bold,
                           color: AppColors.primary,
                         ),
@@ -194,12 +191,12 @@ class _OrderdetailsState extends State<Orderdetails> {
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
                         ),
                         child: Text(
                           'KOT #$kotNum',
                           style: GoogleFonts.poppins(
-                            fontSize: 12,
+                            fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
@@ -213,8 +210,8 @@ class _OrderdetailsState extends State<Orderdetails> {
                       child: Text(
                         '${(currentOrder.kotNumbers?.length ?? 1)} KOT(s) generated for this order',
                         style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: Colors.grey.shade700,
+                          fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -230,14 +227,14 @@ class _OrderdetailsState extends State<Orderdetails> {
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   border: Border.all(color: Colors.orange.shade200),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       status.replaceAll('_', ' '),
-                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.orange.shade800),
+                      style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0), fontWeight: FontWeight.w700, color: Colors.orange.shade800),
                     ),
                     const SizedBox(height: 4),
                     _kv('Total Refunded', _money(currentOrder.refundAmount)),
@@ -245,14 +242,14 @@ class _OrderdetailsState extends State<Orderdetails> {
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text('Reason(s): ${currentOrder.refundReason}',
-                            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade700)),
+                            style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary)),
                       ),
                     if (currentOrder.refundedAt != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           'Last Refund At: ${_fmtDate(currentOrder.refundedAt!)}',
-                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade700),
+                          style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary),
                         ),
                       ),
                     if ((currentOrder.refundedBy ?? '').isNotEmpty)
@@ -260,7 +257,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           'Refunded by: ${currentOrder.refundedBy}',
-                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade700),
+                          style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary),
                         ),
                       ),
                   ],
@@ -273,7 +270,7 @@ class _OrderdetailsState extends State<Orderdetails> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
               ),
               child: Row(
                 children: [
@@ -300,7 +297,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                       boxShadow: [
                         BoxShadow(
                           color: AppColors.primary.withOpacity(0.2),
@@ -311,12 +308,12 @@ class _OrderdetailsState extends State<Orderdetails> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.receipt_long, color: Colors.white, size: 20),
+                        Icon(Icons.receipt_long, color: Colors.white, size: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0)),
                         SizedBox(width: 8),
                         Text(
                           'KOT #$kotNum',
                           style: GoogleFonts.poppins(
-                            fontSize: 16,
+                            fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -326,12 +323,12 @@ class _OrderdetailsState extends State<Orderdetails> {
                           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                           ),
                           child: Text(
                             '${kotItems.length} item${kotItems.length > 1 ? 's' : ''}',
                             style: GoogleFonts.poppins(
-                              fontSize: 12,
+                              fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
@@ -364,8 +361,8 @@ class _OrderdetailsState extends State<Orderdetails> {
 
                       return Card(
                         elevation: 0,
-                        color: itemIsFullyRefunded ? Colors.grey.shade200 : Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        color: itemIsFullyRefunded ? AppColors.surfaceMedium : AppColors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                           child: Column(
@@ -378,7 +375,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                                     flex: 2,
                                     child: Text(
                                       '$remainingQty',
-                                      style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w600),
                                     ),
                                   ),
                                   Expanded(
@@ -387,7 +384,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(it.title?.toString() ?? '—',
-                                            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+                                            style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w600)),
                                         // This is where _metaChip was missing
                                         if (it.variantName != null) _metaChip(it.variantName!),
                                         // Display extras with quantities
@@ -435,19 +432,19 @@ class _OrderdetailsState extends State<Orderdetails> {
                                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                   decoration: BoxDecoration(
                                                     color: Colors.orange.shade50,
-                                                    borderRadius: BorderRadius.circular(6),
+                                                    borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                                                     border: Border.all(color: Colors.orange.shade200, width: 0.5),
                                                   ),
                                                   child: Row(
                                                     mainAxisSize: MainAxisSize.min,
                                                     children: [
-                                                      Icon(Icons.add_circle_outline, size: 12, color: Colors.orange.shade700),
+                                                      Icon(Icons.add_circle_outline, size: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0), color: Colors.orange.shade700),
                                                       SizedBox(width: 4),
                                                       Expanded(
                                                         child: Text(
                                                           'Extras: $extrasDisplay',
                                                           style: GoogleFonts.poppins(
-                                                            fontSize: 11,
+                                                            fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
                                                             color: Colors.orange.shade900,
                                                             fontWeight: FontWeight.w500,
                                                           ),
@@ -467,19 +464,19 @@ class _OrderdetailsState extends State<Orderdetails> {
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                               decoration: BoxDecoration(
                                                 color: AppColors.primary.withOpacity(0.05),
-                                                borderRadius: BorderRadius.circular(6),
+                                                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                                                 border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 0.5),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.restaurant_menu, size: 12, color: AppColors.primary),
+                                                  Icon(Icons.restaurant_menu, size: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0), color: AppColors.primary),
                                                   SizedBox(width: 4),
                                                   Expanded(
                                                     child: Text(
                                                       'Choices: ${it.choiceNames!.join(", ")}',
                                                       style: GoogleFonts.poppins(
-                                                        fontSize: 11,
+                                                        fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
                                                         color: AppColors.primary,
                                                         fontWeight: FontWeight.w500,
                                                       ),
@@ -495,13 +492,13 @@ class _OrderdetailsState extends State<Orderdetails> {
                                             padding: const EdgeInsets.only(top: 4.0),
                                             child: Row(
                                               children: [
-                                                Icon(Icons.receipt, size: 12, color: Colors.grey.shade500),
+                                                Icon(Icons.receipt, size: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0), color: AppColors.textSecondary),
                                                 SizedBox(width: 4),
                                                 Text(
                                                   'Tax: ${(it.taxRate! * 100).toStringAsFixed(0)}%',
                                                   style: GoogleFonts.poppins(
-                                                    fontSize: 11,
-                                                    color: Colors.grey.shade500,
+                                                    fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
+                                                    color: AppColors.textSecondary,
                                                   ),
                                                 ),
                                               ],
@@ -516,7 +513,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                                       alignment: Alignment.centerRight,
                                       child: Text(
                                         _money(lineTotal),
-                                        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700),
+                                        style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w700),
                                       ),
                                     ),
                                   ),
@@ -528,7 +525,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                                   child: Text(
                                     'Refunded: $refundedQty of $originalQty',
                                     style: GoogleFonts.poppins(
-                                      fontSize: 12,
+                                      fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                                       fontWeight: FontWeight.w600,
                                       color: itemIsFullyRefunded ? Colors.red.shade700 : Colors.orange.shade800,
                                     ),
@@ -552,7 +549,7 @@ class _OrderdetailsState extends State<Orderdetails> {
               margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               elevation: 0,
               color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 child: Column(
@@ -569,7 +566,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                             alignment: Alignment.centerRight,
                             child: Text(
                               'by ${currentOrder.discountAppliedBy}',
-                              style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500),
+                              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                             ),
                           ),
                         ),
@@ -621,7 +618,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                           if (received > amount)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 2, left: 12),
-                              child: _totalRow('  Received', _money(received), color: Colors.grey.shade600),
+                              child: _totalRow('  Received', _money(received), color: AppColors.textSecondary),
                             ),
                           if (change > 0)
                             Padding(
@@ -710,7 +707,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
         child: Text(
           text,
-          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700),
+          style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w700),
         ),
       ),
     );
@@ -722,19 +719,19 @@ class _OrderdetailsState extends State<Orderdetails> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F2F5),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.surfaceMedium,
+        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
       ),
       child: Text(
         label,
-        style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade700),
+        style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: AppColors.textSecondary),
       ),
     );
   }
 
   Widget _totalRow(String label, String value, {bool isStrong = false, Color? color}) {
     final style = GoogleFonts.poppins(
-      fontSize: isStrong ? 16 : 14,
+      fontSize: isStrong ? AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0) : AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
       fontWeight: isStrong ? FontWeight.w700 : FontWeight.w600,
       color: color, // Use the color if provided
     );
@@ -751,8 +748,8 @@ class _OrderdetailsState extends State<Orderdetails> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(k, style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade800)),
-        Text(v, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(k, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), color: AppColors.textPrimary)),
+        Text(v, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -832,10 +829,10 @@ class _OrderdetailsState extends State<Orderdetails> {
       context: context,
       builder: (ctx) => AlertDialog(
         insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
         title: Row(
           children: [
-            Icon(Icons.cancel, color: Colors.red, size: 28),
+            Icon(Icons.cancel, color: Colors.red, size: AppResponsive.getValue(context, mobile: 28.0, tablet: 30.0, desktop: 32.0)),
             SizedBox(width: 12),
             Text(
               "Void Order",
@@ -849,12 +846,12 @@ class _OrderdetailsState extends State<Orderdetails> {
           children: [
             Text(
               "Are you sure you want to void this order?",
-              style: GoogleFonts.poppins(fontSize: 14),
+              style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0)),
             ),
             SizedBox(height: 16),
             Text(
               "Reason for voiding:",
-              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w500),
             ),
             SizedBox(height: 8),
             AppTextField(
@@ -924,7 +921,7 @@ class _ActionBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = outlined ? Colors.transparent : (color ?? AppColors.primary);
     final fg = outlined ? Theme.of(context).textTheme.bodyMedium?.color : Colors.white;
-    final border = outlined ? BorderSide(color: Colors.black12) : BorderSide.none;
+    final border = outlined ? BorderSide(color: AppColors.divider) : BorderSide.none;
 
     return SizedBox(
       height: 44,
@@ -936,7 +933,7 @@ class _ActionBtn extends StatelessWidget {
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: border),
         ),
-        child: Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+        child: Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0))),
       ),
     );
   }

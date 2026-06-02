@@ -616,7 +616,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                    fontSize: 18,
+                    fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: Colors.white)),
             Builder(
@@ -624,7 +624,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 if (_dayStart == null) {
                   return Text(DateFormat('dd MMM yyyy').format(DateTime.now()),
                       style: GoogleFonts.poppins(
-                          fontSize: 12, color: Colors.white70));
+                          fontSize: AppResponsive.smallFontSize(context), color: Colors.white70));
                 }
 
                 final now = DateTime.now();
@@ -732,7 +732,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                   style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w700,
-                      color: closingBalance > 0 ? Colors.teal.shade700 : Colors.grey)),
+                      color: closingBalance > 0 ? Colors.teal.shade700 : AppColors.textSecondary)),
             ],
           ),
         ),
@@ -756,11 +756,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     return Container(
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, const Color(0xFF1565C0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
         boxShadow: [
           BoxShadow(
@@ -1083,9 +1079,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.divider),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
@@ -1193,7 +1189,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.point_of_sale_outlined,
             size: AppResponsive.largeIconSize(context) * 2,
-            color: Colors.grey.shade300),
+            color: AppColors.divider),
         SizedBox(height: AppResponsive.mediumSpacing(context)),
         Text('Day not started',
             style: GoogleFonts.poppins(
@@ -1662,7 +1658,7 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
       child: Column(
         children: [
           _buildCompareRow('Reported by ${widget.closedBy}',
-              '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}', Colors.grey.shade700),
+              '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}', AppColors.textSecondary),
           const SizedBox(height: 6),
           _buildCompareRow('You counted',
               '$currency ${counted.toStringAsFixed(DecimalSettings.precision)}', AppColors.textPrimary),
@@ -1705,7 +1701,7 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+            style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
         Text(value,
             style: GoogleFonts.poppins(
                 fontSize: 13, fontWeight: FontWeight.w600, color: valueColor)),

@@ -34,7 +34,7 @@ class DrawerManage extends StatelessWidget {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       child: SafeArea(
         child: Column(
           children: [
@@ -181,7 +181,7 @@ class DrawerManage extends StatelessWidget {
                   if (isDelete || islogout) ...[
                     Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(color: Colors.grey.shade200, thickness: 1),
+                      child: Divider(color: AppColors.divider, thickness: 1),
                     ),
                   ],
 
@@ -217,7 +217,7 @@ class DrawerManage extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                    color: Colors.grey.shade200,
+                    color: AppColors.divider,
                     width: 1,
                   ),
                 ),
@@ -227,7 +227,7 @@ class DrawerManage extends StatelessWidget {
                   Icon(
                     Icons.info_outline,
                     size: 16,
-                    color: Colors.grey.shade600,
+                    color: AppColors.textSecondary,
                   ),
                   SizedBox(width: 8),
                   Expanded(
@@ -235,7 +235,7 @@ class DrawerManage extends StatelessWidget {
                       'Version 1.0.0',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -297,14 +297,14 @@ class DrawerManage extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       fontSize: isTablet ? 15 : 14,
                       fontWeight: FontWeight.w500,
-                      color: isDanger ? Colors.red : Colors.black87,
+                      color: isDanger ? Colors.red : AppColors.textPrimary,
                     ),
                   ),
                 ),
                 Icon(
                   Icons.chevron_right,
                   size: 20,
-                  color: Colors.grey.shade400,
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
@@ -430,7 +430,7 @@ class DrawerManage extends StatelessWidget {
                           Text('Shift Cash Count',
                               style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
                           Text('Count the cash in the drawer',
-                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+                              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
                         ]),
                       ),
                     ]),
@@ -443,11 +443,11 @@ class DrawerManage extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: AppColors.surfaceMedium,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(children: [
-                          const Icon(Icons.person_outline, size: 18, color: Colors.grey),
+                          const Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
                           const SizedBox(width: 8),
                           Text('Shift ended by: ${shift.staffName}',
                               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
@@ -508,7 +508,7 @@ class DrawerManage extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text('Cash you counted',
                           style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700)),
+                              color: AppColors.textSecondary)),
                       const SizedBox(height: 6),
                       AppTextField(
                         controller: amountCtrl,
@@ -577,7 +577,7 @@ class DrawerManage extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text('Note (optional)',
                           style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700)),
+                              color: AppColors.textSecondary)),
                       const SizedBox(height: 6),
                       AppTextField(
                         controller: noteCtrl,
@@ -596,7 +596,7 @@ class DrawerManage extends StatelessWidget {
                     navigator.pushNamedAndRemoveUntil(
                         RouteNames.restaurantLogin, (r) => false);
                   },
-                  child: Text('Skip', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+                  child: Text('Skip', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
                 ),
                 ElevatedButton(
                   onPressed: isSaving ? null : () async {
@@ -661,7 +661,7 @@ class DrawerManage extends StatelessWidget {
                     ),
                   ]),
                 ),
-                Divider(height: 1, color: Colors.grey.shade200),
+                Divider(height: 1, color: AppColors.divider),
                 Padding(
                   padding: EdgeInsets.all(20),
                   child: Column(
@@ -694,7 +694,7 @@ class DrawerManage extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
+                child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
               ),
               ElevatedButton(
                 onPressed: isClosing
@@ -747,13 +747,13 @@ class DrawerManage extends StatelessWidget {
   Widget _infoRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade500),
+        Icon(icon, size: 16, color: AppColors.textSecondary),
         SizedBox(width: 8),
         Text('$label: ',
-            style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade600)),
+            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
         Text(value,
             style: GoogleFonts.poppins(
-                fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+                fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
       ],
     );
   }
@@ -840,7 +840,7 @@ class DrawerManage extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey.shade700)),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -930,7 +930,7 @@ class DrawerManage extends StatelessWidget {
                   "Cancel",
                   style: GoogleFonts.poppins(
                     fontSize: 14,
-                    color: Colors.grey[700],
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

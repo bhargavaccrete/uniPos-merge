@@ -42,6 +42,7 @@ class _BluthoothhState extends State<Bluthooth> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -145,7 +146,7 @@ class _BluthoothhState extends State<Bluthooth> {
               child: Column(
                 children: [
                   Icon(Icons.bluetooth_searching,
-                      size: 48, color: Colors.grey.shade300),
+                      size: 48, color: AppColors.divider),
                   const SizedBox(height: 12),
                   Text(
                     'Tap the scan button to find\nnearby Bluetooth printers',

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 class Delivery extends StatelessWidget {
   const Delivery({super.key});
 
@@ -27,14 +28,14 @@ class Delivery extends StatelessWidget {
                     Text(
                       'Items',
                       style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                      TextStyle(fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.0, desktop: 20.0), fontWeight: FontWeight.w500),
                     ),
                     Text('Qty',
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w500)),
+                            fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.0, desktop: 20.0), fontWeight: FontWeight.w500)),
                     Text('Amount',
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w500)),
+                            fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.0, desktop: 20.0), fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
@@ -52,7 +53,7 @@ class Delivery extends StatelessWidget {
                     borderRadius: BorderRadius.circular(5)),
                 child: Text(
                   'New Order',
-                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0)),
                 ),
               ),
 
@@ -77,7 +78,7 @@ class Delivery extends StatelessWidget {
                           height: height * 0.04,
                           decoration: BoxDecoration(
                             // color: Colors.red,
-                              border: Border.all(color: Colors.grey),
+                              border: Border.all(color: AppColors.textSecondary),
                               shape: BoxShape.circle),
                           child: Text(
                             '1',
@@ -89,7 +90,7 @@ class Delivery extends StatelessWidget {
                       ],
                     ),
 
-                    Text('149.00',style: GoogleFonts.poppins(fontSize: 16,fontWeight: FontWeight.bold),)
+                    Text('149.00',style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),fontWeight: FontWeight.bold),)
                   ],
                 ),
               ),
@@ -100,7 +101,7 @@ class Delivery extends StatelessWidget {
               CommonButton(
                   width: width*0.3,
                   height: height * 0.05,
-                  onTap: (){}, child: Center(child: Text('Add Item',style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w500,fontSize: 14),))),
+                  onTap: (){}, child: Center(child: Text('Add Item',style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w500,fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0)),))),
               SizedBox(height: 10,),
 
               Container(
@@ -112,8 +113,8 @@ class Delivery extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Total:',style: GoogleFonts.poppins(fontSize: 20,fontWeight: FontWeight.bold),),
-                        Text('Rs.149.00',style: GoogleFonts.poppins(fontSize: 20,fontWeight: FontWeight.bold),)
+                        Text('Total:',style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 20.0, tablet: 21.0, desktop: 22.0),fontWeight: FontWeight.bold),),
+                        Text('Rs.149.00',style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 20.0, tablet: 21.0, desktop: 22.0),fontWeight: FontWeight.bold),)
                       ],
                     ),
                     SizedBox(height: 25,),
@@ -121,7 +122,7 @@ class Delivery extends StatelessWidget {
                     CommonButton(
                         width: width,
                         height: height * 0.06,
-                        onTap: (){}, child: Center(child: Text('Settle & Print Bill ',style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w500,fontSize: 18),))),
+                        onTap: (){}, child: Center(child: Text('Settle & Print Bill ',style: GoogleFonts.poppins(color: Colors.white,fontWeight: FontWeight.w500,fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.0, desktop: 20.0)),))),
 
 
                   ],

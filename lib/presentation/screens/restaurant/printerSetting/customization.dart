@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/print_settings.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -108,17 +108,8 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        surfaceTintColor: AppColors.primary,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -126,7 +117,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               'Print Customization',
               style: GoogleFonts.poppins(
                 color: Colors.white,
-                fontSize: isTablet ? 20 : 18,
+                fontSize: AppResponsive.headingFontSize(context),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -134,7 +125,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               'Configure receipt fields',
               style: GoogleFonts.poppins(
                 color: Colors.white.withOpacity(0.9),
-                fontSize: 12,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -304,7 +295,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
           return Container(
             margin: EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isEnabled ? AppColors.primary.withOpacity(0.3) : AppColors.divider,

@@ -50,7 +50,11 @@ class _LicenseKeyEntryScreenState extends State<LicenseKeyEntryScreen> {
     _goToSetup();
   }
 
-  void _skip() => _goToSetup();
+  Future<void> _skip() async {
+    // Bypass the license requirement so the app isn't locked later by the guard.
+    await _store.skipLicense();
+    if (mounted) _goToSetup();
+  }
 
   void _goToSetup() =>
       Navigator.pushReplacementNamed(context, RouteNames.setupWizard);

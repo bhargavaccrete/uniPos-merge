@@ -399,7 +399,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
               width: 40, height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppColors.divider,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -415,7 +415,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
               title: Text('Single Day',
                   style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
               subtitle: Text('View one specific day',
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickSingleDay();
@@ -433,7 +433,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
               title: Text('Date Range',
                   style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
               subtitle: Text('View multiple days',
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600)),
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickDateRange();
@@ -621,10 +621,11 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                 style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
-                    fontSize: 20)),
+                    fontSize: AppResponsive.headingFontSize(context))),
             Text('Full audit trail — every cash movement',
                 style: GoogleFonts.poppins(
-                    color: Colors.white70, fontSize: 12)),
+                    color: Colors.white70,
+                    fontSize: AppResponsive.smallFontSize(context))),
           ],
         ),
         actions: [
@@ -835,7 +836,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.history_outlined,
           size: AppResponsive.largeIconSize(context) * 1.5,
-          color: Colors.grey.shade300),
+          color: AppColors.divider),
       SizedBox(height: AppResponsive.mediumSpacing(context)),
       Text('No transactions found',
           style: GoogleFonts.poppins(
@@ -846,7 +847,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
       Text('Try widening the date range or changing the filter',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
-            color: Colors.grey.shade400,
+            color: AppColors.textSecondary,
           )),
     ]),
   );

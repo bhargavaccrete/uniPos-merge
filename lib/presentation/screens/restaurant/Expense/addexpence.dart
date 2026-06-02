@@ -139,12 +139,12 @@ class _AddexpenceState extends State<Addexpence> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = AppResponsive.isTablet(context);
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(isTablet ? 24 : 16),
+        padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0, desktop: 32.0)),
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: isTablet ? 680 : double.infinity),
@@ -158,18 +158,18 @@ class _AddexpenceState extends State<Addexpence> {
                     onPressed: () {
                       Navigator.pushNamed(context, RouteNames.restaurantExpenseCategory);
                     },
-                    icon: Icon(Icons.category_rounded, size: isTablet ? 20 : 18),
+                    icon: Icon(Icons.category_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
                     label: Text(
                       'Manage Categories',
                       style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 16 : 15,
+                        fontSize: AppResponsive.getValue(context, mobile: 15.0, tablet: 16.0, desktop: 17.0),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: BorderSide(color: AppColors.primary, width: 2),
-                      padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
+                      padding: EdgeInsets.symmetric(vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -179,14 +179,14 @@ class _AddexpenceState extends State<Addexpence> {
                 SizedBox(height: 20),
                 // Form Container
                 Container(
-                  padding: EdgeInsets.all(isTablet ? 28 : 20),
+                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 20.0, tablet: 28.0, desktop: 36.0)),
                   decoration: BoxDecoration(
                     color: AppColors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
+                        blurRadius: AppResponsive.shadowBlurRadius(context),
                         offset: Offset(0, 2),
                       ),
                     ],
@@ -263,7 +263,7 @@ class _AddexpenceState extends State<Addexpence> {
                                             child: DropdownButton<String>(
                                               isExpanded: true,
                                               value: selectedCategoryId,
-                                              hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade400)),
+                                              hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
                                               items: categories.map((category) => DropdownMenuItem<String>(
                                                 value: category.id,
                                                 child: Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
@@ -336,7 +336,7 @@ class _AddexpenceState extends State<Addexpence> {
                                   child: DropdownButton<String>(
                                     isExpanded: true,
                                     value: selectedCategoryId,
-                                    hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade400)),
+                                    hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
                                     items: categories.map((category) => DropdownMenuItem<String>(
                                       value: category.id,
                                       child: Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
@@ -397,7 +397,7 @@ class _AddexpenceState extends State<Addexpence> {
                         // Add Button
                         SizedBox(
                           width: double.infinity,
-                          height: isTablet ? 54 : 50,
+                          height: AppResponsive.getValue(context, mobile: 50.0, tablet: 54.0, desktop: 58.0),
                           child: ElevatedButton(
                             onPressed: _isSaving ? null : _addExpense,
                             style: ElevatedButton.styleFrom(
@@ -417,7 +417,7 @@ class _AddexpenceState extends State<Addexpence> {
                                 : Text(
                                     'Add Expense',
                                     style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 17 : 16,
+                                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),

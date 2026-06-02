@@ -240,18 +240,16 @@ class _ManageInventoryState extends State<ManageInventory> {
 
 
   Widget _buildItemTile(Items item) {
-    final isTablet = AppResponsive.isTablet(context);
-
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: isTablet ? 20 : 16,
+        horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
         vertical: 6,
       ),
       child: Container(
-        padding: EdgeInsets.all(isTablet ? 14 : 12),
+        padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
         decoration: BoxDecoration(
           color: AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
           border: Border.all(color: AppColors.divider),
         ),
         child: Column(
@@ -267,7 +265,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                         item.name,
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
-                          fontSize: isTablet ? 15 : 14,
+                          fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
                           color: AppColors.textPrimary,
                         ),
                       ),
@@ -276,20 +274,18 @@ class _ManageInventoryState extends State<ManageInventory> {
                         children: [
                           Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isTablet ? 10 : 8,
-                              vertical: isTablet ? 5 : 4,
+                              horizontal: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
+                              vertical: AppResponsive.getValue(context, mobile: 4.0, tablet: 5.0, desktop: 6.0),
                             ),
                             decoration: BoxDecoration(
-                              color: item.isSoldByWeight
-                                  ? Colors.blue.withValues(alpha:0.1)
-                                  : Colors.purple.withValues(alpha:0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               item.isSoldByWeight ? 'Weight-based' : 'Unit-based',
                               style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 11 : 10,
-                                color: item.isSoldByWeight ? Colors.blue.shade700 : Colors.purple.shade700,
+                                fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0),
+                                color: AppColors.primary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -298,7 +294,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           Text(
                             '(${item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs')})',
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 12 : 11,
+                              fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
                               color: AppColors.textSecondary,
                               fontWeight: FontWeight.w500,
                             ),
@@ -310,8 +306,8 @@ class _ManageInventoryState extends State<ManageInventory> {
                 ),
                 Container(
                   padding: EdgeInsets.symmetric(
-                    horizontal: isTablet ? 12 : 10,
-                    vertical: isTablet ? 6 : 5,
+                    horizontal: AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0),
+                    vertical: AppResponsive.getValue(context, mobile: 5.0, tablet: 6.0, desktop: 7.0),
                   ),
                   decoration: BoxDecoration(
                     color: item.isInStock
@@ -334,7 +330,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                       Text(
                         item.isInStock ? 'In Stock' : 'Out of Stock',
                         style: GoogleFonts.poppins(
-                          fontSize: isTablet ? 12 : 11,
+                          fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
                           fontWeight: FontWeight.w600,
                           color: item.isInStock ? Colors.green.shade700 : Colors.red.shade700,
                         ),
@@ -357,17 +353,17 @@ class _ManageInventoryState extends State<ManageInventory> {
                 'Variants:',
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
-                  fontSize: isTablet ? 13 : 12,
+                  fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                   color: AppColors.textPrimary,
                 ),
               ),
               SizedBox(height: 10),
               ...item.variant!.map((variant) => Container(
                 margin: EdgeInsets.only(bottom: 8),
-                padding: EdgeInsets.all(isTablet ? 12 : 10),
+                padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0)),
                 decoration: BoxDecoration(
                   color: AppColors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                   border: Border.all(color: AppColors.divider),
                 ),
                 child: Column(
@@ -380,15 +376,15 @@ class _ManageInventoryState extends State<ManageInventory> {
                             _getVariantName(variant.variantId),
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
-                              fontSize: isTablet ? 14 : 13,
+                              fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
                               color: AppColors.textPrimary,
                             ),
                           ),
                         ),
                         Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: isTablet ? 10 : 8,
-                            vertical: isTablet ? 5 : 4,
+                            horizontal: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
+                            vertical: AppResponsive.getValue(context, mobile: 4.0, tablet: 5.0, desktop: 6.0),
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha:0.1),
@@ -398,7 +394,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                             '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}',
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
-                              fontSize: isTablet ? 13 : 12,
+                              fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                               color: AppColors.primary,
                             ),
                           ),
@@ -561,7 +557,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                 hint,
                 style: GoogleFonts.poppins(
                   fontSize: 11,
-                  color: Colors.blue.shade600,
+                  color: AppColors.primary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -572,8 +568,6 @@ class _ManageInventoryState extends State<ManageInventory> {
   }
   @override
   Widget build(BuildContext context) {
-    final isTablet = AppResponsive.isTablet(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       drawer: DrawerManage(
@@ -595,7 +589,7 @@ class _ManageInventoryState extends State<ManageInventory> {
           // Search
           Container(
             color: AppColors.white,
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: AppTextField(
               controller: _searchController,
               onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
@@ -629,9 +623,9 @@ class _ManageInventoryState extends State<ManageInventory> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.category_rounded, size: 48, color: Colors.grey.shade300),
+                        Icon(Icons.category_rounded, size: 48, color: AppColors.divider),
                         SizedBox(height: 12),
-                        Text('No Categories Found', style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade500)),
+                        Text('No Categories Found', style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary)),
                       ],
                     ),
                   );
@@ -642,18 +636,18 @@ class _ManageInventoryState extends State<ManageInventory> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey.shade300),
+                        Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.divider),
                         SizedBox(height: 12),
-                        Text('No items with inventory tracking', style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade500)),
+                        Text('No items with inventory tracking', style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary)),
                         SizedBox(height: 4),
-                        Text("Enable 'Manage Inventory' on items to track stock", style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade400)),
+                        Text("Enable 'Manage Inventory' on items to track stock", style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
                       ],
                     ),
                   );
                 }
 
                 return ListView.builder(
-                  padding: EdgeInsets.all(isTablet ? 16 : 12),
+                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
                   itemCount: categories.length,
                   itemBuilder: (context, index) {
                     final category = categories[index];
@@ -677,8 +671,8 @@ class _ManageInventoryState extends State<ManageInventory> {
                       margin: EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
                         color: AppColors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
+                        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                        border: Border.all(color: AppColors.divider),
                       ),
                       child: Theme(
                         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -687,7 +681,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           childrenPadding: EdgeInsets.only(bottom: 8),
                           leading: Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
                           title: Text(category.name, style: GoogleFonts.poppins(fontWeight: FontWeight.w500, fontSize: 14)),
-                          subtitle: Text('${categoryItems.length} item${categoryItems.length != 1 ? 's' : ''}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500)),
+                          subtitle: Text('${categoryItems.length} item${categoryItems.length != 1 ? 's' : ''}', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                           initiallyExpanded: isExpanded,
                           onExpansionChanged: (expanded) {
                             setState(() {

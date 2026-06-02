@@ -299,12 +299,12 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
           // Modern Search Bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.padding(context),
             child: AppTextField(
               controller: searchController,
               hint: 'Search variants…',
@@ -341,7 +341,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         }
 
         return ListView.builder(
-          padding: EdgeInsets.all(16),
+          padding: AppResponsive.padding(context),
           itemCount: filteredVariants.length,
           itemBuilder: (context, index) {
             final variante = filteredVariants[index];
@@ -362,11 +362,11 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         }
 
         return GridView.builder(
-          padding: EdgeInsets.all(24),
+          padding: AppResponsive.padding(context),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: AppResponsive.gridColumns(context, mobile: 3, tablet: 4, desktop: 5),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+            crossAxisSpacing: AppResponsive.gridSpacing(context),
+            mainAxisSpacing: AppResponsive.gridSpacing(context),
             childAspectRatio: 4,
           ),
           itemCount: filteredVariants.length,
@@ -427,24 +427,24 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
           border: Border.all(color: AppColors.divider.withOpacity(0.5)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
+              blurRadius: AppResponsive.shadowBlurRadius(context),
               offset: Offset(0, 2),
             ),
           ],
         ),
         child: Row(
           children: [
-            Icon(Icons.tune, color: AppColors.primary, size: 18),
+            Icon(Icons.tune, color: AppColors.primary, size: AppResponsive.iconSize(context)),
             SizedBox(width: 8),
-            Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
             if (_canEdit) ...[
-              InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 15, color: AppColors.primary))),
-              InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 15, color: Colors.red))),
+              InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+              InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
             ],
           ],
         ),
@@ -452,16 +452,16 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.all(14),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: Offset(0, 2),
           ),
         ],
@@ -469,18 +469,18 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(10),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
             ),
-            child: Icon(Icons.tune, color: AppColors.primary, size: 22),
+            child: Icon(Icons.tune, color: AppColors.primary, size: AppResponsive.iconSize(context)),
           ),
           SizedBox(width: 12),
-          Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
           if (_canEdit) ...[
-            InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary))),
-            InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+            InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+            InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
           ],
         ],
       ),
@@ -488,9 +488,8 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   }
 
   Widget _buildAddButton() {
-    final isTablet = !AppResponsive.isMobile(context);
     return Container(
-      padding: EdgeInsets.all(isTablet ? 20 : 16),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -507,13 +506,13 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: () => openBottomSheet(),
-            icon: Icon(Icons.add, size: isTablet ? 22 : 20),
-            label: Text('Add Variant', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
+            icon: Icon(Icons.add, size: AppResponsive.iconSize(context)),
+            label: Text('Add Variant', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+              padding: EdgeInsets.symmetric(vertical: AppResponsive.mediumSpacing(context)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),

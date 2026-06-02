@@ -176,7 +176,7 @@ class _TakeawayState extends State<Takeaway> {
               SizedBox(width: 6),
               Text(title, style: GoogleFonts.poppins(fontSize: sectionFs, fontWeight: FontWeight.w500, color: color)),
               SizedBox(width: 6),
-              Text('${items.length}', style: GoogleFonts.poppins(fontSize: countFs, color: Colors.grey.shade500)),
+              Text('${items.length}', style: GoogleFonts.poppins(fontSize: countFs, color: AppColors.textSecondary)),
             ],
           ),
         ),
@@ -257,9 +257,9 @@ class _TakeawayState extends State<Takeaway> {
                     style: GoogleFonts.poppins(fontSize: nameFs, fontWeight: FontWeight.w500),
                     children: [
                       if (variantLine != null)
-                        TextSpan(text: '  $variantLine', style: GoogleFonts.poppins(fontSize: variantFs, fontWeight: FontWeight.w400, color: Colors.grey.shade600)),
+                        TextSpan(text: '  $variantLine', style: GoogleFonts.poppins(fontSize: variantFs, fontWeight: FontWeight.w400, color: AppColors.textSecondary)),
                       if (item.weightDisplay != null)
-                        TextSpan(text: '  ${item.weightDisplay}', style: GoogleFonts.poppins(fontSize: modFs, fontWeight: FontWeight.w400, color: Colors.grey.shade500)),
+                        TextSpan(text: '  ${item.weightDisplay}', style: GoogleFonts.poppins(fontSize: modFs, fontWeight: FontWeight.w400, color: AppColors.textSecondary)),
                     ],
                   ),
                   maxLines: 2,
@@ -269,7 +269,7 @@ class _TakeawayState extends State<Takeaway> {
                 if (addOnsLine != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(addOnsLine, style: GoogleFonts.poppins(fontSize: modFs, color: Colors.grey.shade500)),
+                    child: Text(addOnsLine, style: GoogleFonts.poppins(fontSize: modFs, color: AppColors.textSecondary)),
                   ),
               ],
             ),
@@ -284,8 +284,8 @@ class _TakeawayState extends State<Takeaway> {
                   onTap: () => widget.onDecreseQty(item),
                   child: Container(
                     padding: EdgeInsets.all(btnPad),
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(6)),
-                    child: Icon(Icons.remove, size: iconSize, color: Colors.grey.shade700),
+                    decoration: BoxDecoration(border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(6)),
+                    child: Icon(Icons.remove, size: iconSize, color: AppColors.textSecondary),
                   ),
                 ),
                 Padding(
@@ -311,8 +311,8 @@ class _TakeawayState extends State<Takeaway> {
                     message: 'Cannot cancel cooked items',
                     child: Container(
                       padding: EdgeInsets.all(btnPad),
-                      decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(6)),
-                      child: Icon(Icons.cancel_outlined, size: iconSize, color: Colors.grey.shade400),
+                      decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(6)),
+                      child: Icon(Icons.cancel_outlined, size: iconSize, color: AppColors.textSecondary),
                     ),
                   )
                 else
@@ -371,7 +371,7 @@ class _TakeawayState extends State<Takeaway> {
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: AppColors.surfaceMedium,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -379,7 +379,7 @@ class _TakeawayState extends State<Takeaway> {
                         children: [
                           IconButton(
                             onPressed: cancelQty > 1 ? () => setState(() => cancelQty--) : null,
-                            icon: Icon(Icons.remove_circle_outline, color: cancelQty > 1 ? AppColors.primary : Colors.grey),
+                            icon: Icon(Icons.remove_circle_outline, color: cancelQty > 1 ? AppColors.primary : AppColors.textSecondary),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -387,7 +387,7 @@ class _TakeawayState extends State<Takeaway> {
                           ),
                           IconButton(
                             onPressed: cancelQty < item.quantity ? () => setState(() => cancelQty++) : null,
-                            icon: Icon(Icons.add_circle_outline, color: cancelQty < item.quantity ? AppColors.primary : Colors.grey),
+                            icon: Icon(Icons.add_circle_outline, color: cancelQty < item.quantity ? AppColors.primary : AppColors.textSecondary),
                           ),
                         ],
                       ),
@@ -395,13 +395,13 @@ class _TakeawayState extends State<Takeaway> {
                   else
                     Text('Cancel 1x ${item.title}?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
                   SizedBox(height: 10),
-                  Text('This will print a Cancel KOT for the kitchen.', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
+                  Text('This will print a Cancel KOT for the kitchen.', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
                 ],
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Keep Item', style: GoogleFonts.poppins(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+                  child: Text('Keep Item', style: GoogleFonts.poppins(color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -996,9 +996,9 @@ class _TakeawayState extends State<Takeaway> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shopping_cart_outlined, size: 48, color: Colors.grey.shade300),
+                      Icon(Icons.shopping_cart_outlined, size: 48, color: AppColors.divider),
                       SizedBox(height: 8),
-                      Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 14, tablet: 16), color: Colors.grey.shade400)),
+                      Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 14, tablet: 16), color: AppColors.textSecondary)),
                     ],
                   ),
                 )
@@ -1009,9 +1009,9 @@ class _TakeawayState extends State<Takeaway> {
                       child: Row(
                         children: [
                           if (widget.isDineIn)
-                            Text("Table ${widget.selectedTableNo}", style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: Colors.grey.shade600))
+                            Text("Table ${widget.selectedTableNo}", style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: AppColors.textSecondary))
                           else
-                            Text(widget.isexisting ? 'Existing Order' : 'New Order', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: Colors.grey.shade600)),
+                            Text(widget.isexisting ? 'Existing Order' : 'New Order', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
@@ -1180,11 +1180,11 @@ class _TakeawayState extends State<Takeaway> {
               return Container(
                 constraints: const BoxConstraints(maxHeight: 140),
                 margin: const EdgeInsets.only(top: 4, bottom: 8),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.divider)),
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: suggestions.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+                  separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
                   itemBuilder: (_, index) {
                     final c = suggestions[index];
                     return InkWell(
@@ -1205,7 +1205,7 @@ class _TakeawayState extends State<Takeaway> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(c.name ?? 'Unknown', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500)),
-                                  Text('${c.phone ?? ''} • ${c.totalVisites} visits', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey)),
+                                  Text('${c.phone ?? ''} • ${c.totalVisites} visits', style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textSecondary)),
                                 ],
                               ),
                             ),
@@ -1233,11 +1233,11 @@ class _TakeawayState extends State<Takeaway> {
                       child: Row(
                         children: [
                           Expanded(child: Text('Place Order', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600))),
-                          IconButton(onPressed: () => Navigator.of(ctx).pop(), icon: Icon(Icons.close, size: 20, color: Colors.grey)),
+                          IconButton(onPressed: () => Navigator.of(ctx).pop(), icon: Icon(Icons.close, size: 20, color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
-                    Divider(height: 1, color: Colors.grey.shade200),
+                    Divider(height: 1, color: AppColors.divider),
 
                     // Body
                     Flexible(
@@ -1255,13 +1255,13 @@ class _TakeawayState extends State<Takeaway> {
                                   children: [
                                     Text(selectedCustomer!.name ?? 'Unknown', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
                                     Spacer(),
-                                    Text('${selectedCustomer!.totalVisites} visits', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
+                                    Text('${selectedCustomer!.totalVisites} visits', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                                     SizedBox(width: 8),
                                     GestureDetector(
                                       onTap: () => setDialogState(() {
                                         selectedCustomer = null; nameController.clear(); emailController.clear(); mobileController.clear();
                                       }),
-                                      child: Icon(Icons.close, size: 16, color: Colors.grey),
+                                      child: Icon(Icons.close, size: 16, color: AppColors.textSecondary),
                                     ),
                                   ],
                                 ),
@@ -1312,7 +1312,7 @@ class _TakeawayState extends State<Takeaway> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Total', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey.shade600)),
+                                Text('Total', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                                 Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
                                   style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary)),
                               ],
@@ -1328,7 +1328,7 @@ class _TakeawayState extends State<Takeaway> {
                       child: Row(
                         children: [
                           TextButton(onPressed: () => Navigator.of(ctx).pop(),
-                            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+                            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary))),
                           const SizedBox(width: 12),
                           Expanded(child: _buildActionButton('Place Order', () => _placeOrder(calculations))),
                         ],
@@ -1403,7 +1403,7 @@ class _TakeawayState extends State<Takeaway> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(child: Text('Quick Settle', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700))),
-                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close, size: 18, color: Colors.grey), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close, size: 18, color: AppColors.textSecondary), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -1420,7 +1420,7 @@ class _TakeawayState extends State<Takeaway> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Amount to Collect', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade600)),
+                        Text('Amount to Collect', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
                         Text(
                           '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
                           style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary),
@@ -1431,7 +1431,7 @@ class _TakeawayState extends State<Takeaway> {
                   const SizedBox(height: 20),
 
                   // Payment method label
-                  Text('Select Payment Method', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                  Text('Select Payment Method', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                   const SizedBox(height: 10),
 
                   // Payment chips
@@ -1448,15 +1448,15 @@ class _TakeawayState extends State<Takeaway> {
                           decoration: BoxDecoration(
                             color: isSelected ? AppColors.primary : Colors.white,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.shade300, width: 1.5),
+                            border: Border.all(color: isSelected ? AppColors.primary : AppColors.divider, width: 1.5),
                             boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 6, offset: const Offset(0, 2))] : [],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(_paymentIcon(m.name), size: 16, color: isSelected ? Colors.white : Colors.grey.shade500),
+                              Icon(_paymentIcon(m.name), size: 16, color: isSelected ? Colors.white : AppColors.textSecondary),
                               const SizedBox(width: 6),
-                              Text(m.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : Colors.grey.shade700)),
+                              Text(m.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : AppColors.textSecondary)),
                             ],
                           ),
                         ),
@@ -1474,8 +1474,8 @@ class _TakeawayState extends State<Takeaway> {
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            side: BorderSide(color: Colors.grey.shade300),
-                            foregroundColor: Colors.grey.shade700,
+                            side: BorderSide(color: AppColors.divider),
+                            foregroundColor: AppColors.textSecondary,
                           ),
                           child: Text('Cancel', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
                         ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/presentation/screens/restaurant/TaxSetting/addMultipleTax.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 
@@ -15,61 +14,26 @@ class taxSetting extends StatelessWidget {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Tax Settings',
-        titleFontSize: isTablet ? 22 : 20,
-        actions: [
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
-              vertical: 8,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(isTablet ? 10 : 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    size: isTablet ? 22 : 20,
-                    color: Colors.white,
-                  ),
-                ),
-                if (isTablet) ...[
-                  SizedBox(width: 10),
-                  Text(
-                    'Admin',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
+        titleFontSize: AppResponsive.headingFontSize(context),
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.all(isTablet ? 28 : 20),
+          padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 20.0, tablet: 28.0, desktop: 36.0)),
           child: Column(
             children: [
               // Info Card
               Container(
-                padding: EdgeInsets.all(isTablet ? 20 : 16),
+                padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
+                      blurRadius: AppResponsive.shadowBlurRadius(context),
                       offset: Offset(0, 2),
                     ),
                   ],
@@ -77,24 +41,24 @@ class taxSetting extends StatelessWidget {
                 child: Column(
                   children: [
                     Container(
-                      padding: EdgeInsets.all(isTablet ? 20 : 16),
+                      padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.calculate_rounded,
-                        size: isTablet ? 60 : 50,
+                        size: AppResponsive.getValue(context, mobile: 50.0, tablet: 60.0, desktop: 70.0),
                         color: AppColors.primary,
                       ),
                     ),
-                    SizedBox(height: isTablet ? 24 : 20),
+                    SizedBox(height: AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0, desktop: 28.0)),
                     Text(
                       'Tax Configuration',
                       style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 24 : 22,
+                        fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0),
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     SizedBox(height: 8),
@@ -102,30 +66,15 @@ class taxSetting extends StatelessWidget {
                       'Configure and manage your tax settings',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 15 : 14,
-                        color: Colors.grey.shade600,
+                        fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              SizedBox(height: isTablet ? 32 : 24),
-
-             /* // Tax Registration Card
-              _buildOptionCard(
-                context: context,
-                icon: Icons.receipt_long_rounded,
-                title: 'Tax Registration',
-                description: 'Add your business tax name and registration number',
-                color: Colors.blue,
-                isTablet: isTablet,
-                onTap: () {
-                  Navigator.pushNamed(context, RouteNames.restaurantTaxRegistration);
-                },
-              ),*/
-
-              SizedBox(height: isTablet ? 16 : 12),
+              SizedBox(height: AppResponsive.getValue(context, mobile: 24.0, tablet: 32.0, desktop: 40.0)),
 
               // Multiple Tax Card
               _buildOptionCard(
@@ -133,15 +82,10 @@ class taxSetting extends StatelessWidget {
                 icon: Icons.add_chart_rounded,
                 title: 'Manage Taxes',
                 description: 'Create and apply multiple tax rates to your items',
-                color: Colors.green,
+                color: AppColors.primary,
                 isTablet: isTablet,
                 onTap: () {
-                  // Navigator.of(context).push(
-                  //   MaterialPageRoute(builder: (context) => Addtax()),
-                  // );
                   Navigator.pushNamed(context, RouteNames.restaurantAddMultipleTax);
-
-
                 },
               ),
             ],
@@ -167,15 +111,15 @@ class taxSetting extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: AppColors.divider,
         ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: Offset(0, 2),
           ),
         ],
@@ -184,24 +128,24 @@ class taxSetting extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
           child: Padding(
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(isTablet ? 14 : 12),
+                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     icon,
-                    size: isTablet ? 32 : 28,
+                    size: AppResponsive.getValue(context, mobile: 28.0, tablet: 32.0, desktop: 36.0),
                     color: color,
                   ),
                 ),
-                SizedBox(width: isTablet ? 18 : 14),
+                SizedBox(width: AppResponsive.getValue(context, mobile: 14.0, tablet: 18.0, desktop: 22.0)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,17 +153,17 @@ class taxSetting extends StatelessWidget {
                       Text(
                         title,
                         style: GoogleFonts.poppins(
-                          fontSize: isTablet ? 17 : 16,
+                          fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       SizedBox(height: 4),
                       Text(
                         description,
                         style: GoogleFonts.poppins(
-                          fontSize: isTablet ? 13 : 12,
-                          color: Colors.grey.shade600,
+                          fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -227,8 +171,8 @@ class taxSetting extends StatelessWidget {
                 ),
                 Icon(
                   Icons.arrow_forward_ios_rounded,
-                  size: isTablet ? 20 : 18,
-                  color: Colors.grey.shade400,
+                  size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0),
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),

@@ -98,15 +98,15 @@ class _StartorderState extends State<Startorder>
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.grey.shade100,
+          color: isSelected ? AppColors.primary : AppColors.surfaceMedium,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: iconSz, color: isSelected ? Colors.white : Colors.grey.shade600),
+            Icon(icon, size: iconSz, color: isSelected ? Colors.white : AppColors.textSecondary),
             SizedBox(width: 8),
-            Text(label, style: GoogleFonts.poppins(fontSize: fs, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : Colors.grey.shade700)),
+            Text(label, style: GoogleFonts.poppins(fontSize: fs, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : AppColors.textSecondary)),
           ],
         ),
       ),
@@ -344,7 +344,7 @@ class _StartorderState extends State<Startorder>
       bottomNavigationBar: isTablet ? null : Container(
         decoration: BoxDecoration(
           color: AppColors.white,
-          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          border: Border(top: BorderSide(color: AppColors.divider)),
         ),
         child: SafeArea(
           child: SizedBox(

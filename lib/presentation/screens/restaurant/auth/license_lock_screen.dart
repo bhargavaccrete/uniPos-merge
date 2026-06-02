@@ -91,6 +91,8 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
                     ],
                     SizedBox(height: AppResponsive.largeSpacing(context)),
                     _keyInputCard(isTablet),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    _skipButton(isTablet),
                     SizedBox(height: AppResponsive.largeSpacing(context)),
                     _supportNote(isTablet),
                   ],
@@ -289,6 +291,27 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _skip() async {
+    await _store.skipLicense();
+    widget.onActivated();
+  }
+
+  Widget _skipButton(bool isTablet) {
+    return TextButton.icon(
+      onPressed: _loading ? null : _skip,
+      icon: Icon(Icons.skip_next_rounded,
+          size: isTablet ? 20 : 18, color: AppColors.textSecondary),
+      label: Text(
+        'Skip for now',
+        style: GoogleFonts.poppins(
+          fontSize: isTablet ? 14 : 13,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }

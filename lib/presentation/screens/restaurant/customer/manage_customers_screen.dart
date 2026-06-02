@@ -11,6 +11,7 @@ import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
 
 class ManageCustomersScreen extends StatefulWidget {
@@ -57,17 +58,9 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        title: Text(
-          'Manage Customers',
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        iconTheme: IconThemeData(color: Colors.white),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Manage Customers',
         actions: [
           IconButton(
             icon: Icon(Icons.person_add),
@@ -118,13 +111,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.people_outline, size: 80, color: Colors.grey[300]),
+                        Icon(Icons.people_outline, size: 64, color: AppColors.divider),
                         SizedBox(height: height * 0.02),
                         Text(
                           'No customers yet',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -133,7 +126,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                           'Tap + to add your first customer',
                           style: GoogleFonts.poppins(
                             fontSize: 14,
-                            color: Colors.grey[500],
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -148,13 +141,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
+                        Icon(Icons.search_off, size: 64, color: AppColors.divider),
                         SizedBox(height: height * 0.02),
                         Text(
                           'No customers found',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -176,11 +169,6 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddCustomerDialog(context),
-        backgroundColor: AppColors.primary,
-        child: Icon(Icons.person_add, color: Colors.white),
-      ),
     );
   }
 
@@ -189,15 +177,23 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
     final height = MediaQuery.of(context).size.height;
 
-    return Card(
+    return Container(
       margin: EdgeInsets.only(bottom: height * 0.015),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: () => _showCustomerDetailsDialog(context, customer),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: EdgeInsets.all(width * 0.03),
           child: Row(
@@ -229,7 +225,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     if (customer.phone?.isNotEmpty == true) ...[
@@ -237,13 +233,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                       Row(
                         children: [
 
-                          Icon(Icons.phone, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.phone, size: 14, color: AppColors.textSecondary),
                           SizedBox(width: 4),
                           Text(
                             customer.phone!,
                             style: GoogleFonts.poppins(
                               fontSize: 14,
-                              color: Colors.grey[700],
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -253,14 +249,14 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                       SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.email, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.email, size: 14, color: AppColors.textSecondary),
                           SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               customer.email!,
                               style: GoogleFonts.poppins(
                                 fontSize: 14,
-                                color: Colors.grey[700],
+                                color: AppColors.textSecondary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -287,7 +283,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                     value: 'edit',
                     child: Row(
                       children: [
-                        Icon(Icons.edit, size: 20, color: Colors.blue),
+                        Icon(Icons.edit, size: 20, color: AppColors.primary),
                         SizedBox(width: 8),
                         Text('Edit'),
                       ],
@@ -666,7 +662,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   label,
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -675,7 +671,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   value,
                   style: GoogleFonts.poppins(
                     fontSize: 14,
-                    color: Colors.black87,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],

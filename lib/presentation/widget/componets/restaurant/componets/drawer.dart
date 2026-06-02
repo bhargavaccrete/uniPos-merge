@@ -44,7 +44,7 @@ class _DrawerrState extends State<Drawerr> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       child: SafeArea(
         child: Column(
           children: [
@@ -267,7 +267,7 @@ class _DrawerrState extends State<Drawerr> {
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                    color: Colors.grey.shade200,
+                    color: AppColors.divider,
                     width: 1,
                   ),
                 ),
@@ -277,7 +277,7 @@ class _DrawerrState extends State<Drawerr> {
                   Icon(
                     Icons.info_outline,
                     size: AppResponsive.smallIconSize(context),
-                    color: Colors.grey.shade600,
+                    color: AppColors.textSecondary,
                   ),
                   AppResponsive.horizontalSpace(context, size: SpacingSize.small),
                   Expanded(
@@ -285,7 +285,7 @@ class _DrawerrState extends State<Drawerr> {
                       'Version 1.0.0',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
-                        color: Colors.grey.shade600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -342,14 +342,14 @@ class _DrawerrState extends State<Drawerr> {
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 14, tablet: 15),
                       fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
                 Icon(
                   Icons.chevron_right,
                   size: 20,
-                  color: Colors.grey.shade400,
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
@@ -372,7 +372,7 @@ class _DrawerrState extends State<Drawerr> {
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Container(
         decoration: BoxDecoration(
-          color: isExpanded ? Colors.grey.shade50 : Colors.transparent,
+          color: isExpanded ? AppColors.surfaceLight : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Theme(
@@ -404,7 +404,7 @@ class _DrawerrState extends State<Drawerr> {
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.getValue(context, mobile: 14, tablet: 15),
                 fontWeight: FontWeight.w500,
-                color: Colors.black87,
+                color: AppColors.textPrimary,
               ),
             ),
             children: children,
@@ -447,7 +447,7 @@ class _DrawerrState extends State<Drawerr> {
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 14),
                       fontWeight: FontWeight.w400,
-                      color: Colors.black87,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -511,7 +511,7 @@ class _DrawerrState extends State<Drawerr> {
                   "No",
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.buttonFontSize(context),
-                    color: Colors.grey[700],
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

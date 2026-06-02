@@ -300,7 +300,7 @@ class _PastorderState extends State<Pastorder> {
                         color: Colors.white,
                         border: Border.all(
                           color: isVoided
-                              ? Colors.grey.shade400
+                              ? AppColors.textSecondary
                               : const Color(0xFFDEE1E6),
                         ),
                         borderRadius: BorderRadius.circular(12),
@@ -342,7 +342,7 @@ class _PastorderState extends State<Pastorder> {
                                 ),
                               ),
                               Text(_fmtDateTime(o.orderAt),
-                                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
+                                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -412,11 +412,11 @@ class _PastorderState extends State<Pastorder> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
+                                    color: AppColors.divider,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text('Voided',
-                                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
+                                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                                 ),
                               ] else if (isRefunded) ...[
                                 const SizedBox(width: 8),

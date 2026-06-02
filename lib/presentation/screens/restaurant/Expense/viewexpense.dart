@@ -104,7 +104,7 @@ class _ViewExpenseState extends State<ViewExpense> {
         children: [
           Row(
             children: [
-              Expanded(child: Text('Edit Expense', style: GoogleFonts.poppins(fontSize: isTablet ? 20 : 16, fontWeight: FontWeight.w600))),
+              Expanded(child: Text('Edit Expense', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0), fontWeight: FontWeight.w600))),
               IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, size: 20, color: Colors.grey)),
             ],
           ),
@@ -385,8 +385,6 @@ class _ViewExpenseState extends State<ViewExpense> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = AppResponsive.isTablet(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: Column(
@@ -507,16 +505,16 @@ class _ViewExpenseState extends State<ViewExpense> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade300),
+                        Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.divider),
                         SizedBox(height: 12),
-                        Text('No expenses found', style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade500)),
+                        Text('No expenses found', style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary)),
                       ],
                     ),
                   );
                 }
 
                 return ListView.builder(
-                  padding: EdgeInsets.all(isTablet ? 16 : 12),
+                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
                   itemCount: filteredExpenses.length,
                   itemBuilder: (context, index) {
                     final expense = filteredExpenses[index];
@@ -527,8 +525,8 @@ class _ViewExpenseState extends State<ViewExpense> {
                         padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          border: Border.all(color: AppColors.divider),
                         ),
                         child: Row(
                           children: [
@@ -569,14 +567,14 @@ class _ViewExpenseState extends State<ViewExpense> {
                                   Container(
                                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withValues(alpha:0.1),
+                                      color: AppColors.info.withValues(alpha:0.1),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       expense.paymentType ?? 'Cash',
                                       style: GoogleFonts.poppins(
                                         fontSize: 11,
-                                        color: Colors.blue,
+                                        color: AppColors.info,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),

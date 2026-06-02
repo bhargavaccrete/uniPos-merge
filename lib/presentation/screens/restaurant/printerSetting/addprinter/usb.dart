@@ -37,6 +37,7 @@ class _UsbState extends State<Usb> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -127,7 +128,7 @@ class _UsbState extends State<Usb> {
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.usb_off, size: 48, color: Colors.grey.shade300),
+                  Icon(Icons.usb_off, size: 48, color: AppColors.divider),
                   const SizedBox(height: 12),
                   Text(
                     'Connect a USB printer and\ntap the scan button',

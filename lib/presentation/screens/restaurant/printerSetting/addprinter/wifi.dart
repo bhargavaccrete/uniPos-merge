@@ -54,6 +54,7 @@ class _WifiLanState extends State<WifiLan> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

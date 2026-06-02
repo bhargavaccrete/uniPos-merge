@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart'; // Or wherever AppSettings is located
 import 'package:flutter/widgets.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
+import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/widget/componets/restaurant/componets/togglelist.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
 import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
@@ -49,58 +49,17 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
   }
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
-
     // Use a ListenableBuilder to listen for changes in AppSettings
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
-        leading: InkWell(
-            onTap: (){
-              Navigator.push(context, MaterialPageRoute(builder: (context)=> Startorder()));
-            },
-            child: Icon(Icons.arrow_back,)),
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back),
+        ),
         title: 'Setting & Customization',
-        titleFontSize: 16,
+        titleFontSize: AppResponsive.headingFontSize(context),
       ),
-      // body: ListenableBuilder(
-      //   listenable: AppSettings.settingsNotifier,
-      //   builder: (context, child) {
-      //     final setting = AppSettings.values;
-      //     // This builder will re-run whenever a setting is changed.
-      //     return SingleChildScrollView(
-      //       padding: const EdgeInsets.all(10),
-      //       child: Column(
-      //         mainAxisSize: MainAxisSize.min,
-      //         // Build the list from the static AppSettings values
-      //         children: AppSettings.groupedSettings.entries.map((group) {
-      //           final groupTitle = group.key;
-      //           final settingKeys = group.value;
-      //
-      //           return Padding(
-      //             padding: const EdgeInsets.all(8.0),
-      //             child: Container(
-      //               width: width,
-      //               child: SwitchList(
-      //                 heightconatiner: height * 0.07,
-      //                 fontsize: 10,
-      //                 title: entry.key,
-      //                 isvalue: entry.value, // Get the current value
-      //                 onChanged: (bool newValue) {
-      //                   // Update the setting in the static class
-      //                   AppSettings.updateSetting(entry.key, newValue);
-      //                   setState(() {
-      //
-      //                   });
-      //                 },
-      //               ),
-      //             ),
-      //           );
-      //         }).toList(),
-      //       ),
-      //     );
-      //   },
-      // ),
       body: ListenableBuilder(
         listenable: AppSettings.settingsNotifier,
         builder: (context, child) {
@@ -123,7 +82,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
                         // alignment: Alignment.center,
                         child: Text(
                           groupTitle,
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary
@@ -131,7 +90,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
                         ),
                       ),
                     ),
-                    Divider(),
+                    Divider(color: AppColors.divider),
                     ...settingKeys.map((key) {
                       final currentValue = settings[key] ?? false;
 

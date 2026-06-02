@@ -605,12 +605,12 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
           // Modern Search Bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.padding(context),
             child: AppTextField(
               controller: searchController,
               hint: 'Search choices…',
@@ -647,7 +647,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         }
 
         return ListView.builder(
-          padding: EdgeInsets.all(16),
+          padding: AppResponsive.padding(context),
           itemCount: filteredChoices.length,
           itemBuilder: (context, index) {
             final choice = filteredChoices[index];
@@ -668,11 +668,11 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         }
 
         return GridView.builder(
-          padding: EdgeInsets.all(24),
+          padding: AppResponsive.padding(context),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 2, desktop: 3),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+            crossAxisSpacing: AppResponsive.gridSpacing(context),
+            mainAxisSpacing: AppResponsive.gridSpacing(context),
             childAspectRatio: 2.8,
           ),
           itemCount: filteredChoices.length,
@@ -729,15 +729,15 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
 
   Widget _buildMobileChoiceCard(ChoicesModel choice) {
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: Offset(0, 2),
           ),
         ],
@@ -748,21 +748,21 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
           tilePadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           childrenPadding: EdgeInsets.only(bottom: 8),
           leading: Container(
-            padding: EdgeInsets.all(10),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
             ),
-            child: Icon(Icons.checklist, color: AppColors.primary, size: 22),
+            child: Icon(Icons.checklist, color: AppColors.primary, size: AppResponsive.iconSize(context)),
           ),
-          title: Text(choice.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-          subtitle: Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+          title: Text(choice.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          subtitle: Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_canEdit) ...[
-                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 18, color: AppColors.primary))),
-                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 18, color: Colors.red))),
+                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
               ],
             ],
           ),
@@ -790,12 +790,12 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
       padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: Offset(0, 2),
           ),
         ],
@@ -805,20 +805,20 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         children: [
           Row(
             children: [
-              Icon(Icons.checklist, color: AppColors.primary, size: 20),
+              Icon(Icons.checklist, color: AppColors.primary, size: AppResponsive.iconSize(context)),
               SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(choice.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textSecondary)),
+                    Text(choice.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary)),
                   ],
                 ),
               ),
               if (_canEdit) ...[
-                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 16, color: AppColors.primary))),
-                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: 16, color: Colors.red))),
+                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
               ],
             ],
           ),
@@ -847,9 +847,8 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   }
 
   Widget _buildAddButton() {
-    final isTablet = !AppResponsive.isMobile(context);
     return Container(
-      padding: EdgeInsets.all(isTablet ? 20 : 16),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -866,13 +865,13 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: () => openBottomSheet(),
-            icon: Icon(Icons.add, size: isTablet ? 22 : 20),
-            label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 14, fontWeight: FontWeight.w500)),
+            icon: Icon(Icons.add, size: AppResponsive.iconSize(context)),
+            label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
+              padding: EdgeInsets.symmetric(vertical: AppResponsive.mediumSpacing(context)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),

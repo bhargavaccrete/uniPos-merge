@@ -219,7 +219,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Customer Details',
         titleFontSize: isTablet ? 22 : 20,
@@ -275,7 +275,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                                 selectedCustomer!.phone!,
                                 style: GoogleFonts.poppins(
                                   fontSize: 12,
-                                  color: Colors.grey[700],
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             Row(
@@ -859,7 +859,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           height: height * 0.07,
                           padding: EdgeInsets.all(5),
                           decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey)),
+                              border: Border.all(color: AppColors.textSecondary)),
                           child: DropdownButtonHideUnderline(
                               child: DropdownButton(
                                   value: SelectedRemark,
@@ -954,14 +954,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
           ),
           // Proceed Button — pinned at bottom
           Container(
-            color: Colors.grey.shade50,
+            color: AppColors.surfaceLight,
             padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: SizedBox(
               width: double.infinity,
               height: isTablet ? 54 : 50,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _isPaymentValid ? AppColors.primary : Colors.grey.shade400,
+                  backgroundColor: _isPaymentValid ? AppColors.primary : AppColors.textSecondary,
                   foregroundColor: Colors.white,
                   elevation: _isPaymentValid ? 2 : 0,
                   shape: RoundedRectangleBorder(
@@ -1007,7 +1007,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
           color: isSelected ? AppColors.primary : Colors.white,
           border: Border.all(
             width: 1.5,
-            color: isSelected ? AppColors.primary : Colors.grey.shade300,
+            color: isSelected ? AppColors.primary : AppColors.divider,
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -1616,7 +1616,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 14,
-                  color: Colors.grey.shade600,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 28),
@@ -1634,13 +1634,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        side: BorderSide(color: Colors.grey.shade300),
+                        side: BorderSide(color: AppColors.divider),
                       ),
                       child: Text(
                         'Skip',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -1785,7 +1785,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 14,
-                  color: Colors.grey.shade600,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 28),
@@ -1803,13 +1803,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        side: BorderSide(color: Colors.grey.shade300),
+                        side: BorderSide(color: AppColors.divider),
                       ),
                       child: Text(
                         'Skip',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade600,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),

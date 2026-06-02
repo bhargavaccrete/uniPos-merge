@@ -37,17 +37,17 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         child: Container(
           padding: EdgeInsets.symmetric(vertical: AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : Colors.grey.shade100,
+            color: isSelected ? AppColors.primary : AppColors.surfaceMedium,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: AppResponsive.smallIconSize(context), color: isSelected ? Colors.white : Colors.grey.shade600),
+              Icon(icon, size: AppResponsive.smallIconSize(context), color: isSelected ? Colors.white : AppColors.textSecondary),
               SizedBox(width: 6),
               Text(label, style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
               )),
             ],
           ),
