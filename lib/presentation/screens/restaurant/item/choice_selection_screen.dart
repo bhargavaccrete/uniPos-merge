@@ -50,7 +50,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Add Choices',
         leading: IconButton(
@@ -88,7 +88,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
             Icon(
               Icons.checklist_outlined,
               size: 80,
-              color: Colors.grey[300],
+              color: AppColors.divider,
             ),
             SizedBox(height: 20),
             Text(
@@ -96,7 +96,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ),
             SizedBox(height: 10),
@@ -104,7 +104,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
               'Create your first choice group to get started',
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -146,7 +146,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
             'Select choice groups for this item:',
             style: GoogleFonts.poppins(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: AppColors.textSecondary,
             ),
           ),
           SizedBox(height: 20),
@@ -158,11 +158,11 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
               margin: EdgeInsets.only(bottom: 15),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                  color: isSelected ? AppColors.primary : AppColors.divider,
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(12),
-                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
+                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : AppColors.white,
               ),
               child: CheckboxListTile(
                 value: isSelected,
@@ -181,7 +181,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: isSelected ? Colors.black : Colors.grey[700],
+                    color: isSelected ? Colors.black : AppColors.textSecondary,
                   ),
                 ),
                 subtitle: Column(
@@ -194,7 +194,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                           '${choice.choiceOption.length} option${choice.choiceOption.length != 1 ? 's' : ''} available',
                           style: GoogleFonts.poppins(
                             fontSize: 13,
-                            color: Colors.grey[500],
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         SizedBox(width: 8),
@@ -244,14 +244,14 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                           return Container(
                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.grey[200],
+                              color: AppColors.divider,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               option.name,
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
-                                color: Colors.grey[700],
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           );
@@ -261,14 +261,14 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.grey[300],
+                              color: AppColors.divider,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               '+${choice.choiceOption.length - 3}',
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
-                                color: Colors.grey[600],
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -290,10 +290,10 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: AppColors.textSecondary.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: Offset(0, -3),
@@ -305,7 +305,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
           Expanded(
             child: CommonButton(
               onTap: () => Navigator.pop(context),
-              bgcolor: Colors.white,
+              bgcolor: AppColors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
               height: AppResponsive.height(context, 0.06),
@@ -369,7 +369,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     Text(
                       'Enter choice name and options',
                       style: GoogleFonts.poppins(
-                          fontSize: 13, color: Colors.grey[600]),
+                          fontSize: 13, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 15),
 
@@ -487,7 +487,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     Navigator.pop(context);
                   },
                   child: Text('Cancel',
-                      style: GoogleFonts.poppins(color: Colors.grey[600])),
+                      style: GoogleFonts.poppins(color: AppColors.textSecondary)),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -577,7 +577,7 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
             Icon(icon,
                 size: 18,
                 color:
-                    isSelected ? AppColors.primary : Colors.grey.shade400),
+                    isSelected ? AppColors.primary : AppColors.textSecondary),
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,10 +588,10 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                         fontWeight: FontWeight.w600,
                         color: isSelected
                             ? AppColors.primary
-                            : Colors.grey.shade600)),
+                            : AppColors.textSecondary)),
                 Text(subtitle,
                     style: GoogleFonts.poppins(
-                        fontSize: 10, color: Colors.grey.shade400)),
+                        fontSize: 10, color: AppColors.textSecondary)),
               ],
             ),
           ],

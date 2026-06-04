@@ -167,14 +167,22 @@ class LicenseInfo {
         'activation_id': activationId,
       };
 
-  bool get isExpiredLocally {
+  /// Expiry check against an explicit [asOf] time. Used with the anti-rollback
+  /// "trusted clock" (high-water-mark) so changing the device date backward
+  /// cannot fake an earlier time and make an expired license look valid.
+  bool isExpiredLocallyAsOf(DateTime asOf) {
     if (status == LicenseStatus.notActivated) return true;
     if (expiryDate == null) return false;
-    return DateTime.now().isAfter(expiryDate!);
+    return asOf.isAfter(expiryDate!);
   }
 
-  bool get isValidLocally =>
-      status == LicenseStatus.active && !isExpiredLocally;
+  /// Validity against an explicit [asOf] time.
+  bool isValidLocallyAsOf(DateTime asOf) =>
+      status == LicenseStatus.active && !isExpiredLocallyAsOf(asOf);
+
+  bool get isExpiredLocally => isExpiredLocallyAsOf(DateTime.now());
+
+  bool get isValidLocally => isValidLocallyAsOf(DateTime.now());
 
   /// Returns 9999 for perpetual licenses (null expiry).
   int get daysRemaining {

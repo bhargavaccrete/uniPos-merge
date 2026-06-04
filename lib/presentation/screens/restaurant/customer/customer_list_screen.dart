@@ -113,9 +113,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${customer.name ?? 'Customer'}"?', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-        content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
+        content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary))),
           TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
         ],
       ),
@@ -141,7 +141,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Customers',
         actions: [
@@ -164,7 +164,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     Icon(
                       Icons.sort_by_alpha,
                       size: 20,
-                      color: sortBy == 'name' ? AppColors.primary : Colors.grey,
+                      color: sortBy == 'name' ? AppColors.primary : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -185,7 +185,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     Icon(
                       Icons.people_rounded,
                       size: 20,
-                      color: sortBy == 'visits' ? AppColors.primary : Colors.grey,
+                      color: sortBy == 'visits' ? AppColors.primary : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -206,7 +206,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     Icon(
                       Icons.stars_rounded,
                       size: 20,
-                      color: sortBy == 'points' ? AppColors.primary : Colors.grey,
+                      color: sortBy == 'points' ? AppColors.primary : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -229,7 +229,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         children: [
           // Search Bar & Add Button Section
           Container(
-            color: Colors.white,
+            color: AppColors.white,
             padding: EdgeInsets.all(isTablet ? 20 : 16),
             child: Column(
               children: [
@@ -328,7 +328,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                         Icon(
                           Icons.people_outline_rounded,
                           size: isTablet ? 80 : 64,
-                          color: Colors.grey.shade400,
+                          color: AppColors.textSecondary,
                         ),
                         SizedBox(height: isTablet ? 20 : 16),
                         Text(
@@ -338,7 +338,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           style: GoogleFonts.poppins(
                             fontSize: isTablet ? 18 : 16,
                             fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade600,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         if (_searchController.text.isEmpty) ...[
@@ -347,7 +347,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                             'Add your first customer to get started',
                             style: GoogleFonts.poppins(
                               fontSize: isTablet ? 14 : 13,
-                              color: Colors.grey.shade500,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -396,9 +396,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     return Container(
       margin: EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.divider),
       ),
       child: InkWell(
         onTap: () => _navigateToCustomerDetail(customer),
@@ -427,13 +427,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                         '${customer.totalVisites} visits',
                         '${customer.loyaltyPoints} pts',
                       ].join('  •  '),
-                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade500),
+                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
               ),
               PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert_rounded, color: Colors.grey.shade500, size: 20),
+                icon: Icon(Icons.more_vert_rounded, color: AppColors.textSecondary, size: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 onSelected: (value) {
                   if (value == 'edit') _navigateToEditCustomer(customer);

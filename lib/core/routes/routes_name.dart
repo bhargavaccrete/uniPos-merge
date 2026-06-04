@@ -91,9 +91,7 @@ class RouteNames {
   static const restaurantLicensing = '/restaurant-licensing';
   static const restaurantOrderSettings = '/restaurant-order-settings';
   static const restaurantPaymentMethods = '/restaurant-payment-methods';
-  static const restaurantOrderNotifications = '/restaurant-order-notifications';
   static const restaurantChangePassword = '/restaurant-change-password';
-  static const restaurantAddressCustomization = '/restaurant-address-customization';
 
   // Restaurant - Tax
   static const restaurantTaxSettings = '/restaurant-tax-settings';
@@ -112,7 +110,6 @@ class RouteNames {
   static const restaurantAttendanceReport = '/restaurant-attendance-report';
 
   // Restaurant - Other
-  static const restaurantLanguage = '/restaurant-language';
   static const restaurantNeedHelp = '/restaurant-need-help';
   static const restaurantSupport = '/restaurant-support';
   static const restaurantCustomizationDrawer = '/restaurant-customization';

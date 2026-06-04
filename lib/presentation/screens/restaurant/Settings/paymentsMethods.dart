@@ -94,7 +94,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                 ],
               ),
             ),
-            Divider(height: 1, color: Colors.grey.shade200),
+            Divider(height: 1, color: AppColors.divider),
 
             // Content
             Padding(
@@ -115,7 +115,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
             child: Text(
               'Cancel',
               style: GoogleFonts.poppins(
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -195,7 +195,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                 ],
               ),
             ),
-            Divider(height: 1, color: Colors.grey.shade200),
+            Divider(height: 1, color: AppColors.divider),
 
             // Content
             Padding(
@@ -216,7 +216,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
             child: Text(
               'Cancel',
               style: GoogleFonts.poppins(
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -257,7 +257,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Payment Methods',
         titleFontSize: isTablet ? 22 : 20,
@@ -301,7 +301,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
         children: [
           // Action Buttons Section
           Container(
-            color: Colors.white,
+            color: AppColors.white,
             padding: EdgeInsets.all(isTablet ? 20 : 16),
             child: Row(
               children: [
@@ -381,13 +381,13 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                         Container(
                           padding: EdgeInsets.all(isTablet ? 24 : 20),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: AppColors.surfaceMedium,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             Icons.payment_rounded,
                             size: isTablet ? 64 : 56,
-                            color: Colors.grey.shade400,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         SizedBox(height: 16),
@@ -404,7 +404,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                           'Add a payment method to get started',
                           style: GoogleFonts.poppins(
                             fontSize: isTablet ? 15 : 14,
-                            color: Colors.grey.shade600,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -417,7 +417,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                     padding: EdgeInsets.all(isTablet ? 20 : 16),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.white,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -499,7 +499,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
 
                               return DataRow(
                                 color: WidgetStateProperty.all(
-                                  index % 2 == 0 ? Colors.white : Colors.grey.shade50,
+                                  index % 2 == 0 ? AppColors.white : AppColors.surfaceLight,
                                 ),
                                 cells: [
                                   DataCell(
@@ -517,12 +517,12 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                                       decoration: BoxDecoration(
                                         color: method.isEnabled
                                             ? Colors.green.withValues(alpha: 0.1)
-                                            : Colors.grey.withValues(alpha: 0.1),
+                                            : AppColors.textSecondary.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Icon(
                                         _getIcon(method.iconName),
-                                        color: method.isEnabled ? Colors.green : Colors.grey,
+                                        color: method.isEnabled ? Colors.green : AppColors.textSecondary,
                                         size: isTablet ? 24 : 22,
                                       ),
                                     ),
@@ -621,7 +621,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                                                           ],
                                                         ),
                                                       ),
-                                                      Divider(height: 1, color: Colors.grey.shade200),
+                                                      Divider(height: 1, color: AppColors.divider),
 
                                                       // Content
                                                       Padding(
@@ -642,7 +642,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                                                       child: Text(
                                                         'Cancel',
                                                         style: GoogleFonts.poppins(
-                                                          color: Colors.grey.shade600,
+                                                          color: AppColors.textSecondary,
                                                           fontWeight: FontWeight.w500,
                                                         ),
                                                       ),

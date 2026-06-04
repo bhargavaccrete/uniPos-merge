@@ -47,7 +47,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Select Tax',
         leading: IconButton(
@@ -85,7 +85,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
             Icon(
               Icons.receipt_outlined,
               size: 80,
-              color: Colors.grey[300],
+              color: AppColors.divider,
             ),
             const SizedBox(height: 20),
             Text(
@@ -93,7 +93,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 10),
@@ -102,7 +102,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 30),
@@ -164,7 +164,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: isSelected ? AppColors.primary : Colors.grey.shade300,
+          color: isSelected ? AppColors.primary : AppColors.divider,
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -177,7 +177,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
         },
         leading: Icon(
           isSelected ? Icons.check_circle : Icons.circle_outlined,
-          color: isSelected ? AppColors.primary : Colors.grey,
+          color: isSelected ? AppColors.primary : AppColors.textSecondary,
         ),
         title: Text(
           name,
@@ -189,7 +189,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
         subtitle: Text(
           '${(percentage ?? 0.0).toStringAsFixed(2)}%',
           style: GoogleFonts.poppins(
-            color: Colors.grey[600],
+            color: AppColors.textSecondary,
             fontSize: 14,
           ),
         ),
@@ -207,10 +207,10 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.shade300,
+            color: AppColors.divider,
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -221,7 +221,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
           Expanded(
             child: CommonButton(
               onTap: () => Navigator.pop(context),
-              bgcolor: Colors.white,
+              bgcolor: AppColors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
               height:AppResponsive.height(context, 0.06),
@@ -304,7 +304,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
             },
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey),
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -387,7 +387,7 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'No',
-              style: GoogleFonts.poppins(color: Colors.grey),
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
             ),
           ),
           ElevatedButton(

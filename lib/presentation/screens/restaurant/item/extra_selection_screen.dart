@@ -49,7 +49,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Add Extras',
         leading: IconButton(
@@ -87,7 +87,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
             Icon(
               Icons.add_circle_outline,
               size: 80,
-              color: Colors.grey[300],
+              color: AppColors.divider,
             ),
             SizedBox(height: 20),
             Text(
@@ -95,7 +95,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ),
             SizedBox(height: 10),
@@ -103,7 +103,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
               'Create your first extra category to get started',
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -145,7 +145,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
             'Select extra categories for this item:',
             style: GoogleFonts.poppins(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: AppColors.textSecondary,
             ),
           ),
           SizedBox(height: 20),
@@ -158,11 +158,11 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
               margin: EdgeInsets.only(bottom: 15),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                  color: isSelected ? AppColors.primary : AppColors.divider,
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(12),
-                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
+                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : AppColors.white,
               ),
               child: CheckboxListTile(
                 value: isSelected,
@@ -181,7 +181,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: isSelected ? Colors.black : Colors.grey[700],
+                    color: isSelected ? Colors.black : AppColors.textSecondary,
                   ),
                 ),
                 subtitle: Column(
@@ -194,7 +194,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                           '$toppingCount topping${toppingCount != 1 ? 's' : ''} available',
                           style: GoogleFonts.poppins(
                             fontSize: 13,
-                            color: Colors.grey[500],
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         if (extra.minimum != null || extra.maximum != null) ...[
@@ -250,7 +250,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                   topping.name,
                                   style: GoogleFonts.poppins(
                                     fontSize: 11,
-                                    color: Colors.grey[700],
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -262,14 +262,14 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                 ? Container(
                               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.grey[300],
+                                color: AppColors.divider,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 '+${extra.topping!.length - 3}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 11,
-                                  color: Colors.grey[600],
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             )
@@ -293,10 +293,10 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: AppColors.textSecondary.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: Offset(0, -3),
@@ -308,7 +308,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
           Expanded(
             child: CommonButton(
               onTap: () => Navigator.pop(context),
-              bgcolor: Colors.white,
+              bgcolor: AppColors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
               height: AppResponsive.height(context, 0.06),
@@ -385,7 +385,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       'Enter extra category name and toppings',
                       style: GoogleFonts.poppins(
                         fontSize: 13,
-                        color: Colors.grey[600],
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     SizedBox(height: 15),
@@ -414,7 +414,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                         margin: EdgeInsets.only(bottom: 15),
                         padding: EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: AppColors.divider),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Column(
@@ -643,7 +643,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                   },
                   child: Text(
                     'Cancel',
-                    style: GoogleFonts.poppins(color: Colors.grey[600]),
+                    style: GoogleFonts.poppins(color: AppColors.textSecondary),
                   ),
                 ),
                 ElevatedButton(

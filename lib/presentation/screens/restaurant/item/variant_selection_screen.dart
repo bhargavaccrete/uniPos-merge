@@ -151,7 +151,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Add Variants',
         leading: IconButton(
@@ -189,7 +189,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             Icon(
               Icons.straighten_outlined,
               size: 80,
-              color: Colors.grey[300],
+              color: AppColors.divider,
             ),
             SizedBox(height: 20),
             Text(
@@ -197,7 +197,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ),
             SizedBox(height: 10),
@@ -205,7 +205,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               'Create your first variant to get started',
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -247,7 +247,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             'Select variants for this item and set their prices:',
             style: GoogleFonts.poppins(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: AppColors.textSecondary,
             ),
           ),
           SizedBox(height: 20),
@@ -261,11 +261,11 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               padding: EdgeInsets.all(15),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.grey[300]!,
+                  color: isSelected ? AppColors.primary : AppColors.divider,
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(12),
-                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
+                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : AppColors.white,
               ),
               child: Column(
                 children: [
@@ -289,7 +289,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
-                            color: isSelected ? Colors.black : Colors.grey[600],
+                            color: isSelected ? Colors.black : AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -322,10 +322,10 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: AppColors.textSecondary.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: Offset(0, -3),
@@ -337,7 +337,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
           Expanded(
             child: CommonButton(
               onTap: () => Navigator.pop(context),
-              bgcolor: Colors.white,
+              bgcolor: AppColors.white,
               bordercolor: AppColors.primary,
               bordercircular: 10,
               height: AppResponsive.height(context, 0.06),
@@ -407,7 +407,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   'Enter variant name (e.g., Small, Medium, Large)',
                   style: GoogleFonts.poppins(
                     fontSize: 13,
-                    color: Colors.grey[600],
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 SizedBox(height: 15),
@@ -425,7 +425,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancel',
-                style: GoogleFonts.poppins(color: Colors.grey[600]),
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
               ),
             ),
             ElevatedButton(

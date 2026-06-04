@@ -974,8 +974,17 @@ class RestaurantBulkImportService {
         }
 
         List<Topping> toppings = extra.topping?.toList() ?? [];
+        int addedToppings = 0;
 
         for (var toppingName in toppingGroups[extraId]!.keys) {
+          // Skip toppings this extra already has — prevents duplicates when the
+          // same file is re-imported (the group dedupes by id, children must too).
+          if (toppings.any((t) =>
+              t.name.toLowerCase().trim() == toppingName.toLowerCase().trim())) {
+            result.warnings.add('Topping "$toppingName" already in extra $extraId, skipping');
+            continue;
+          }
+
           var toppingRows = toppingGroups[extraId]![toppingName]!;
           var firstRow = toppingRows.first;
 
@@ -1015,11 +1024,15 @@ class RestaurantBulkImportService {
             createdTime: DateTime.now(),
           ));
           result.toppingsImported++;
+          addedToppings++;
         }
 
-        var updatedExtra = extra.copyWith(topping: toppings);
-        await extraStore.updateExtra(updatedExtra);
-        _extraCache[extraId] = updatedExtra;
+        // Only persist when something new was actually added.
+        if (addedToppings > 0) {
+          var updatedExtra = extra.copyWith(topping: toppings);
+          await extraStore.updateExtra(updatedExtra);
+          _extraCache[extraId] = updatedExtra;
+        }
       } catch (e) {
         result.errors.add('Error importing toppings for extra $extraId: $e');
       }
@@ -1092,6 +1105,7 @@ class RestaurantBulkImportService {
 
 
         List<ChoiceOption> options = choice.choiceOption.toList();
+        int addedOptions = 0;
 
         for (var row in optionGroups[choiceId]!) {
           String optionId = _getValue(row, 1);
@@ -1099,26 +1113,38 @@ class RestaurantBulkImportService {
 
           if (optionId.isEmpty || optionName.isEmpty) continue;
 
+          // Skip options this choice already has — prevents duplicates on
+          // re-import (match by id or by name).
+          if (options.any((o) =>
+              o.id == optionId ||
+              o.name.toLowerCase().trim() == optionName.toLowerCase().trim())) {
+            result.warnings.add('Option "$optionName" already in choice $choiceId, skipping');
+            continue;
+          }
+
           options.add(ChoiceOption(
             id: optionId,
             name: optionName,
           ));
           result.choiceOptionsImported++;
+          addedOptions++;
         }
 
-        // Create new ChoicesModel with updated options
-        var updatedChoice = ChoicesModel(
-          id: choice.id,
-          name: choice.name,
-          choiceOption: options,
-          createdTime: choice.createdTime,
-          lastEditedTime: DateTime.now(),
-          editedBy: 'BulkImport',
-          editCount: choice.editCount + 1,
-          allowMultipleSelection: choice.allowMultipleSelection, // Preserve the selection type
-        );
-        await choiceStore.updateChoice(updatedChoice);
-        _choiceCache[choiceId] = updatedChoice;
+        // Only persist (and bump editCount) when new options were added.
+        if (addedOptions > 0) {
+          var updatedChoice = ChoicesModel(
+            id: choice.id,
+            name: choice.name,
+            choiceOption: options,
+            createdTime: choice.createdTime,
+            lastEditedTime: DateTime.now(),
+            editedBy: 'BulkImport',
+            editCount: choice.editCount + 1,
+            allowMultipleSelection: choice.allowMultipleSelection, // Preserve the selection type
+          );
+          await choiceStore.updateChoice(updatedChoice);
+          _choiceCache[choiceId] = updatedChoice;
+        }
       } catch (e) {
         result.errors.add('Error importing options for choice $choiceId: $e');
       }

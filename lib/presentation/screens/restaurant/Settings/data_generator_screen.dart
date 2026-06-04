@@ -150,7 +150,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Performance Test Data Generator',
         titleFontSize: isTablet ? 22 : 18,
@@ -284,7 +284,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                   'Database Health',
                   totalRecords > 0 ? 'Active' : 'Empty',
                   icon: Icons.health_and_safety,
-                  valueColor: totalRecords > 0 ? Colors.green : Colors.grey,
+                  valueColor: totalRecords > 0 ? Colors.green : AppColors.textSecondary,
                 ),
                 _buildReportRow(
                   'Large Dataset Test',
@@ -333,7 +333,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 20, color: Colors.grey.shade600),
+            Icon(icon, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 8),
           ],
           Expanded(
@@ -458,7 +458,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   Widget _buildInfoCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blue.shade200),
         boxShadow: [
@@ -511,7 +511,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   Widget _buildInputSection() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -572,7 +572,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   Widget _buildImageOptionsCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.orange.shade200),
         boxShadow: [

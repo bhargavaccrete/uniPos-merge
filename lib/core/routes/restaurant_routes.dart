@@ -82,9 +82,7 @@ import 'package:unipos/presentation/screens/restaurant/Reports/performance_stati
 import 'package:unipos/presentation/screens/restaurant/Settings/settingsScreen.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/orderSettings.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/orderNotificationSetting.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/changePassword.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/addressCustomizationScreen.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/licensing_screen.dart';
 
 // Restaurant - Tax
@@ -100,7 +98,6 @@ import 'package:unipos/presentation/screens/restaurant/printerSetting/customizat
 import 'package:unipos/presentation/screens/restaurant/end%20day/endday.dart';
 
 // Restaurant - Other
-import 'package:unipos/presentation/screens/restaurant/language.dart';
 import 'package:unipos/presentation/screens/restaurant/need%20help/needhelp.dart';
 import 'package:unipos/presentation/screens/restaurant/customiztion/customization_drawer.dart';
 
@@ -211,7 +208,6 @@ class RestaurantRoutes {
     RouteNames.restaurantOrderSettings: _guard(Ordersettings(), 'settings'),
     RouteNames.restaurantPaymentMethods: _guard(Paymentsmethods(), 'settings'),
     RouteNames.restaurantChangePassword: _guard(Changepassword(), 'settings'),
-    RouteNames.restaurantAddressCustomization: _guard(AddressCustomizationScreen(), 'settings'),
 
     // Restaurant - Tax
     RouteNames.restaurantTaxSettings: _guard(taxSetting(), 'taxSettings'),

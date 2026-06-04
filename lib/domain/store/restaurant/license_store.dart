@@ -24,9 +24,18 @@ abstract class _LicenseStore with Store {
   // Temporary bypass flag (e.g. web where activation is unavailable). Stored in
   // SharedPreferences so it works on web (secure storage is unreliable there).
   static const _bypassKey = 'unipos_license_bypass';
+  // Anti-rollback "high-water-mark": furthest-forward time we've ever seen
+  // (ms since epoch). Expiry is checked against max(now, this) so setting the
+  // device clock backward cannot make an expired license look valid.
+  static const _lastSeenKey = 'unipos_last_seen_epoch';
   static const _storage = FlutterSecureStorage();
 
   Timer? _heartbeatTimer;
+
+  // Loaded/advanced by [_loadAndAdvanceTrustedClock]. A plain field (not an
+  // @observable) so no MobX codegen change is needed — isLicensed recomputes
+  // when licenseInfo changes, by which point this is already loaded.
+  int _trustedNowMs = 0;
 
   /// When true, the app behaves as licensed without an actual activation.
   /// Set via [skipLicense]; cleared via [clearBypass].
@@ -48,7 +57,8 @@ abstract class _LicenseStore with Store {
 
   @computed
   bool get isLicensed =>
-      licenseBypassed || (licenseInfo?.isValidLocally ?? false);
+      licenseBypassed ||
+      (licenseInfo?.isValidLocallyAsOf(_trustedNow()) ?? false);
 
   @computed
   bool get isExpiringSoon =>
@@ -68,6 +78,10 @@ abstract class _LicenseStore with Store {
   Future<void> _applyServerData(Map<String, dynamic> data) async {
     final devicePayload = await DevicePayloadService.build();
     final info = LicenseInfo.fromServerJson(data, devicePayload);
+    // Server is authoritative — reset the trusted clock to its time (may correct
+    // a poisoned forward clock). Done before licenseInfo so isLicensed recomputes
+    // against the corrected time.
+    await _resetTrustedClockFromServer(info);
     licenseInfo = info;
     final storedJson = {
       ...info.toJson(),
@@ -80,6 +94,54 @@ abstract class _LicenseStore with Store {
     stopHeartbeatTimer();
     await _storage.delete(key: _tokenKey);
     licenseInfo = null;
+  }
+
+  // ── Anti-rollback trusted clock (high-water-mark) ──────────────────────────
+
+  /// The trusted "now": never earlier than the stored high-water-mark, so a
+  /// rolled-back device clock is ignored for expiry purposes.
+  DateTime _trustedNow() {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final ms = nowMs > _trustedNowMs ? nowMs : _trustedNowMs;
+    return DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  /// Loads the stored high-water-mark, advances it to max(now, stored, seedFrom)
+  /// and persists it. Must run before [isLicensed] is read at startup/activation
+  /// so a backward-set clock is caught on the very first check.
+  Future<void> _loadAndAdvanceTrustedClock({DateTime? seedFrom}) async {
+    int stored = 0;
+    try {
+      final raw = await _storage.read(key: _lastSeenKey);
+      stored = int.tryParse(raw ?? '') ?? 0;
+    } catch (_) {}
+    // First run after activation: seed from the server-issued activation date.
+    if (stored == 0 && seedFrom != null) {
+      stored = seedFrom.millisecondsSinceEpoch;
+    }
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    _trustedNowMs = nowMs > stored ? nowMs : stored; // high-water-mark (max)
+    try {
+      await _storage.write(key: _lastSeenKey, value: '$_trustedNowMs');
+    } catch (_) {}
+  }
+
+  /// Resets the trusted clock to the server's authoritative time (expiry minus
+  /// remaining days). Unlike the offline high-water-mark, this may move the mark
+  /// DOWN — but only on a verified server response, which lets a valid license
+  /// recover from an accidental forward-clock "poison" WITHOUT reopening the
+  /// offline rollback hole (a backward device clock alone can never do this).
+  Future<void> _resetTrustedClockFromServer(LicenseInfo info) async {
+    DateTime serverNow;
+    if (info.expiryDate != null && info.validityDays > 0) {
+      serverNow = info.expiryDate!.subtract(Duration(days: info.validityDays));
+    } else {
+      serverNow = DateTime.now();
+    }
+    _trustedNowMs = serverNow.millisecondsSinceEpoch;
+    try {
+      await _storage.write(key: _lastSeenKey, value: '$_trustedNowMs');
+    } catch (_) {}
   }
 
   // ── Load & Validate ───────────────────────────────────────────────────────
@@ -129,10 +191,12 @@ abstract class _LicenseStore with Store {
       if (tokenMap.containsKey('payload')) {
         if (kDebugMode) await DevTokenHelper.init();
         final devicePayload = await DevicePayloadService.build();
-        licenseInfo = LicenseValidationService.validate(
+        final info = LicenseValidationService.validate(
           rawToken: rawToken,
           currentDevice: devicePayload,
         );
+        await _loadAndAdvanceTrustedClock(seedFrom: info?.activatedAt);
+        licenseInfo = info;
         if (licenseInfo != null) startHeartbeatTimer();
         return;
       }
@@ -146,7 +210,9 @@ abstract class _LicenseStore with Store {
         return;
       }
 
-      licenseInfo = LicenseInfo.fromJson(tokenMap);
+      final info = LicenseInfo.fromJson(tokenMap);
+      await _loadAndAdvanceTrustedClock(seedFrom: info.activatedAt);
+      licenseInfo = info;
       if (licenseInfo != null) startHeartbeatTimer();
     } catch (_) {}
   }
@@ -208,6 +274,9 @@ abstract class _LicenseStore with Store {
         errorMessage = 'License is not active. Contact support.';
         return false;
       }
+      // Server confirmed activation — reset trusted clock to server time so a
+      // fresh/renewed key recovers even if the mark was previously advanced.
+      await _resetTrustedClockFromServer(info);
       licenseInfo = info;
       final storedJson = {
         ...info.toJson(),

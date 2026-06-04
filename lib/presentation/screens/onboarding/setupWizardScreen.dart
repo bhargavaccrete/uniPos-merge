@@ -266,7 +266,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         if (!didPop) _showExitDialog();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: AppColors.surfaceLight,
         body: SafeArea(
           child: Observer(
             builder: (_) => Responsive(
@@ -359,7 +359,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),

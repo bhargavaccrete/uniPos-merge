@@ -5,8 +5,6 @@ import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mobx/mobx.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:unipos/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:unipos/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:unipos/data/models/retail/hive_model/product_attribute_model_221.dart';
@@ -69,41 +67,6 @@ abstract class _BulkImportStore with Store {
     isLoading = true;
     errorMessage = null;
     try {
-      // 1. Request Storage Permission (Mobile only) - Updated for Android 13+
-      if (!kIsWeb && Platform.isAndroid) {
-        // On Android 13+ (API 33+), we need to request different permissions
-        // For now, we'll use the app's private directory which doesn't require permissions
-        // Or request manageExternalStorage for Android 11+
-        final androidVersion = Platform.version;
-
-        // Try to request storage permission (works for Android 10 and below)
-        var status = await Permission.storage.status;
-        if (!status.isGranted) {
-          status = await Permission.storage.request();
-        }
-
-        // If still not granted, try manageExternalStorage for Android 11+
-        if (!status.isGranted) {
-          var manageStatus = await Permission.manageExternalStorage.status;
-          if (!manageStatus.isGranted) {
-            manageStatus = await Permission.manageExternalStorage.request();
-          }
-
-          // If still no permission, we'll save to app's private directory
-          if (!manageStatus.isGranted) {
-          }
-        }
-      } else if (!kIsWeb && Platform.isIOS) {
-        var status = await Permission.storage.status;
-        if (!status.isGranted) {
-          status = await Permission.storage.request();
-          if (!status.isGranted) {
-            errorMessage = 'Storage permission required to save template.';
-            return null;
-          }
-        }
-      }
-
       // 2. Define Headers
       List<String> headers = [
         'Handle', // 0. Group ID (Required)
@@ -160,29 +123,56 @@ abstract class _BulkImportStore with Store {
       ].map((e) => TextCellValue(e)).toList());
 
       // 4. Encode
-      var fileBytes = excel.encode();
-
-      // 5. Save File
-      if (kIsWeb) {
-        // For web, we can't save files easily, so just show a message
-        successMessage = 'Template format:\n'
-            'Create a CSV or Excel file with these columns:\n'
-            'Handle, Name, Category, Description, Option1 Name, Option1 Value, '
-            'Option2 Name, Option2 Value, Option3 Name, Option3 Value, '
-            'Cost Price, Selling Price, Stock, Barcode, Min Stock\n\n'
-            'Example row:\n'
-            'product1, Test Product, Electronics, Sample product, , , , , , , 10, 20, 100, BARCODE123, 5';
+      final bytes = excel.encode();
+      if (bytes == null) {
+        errorMessage = 'Failed to generate template.';
         return null;
+      }
+
+      // 5. Save File via native picker — handles web download, desktop
+      //    Save dialog, and Android/iOS Downloads + permissions uniformly.
+      const fileName = 'product_import_template.xlsx';
+
+      if (kIsWeb) {
+        final result = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Template',
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['xlsx'],
+          bytes: Uint8List.fromList(bytes),
+        );
+        successMessage = result != null
+            ? 'Template downloaded successfully.'
+            : 'Download cancelled.';
+        return result;
+      } else if (Platform.isAndroid || Platform.isIOS) {
+        // On Android/iOS bytes are required; FilePicker writes the file itself.
+        final result = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Template',
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['xlsx'],
+          bytes: Uint8List.fromList(bytes),
+        );
+        successMessage = result != null
+            ? 'Template saved to Downloads.'
+            : 'Download cancelled.';
+        return result;
       } else {
-        final directory = await getExternalStorageDirectory();
-        final path = directory?.path ?? (await getApplicationDocumentsDirectory()).path;
-        
-        final file = File('$path/product_import_template.xlsx');
-        await file.create(recursive: true);
-        await file.writeAsBytes(fileBytes!);
-        
-        successMessage = 'Template saved to: ${file.path}';
-        return file.path;
+        // Desktop (Windows/macOS/Linux): picker returns a path, we write bytes.
+        final result = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Template',
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['xlsx'],
+        );
+        if (result != null) {
+          await File(result).writeAsBytes(bytes);
+          successMessage = 'Template saved successfully.';
+        } else {
+          successMessage = 'Download cancelled.';
+        }
+        return result;
       }
     } catch (e) {
       errorMessage = 'Failed to generate template: $e';

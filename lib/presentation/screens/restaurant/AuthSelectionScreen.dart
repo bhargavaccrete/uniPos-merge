@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/routes/routes_name.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/images.dart';
 
@@ -18,7 +17,7 @@ class AuthSelectionScreen extends StatelessWidget {
     double height = MediaQuery.of(context).size.height * 1;
     double width = MediaQuery.of(context).size.width * 1;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
       body: SingleChildScrollView(
         child: Container(
           width: width,
@@ -32,16 +31,11 @@ class AuthSelectionScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Positioned(
-                left: 100,
-                child: Container(
-                  // color: Colors.green,
-                  height: height * 0.15,
-                  width: width * 0.50,
-                  alignment: Alignment.center,
-                  child: Image.asset(AppImages.logo),
-                  // child: Image.asset('assets/images/BillBerry1_processed.jpg'),
-                ),
+              Container(
+                height: height * 0.15,
+                width: width * 0.50,
+                alignment: Alignment.center,
+                child: Image.asset(AppImages.logo),
               ),
               SizedBox(height: 10),
               Text(
@@ -57,10 +51,6 @@ class AuthSelectionScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (context) => loginScreen()));
-                    Navigator.pushNamed(context, RouteNames.restaurantChangePassword);
-
-
-
                   },
                   child: Center(
                       child: Text('Login',

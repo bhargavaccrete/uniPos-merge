@@ -667,19 +667,28 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
           return _buildEmptyState(size.height);
         }
 
-        return GridView.builder(
+        // Masonry layout: each card keeps its natural height so all options are
+        // reachable (a fixed-aspect grid clips long lists). Reuses the full
+        // mobile card and distributes cards round-robin across columns.
+        final columns =
+            AppResponsive.gridColumns(context, mobile: 2, tablet: 2, desktop: 3);
+        final colLists = List.generate(columns, (_) => <Widget>[]);
+        for (var i = 0; i < filteredChoices.length; i++) {
+          colLists[i % columns].add(_buildMobileChoiceCard(filteredChoices[i]));
+        }
+        final spacing = AppResponsive.gridSpacing(context);
+
+        return SingleChildScrollView(
           padding: AppResponsive.padding(context),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 2, desktop: 3),
-            crossAxisSpacing: AppResponsive.gridSpacing(context),
-            mainAxisSpacing: AppResponsive.gridSpacing(context),
-            childAspectRatio: 2.8,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var c = 0; c < columns; c++) ...[
+                if (c > 0) SizedBox(width: spacing),
+                Expanded(child: Column(children: colLists[c])),
+              ],
+            ],
           ),
-          itemCount: filteredChoices.length,
-          itemBuilder: (context, index) {
-            final choice = filteredChoices[index];
-            return _buildGridChoiceCard(choice);
-          },
         );
       },
     );
@@ -781,67 +790,6 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                   );
                 }).toList(),
         ),
-      ),
-    );
-  }
-
-  Widget _buildGridChoiceCard(ChoicesModel choice) {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: AppResponsive.shadowBlurRadius(context),
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.checklist, color: AppColors.primary, size: AppResponsive.iconSize(context)),
-              SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(choice.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary)),
-                  ],
-                ),
-              ),
-              if (_canEdit) ...[
-                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
-                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
-              ],
-            ],
-          ),
-          if (choice.choiceOption.isNotEmpty) ...[
-            SizedBox(height: 8),
-            Expanded(
-              child: ListView(
-                children: [
-                  ...choice.choiceOption.take(2).map((option) => Padding(
-                    padding: EdgeInsets.only(bottom: 3),
-                    child: Row(children: [
-                      Container(width: 4, height: 4, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-                      SizedBox(width: 8),
-                      Expanded(child: Text(option.name, style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                    ]),
-                  )),
-                  if (choice.choiceOption.length > 2)
-                    Text('+${choice.choiceOption.length - 2} more', style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
-                ],
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }

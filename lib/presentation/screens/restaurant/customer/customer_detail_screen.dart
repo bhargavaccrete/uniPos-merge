@@ -81,7 +81,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           keyboardType: TextInputType.number,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary))),
           TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Add', style: GoogleFonts.poppins(color: AppColors.primary, fontWeight: FontWeight.w500))),
         ],
       ),
@@ -125,9 +125,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         insetPadding: EdgeInsets.symmetric(horizontal: dialogHInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Text('Delete "${_customer.name ?? 'Customer'}"?', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-        content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
+        content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary))),
           TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
         ],
       ),
@@ -164,7 +164,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Customer Details',
         actions: [
@@ -209,7 +209,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   // Customer Header
                   Container(
                     width: double.infinity,
-                    color: Colors.white,
+                    color: AppColors.white,
                     padding: EdgeInsets.all(isTablet ? 28 : 24),
                     child: Column(
                       children: [
@@ -249,7 +249,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                             children: [
                               Icon(
                                 Icons.phone_rounded,
-                                color: Colors.grey.shade600,
+                                color: AppColors.textSecondary,
                                 size: isTablet ? 18 : 16,
                               ),
                               SizedBox(width: 8),
@@ -257,7 +257,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                 _customer.phone!,
                                 style: GoogleFonts.poppins(
                                   fontSize: isTablet ? 16 : 15,
-                                  color: Colors.grey.shade700,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -272,9 +272,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     margin: EdgeInsets.all(isTablet ? 20 : 16),
                     padding: EdgeInsets.all(isTablet ? 20 : 16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: AppColors.divider),
                     ),
                     child: Row(
                       children: [
@@ -371,9 +371,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                           Container(
                             padding: EdgeInsets.all(isTablet ? 16 : 14),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.white,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade200),
+                              border: Border.all(color: AppColors.divider),
                             ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,7 +389,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                     _customer.notes!,
                                     style: GoogleFonts.poppins(
                                       fontSize: isTablet ? 14 : 13,
-                                      color: Colors.grey.shade800,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -497,7 +497,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           label,
           style: GoogleFonts.poppins(
             fontSize: isTablet ? 13 : 12,
-            color: Colors.grey.shade700,
+            color: AppColors.textSecondary,
             fontWeight: FontWeight.w500,
           ),
           textAlign: TextAlign.center,
@@ -521,9 +521,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     return Container(
       padding: EdgeInsets.all(isTablet ? 16 : 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         children: children,
@@ -546,7 +546,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           Icon(
             icon,
             size: isTablet ? 22 : 20,
-            color: isSubdued ? Colors.grey.shade400 : AppColors.primary,
+            color: isSubdued ? AppColors.textSecondary : AppColors.primary,
           ),
           SizedBox(width: 12),
           Expanded(
@@ -557,7 +557,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   label,
                   style: GoogleFonts.poppins(
                     fontSize: isTablet ? 13 : 12,
-                    color: Colors.grey.shade600,
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -566,7 +566,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   value,
                   style: GoogleFonts.poppins(
                     fontSize: isTablet ? 15 : 14,
-                    color: isSubdued ? Colors.grey.shade500 : Colors.grey.shade800,
+                    color: isSubdued ? AppColors.textSecondary : AppColors.textPrimary,
                     fontWeight: isSubdued ? FontWeight.normal : FontWeight.w500,
                   ),
                 ),

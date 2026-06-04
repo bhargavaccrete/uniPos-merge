@@ -45,7 +45,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Add More Info',
         leading: IconButton(
@@ -184,7 +184,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                       'taxId': selectedTaxId,
                       'taxRate': selectedTaxRate,
                     }),
-                    bgcolor: Colors.white,
+                    bgcolor: AppColors.white,
                     bordercolor: AppColors.primary,
                     bordercircular: 10,
                     height: AppResponsive.height(context, 0.06),
@@ -243,11 +243,11 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           border: Border.all(
-            color: hasSelection ? AppColors.primary : Colors.grey[300]!,
+            color: hasSelection ? AppColors.primary : AppColors.divider,
             width: hasSelection ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
-          color: hasSelection ? AppColors.primary.withValues(alpha: 0.05) : Colors.grey[50],
+          color: hasSelection ? AppColors.primary.withValues(alpha: 0.05) : AppColors.surfaceLight,
         ),
         child: Row(
           children: [
@@ -280,7 +280,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                     description,
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -289,7 +289,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Colors.grey[400],
+              color: AppColors.textSecondary,
             ),
           ],
         ),
@@ -310,9 +310,9 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
       child: Container(
         padding: EdgeInsets.all(20),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
+          border: Border.all(color: AppColors.divider),
           borderRadius: BorderRadius.circular(12),
-          color: Colors.grey[50],
+          color: AppColors.surfaceLight,
         ),
         child: Row(
           children: [
@@ -367,7 +367,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                     description,
                     style: GoogleFonts.poppins(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -375,7 +375,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
             ),
             Icon(
               Icons.arrow_forward_ios,
-              color: Colors.grey[400],
+              color: AppColors.textSecondary,
               size: 18,
             ),
           ],

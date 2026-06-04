@@ -408,11 +408,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.teal.shade600, Colors.teal.shade400],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: Colors.teal.shade600,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                         ),
                         child: Column(

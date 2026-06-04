@@ -147,7 +147,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: _isEditMode ? 'Edit Customer' : 'Add Customer',
         actions: [
@@ -177,7 +177,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             Container(
               padding: EdgeInsets.all(isTablet ? 20 : 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.white,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -222,7 +222,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
                               : 'Add a new customer to your database',
                           style: GoogleFonts.poppins(
                             fontSize: isTablet ? 14 : 13,
-                            color: Colors.grey.shade600,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],

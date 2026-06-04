@@ -77,52 +77,17 @@ class _ManageCategoryState extends State<ManageCategory> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = AppResponsive.isTablet(context);
+    final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Manage Categories',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
         ),
-        actions: [
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
-              vertical: 8,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(isTablet ? 10 : 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha:0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    size: isTablet ? 22 : 20,
-                    color: Colors.white,
-                  ),
-                ),
-                if (isTablet) ...[
-                  SizedBox(width: 10),
-                  Text(
-                    'Admin',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -166,7 +131,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                           ),
                         ],
                       ),
-                      Divider(height: 24, color: Colors.grey.shade200),
+                      Divider(height: 24, color: AppColors.divider),
                       Text(
                         'Category Name',
                         style: GoogleFonts.poppins(
@@ -230,7 +195,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                             bottom: MediaQuery.of(context).viewInsets.bottom + 20,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppColors.white,
                             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                           ),
                           child: SingleChildScrollView(
@@ -243,7 +208,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                                     width: 40,
                                     height: 4,
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
+                                      color: AppColors.divider,
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                   ),
@@ -348,12 +313,12 @@ class _ManageCategoryState extends State<ManageCategory> {
                             decoration: BoxDecoration(
                               color: category.isEnabled
                                   ? AppColors.primary.withValues(alpha:0.1)
-                                  : Colors.grey.withValues(alpha:0.1),
+                                  : AppColors.textSecondary.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
                               Icons.category_rounded,
-                              color: category.isEnabled ? AppColors.primary : Colors.grey,
+                              color: category.isEnabled ? AppColors.primary : AppColors.textSecondary,
                               size: 24,
                             ),
                           ),
@@ -428,7 +393,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                                         child: Text(
                                           'Cancel',
                                           style: GoogleFonts.poppins(
-                                            color: Colors.grey.shade600,
+                                            color: AppColors.textSecondary,
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
