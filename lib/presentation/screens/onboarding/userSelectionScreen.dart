@@ -219,7 +219,7 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
           ),
           SizedBox(height: AppResponsive.smallSpacing(context)),
           Text(
-            "Let's get you started",
+            "Choose how you'd like to start",
             style: TextStyle(
               fontSize: AppResponsive.bodyFontSize(context),
               color: AppColors.darkNeutral.withOpacity(0.7),
@@ -238,25 +238,21 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
         scale: _scaleAnimation,
         child: useColumn
             ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildUserCard(
-                    title: "I'm a New User",
-                    subtitle: 'Set up your store from scratch',
-                    description:
-                        'Complete setup wizard to configure your outlet, tax, inventory, and more',
-                    icon: Icons.person_add,
-                    color: AppColors.primary,
+                    title: 'Create New Store',
+                    subtitle: 'Start from scratch',
+                    icon: Icons.add_business,
                     isHovered: _isNewUserHovered,
                     onTap: _navigateToSetupWizard,
                     onHover: (v) => setState(() => _isNewUserHovered = v),
                   ),
                   SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildUserCard(
-                    title: "I'm an Existing User",
-                    subtitle: 'Restore your data from backup',
-                    description: 'Import your backup file to continue where you left off',
+                    title: 'Restore Backup',
+                    subtitle: 'Continue existing',
                     icon: Icons.restore,
-                    color: AppColors.secondary,
                     isHovered: _isExistingUserHovered,
                     onTap: _showRestoreDialog,
                     onHover: (v) => setState(() => _isExistingUserHovered = v),
@@ -269,12 +265,9 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
                 children: [
                   Expanded(
                     child: _buildUserCard(
-                      title: "I'm a New User",
-                      subtitle: 'Set up your store from scratch',
-                      description:
-                          'Complete setup wizard to configure your outlet, tax, inventory, and more',
-                      icon: Icons.person_add,
-                      color: AppColors.primary,
+                      title: 'Create New Store',
+                      subtitle: 'Start from scratch',
+                      icon: Icons.add_business,
                       isHovered: _isNewUserHovered,
                       onTap: _navigateToSetupWizard,
                       onHover: (v) => setState(() => _isNewUserHovered = v),
@@ -283,11 +276,9 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
                   SizedBox(width: AppResponsive.mediumSpacing(context)),
                   Expanded(
                     child: _buildUserCard(
-                      title: "I'm an Existing User",
-                      subtitle: 'Restore your data from backup',
-                      description: 'Import your backup file to continue where you left off',
+                      title: 'Restore Backup',
+                      subtitle: 'Continue existing',
                       icon: Icons.restore,
-                      color: AppColors.secondary,
                       isHovered: _isExistingUserHovered,
                       onTap: _showRestoreDialog,
                       onHover: (v) => setState(() => _isExistingUserHovered = v),
@@ -303,13 +294,12 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
   Widget _buildUserCard({
     required String title,
     required String subtitle,
-    required String description,
     required IconData icon,
-    required Color color,
     required bool isHovered,
     required VoidCallback onTap,
     required Function(bool) onHover,
   }) {
+    final color = AppColors.primary;
     final iconContainerSize = AppResponsive.getValue(context, mobile: 64.0, tablet: 72.0, desktop: 80.0);
     return MouseRegion(
       onEnter: (_) => onHover(true),
@@ -317,77 +307,65 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         transform: Matrix4.identity()..scale(isHovered ? 1.03 : 1.0),
-        child: InkWell(
-          onTap: onTap,
+        child: Material(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-          child: Container(
-            padding: AppResponsive.cardPadding(context),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-              border: Border.all(
-                color: isHovered ? color : Colors.transparent,
-                width: 2,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: AppResponsive.cardPadding(context),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                border: Border.all(
+                  color: isHovered ? color : Colors.transparent,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isHovered
+                        ? color.withOpacity(0.2)
+                        : Colors.black.withOpacity(0.05),
+                    blurRadius: isHovered ? 16 : 8,
+                    spreadRadius: isHovered ? 0 : 2,
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: isHovered
-                      ? color.withOpacity(0.2)
-                      : Colors.black.withOpacity(0.05),
-                  blurRadius: isHovered ? 16 : 8,
-                  spreadRadius: isHovered ? 0 : 2,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  children: [
-                    Container(
-                      width: iconContainerSize,
-                      height: iconContainerSize,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, size: iconContainerSize * 0.5, color: color),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: iconContainerSize,
+                    height: iconContainerSize,
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      shape: BoxShape.circle,
                     ),
-                    SizedBox(height: AppResponsive.mediumSpacing(context)),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: AppResponsive.subheadingFontSize(context),
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkNeutral,
-                      ),
+                    child: Icon(icon, size: iconContainerSize * 0.5, color: color),
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: AppResponsive.subheadingFontSize(context),
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkNeutral,
                     ),
-                    SizedBox(height: AppResponsive.smallSpacing(context) - 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w500,
-                        color: color,
-                      ),
+                  ),
+                  SizedBox(height: AppResponsive.smallSpacing(context) - 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: AppColors.darkNeutral.withOpacity(0.6),
                     ),
-                    SizedBox(height: AppResponsive.smallSpacing(context)),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: AppColors.darkNeutral.withOpacity(0.6),
-                        height: 1.5,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: EdgeInsets.only(top: AppResponsive.mediumSpacing(context)),
-                  child: Icon(Icons.arrow_forward, color: color, size: AppResponsive.iconSize(context)),
-                ),
-              ],
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  Icon(Icons.arrow_forward, color: color, size: AppResponsive.iconSize(context)),
+                ],
+              ),
             ),
           ),
         ),

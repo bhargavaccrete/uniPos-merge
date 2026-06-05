@@ -330,10 +330,12 @@ abstract class _CartStore with Store {
 
   @action
   Future<void> removeItem(String variantId) async {
-    final item = items.firstWhere(
-      (item) => item.variantId == variantId,
-      orElse: () => throw Exception('Item not found'),
-    );
+    // Idempotent: if the item is already gone (rapid double-tap, or
+    // decrementQuantity removing the last unit), no-op instead of throwing.
+    final index = items.indexWhere((item) => item.variantId == variantId);
+    if (index == -1) return;
+
+    final item = items[index];
 
     // Remove from Hive
     await _cartBox.delete(item.cartItemId);

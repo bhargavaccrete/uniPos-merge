@@ -200,6 +200,29 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<AttributeRepository>(() => AttributeRepository());
   locator.registerLazySingleton<AttributeStore>(() => AttributeStore());
   locator.registerLazySingleton<VariantGeneratorService>(() => VariantGeneratorService());
+
+  // End-of-Day & Expenses (reused from restaurant side).
+  // The repositories are already AppConfig.isRetail-aware (they bind to the
+  // retail 'eodBox' / 'expenseBox', which hive_init opens for retail), so the
+  // same restaurant stores work here unchanged. Without these, retail EOD
+  // generation, EOD save, and the Start-Day "carry forward last closing
+  // balance" all fail because eodStore/expenseStore aren't resolvable.
+  locator.registerLazySingleton<ExpenseRepository>(() => ExpenseRepository());
+  locator.registerLazySingleton<ExpenseStore>(
+    () => ExpenseStore(locator<ExpenseRepository>()),
+  );
+  locator.registerLazySingleton<EodRepository>(() => EodRepository());
+  locator.registerLazySingleton<EodStore>(
+    () => EodStore(locator<EodRepository>()),
+  );
+
+  // Cash Drawer (Cash In / Cash Out) — reused from restaurant. The repository
+  // binds to the shared cashMovementsBox (opened for retail in hive_init), and
+  // feeds EOD cash reconciliation which already reads these movements.
+  locator.registerLazySingleton<CashMovementRepository>(() => CashMovementRepository());
+  locator.registerLazySingleton<CashMovementStore>(
+    () => CashMovementStore(locator<CashMovementRepository>()),
+  );
 }
 
 /// Register restaurant-specific dependencies

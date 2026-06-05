@@ -30,20 +30,41 @@ class AttributeRepository {
     return _productAttributesBox!;
   }
 
-  /// Check if boxes are corrupted and auto-reset if needed
+  /// Reads every record in [box], skipping any single entry that fails to
+  /// deserialize (a corrupted record) instead of letting it throw. This is the
+  /// same recovery pattern [getAllAttributes] uses; centralizing it here makes
+  /// every read in this repository corruption-tolerant.
+  List<T> _safeValues<T>(Box<T> box) {
+    final result = <T>[];
+    for (final key in box.keys) {
+      try {
+        final value = box.get(key);
+        if (value != null) result.add(value);
+      } catch (e) {
+        print('Skipping corrupted record (key $key): $e');
+      }
+    }
+    return result;
+  }
+
+  /// Detects whether the attribute box has unreadable (corrupted) records.
+  ///
+  /// IMPORTANT: this no longer deletes anything. All reads here are now
+  /// corruption-tolerant (see [_safeValues]) — they skip bad records rather
+  /// than throwing — so wiping the whole box is never necessary and only causes
+  /// silent data loss. Destructive recovery lives ONLY in [resetAllBoxes],
+  /// which must be triggered manually from an admin screen with confirmation.
+  ///
+  /// Returns true if at least one record is unreadable (caller may surface a
+  /// warning); false otherwise.
   Future<bool> checkAndFixCorruption() async {
     try {
-      final box = attributesBox;
-      // Try to access values - this will throw if corrupted
-      box.values.length;
-      return false; // Not corrupted
-    } catch (e) {
-      if (e.toString().contains('Bad state') || e.toString().contains('No element')) {
-        print('🔧 Detected corrupted attribute data, auto-resetting...');
-        await resetAllBoxes();
-        return true; // Was corrupted, now fixed
-      }
+      attributesBox.values.length; // forces deserialization; throws if corrupt
       return false;
+    } catch (e) {
+      print('⚠️ Detected unreadable attribute record(s); reads will skip them. '
+          'Data is preserved. ($e)');
+      return true;
     }
   }
 
@@ -201,7 +222,7 @@ class AttributeRepository {
   /// Get multiple values by IDs
   Future<List<AttributeValueModel>> getValuesByIds(List<String> valueIds) async {
     final box = valuesBox;
-    return box.values.where((v) => valueIds.contains(v.valueId)).toList();
+    return _safeValues(box).where((v) => valueIds.contains(v.valueId)).toList();
   }
 
   /// Add a value to an attribute
@@ -225,7 +246,7 @@ class AttributeRepository {
   /// Delete all values for an attribute
   Future<void> deleteValuesForAttribute(String attributeId) async {
     final box = valuesBox;
-    final valuesToDelete = box.values
+    final valuesToDelete = _safeValues(box)
         .where((v) => v.attributeId == attributeId)
         .map((v) => v.valueId)
         .toList();
@@ -285,7 +306,7 @@ class AttributeRepository {
   /// Remove an attribute from a product
   Future<void> removeAttributeFromProduct(String productId, String attributeId) async {
     final box = productAttributesBox;
-    final toRemove = box.values.where(
+    final toRemove = _safeValues(box).where(
       (pa) => pa.productId == productId && pa.attributeId == attributeId,
     ).toList();
 
@@ -297,7 +318,7 @@ class AttributeRepository {
   /// Remove all attributes from a product
   Future<void> removeAllAttributesFromProduct(String productId) async {
     final box = productAttributesBox;
-    final toRemove = box.values.where((pa) => pa.productId == productId).toList();
+    final toRemove = _safeValues(box).where((pa) => pa.productId == productId).toList();
 
     for (final pa in toRemove) {
       await box.delete(pa.id);
@@ -307,7 +328,7 @@ class AttributeRepository {
   /// Remove an attribute from all products
   Future<void> removeAttributeFromAllProducts(String attributeId) async {
     final box = productAttributesBox;
-    final toRemove = box.values.where((pa) => pa.attributeId == attributeId).toList();
+    final toRemove = _safeValues(box).where((pa) => pa.attributeId == attributeId).toList();
 
     for (final pa in toRemove) {
       await box.delete(pa.id);
@@ -317,7 +338,7 @@ class AttributeRepository {
   /// Get products using a specific attribute
   Future<List<String>> getProductsUsingAttribute(String attributeId) async {
     final box = productAttributesBox;
-    return box.values
+    return _safeValues(box)
         .where((pa) => pa.attributeId == attributeId)
         .map((pa) => pa.productId)
         .toSet()
@@ -364,7 +385,7 @@ class AttributeRepository {
   Future<List<AttributeModel>> searchAttributes(String query) async {
     final box = attributesBox;
     final lowercaseQuery = query.toLowerCase();
-    return box.values
+    return _safeValues(box)
         .where((a) =>
             a.isActive &&
             (a.name.toLowerCase().contains(lowercaseQuery) ||

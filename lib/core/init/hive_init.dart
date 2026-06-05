@@ -331,6 +331,11 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantExpense1)) {
       Hive.registerAdapter(ExpenseAdapter());
     }
+
+    // CashMovement - 128 (shared with restaurant mode - Cash Drawer + EOD reconciliation)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashMovement)) {
+      Hive.registerAdapter(CashMovementModelAdapter());
+    }
   }
 
   /// Clean up old incorrectly-named attribute boxes
@@ -417,6 +422,10 @@ class HiveInit {
     // Expense boxes (shared with restaurant mode - needed for EOD)
     await Hive.openBox<ExpenseCategory>(HiveBoxNames.retailExpenseCategory);
     await Hive.openBox<Expense>(HiveBoxNames.retailExpense);
+
+    // Cash movements box (shared with restaurant mode - Cash In/Out powers the
+    // Cash Drawer screen and makes EOD cash reconciliation accurate).
+    await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
 
     _areRetailBoxesOpen = true;
   }

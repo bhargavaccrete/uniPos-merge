@@ -4,7 +4,7 @@ import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/responsive.dart';
-import 'package:unipos/util/color.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
 import 'package:unipos/presentation/screens/retail/pos_screen.dart';
 import 'package:unipos/presentation/screens/retail/inventory_screen.dart';
@@ -15,6 +15,7 @@ import 'package:unipos/presentation/screens/retail/supplier_list_screen.dart';
 import 'package:unipos/presentation/screens/retail/purchase_history_screen.dart';
 import 'package:unipos/presentation/screens/retail/purchase_order_list_screen.dart';
 import 'package:unipos/presentation/screens/retail/sales_history_screen.dart';
+import 'package:unipos/presentation/screens/retail/cash_drawer_screen.dart';
 import 'package:unipos/presentation/screens/retail/settings_screen.dart';
 import 'package:unipos/presentation/screens/retail/category_management_screen.dart';
 import 'package:unipos/presentation/screens/retail/login_screen.dart';
@@ -29,6 +30,15 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      // Desktop keeps its sidebar + content header; mobile/tablet use the
+      // unified primary AppBar so retail matches the restaurant standard.
+      appBar: Responsive.isDesktop(context)
+          ? null
+          : buildPrimaryAppBar(
+              title: 'UniPOS Dashboard',
+              automaticallyImplyLeading: false,
+              actions: _buildDashboardAppBarActions(context),
+            ),
       body: SafeArea(
         child: Responsive(
           mobile: _buildMobileLayout(context),
@@ -43,7 +53,6 @@ class HomeScreen extends StatelessWidget {
   Widget _buildMobileLayout(BuildContext context) {
     return Column(
       children: [
-        _buildMobileHeader(context),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -70,7 +79,6 @@ class HomeScreen extends StatelessWidget {
   Widget _buildTabletLayout(BuildContext context) {
     return Column(
       children: [
-        _buildTabletHeader(context),
         Expanded(
           child: Center(
             child: Container(
@@ -122,68 +130,14 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ==================== HEADERS ====================
-  Widget _buildMobileHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'UniPOS Dashboard',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          _buildUserMenuButton(context, Colors.white),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabletHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.store, color: Colors.white, size: 28),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'UniPOS Dashboard',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          _buildUserMenuButton(context, Colors.white),
-        ],
-      ),
-    );
+  /// Action widgets shown on the right of the dashboard AppBar (mobile/tablet).
+  List<Widget> _buildDashboardAppBarActions(BuildContext context) {
+    // Faithful port of the old in-body header: the account menu (logout,
+    // change password, etc.). White tint to read on the primary AppBar.
+    return [
+      _buildUserMenuButton(context, Colors.white),
+      const SizedBox(width: 4),
+    ];
   }
 
   Widget _buildDesktopHeader(BuildContext context) {
@@ -499,6 +453,12 @@ class HomeScreen extends StatelessWidget {
         icon: Icons.receipt_long,
         title: 'Sales',
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalesHistoryScreen())),
+      ),
+      _buildMenuCard(
+        context,
+        icon: Icons.account_balance_wallet,
+        title: 'Cash Drawer',
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CashDrawerScreen())),
       ),
       _buildMenuCard(
         context,

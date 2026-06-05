@@ -6,6 +6,10 @@ import 'package:path/path.dart' as path;
 import '../../../../data/models/retail/printer_settings_model.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/retail/retail_printer_settings_service.dart';
+import '../../../../domain/services/retail/print_service.dart';
+import '../../../../domain/services/retail/store_settings_service.dart';
+import '../../../../data/models/retail/hive_model/sale_model_203.dart';
+import '../../../../data/models/retail/hive_model/sale_item_model_204.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
   const PrinterSettingsScreen({Key? key}) : super(key: key);
@@ -900,7 +904,70 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   }
 
   Future<void> _testPrint() async {
-    NotificationService.instance.showSuccess('Test print feature coming soon');
-    // TODO: Implement test print with sample invoice
+    try {
+      const sampleSaleId = 'TEST-PRINT';
+
+      // Sample line items for the test receipt — never saved to the database.
+      final sampleItems = _buildTestPrintItems(sampleSaleId);
+      if (sampleItems.isEmpty) return;
+
+      // Totals are derived from what the items computed (price + GST), so the
+      // sample receipt's math is internally consistent like a real sale.
+      final subtotal =
+          sampleItems.fold<double>(0, (s, i) => s + (i.taxableAmount ?? 0));
+      final gst = sampleItems.fold<double>(0, (s, i) => s + (i.gstAmount ?? 0));
+      final grandTotal = sampleItems.fold<double>(0, (s, i) => s + i.total);
+
+      final sampleSale = SaleModel.create(
+        saleId: sampleSaleId,
+        totalItems: sampleItems.length,
+        subtotal: subtotal,
+        taxAmount: gst,
+        totalAmount: grandTotal,
+        paymentType: 'cash',
+      );
+
+      // Reuse the same PrintService that prints real invoices, so the test
+      // exercises the actual printer + current printer settings.
+      await PrintService().printReceipt(
+        context: context,
+        sale: sampleSale,
+        items: sampleItems,
+        format: ReceiptFormat.thermal,
+        storeName: await StoreSettingsService().getStoreName(),
+      );
+    } catch (e) {
+      if (mounted) {
+        NotificationService.instance.showError('Test print failed: $e');
+      }
+    }
+  }
+
+  /// Builds the sample line items printed by [_testPrint].
+  /// Two rows with different GST rates + a qty > 1 so the receipt exercises the
+  /// item table, quantity column, and CGST/SGST tax breakdown. Tweak freely.
+  List<SaleItemModel> _buildTestPrintItems(String saleId) {
+    return [
+      SaleItemModel.create(
+        saleId: saleId,
+        varianteId: 'TEST-V1',
+        productId: 'TEST-P1',
+        productName: 'Sample Item A',
+        price: 100,
+        qty: 2,
+        gstRate: 18,
+        hsnCode: '0000',
+      ),
+      SaleItemModel.create(
+        saleId: saleId,
+        varianteId: 'TEST-V2',
+        productId: 'TEST-P2',
+        productName: 'Sample Item B',
+        price: 50,
+        qty: 1,
+        gstRate: 5,
+        hsnCode: '0000',
+      ),
+    ];
   }
 }

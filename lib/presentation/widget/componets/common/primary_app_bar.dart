@@ -18,6 +18,7 @@ AppBar buildPrimaryAppBar({
   PreferredSizeWidget? bottom,
   bool centerTitle = false,
   double titleFontSize = 20,
+  bool automaticallyImplyLeading = true,
 }) {
   return AppBar(
     backgroundColor: AppColors.primary,
@@ -27,6 +28,7 @@ AppBar buildPrimaryAppBar({
     iconTheme: const IconThemeData(color: Colors.white),
     actionsIconTheme: const IconThemeData(color: Colors.white),
     centerTitle: centerTitle,
+    automaticallyImplyLeading: automaticallyImplyLeading,
     leading: leading,
     title: titleWidget ??
         (title == null

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/responsive.dart';
+import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
 import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
@@ -436,13 +437,7 @@ class _PosScreenState extends State<PosScreen> {
     if (!_isInitialized) {
       return Scaffold(
         backgroundColor: const Color(0xFFFAFAFA),
-        appBar: AppBar(
-          title: const Text('Billing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: Colors.white,
-          automaticallyImplyLeading: false,
-        ),
+        appBar: buildPrimaryAppBar(title: 'Billing', centerTitle: true,),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -474,13 +469,11 @@ class _PosScreenState extends State<PosScreen> {
 
   // ==================== APP BAR ====================
   PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      title: const Text('Billing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+    return buildPrimaryAppBar(
+      title: 'Billing',
       centerTitle: true,
-      elevation: 0,
-      backgroundColor: Colors.white,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Color(0xFF1A1A1A)),
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () {
           Navigator.pushReplacementNamed(context, '/retail-menu');
         },
@@ -491,7 +484,7 @@ class _PosScreenState extends State<PosScreen> {
           builder: (context) => Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.pause_circle_outline, color: Colors.orange),
+                icon: const Icon(Icons.pause_circle_outline, color: Colors.white),
                 tooltip: 'View parked sales',
                 onPressed: () async {
                   await Navigator.push(
@@ -532,7 +525,7 @@ class _PosScreenState extends State<PosScreen> {
         ),
         Observer(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.pause, color: Colors.orange),
+            icon: const Icon(Icons.pause, color: Colors.white),
             tooltip: 'Hold current sale',
             onPressed: cartStore.itemCount > 0 ? _holdCurrentSale : null,
           ),
