@@ -5,11 +5,6 @@ import 'package:unipos/stores/setup_wizard_store.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 
-const _typeFeatures = {
-  'retail': ['Barcode Scanning', 'Stock Management', 'Customer Loyalty'],
-  'restaurant': ['Table Management', 'Kitchen Display', 'Menu Builder'],
-};
-
 class BusinessTypeStep extends StatelessWidget {
   final SetupWizardStore store;
   final VoidCallback onNext;
@@ -280,8 +275,6 @@ class _BusinessTypeCard extends StatelessWidget {
     }
   }
 
-  List<String> _features() => _typeFeatures[type['id']] ?? [];
-
   @override
   Widget build(BuildContext context) {
     final accent = _accentColor;
@@ -381,17 +374,6 @@ class _BusinessTypeCard extends StatelessWidget {
                       height: 1.45,
                     ),
                   ),
-
-                  if (_features().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: _features()
-                          .map((f) => _chip(context, f, accent))
-                          .toList(),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -401,24 +383,4 @@ class _BusinessTypeCard extends StatelessWidget {
     );
   }
 
-  Widget _chip(BuildContext context, String label, Color accent) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? accent.withValues(alpha: 0.1) : AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isSelected ? accent.withValues(alpha: 0.3) : AppColors.divider,
-        ),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          color: isSelected ? accent : AppColors.textSecondary,
-        ),
-      ),
-    );
-  }
 }

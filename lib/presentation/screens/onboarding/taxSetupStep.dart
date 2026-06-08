@@ -196,11 +196,13 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                   children: [
                     _buildHeader(),
                     const SizedBox(height: 24),
-                    _buildInclusiveToggle(),
+                    _buildTaxModeSelector(),
                     const SizedBox(height: 20),
-                    _buildAddCard(),
+                    _buildRecommendedRates(),
                     const SizedBox(height: 20),
                     _buildTaxList(),
+                    const SizedBox(height: 16),
+                    _buildFooterNote(),
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -266,207 +268,274 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     );
   }
 
-  // ── Tax Inclusive Toggle ─────────────────────────────────────────────────────
+  // ── Tax Mode Selector ────────────────────────────────────────────────────────
 
-  Widget _buildInclusiveToggle() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  Future<void> _setInclusive(bool value) async {
+    if (AppConfig.isRestaurant) {
+      widget.store.setTaxEnabled(value);
+      await AppSettings.updateSetting('Tax Is Inclusive', value);
+    } else {
+      widget.store.setTaxInclusive(value);
+    }
+  }
+
+  Widget _buildTaxModeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Choose how tax is calculated',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
-        ],
-      ),
-      child: Observer(
-        builder: (_) {
-          final isInclusive = AppConfig.isRestaurant
-              ? widget.store.taxEnabled
-              : widget.store.taxInclusive;
-
-          return Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+        ),
+        const SizedBox(height: 12),
+        Observer(
+          builder: (_) {
+            final isInclusive = AppConfig.isRestaurant
+                ? widget.store.taxEnabled
+                : widget.store.taxInclusive;
+            return Column(
+              children: [
+                _buildModeOption(
+                  selected: isInclusive,
+                  title: 'Tax Included in Price',
+                  example: '₹112 (GST included)',
+                  onTap: () => _setInclusive(true),
                 ),
-                child: const Icon(Icons.calculate_outlined,
-                    color: AppColors.accent, size: 22),
+                const SizedBox(height: 12),
+                _buildModeOption(
+                  selected: !isInclusive,
+                  title: 'Tax Added at Billing',
+                  example: '₹100 + GST = ₹112',
+                  onTap: () => _setInclusive(false),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeOption({
+    required bool selected,
+    required String title,
+    required String example,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withValues(alpha: 0.04) : AppColors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? AppColors.primary : Colors.transparent,
+                border: Border.all(
+                  color: selected ? AppColors.primary : AppColors.divider,
+                  width: 2,
+                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tax Inclusive Pricing',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
+              child: selected
+                  ? const Icon(Icons.check, size: 13, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? AppColors.primary : AppColors.textPrimary,
                     ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    example,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Recommended Rates ────────────────────────────────────────────────────────
+
+  Widget _buildRecommendedRates() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Recommended Tax Rates',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _presets.map((p) {
+            final alreadyAdded = _taxes.any(
+              (t) => t.name == p['name'] && t.rate == (p['rate'] as double),
+            );
+            return GestureDetector(
+              onTap: alreadyAdded
+                  ? null
+                  : () => _addPreset(p['name'] as String, p['rate'] as double),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: alreadyAdded
+                      ? AppColors.surfaceMedium
+                      : AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: alreadyAdded
+                        ? AppColors.divider
+                        : AppColors.primary.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      alreadyAdded ? Icons.check : Icons.add,
+                      size: 15,
+                      color: alreadyAdded
+                          ? AppColors.textSecondary
+                          : AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      isInclusive
-                          ? 'Tax is included in item price'
-                          : 'Tax is added on top of item price',
+                      p['label'] as String,
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: alreadyAdded
+                            ? AppColors.textSecondary
+                            : AppColors.primary,
                       ),
                     ),
                   ],
                 ),
               ),
-              Switch.adaptive(
-                value: isInclusive,
-                activeColor: AppColors.primary,
-                onChanged: (value) async {
-                  if (AppConfig.isRestaurant) {
-                    widget.store.setTaxEnabled(value);
-                    await AppSettings.updateSetting('Tax Is Inclusive', value);
-                  } else {
-                    widget.store.setTaxInclusive(value);
-                  }
-                },
-              ),
-            ],
-          );
-        },
-      ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _showCustomTaxDialog,
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(
+              'Create Custom Tax',
+              style: GoogleFonts.poppins(
+                  fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  // ── Add Tax Card ─────────────────────────────────────────────────────────────
-
-  Widget _buildAddCard() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  Future<void> _showCustomTaxDialog() async {
+    _taxNameController.clear();
+    _taxRateController.clear();
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Create Custom Tax',
+          style: GoogleFonts.poppins(
+              fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppTextField(
+              controller: _taxNameController,
+              label: 'Tax Name',
+              hint: 'e.g. GST, VAT',
+              icon: Icons.label_outline,
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              controller: _taxRateController,
+              label: 'Rate %',
+              hint: '18',
+              icon: Icons.percent,
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
+            ),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.add_circle_outline,
-                  color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Add Tax Rate',
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Quick-add presets
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _presets.map((p) {
-              final alreadyAdded = _taxes.any(
-                (t) =>
-                    t.name == p['name'] &&
-                    t.rate == (p['rate'] as double),
-              );
-              return GestureDetector(
-                onTap: alreadyAdded
-                    ? null
-                    : () => _addPreset(
-                        p['name'] as String, p['rate'] as double),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: alreadyAdded
-                        ? AppColors.surfaceMedium
-                        : AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: alreadyAdded
-                          ? AppColors.divider
-                          : AppColors.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    p['label'] as String,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: alreadyAdded
-                          ? AppColors.textSecondary
-                          : AppColors.primary,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: AppColors.divider),
-          const SizedBox(height: 16),
-
-          // Manual input row
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: AppTextField(
-                  controller: _taxNameController,
-                  label: 'Tax Name',
-                  hint: 'e.g. GST, VAT',
-                  icon: Icons.label_outline,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: AppTextField(
-                  controller: _taxRateController,
-                  label: 'Rate %',
-                  hint: '18',
-                  icon: Icons.percent,
-                  keyboardType: TextInputType.number,
-                ),
-              ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: _addTax,
-                child: Container(
-                  height: 52,
-                  width: 52,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.add,
-                      color: Colors.white, size: 22),
-                ),
-              ),
-            ],
+          ElevatedButton(
+            onPressed: () {
+              final name = _taxNameController.text.trim();
+              final rate = double.tryParse(_taxRateController.text.trim());
+              if (name.isEmpty || rate == null) return;
+              _addTax();
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text('Add',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -484,7 +553,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
         Row(
           children: [
             Text(
-              'Configured Taxes',
+              'Default Tax',
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -656,6 +725,26 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
           ),
         ],
       ),
+    );
+  }
+
+  // ── Footer note ──────────────────────────────────────────────────────────────
+
+  Widget _buildFooterNote() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.info_outline,
+            size: 14, color: AppColors.textSecondary.withValues(alpha: 0.7)),
+        const SizedBox(width: 6),
+        Text(
+          'You can modify taxes later from Settings.',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 

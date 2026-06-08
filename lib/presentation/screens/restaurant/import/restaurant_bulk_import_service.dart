@@ -16,6 +16,7 @@ import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:uuid/uuid.dart';
+import 'import_template_builder.dart';
 
 /// Restaurant bulk import service.
 ///
@@ -49,393 +50,19 @@ class RestaurantBulkImportService {
   static const String SHEET_ITEMS = 'Items';
   static const String SHEET_ITEM_VARIANTS = 'ItemVariants';
 
-  /// Enhanced template with CategoryName support and user-friendly instructions
+  /// Enhanced template with dropdowns + input tooltips (built with Syncfusion
+  /// xlsio so we can write Data Validation, which the `excel` package cannot).
   Future<String> downloadTemplate() async {
     try {
-      var excel = Excel.createExcel();
-
-      // Add sheets in logical order (Instructions first!)
-      _createInstructionsSheet(excel);
-      _createCategoriesSheet(excel);
-      _createEnhancedItemsSheet(excel);
-      _createItemVariantsSheet(excel);
-      _createVariantsSheet(excel);
-      _createExtrasSheet(excel);
-      _createToppingsSheet(excel);
-      _createChoicesSheet(excel);
-      _createChoiceOptionsSheet(excel);
-
-      // ✅ FIX: Delete default Sheet1 AFTER creating all custom sheets
-      // This ensures Sheet1 doesn't appear in the final file
-      if (excel.sheets.containsKey('Sheet1')) {
-        excel.delete('Sheet1');
-      }
-
-      return await _saveExcelFile(excel, 'unipos_restaurant_import_template_v3.xlsx');
+      final bytes = ImportTemplateBuilder().build();
+      return await _saveBytes(bytes, 'unipos_restaurant_import_template_v4.xlsx');
     } catch (e) {
       return 'Error downloading template: $e';
     }
   }
 
-  /// Create comprehensive Instructions sheet
-  void _createInstructionsSheet(Excel excel) {
-    var sheet = excel['📖 Instructions'];
-
-    // Title
-    var titleCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0));
-    titleCell.value =  TextCellValue('UniPOS Restaurant Bulk Import Guide');
-    titleCell.cellStyle = CellStyle(
-      bold: true,
-      fontSize: 16,
-      backgroundColorHex: ExcelColor.green,
-    );
-
-    int row = 2;
-
-    // Quick Start
-    _addBoldRow(sheet, row++, ['QUICK START GUIDE']);
-    _addTextRow(sheet, row++, ['1. Start with "Categories" sheet - Add your food categories (Burgers, Pizza, etc.)']);
-    _addTextRow(sheet, row++, ['2. Fill "Items" sheet - Add your menu items (Name, Price, Category are REQUIRED)']);
-    _addTextRow(sheet, row++, ['3. Optional: Fill other sheets for variants, extras, toppings, choices']);
-    _addTextRow(sheet, row++, ['4. Save the file and import it back into UniPOS']);
-    row++;
-
-    // Important Notes
-    _addBoldRow(sheet, row++, ['⚠️ IMPORTANT NOTES']);
-    _addTextRow(sheet, row++, ['• Fields marked with * are REQUIRED']);
-    _addTextRow(sheet, row++, ['• Row 2 in each sheet contains helpful instructions (yellow background)']);
-    _addTextRow(sheet, row++, ['• Sample data is provided in rows 3-5 - You can delete these and add your own']);
-    _addTextRow(sheet, row++, ['• For Yes/No fields: Type exactly "Yes" or "No" (case sensitive)']);
-    _addTextRow(sheet, row++, ['• CategoryName in Items sheet must match a name from Categories sheet']);
-    row++;
-
-    // Sheet Descriptions
-    _addBoldRow(sheet, row++, ['SHEET DESCRIPTIONS']);
-    _addTextRow(sheet, row++, ['📁 Categories: Your food categories (Burgers, Pizza, Drinks, etc.)']);
-    _addTextRow(sheet, row++, ['🍕 Items: Your menu items - START HERE! (Required: Name, Price, Category, VegType)']);
-    _addTextRow(sheet, row++, ['📏 ItemVariants: Size-based pricing (Small: ₹200, Medium: ₹300, Large: ₹400)']);
-    _addTextRow(sheet, row++, ['🔧 Variants: Available sizes (Small, Medium, Large)']);
-    _addTextRow(sheet, row++, ['➕ Extras: Customization groups (Toppings, Sauces)']);
-    _addTextRow(sheet, row++, ['🧀 Toppings: Individual toppings with prices']);
-    _addTextRow(sheet, row++, ['🎯 Choices: Selection options with available choices listed']);
-    _addTextRow(sheet, row++, ['✅ ChoiceOptions: Individual choice options (auto-linked to choices)']);
-    row++;
-
-    // Tips
-    _addBoldRow(sheet, row++, ['💡 TIPS FOR SUCCESS']);
-    _addTextRow(sheet, row++, ['• Start simple: Just fill Categories and Items sheets']);
-    _addTextRow(sheet, row++, ['• Test with 2-3 items first before doing all your menu']);
-    _addTextRow(sheet, row++, ['• Keep category names simple and consistent']);
-    _addTextRow(sheet, row++, ['• For images: Use direct image URLs or leave blank to add later']);
-    _addTextRow(sheet, row++, ['• Price should be numbers only (no currency symbols)']);
-  }
-
-  void _addBoldRow(Sheet sheet, int rowIndex, List<String> values) {
-    for (int i = 0; i < values.length; i++) {
-      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
-      cell.value = TextCellValue(values[i]);
-      cell.cellStyle = CellStyle(
-        bold: true,
-        fontSize: 12,
-        backgroundColorHex: ExcelColor.grey,
-      );
-    }
-  }
-
-  void _addTextRow(Sheet sheet, int rowIndex, List<String> values) {
-    for (int i = 0; i < values.length; i++) {
-      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
-      cell.value = TextCellValue(values[i]);
-    }
-  }
-
-  void _createCategoriesSheet(Excel excel) {
-    var sheet = excel[SHEET_CATEGORIES];
-
-    // Headers
-    _addHeader(sheet, 0, ['id*', 'name*', 'imagePath']);
-
-    // Instructions row
-    _addInstructionRow(sheet, 1, [
-      'Unique ID (e.g., cat_burgers)',
-      'Category Name (e.g., Burgers)',
-      'Optional: Image path/URL'
-    ]);
-
-    // Sample data — 8 veg-friendly categories
-    _addRow(sheet, 2, ['cat_starters',   'Starters',       '']);
-    _addRow(sheet, 3, ['cat_soups',      'Soups',          '']);
-    _addRow(sheet, 4, ['cat_main',       'Main Course',    '']);
-    _addRow(sheet, 5, ['cat_breads',     'Breads',         '']);
-    _addRow(sheet, 6, ['cat_rice',       'Rice & Biryani', '']);
-    _addRow(sheet, 7, ['cat_desserts',   'Desserts',       '']);
-    _addRow(sheet, 8, ['cat_beverages',  'Beverages',      '']);
-    _addRow(sheet, 9, ['cat_pizza',      'Pizza',          '']);
-  }
-
-  void _createVariantsSheet(Excel excel) {
-    var sheet = excel[SHEET_VARIANTS];
-
-    // Headers
-    _addHeader(sheet, 0, ['id*', 'name*']);
-
-    // Instructions row
-    _addInstructionRow(sheet, 1, [
-      'Unique ID (e.g., var_small)',
-      'Variant name (e.g., Small, Medium, Large)'
-    ]);
-
-    // Sample data
-    _addRow(sheet, 2, ['var_half',   'Half']);
-    _addRow(sheet, 3, ['var_full',   'Full']);
-    _addRow(sheet, 4, ['var_small',  'Small']);
-    _addRow(sheet, 5, ['var_medium', 'Medium']);
-    _addRow(sheet, 6, ['var_large',  'Large']);
-    _addRow(sheet, 7, ['var_regular', 'Regular']);
-    _addRow(sheet, 8, ['var_family', 'Family Size']);
-  }
-
-  void _createExtrasSheet(Excel excel) {
-    var sheet = excel[SHEET_EXTRAS];
-    _addHeader(sheet, 0, ['id', 'name', 'isEnabled', 'minimum', 'maximum']);
-    // No instruction row — data starts at row 1
-    _addRow(sheet, 1, ['extra_toppings', 'Toppings',      'Yes', 0, 5]);
-    _addRow(sheet, 2, ['extra_cheese',   'Cheese Options', 'Yes', 0, 3]);
-    _addRow(sheet, 3, ['extra_sauces',   'Sauces',         'Yes', 0, 2]);
-  }
-
-  void _createToppingsSheet(Excel excel) {
-    var sheet = excel[SHEET_TOPPINGS];
-    _addHeader(sheet, 0, ['extraId', 'name', 'isveg', 'price', 'isContainSize', 'variantId', 'variantPrice']);
-    // No instruction row — data starts at row 1
-    // Toppings group
-    _addRow(sheet, 1, ['extra_toppings', 'Olives',     'Yes', 15, 'No', '', '']);
-    _addRow(sheet, 2, ['extra_toppings', 'Mushrooms',  'Yes', 20, 'No', '', '']);
-    _addRow(sheet, 3, ['extra_toppings', 'Jalapenos',  'Yes', 15, 'No', '', '']);
-    _addRow(sheet, 4, ['extra_toppings', 'Corn',       'Yes', 15, 'No', '', '']);
-    _addRow(sheet, 5, ['extra_toppings', 'Capsicum',   'Yes', 15, 'No', '', '']);
-    // Cheese group
-    _addRow(sheet, 6, ['extra_cheese',   'Mozzarella',    'Yes', 30, 'No', '', '']);
-    _addRow(sheet, 7, ['extra_cheese',   'Cheddar',        'Yes', 35, 'No', '', '']);
-    _addRow(sheet, 8, ['extra_cheese',   'Double Cheese',  'Yes', 50, 'No', '', '']);
-    // Sauces group
-    _addRow(sheet, 9,  ['extra_sauces', 'Tomato Base',  'Yes', 0,  'No', '', '']);
-    _addRow(sheet, 10, ['extra_sauces', 'Pesto',        'Yes', 20, 'No', '', '']);
-    _addRow(sheet, 11, ['extra_sauces', 'BBQ Sauce',    'Yes', 20, 'No', '', '']);
-  }
-
-  void _createChoicesSheet(Excel excel) {
-    var sheet = excel[SHEET_CHOICES];
-    _addHeader(sheet, 0, ['id', 'name', 'allowMultiple', 'options']);
-
-    // Instructions row
-    _addInstructionRow(sheet, 1, [
-      'Unique ID (e.g., choice_crust)',
-      'Choice name (e.g., Crust Type)',
-      'Yes = multiple selections, No = single selection only',
-      'Available options (e.g., Thin, Thick, Stuffed)'
-    ]);
-
-    // Sample data with options listed
-    _addRow(sheet, 2, ['choice_crust', 'Crust Type', 'No', 'Thin Crust, Thick Crust, Stuffed Crust']);
-    _addRow(sheet, 3, ['choice_spice', 'Spice Level', 'No', 'Mild, Medium, Hot, Extra Hot']);
-    _addRow(sheet, 4, ['choice_toppings', 'Extra Toppings', 'Yes', 'Cheese, Olives, Mushrooms, Jalapenos']);
-  }
-
-  void _createChoiceOptionsSheet(Excel excel) {
-    var sheet = excel[SHEET_CHOICE_OPTIONS];
-    _addHeader(sheet, 0, ['choiceId', 'id', 'name']);
-
-    // Instructions row
-    _addInstructionRow(sheet, 1, [
-      'Must match choice ID from Choices sheet',
-      'Unique option ID (e.g., opt_thin)',
-      'Display name (e.g., Thin Crust)'
-    ]);
-
-    // Crust options (single selection)
-    _addRow(sheet, 2, ['choice_crust', 'opt_thin',    'Thin Crust']);
-    _addRow(sheet, 3, ['choice_crust', 'opt_thick',   'Thick Crust']);
-    _addRow(sheet, 4, ['choice_crust', 'opt_stuffed', 'Stuffed Crust']);
-
-    // Spice options (single selection)
-    _addRow(sheet, 5, ['choice_spice', 'opt_mild',      'Mild']);
-    _addRow(sheet, 6, ['choice_spice', 'opt_medium',    'Medium']);
-    _addRow(sheet, 7, ['choice_spice', 'opt_hot',       'Hot']);
-    _addRow(sheet, 8, ['choice_spice', 'opt_extra_hot', 'Extra Hot']);
-
-    // Extra Toppings options (multiple selection)
-    _addRow(sheet, 9,  ['choice_toppings', 'opt_t_cheese',    'Cheese']);
-    _addRow(sheet, 10, ['choice_toppings', 'opt_t_olives',    'Olives']);
-    _addRow(sheet, 11, ['choice_toppings', 'opt_t_mushrooms', 'Mushrooms']);
-    _addRow(sheet, 12, ['choice_toppings', 'opt_t_jalapenos', 'Jalapenos']);
-  }
-
-  /// Enhanced Items sheet with CategoryName and ImageURL - USER FRIENDLY VERSION
-  void _createEnhancedItemsSheet(Excel excel) {
-    var sheet = excel[SHEET_ITEMS];
-
-    // Row 0: Enhanced headers
-    _addHeader(sheet, 0, [
-      'ItemName*', 'Price*', 'CategoryName*', 'VegType*', 'Description',
-      'ImageURL', 'IsSoldByWeight', 'Unit', 'TrackInventory',
-      'StockQuantity', 'AllowOutOfStock', 'TaxRate', 'IsEnabled',
-      'HasVariants', 'ChoiceIds', 'ExtraIds'
-    ]);
-
-    // Row 1: Instructions row (colored differently)
-    _addInstructionRow(sheet, 1, [
-      'Required: Item name',
-      'Required: Number only',
-      'Required: Must match Categories sheet',
-      'Required: Veg or Non-Veg',
-      'Optional: Short description',
-      'Optional: Image URL',
-      'Yes or No',
-      'kg, gm, pcs',
-      'Yes or No',
-      'Number (0 if not tracking)',
-      'Yes or No',
-      'Number (0-100)',
-      'Yes or No',
-      'Yes or No',
-      'Comma separated IDs',
-      'Comma separated IDs'
-    ]);
-
-    // Row 2-20: 19 all-Veg sample items across 7 categories
-    // Format: ItemName, Price, CategoryName, VegType, Description,
-    //         ImageURL, IsSoldByWeight, Unit, TrackInventory,
-    //         StockQuantity, AllowOutOfStock, TaxRate, IsEnabled,
-    //         HasVariants, ChoiceIds, ExtraIds
-
-    // — Starters —
-    _addRow(sheet, 2,  ['Veg Spring Rolls',   120, 'Starters',       'Veg', 'Crispy rolls filled with mixed vegetables',         '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 3,  ['Paneer Tikka',          0, 'Starters',       'Veg', 'Marinated cottage cheese grilled to perfection',    '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', '', '']);
-    _addRow(sheet, 4,  ['Veg Manchurian',      140, 'Starters',       'Veg', 'Crispy vegetable balls in tangy Manchurian sauce',  '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-
-    // — Soups —
-    _addRow(sheet, 5,  ['Sweet Corn Soup',      90, 'Soups',          'Veg', 'Classic sweet corn soup with vegetables',           '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 6,  ['Tomato Soup',          80, 'Soups',          'Veg', 'Fresh tomato soup with herbs and cream',            '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-
-    // — Main Course —
-    _addRow(sheet, 7,  ['Paneer Butter Masala', 220, 'Main Course',   'Veg', 'Cottage cheese in rich tomato cream sauce',         '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 8,  ['Dal Makhani',          180, 'Main Course',   'Veg', 'Slow-cooked black lentils in buttery sauce',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 9,  ['Mixed Veg Curry',       160, 'Main Course',  'Veg', 'Seasonal vegetables in spiced tomato gravy',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 10, ['Palak Paneer',          200, 'Main Course',  'Veg', 'Cottage cheese cubes in creamy spinach gravy',      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 11, ['Chana Masala',          170, 'Main Course',  'Veg', 'Spiced chickpeas in tangy onion-tomato masala',     '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-
-    // — Breads —
-    _addRow(sheet, 12, ['Butter Naan',           40, 'Breads',        'Veg', 'Soft leavened flatbread baked in tandoor',          '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 13, ['Garlic Naan',            50, 'Breads',       'Veg', 'Naan topped with garlic butter and cilantro',       '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 14, ['Tandoori Roti',          30, 'Breads',       'Veg', 'Whole wheat bread baked in clay tandoor',           '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-
-    // — Rice & Biryani —
-    _addRow(sheet, 15, ['Veg Biryani',             0, 'Rice & Biryani', 'Veg', 'Fragrant basmati rice layered with vegetables',  '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', '', '']);
-    _addRow(sheet, 16, ['Jeera Rice',             120, 'Rice & Biryani', 'Veg', 'Cumin-tempered long-grain basmati rice',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-    _addRow(sheet, 17, ['Veg Fried Rice',         150, 'Rice & Biryani', 'Veg', 'Wok-tossed rice with mixed vegetables',        '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '']);
-
-    // — Desserts —
-    _addRow(sheet, 18, ['Gulab Jamun',            80, 'Desserts',     'Veg', 'Soft milk dumplings soaked in rose sugar syrup',    '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
-    _addRow(sheet, 19, ['Rasmalai',              100, 'Desserts',     'Veg', 'Soft spongy cheese patties in sweetened saffron milk', '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
-
-    // — Beverages —
-    _addRow(sheet, 20, ['Mango Lassi',            80, 'Beverages',    'Veg', 'Chilled mango blended with yogurt and milk',        '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
-    _addRow(sheet, 21, ['Masala Chai',            40, 'Beverages',    'Veg', 'Spiced Indian tea brewed with ginger and cardamom', '', 'No', 'pcs', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '']);
-
-    // — Pizza (HasVariants=Yes, with Choices + Extras) —
-    // Margherita: Single crust choice + single spice choice + topping extras + cheese extras
-    _addRow(sheet, 22, ['Margherita Pizza',  0, 'Pizza', 'Veg', 'Classic tomato base with fresh mozzarella',
-      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'choice_crust,choice_spice', 'extra_toppings,extra_cheese']);
-    // Paneer Pizza: All choices (crust single + spice single + toppings multiple) + extras
-    _addRow(sheet, 23, ['Paneer Pizza',      0, 'Pizza', 'Veg', 'Spiced paneer chunks on a tangy tomato base',
-      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'choice_crust,choice_spice,choice_toppings', 'extra_toppings,extra_cheese']);
-    // Farmhouse: Choices + sauce extra to show all three extra groups
-    _addRow(sheet, 24, ['Farmhouse Pizza',   0, 'Pizza', 'Veg', 'Loaded with seasonal vegetables and herbs',
-      '', 'No', 'pcs', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'choice_crust,choice_spice,choice_toppings', 'extra_toppings,extra_cheese,extra_sauces']);
-
-  }
-
-  /// Add instruction row with different styling
-  void _addInstructionRow(Sheet sheet, int rowIndex, List<String> values) {
-    for (int i = 0; i < values.length; i++) {
-      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
-      cell.value = TextCellValue(values[i]);
-      cell.cellStyle = CellStyle(
-        italic: true,
-        backgroundColorHex: ExcelColor.yellow100,
-        fontSize: 9,
-      );
-    }
-  }
-
-  void _createItemVariantsSheet(Excel excel) {
-    var sheet = excel[SHEET_ITEM_VARIANTS];
-
-    // Headers
-    _addHeader(sheet, 0, ['itemName*', 'variantName*', 'price*', 'trackInventory', 'stockQuantity']);
-
-    // Instructions row
-    _addInstructionRow(sheet, 1, [
-      'Must match item name from Items sheet',
-      'Must match variant from Variants sheet',
-      'Price for this variant (number only)',
-      'Yes or No',
-      'Number (0 if not tracking)'
-    ]);
-
-    // Veg Biryani — 3 sizes
-    _addRow(sheet, 2, ['Veg Biryani', 'Small',  160, 'No', 0]);
-    _addRow(sheet, 3, ['Veg Biryani', 'Medium', 200, 'No', 0]);
-    _addRow(sheet, 4, ['Veg Biryani', 'Large',  280, 'No', 0]);
-
-    // Paneer Tikka — Half & Full
-    _addRow(sheet, 5, ['Paneer Tikka', 'Half', 120, 'No', 0]);
-    _addRow(sheet, 6, ['Paneer Tikka', 'Full', 220, 'No', 0]);
-
-    // Pizza — Small / Medium / Large (with choices + extras, see Items sheet)
-    _addRow(sheet, 7,  ['Margherita Pizza', 'Small',  199, 'No', 0]);
-    _addRow(sheet, 8,  ['Margherita Pizza', 'Medium', 299, 'No', 0]);
-    _addRow(sheet, 9,  ['Margherita Pizza', 'Large',  399, 'No', 0]);
-
-    _addRow(sheet, 10, ['Paneer Pizza', 'Small',  229, 'No', 0]);
-    _addRow(sheet, 11, ['Paneer Pizza', 'Medium', 329, 'No', 0]);
-    _addRow(sheet, 12, ['Paneer Pizza', 'Large',  429, 'No', 0]);
-
-    _addRow(sheet, 13, ['Farmhouse Pizza', 'Small',  249, 'No', 0]);
-    _addRow(sheet, 14, ['Farmhouse Pizza', 'Medium', 349, 'No', 0]);
-    _addRow(sheet, 15, ['Farmhouse Pizza', 'Large',  449, 'No', 0]);
-  }
-
-  void _addHeader(Sheet sheet, int rowIndex, List<String> headers) {
-    for (int i = 0; i < headers.length; i++) {
-      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
-      cell.value = TextCellValue(headers[i]);
-      cell.cellStyle = CellStyle(
-        bold: true,
-        backgroundColorHex: ExcelColor.blue200,
-      );
-    }
-  }
-
-  void _addRow(Sheet sheet, int rowIndex, List<dynamic> values) {
-    for (int i = 0; i < values.length; i++) {
-      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex));
-      if (values[i] is String) {
-        cell.value = TextCellValue(values[i]);
-      } else if (values[i] is num) {
-        cell.value = DoubleCellValue(values[i].toDouble());
-      } else {
-        cell.value = TextCellValue('');
-      }
-    }
-  }
-
-  Future<String> _saveExcelFile(Excel excel, String fileName) async {
+  Future<String> _saveBytes(List<int> bytes, String fileName) async {
     try {
-      final bytes = excel.encode();
-      if (bytes == null) return 'Failed to encode Excel file';
-
       if (kIsWeb) {
         // Web platform: Use FilePicker with bytes
         final result = await FilePicker.platform.saveFile(
@@ -462,7 +89,7 @@ class RestaurantBulkImportService {
           // FilePicker automatically writes the bytes on Android/iOS
           return 'Template saved successfully to Downloads';
         } else {
-          // User cancelled the save dialog
+          // saveFile returns null when the user backs out of the save dialog.
           return 'Download cancelled';
         }
       } else {
@@ -690,8 +317,8 @@ class RestaurantBulkImportService {
 
     // 4. VegType validation
     final vegType = row['VegType']?.toString().trim().toLowerCase() ?? '';
-    if (vegType.isNotEmpty && vegType != 'veg' && vegType != 'non-veg') {
-      errors.add('Row $rowNumber: VegType must be "Veg" or "Non-Veg" (got "$vegType")');
+    if (vegType.isNotEmpty && vegType != 'veg' && vegType != 'non-veg' && vegType != 'egg') {
+      errors.add('Row $rowNumber: VegType must be "Veg", "Non-Veg" or "Egg" (got "$vegType")');
     }
 
     // 5. Weight + Unit validation
@@ -699,6 +326,14 @@ class RestaurantBulkImportService {
     final unit = row['Unit']?.toString().trim() ?? '';
     if (isSoldByWeight && unit.isEmpty) {
       errors.add('Row $rowNumber: Unit required when IsSoldByWeight is YES');
+    }
+    // 5b. Unit must be a recognized unit (defense-in-depth; the dropdown
+    // normally prevents this, but a hand-typed/old file might not match).
+    const knownUnits = {
+      'piece', 'pcs', 'pc', 'kg', 'gram', 'gm', 'g', 'liter', 'litre', 'l', 'ml', 'unit',
+    };
+    if (unit.isNotEmpty && !knownUnits.contains(unit.toLowerCase())) {
+      errors.add('Row $rowNumber: Unrecognized Unit "$unit" (use Piece, Kg, Gram, Liter or Ml)');
     }
 
     // 6. Inventory validation
@@ -725,8 +360,17 @@ class RestaurantBulkImportService {
       return existingCategory.id;
     }
 
-    // Category doesn't exist - create it
+    // Near-miss detection: a very similar category already existing usually
+    // means a typo ("Pizzza" vs "Pizza"). We still create it as-is — never
+    // silently merge into a guessed category — but flag it loudly.
+    final similar = _findSimilarCategoryName(nameLower);
+    if (similar != null) {
+      result.warnings.add(
+        '⚠️ Category "${categoryName.trim()}" looks similar to existing "$similar" — created as new; check for duplicates.',
+      );
+    }
 
+    // Category doesn't exist - create it
     final newCategory = Category(
       id: const Uuid().v4(),
       name: categoryName.trim(), // Use trimmed name for consistency
@@ -744,6 +388,43 @@ class RestaurantBulkImportService {
     result.warnings.add('✨ Auto-created category: ${newCategory.name}');
 
     return newCategory.id;
+  }
+
+  /// Returns an existing category name within edit-distance 1 of [nameLower]
+  /// (a likely typo), or null.
+  String? _findSimilarCategoryName(String nameLower) {
+    for (final existing in _categoryByNameCache.values) {
+      final other = existing.name.toLowerCase().trim();
+      if (other == nameLower) continue;
+      if ((other.length - nameLower.length).abs() > 1) continue;
+      if (_within1Edit(nameLower, other)) return existing.name;
+    }
+    return null;
+  }
+
+  /// True if [a] and [b] differ by at most one insert/delete/substitution.
+  bool _within1Edit(String a, String b) {
+    final int la = a.length, lb = b.length;
+    if ((la - lb).abs() > 1) return false;
+    int i = 0, j = 0, edits = 0;
+    while (i < la && j < lb) {
+      if (a[i] == b[j]) {
+        i++;
+        j++;
+        continue;
+      }
+      if (++edits > 1) return false;
+      if (la > lb) {
+        i++; // deletion from a
+      } else if (lb > la) {
+        j++; // insertion into a
+      } else {
+        i++;
+        j++; // substitution
+      }
+    }
+    if (i < la || j < lb) edits++; // leftover trailing char
+    return edits <= 1;
   }
 
   /// ✅ CRITICAL: Auto-create tax from rate (duplicate-safe)

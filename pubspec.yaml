@@ -103,6 +103,7 @@ dependencies:
   device_info_plus: ^10.1.0
   geolocator: ^13.0.4
   package_info_plus: ^9.0.1
+  syncfusion_flutter_xlsio: ^29.2.11
 
 
 

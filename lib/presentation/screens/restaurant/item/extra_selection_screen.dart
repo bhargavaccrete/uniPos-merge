@@ -344,34 +344,73 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   }
 
   void _showAddExtraDialog() {
-    final extraNameController = TextEditingController();
-    // Load variants for "Contains Size" feature
-    final availableVariants = variantStore.variants.toList();
-
-    // Data structure to hold topping inputs including variant prices
-    final List<Map<String, dynamic>> toppingData = [
-      {
-        'nameController': TextEditingController(),
-        'priceController': TextEditingController(),
-        'isVeg': true,
-        'hasSize': false,
-        'variantPriceControllers': <String, TextEditingController>{}, // map variantId -> controller
-        'selectedVariants': <String>{}, // set of selected variant IDs
-      }
-    ];
-
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final hInset = !AppResponsive.isMobile(context)
+      builder: (_) => _AddExtraDialog(
+        onAdded: () {
+          if (mounted) _loadExtras();
+        },
+      ),
+    );
+  }
+}
+
+/// Dialog for creating a new Extra category with toppings.
+///
+/// Owns its [TextEditingController]s and disposes them in [dispose], which the
+/// framework guarantees runs AFTER the dialog's exit animation completes. This
+/// avoids the `_dependents.isEmpty` crash that occurred when controllers were
+/// disposed (via a Future.delayed timer) while their TextFields were still
+/// mounted and animating out.
+class _AddExtraDialog extends StatefulWidget {
+  final VoidCallback onAdded;
+
+  const _AddExtraDialog({required this.onAdded});
+
+  @override
+  State<_AddExtraDialog> createState() => _AddExtraDialogState();
+}
+
+class _AddExtraDialogState extends State<_AddExtraDialog> {
+  final extraNameController = TextEditingController();
+  // Load variants for "Contains Size" feature
+  final availableVariants = variantStore.variants.toList();
+
+  // Data structure to hold topping inputs including variant prices
+  final List<Map<String, dynamic>> toppingData = [
+    {
+      'nameController': TextEditingController(),
+      'priceController': TextEditingController(),
+      'isVeg': true,
+      'hasSize': false,
+      'variantPriceControllers': <String, TextEditingController>{}, // map variantId -> controller
+      'selectedVariants': <String>{}, // set of selected variant IDs
+    }
+  ];
+
+  @override
+  void dispose() {
+    extraNameController.dispose();
+    for (var data in toppingData) {
+      data['nameController'].dispose();
+      data['priceController'].dispose();
+      (data['variantPriceControllers'] as Map<String, TextEditingController>)
+          .values
+          .forEach((c) => c.dispose());
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    void setDialogState(VoidCallback fn) => setState(fn);
+    final hInset = !AppResponsive.isMobile(context)
                 ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
                 : 24.0;
             return AlertDialog(
               insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
               title: Text(
-                'Add New Extra',
+                'Add Extra Category',
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
                 ),
@@ -381,23 +420,15 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Enter extra category name and toppings',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    SizedBox(height: 15),
                     AppTextField(
                       controller: extraNameController,
                       label: 'Category Name',
-                      hint: 'e.g. Add-ons',
+                      hint: 'e.g. Pizza Toppings',
                       icon: Icons.add_circle_outline,
                     ),
                     SizedBox(height: 20),
                     Text(
-                      'Toppings:',
+                      'Toppings',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -420,31 +451,36 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Topping ${index + 1}',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 13,
+                            if (toppingData.length > 1)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Topping ${index + 1}',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 13,
+                                    ),
                                   ),
-                                ),
-                                if (toppingData.length > 1)
                                   IconButton(
                                     icon: Icon(Icons.remove_circle, color: Colors.red, size: 20),
                                     onPressed: () {
-                                      setDialogState(() {
-                                        data['nameController'].dispose();
-                                        data['priceController'].dispose();
-                                        // Dispose variant controllers
-                                        variantControllers.values.forEach((c) => c.dispose());
-                                        toppingData.removeAt(index);
+                                      final removed = toppingData[index];
+                                      setDialogState(() => toppingData.removeAt(index));
+                                      // Dispose AFTER the rebuild removes the
+                                      // fields, so we never dispose a controller
+                                      // still attached to a mounted TextField.
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        removed['nameController'].dispose();
+                                        removed['priceController'].dispose();
+                                        (removed['variantPriceControllers'] as Map<String, TextEditingController>)
+                                            .values
+                                            .forEach((c) => c.dispose());
                                       });
                                     },
                                   ),
-                              ],
-                            ),
+                                ],
+                              ),
                             SizedBox(height: 8),
                             AppTextField(
                               controller: data['nameController'],
@@ -452,80 +488,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                               hint: 'e.g. Extra Cheese',
                               icon: Icons.local_pizza_outlined,
                             ),
-                            SizedBox(height: 10),
-                            // Veg/Non-Veg Selection
-                            Row(
-                              children: [
-                                Text(
-                                  'Type:',
-                                  style: GoogleFonts.poppins(fontSize: 13),
-                                ),
-                                SizedBox(width: 10),
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      Radio<bool>(
-                                        value: true,
-                                        groupValue: data['isVeg'],
-                                        onChanged: (value) {
-                                          setDialogState(() {
-                                            data['isVeg'] = value!;
-                                          });
-                                        },
-                                        activeColor: Colors.green,
-                                      ),
-                                      Icon(Icons.circle, color: Colors.green, size: 12),
-                                      SizedBox(width: 4),
-                                      Text('Veg', style: GoogleFonts.poppins(fontSize: 12)),
-                                      SizedBox(width: 15),
-                                      Radio<bool>(
-                                        value: false,
-                                        groupValue: data['isVeg'],
-                                        onChanged: (value) {
-                                          setDialogState(() {
-                                            data['isVeg'] = value!;
-                                          });
-                                        },
-                                        activeColor: Colors.red,
-                                      ),
-                                      Icon(Icons.circle, color: Colors.red, size: 12),
-                                      SizedBox(width: 4),
-                                      Text('Non-Veg', style: GoogleFonts.poppins(fontSize: 12)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 10),
-                            // Contains Size Checkbox
-                            if (availableVariants.isNotEmpty)
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: hasSize,
-                                    onChanged: (value) {
-                                      setDialogState(() {
-                                        data['hasSize'] = value!;
-                                        if (value) {
-                                          // Initialize variant controllers if needed
-                                          if (selectedVariants.isEmpty) {
-                                            // Auto-select all or none? Let's leave empty and let user select
-                                          }
-                                        } else {
-                                          // Clear logic if unchecked? Keep data for now or clear?
-                                        }
-                                      });
-                                    },
-                                    activeColor: AppColors.primary,
-                                  ),
-                                  Text(
-                                    'Contains Size (Variant Pricing)',
-                                    style: GoogleFonts.poppins(fontSize: 13),
-                                  ),
-                                ],
-                              ),
-
-                            // Price Input (Show if NO size or used as base price)
+                            // Price (shown when not priced by size)
                             if (!hasSize) ...[
                               SizedBox(height: 10),
                               AppTextField(
@@ -538,8 +501,57 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                                 ),
                                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                               ),
-                            ] else ...[
-                              // Variant Pricing Section
+                            ],
+                            SizedBox(height: 12),
+                            // Type (Veg / Non-Veg) segmented toggle
+                            Text('Type', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                            SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _vegToggle(
+                                    label: 'Veg',
+                                    color: Colors.green,
+                                    selected: data['isVeg'] == true,
+                                    onTap: () => setDialogState(() => data['isVeg'] = true),
+                                  ),
+                                ),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: _vegToggle(
+                                    label: 'Non-Veg',
+                                    color: Colors.red,
+                                    selected: data['isVeg'] == false,
+                                    onTap: () => setDialogState(() => data['isVeg'] = false),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // Different prices by size
+                            if (availableVariants.isNotEmpty) ...[
+                              SizedBox(height: 12),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => setDialogState(() => data['hasSize'] = !hasSize),
+                                child: Row(
+                                  children: [
+                                    Checkbox(
+                                      value: hasSize,
+                                      onChanged: (value) => setDialogState(() => data['hasSize'] = value!),
+                                      activeColor: AppColors.primary,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    Text(
+                                      'Different prices by size',
+                                      style: GoogleFonts.poppins(fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            // Variant pricing (when priced by size)
+                            if (hasSize) ...[
+                              SizedBox(height: 6),
                               Padding(
                                 padding: const EdgeInsets.only(left: 10, top: 5),
                                 child: Column(
@@ -623,7 +635,7 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
                       },
                       icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
                       label: Text(
-                        'Add Topping',
+                        'Add Another Topping',
                         style: GoogleFonts.poppins(color: AppColors.primary),
                       ),
                     ),
@@ -632,15 +644,8 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    for (var data in toppingData) {
-                      data['nameController'].dispose();
-                      data['priceController'].dispose();
-                      (data['variantPriceControllers'] as Map<String, TextEditingController>).values.forEach((c) => c.dispose());
-                    }
-                    extraNameController.dispose();
-                    Navigator.pop(context);
-                  },
+                  // Controllers are disposed in [dispose]; just close here.
+                  onPressed: () => Navigator.pop(context),
                   child: Text(
                     'Cancel',
                     style: GoogleFonts.poppins(color: AppColors.textSecondary),
@@ -668,11 +673,6 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
 
                       if (hasSize) {
                         variantPrices = {};
-                        if (selectedVariants.isEmpty) {
-                          // Skip if contains size but no variants selected?
-                          // Or allow with 0 prices? Let's skip invalid ones or warn
-                          // For now, continuing
-                        }
                         for (var variantId in selectedVariants) {
                           final priceText = variantControllers[variantId]?.text.trim() ?? '0';
                           final price = double.tryParse(priceText) ?? 0.0;
@@ -708,42 +708,60 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
 
                     await extraStore.addExtra(newExtra);
 
-                    // Unfocus keyboard first
-                    FocusScope.of(context).unfocus();
+                    // Notify parent to reload, then close. Controllers are
+                    // disposed safely in [dispose] once the route is gone.
+                    widget.onAdded();
+                    if (mounted) Navigator.of(context).pop();
 
-                    // Close the dialog
-                    Navigator.of(context).pop();
-
-                    // After dialog is closed, dispose controllers
-                    await Future.delayed(Duration(milliseconds: 100));
-                    for (var data in toppingData) {
-                      data['nameController'].dispose();
-                      data['priceController'].dispose();
-                      (data['variantPriceControllers'] as Map<String, TextEditingController>).values.forEach((c) => c.dispose());
-                    }
-                    extraNameController.dispose();
-
-                    // Reload extras in parent widget
-                    if (mounted) {
-                      _loadExtras();
-                    }
-
-                    // Show success message
                     NotificationService.instance.showSuccess('Extra "${newExtra.Ename}" added with ${toppings.length} toppings');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                   ),
                   child: Text(
-                    'Add',
+                    'Save',
                     style: GoogleFonts.poppins(color: Colors.white),
                   ),
                 ),
               ],
             );
-          },
-        );
-      },
+  }
+
+  /// A single Veg / Non-Veg segmented toggle button.
+  Widget _vegToggle({
+    required String label,
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.1) : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? color : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.circle, size: 10, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected ? color : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

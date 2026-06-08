@@ -112,12 +112,12 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
                   'Download Template',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.buttonFontSize(context),
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                  foregroundColor: AppColors.primary,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
@@ -274,9 +274,16 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
                         if (_lastResult!.imagesDownloaded > 0)
                           _buildResultItem(context, Icons.image_rounded, 'Images Downloaded',
                               '${_lastResult!.imagesDownloaded}', AppColors.info),
-                        if (_lastResult!.failedRows.isNotEmpty)
+                        if (_lastResult!.failedRows.isNotEmpty) ...[
                           _buildResultItem(context, Icons.error_outline_rounded, 'Failed Rows',
                               '${_lastResult!.failedRows.length}', AppColors.danger),
+                          _buildFailedRowsDetail(context),
+                        ],
+                        if (_lastResult!.warnings.isNotEmpty) ...[
+                          _buildResultItem(context, Icons.info_outline_rounded, 'Notices',
+                              '${_lastResult!.warnings.length}', AppColors.warning),
+                          _buildWarningsDetail(context),
+                        ],
                       ],
                     ),
                   ),
@@ -430,6 +437,85 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
     );
   }
 
+  /// Count non-empty data rows in a sheet (skips header + instruction rows).
+  int _countDataRows(Map<String, List<List<dynamic>>> sheets, String sheetName,
+      {int dataStart = 2}) {
+    final rows = sheets[sheetName];
+    if (rows == null) return 0;
+    int count = 0;
+    for (int i = dataStart; i < rows.length; i++) {
+      final row = rows[i];
+      if (row.isNotEmpty && row[0].toString().trim().isNotEmpty) count++;
+    }
+    return count;
+  }
+
+  /// Ask the user to confirm before committing the parsed file.
+  Future<bool> _confirmImport(int itemCount, int categoryCount) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        ),
+        title: Text(
+          'Confirm Import',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Found in this file:',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            _buildResultItem(context, Icons.inventory_2_rounded, 'Items',
+                '$itemCount', AppColors.primary),
+            _buildResultItem(context, Icons.category_rounded, 'Categories',
+                '$categoryCount', AppColors.success),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            Text(
+              'Existing items with the same name are skipped. Continue?',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+              ),
+            ),
+            child: Text('Import',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   Future<void> _downloadTemplate() async {
     setState(() {
       _isLoading = true;
@@ -448,6 +534,10 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
 
         if (result.contains('Error')) {
           NotificationService.instance.showError(result);
+        } else if (result.toLowerCase().contains('cancel')) {
+          // file_picker's saveFile can return null even after a successful
+          // save on Android — show a neutral message instead of a green ✓.
+          NotificationService.instance.showInfo(result);
         } else {
           NotificationService.instance.showSuccess(result);
         }
@@ -498,6 +588,20 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
           });
         }
         return; // User canceled file picker or file was empty
+      }
+
+      // Preview & confirm before committing the import
+      final itemCount = _countDataRows(sheets, 'Items');
+      final categoryCount = _countDataRows(sheets, 'Categories');
+      if (mounted) {
+        final confirmed = await _confirmImport(itemCount, categoryCount);
+        if (!confirmed) {
+          setState(() {
+            _isLoading = false;
+            _statusMessage = '';
+          });
+          return;
+        }
       }
 
       // Import data
@@ -630,6 +734,93 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Expandable list of failed rows with their validation reasons.
+  Widget _buildFailedRowsDetail(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+        title: Text(
+          'View failed rows',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w500,
+            color: AppColors.danger,
+          ),
+        ),
+        children: _lastResult!.failedRows.map((f) {
+          return Container(
+            margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+              border: Border.all(color: AppColors.danger.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Row ${f.rowNumber}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.danger,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                ...f.errors.map(
+                  (e) => Text(
+                    '• $e',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  /// Expandable list of import notices/warnings (auto-created categories,
+  /// near-miss typos, skipped duplicates, etc.).
+  Widget _buildWarningsDetail(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+        title: Text(
+          'View notices',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w500,
+            color: AppColors.warning,
+          ),
+        ),
+        children: _lastResult!.warnings.map((w) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context) / 2),
+            child: Text(
+              '• $w',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

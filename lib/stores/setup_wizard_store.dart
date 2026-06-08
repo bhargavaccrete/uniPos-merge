@@ -141,8 +141,8 @@ abstract class _SetupWizardStore with Store {
   // Default business types list
   @computed
   List<Map<String, String>> get businessTypes => [
-        {'id': 'retail', 'name': 'Retail Store', 'description': 'General retail and shopping', 'icon': 'store'},
         {'id': 'restaurant', 'name': 'Restaurant', 'description': 'Food service and dining', 'icon': 'restaurant'},
+        {'id': 'retail', 'name': 'Retail Store', 'description': 'General retail and shopping', 'icon': 'store'},
       ];
 
   // ==================== ACTIONS ====================

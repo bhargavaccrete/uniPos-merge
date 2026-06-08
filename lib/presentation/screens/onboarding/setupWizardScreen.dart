@@ -417,6 +417,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   Widget _buildHeader() {
+    final currentStepInfo = SetupStep.getSteps()[_store.currentStep];
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppResponsive.mediumSpacing(context),
@@ -443,7 +444,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                   ),
                 ),
                 Text(
-                  'Step ${_store.currentStep + 1} of $_totalSteps',
+                  'Step ${_store.currentStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
                   style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600]),
                 ),
               ],
@@ -1063,26 +1064,16 @@ class WelcomeStep extends StatelessWidget {
                   ),
                   SizedBox(height: AppResponsive.largeSpacing(context)),
 
-                  // Feature cards
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildFeatureItem(context, Icons.timer, 'Quick Setup', 'Complete setup in under 10 minutes', showDivider: true),
-                        _buildFeatureItem(context, Icons.security, 'Secure & Private', 'Your data is encrypted and stored locally', showDivider: true),
-                        _buildFeatureItem(context, Icons.support_agent, 'Support Available', 'Get help anytime during setup', showDivider: false),
-                      ],
-                    ),
+                  // Compact reassurance row (slimmed from full feature-card list)
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: AppResponsive.smallSpacing(context),
+                    runSpacing: 8,
+                    children: [
+                      _buildChip(context, Icons.timer, 'Under 10 min'),
+                      _buildChip(context, Icons.security, 'Private & secure'),
+                      _buildChip(context, Icons.support_agent, 'Help anytime'),
+                    ],
                   ),
                   SizedBox(height: AppResponsive.largeSpacing(context)),
 
@@ -1119,60 +1110,28 @@ class WelcomeStep extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureItem(
-    BuildContext context,
-    IconData icon,
-    String title,
-    String description, {
-    required bool showDivider,
-  }) {
-    final boxSize = AppResponsive.getValue(context, mobile: 42.0, tablet: 48.0, desktop: 52.0);
-
-    return Column(
-      children: [
-        Padding(
-          padding: AppResponsive.cardPadding(context),
-          child: Row(
-            children: [
-              Container(
-                width: boxSize,
-                height: boxSize,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                ),
-                child: Icon(icon, color: AppColors.primary, size: AppResponsive.iconSize(context)),
-              ),
-              SizedBox(width: AppResponsive.mediumSpacing(context)),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: AppResponsive.subheadingFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.darkNeutral,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+  Widget _buildChip(BuildContext context, IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.primary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        if (showDivider)
-          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
-      ],
+        ],
+      ),
     );
   }
 }
