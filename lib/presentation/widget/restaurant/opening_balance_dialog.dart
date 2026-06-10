@@ -3,11 +3,51 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
+import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/common/notification_service.dart';
+import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
+
+/// Shows the opening-balance dialog and starts the day with the entered amount,
+/// recording an opening adjustment if it differs from yesterday's closing.
+/// Returns true once the day is started (false only if dismissed).
+///
+/// Single source of truth for "start the day" — used by the dashboard banner
+/// and by the order screens (so the day starts the moment the first order is
+/// placed, not forced on app open).
+Future<bool> promptStartDay(BuildContext context) async {
+  final balance = await showDialog<double>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const OpeningBalanceDialog(),
+  );
+  if (balance == null) return false;
+
+  // Record an ADJUSTMENT if the opening differs from yesterday's closing.
+  final lastClosing = await DayManagementService.getLastClosingBalance();
+  final diff = balance - lastClosing;
+  if (lastClosing > 0 && diff.abs() > 0.01) {
+    final byName = RestaurantSession.staffName ??
+        (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+    await cashMovementStore.addAdjustment(
+      signedAmount: diff,
+      reason: 'Opening balance modified',
+      note: 'Previous closing: Rs.${lastClosing.toStringAsFixed(2)}, '
+          'Opened at: Rs.${balance.toStringAsFixed(2)}',
+      staffName: byName,
+    );
+  }
+
+  await DayManagementService.setOpeningBalance(balance); // marks day started
+  NotificationService.instance.showSuccess(
+    'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
+  );
+  return true;
+}
 
 class OpeningBalanceDialog extends StatefulWidget {
   const OpeningBalanceDialog({super.key});
@@ -78,14 +118,16 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return PopScope(
-      canPop: false,
+      canPop: true, // back gesture = cancel (returns null)
       child: Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.symmetric(
           horizontal: isTablet ? 120 : 28,
           vertical: isTablet ? 60 : 40,
         ),
-        child: Container(
+        child: Stack(
+          children: [
+            Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -238,69 +280,55 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
 
                     SizedBox(height: isTablet ? 28 : 24),
 
-                    // Buttons
-                    Row(
-                      children: [
-                        if (!_isLoading)
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.of(context).pop(0.0),
-                              style: OutlinedButton.styleFrom(
-                                padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
-                                side: const BorderSide(color: AppColors.divider),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                'Start with ${CurrencyHelper.currentSymbol}0',
-                                style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 14 : 13,
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        if (!_isLoading) const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _saveOpeningBalance,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    'Start Day',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: isTablet ? 16 : 14,
-                                    ),
-                                  ),
+                    // Single action — starts with whatever's in the field (0 is fine).
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _saveOpeningBalance,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                      ],
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                'Start Day',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: isTablet ? 16 : 14,
+                                ),
+                              ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
+            ),
+            // Close (cancel) — returns null so promptStartDay reports "not started"
+            Positioned(
+              top: 6,
+              right: 6,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 22),
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Cancel',
+              ),
+            ),
+          ],
         ),
       ),
     );

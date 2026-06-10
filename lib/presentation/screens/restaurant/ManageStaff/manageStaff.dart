@@ -12,6 +12,7 @@ import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart
 import 'package:unipos/presentation/widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../data/models/restaurant/db/staffModel_310.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/common/app_responsive.dart';
 
@@ -145,6 +146,26 @@ class _manageStaffState extends State<manageStaff> {
     );
     await staffStore.addStaff(newstaff);
     _clear();
+  }
+
+  /// PIN-only login means PINs must be globally unique — across all staff AND
+  /// the admin. Returns true if [pin] is already taken. [excludeStaffId] skips
+  /// the staff being edited.
+  Future<bool> _isPinTaken(String pin, {String? excludeStaffId}) async {
+    final staffClash = staffStore.staff.any((s) =>
+        s.id != excludeStaffId &&
+        RestaurantAuthHelper.verifyPassword(pin, s.pinNo));
+    if (staffClash) return true;
+    // Check the admin PIN too. If nothing is stored yet, the admin is still on
+    // the login default ('123456') — so compare against that, otherwise a staff
+    // could take the default admin PIN and shadow the admin at login.
+    final prefs = await SharedPreferences.getInstance();
+    final adminPass = prefs.getString('restaurant_admin_password');
+    final adminCollision = adminPass != null
+        ? RestaurantAuthHelper.verifyPassword(pin, adminPass)
+        : pin == '123456';
+    if (adminCollision) return true;
+    return false;
   }
 
   void _searchStaff(String query) {
@@ -543,24 +564,7 @@ class _manageStaffState extends State<manageStaff> {
                     ]),
                     const SizedBox(height: 14),
 
-                    // ── Username ─────────────────────────────────────
-                    AppTextField(
-                      controller: userNameController,
-                      label: 'Username',
-                      hint: 'Auto from first name',
-                      icon: Icons.alternate_email_rounded,
-                      required: true,
-                      onChanged: (v) {
-                        if (v.trim().isEmpty) {
-                          _usernameManuallyEdited = false;
-                          _syncUsernameFromFirstName();
-                        } else {
-                          _usernameManuallyEdited = true;
-                        }
-                      },
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Username is required' : null,
-                    ),
-                    const SizedBox(height: 14),
+                    // Username field hidden — auto-generated from first name.
 
                     // ── Role ─────────────────────────────────────────
                     _buildRoleSelector(selectedrole,
@@ -650,7 +654,7 @@ class _manageStaffState extends State<manageStaff> {
                           icon: const Icon(Icons.person_add_rounded, size: 18),
                           label: Text('Add Staff',
                               style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                          onPressed: () {
+                          onPressed: () async {
                             if (_formKey.currentState!.validate()) {
                               if (selectedrole == 'Select Role') {
                                 NotificationService.instance.showInfo('Please select a role');
@@ -661,8 +665,13 @@ class _manageStaffState extends State<manageStaff> {
                                 NotificationService.instance.showError('Username already exists.');
                                 return;
                               }
+                              if (await _isPinTaken(pinNoController.text.trim())) {
+                                NotificationService.instance.showError(
+                                    'This PIN is already in use. Choose a different one.');
+                                return;
+                              }
                               _addStaff();
-                              Navigator.pop(ctx);
+                              if (ctx.mounted) Navigator.pop(ctx);
                               NotificationService.instance.showSuccess('Staff added successfully');
                             }
                           },
@@ -800,16 +809,7 @@ class _manageStaffState extends State<manageStaff> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── Username ─────────────────────────────────────────
-                      AppTextField(
-                        controller: editUserNameController,
-                        label: 'Username',
-                        hint: 'e.g. john_cashier',
-                        icon: Icons.alternate_email_rounded,
-                        required: true,
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Username is required' : null,
-                      ),
-                      const SizedBox(height: 14),
+                      // Username field hidden — kept as-is, not editable.
 
                       // ── Role ─────────────────────────────────────────────
                       _buildRoleSelector(
@@ -963,6 +963,12 @@ class _manageStaffState extends State<manageStaff> {
                                   return;
                                 }
                                 final newPin = editPinController.text.trim();
+                                if (newPin.isNotEmpty &&
+                                    await _isPinTaken(newPin, excludeStaffId: staff.id)) {
+                                  NotificationService.instance.showError(
+                                      'This PIN is already in use. Choose a different one.');
+                                  return;
+                                }
                                 final updatedStaff = staff.copyWith(
                                   userName: editUserNameController.text.trim(),
                                   firstName: editFirstNameController.text.trim(),

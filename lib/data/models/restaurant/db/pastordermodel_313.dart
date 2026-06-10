@@ -2,6 +2,8 @@
 import 'dart:convert';
 import 'package:unipos/core/constants/hive_type_ids.dart';
 import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:hive/hive.dart';
 
 part 'pastordermodel_313.g.dart';
@@ -368,5 +370,21 @@ class PastOrderModel extends HiveObject{
         {'method': paymentmode ?? 'cash', 'amount': totalPrice}
       ];
     }
+  }
+
+  /// Consistent payment label for list/table views, built from the same
+  /// [paymentList] source the receipt uses — so every surface matches.
+  /// Single payment → "CASH". Split → "CASH ₹100.00, CARD ₹100.00".
+  String get paymentDisplay {
+    if (isSplitPayment == true &&
+        paymentListJson != null &&
+        paymentListJson!.isNotEmpty) {
+      return paymentList.map((p) {
+        final method = (p['method'] as String? ?? '').toUpperCase();
+        final amount = (p['amount'] as num?)?.toDouble() ?? 0;
+        return '$method ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(amount)}';
+      }).join(', ');
+    }
+    return (paymentmode ?? '').toUpperCase();
   }
 }

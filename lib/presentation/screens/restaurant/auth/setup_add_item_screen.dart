@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/currency_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
@@ -16,9 +15,12 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/Button
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/category_management_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/item/add_more_info_screen.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/widgets/tax_selector_button.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_screen.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:unipos/util/restaurant/staticswitch.dart';
+import 'package:unipos/domain/services/restaurant/stock_adjust_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/screens/restaurant/auth/setup_items_list_screen.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
@@ -72,6 +74,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   bool _trackInventory = false;
   bool _allowOrderWhenOutOfStock = false;
   final _stockController = TextEditingController();
+  final _lowStockController = TextEditingController();
+  bool _lowStockAlertEnabled = false;
 
   // Variants, Choices, Extras (from Add More Info screen)
   List<ItemVariante> _selectedVariants = [];
@@ -125,6 +129,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     _priceController.dispose();
     _descriptionController.dispose();
     _stockController.dispose();
+    _lowStockController.dispose();
     _nameFocusNode.dispose();
     _priceFocusNode.dispose();
     _descriptionFocusNode.dispose();
@@ -343,6 +348,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             'variants': _selectedVariants.map((v) => v.toMap()).toList(),
             'choiceIds': _selectedChoiceIds,
             'extraIds': _selectedExtraIds,
+            'trackInventory': _trackInventory,
           },
         ),
       ),
@@ -358,6 +364,24 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         _selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
         _selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
       });
+    }
+  }
+
+  // ============ TAX SELECTION ============
+
+  /// Open the shared tax picker (card → picker, consistent with edit/add-item).
+  Future<void> _selectTax() async {
+    FocusScope.of(context).unfocus();
+    final result = await TaxSelectorSheet.show(
+      context,
+      selectedTaxId: _selectedTaxId,
+    );
+    if (result != null) {
+      // Reload so a tax added inside the picker is found by rate/name lookups.
+      await _loadTaxes();
+      if (mounted) {
+        setState(() => _selectedTaxId = result.id);
+      }
     }
   }
 
@@ -394,73 +418,6 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     );
 
     return tax.taxperecentage ?? 0.0;
-  }
-
-  /// Calculate base price (price before tax)
-  /// If tax inclusive: extract base from entered price
-  /// If tax exclusive: entered price IS the base
-  double _calculateBasePrice() {
-    final priceText = _priceController.text.trim();
-    if (priceText.isEmpty) return 0.0;
-
-    final enteredPrice = double.tryParse(priceText) ?? 0.0;
-    final taxPercentage = _calculateTotalTaxPercentage();
-
-    // Check if tax is inclusive
-    final isTaxInclusive = AppSettings.isTaxInclusive;
-
-    if (isTaxInclusive && taxPercentage > 0) {
-      // Tax Inclusive: Calculate base price by removing tax
-      // Example: entered=100, tax=18% → base = 100/1.18 = 84.75
-      return enteredPrice / (1 + (taxPercentage / 100));
-    } else {
-      // Tax Exclusive: Entered price IS the base
-      return enteredPrice;
-    }
-  }
-
-  /// Calculate tax amount
-  double _calculateTaxAmount() {
-    final priceText = _priceController.text.trim();
-    if (priceText.isEmpty) return 0.0;
-
-    final enteredPrice = double.tryParse(priceText) ?? 0.0;
-    final taxPercentage = _calculateTotalTaxPercentage();
-
-    if (taxPercentage == 0) return 0.0;
-
-    final isTaxInclusive = AppSettings.isTaxInclusive;
-
-    if (isTaxInclusive) {
-      // Tax Inclusive: Extract tax from entered price
-      // Example: entered=100, tax=18% → tax = 100 - (100/1.18) = 15.25
-      final basePrice = enteredPrice / (1 + (taxPercentage / 100));
-      return enteredPrice - basePrice;
-    } else {
-      // Tax Exclusive: Calculate tax on base price
-      // Example: base=100, tax=18% → tax = 100 * 0.18 = 18
-      return enteredPrice * (taxPercentage / 100);
-    }
-  }
-
-  /// Calculate final price (what customer pays)
-  double _calculatePriceWithTax() {
-    final priceText = _priceController.text.trim();
-    if (priceText.isEmpty) return 0.0;
-
-    final enteredPrice = double.tryParse(priceText) ?? 0.0;
-    final taxPercentage = _calculateTotalTaxPercentage();
-
-    final isTaxInclusive = AppSettings.isTaxInclusive;
-
-    if (isTaxInclusive) {
-      // Tax Inclusive: Final price = entered price (tax already included)
-      return enteredPrice;
-    } else {
-      // Tax Exclusive: Final price = base + tax
-      final taxAmount = enteredPrice * (taxPercentage / 100);
-      return enteredPrice + taxAmount;
-    }
   }
 
   // ============ SAVE ITEM ============
@@ -520,9 +477,14 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
         unit: _sellingMethod == SellingMethod.byWeight ? _selectedUnit : null,
         trackInventory: _trackInventory,
-        stockQuantity: _trackInventory
+        // Item-level stock only for simple items; variant items track per variant.
+        stockQuantity: (_trackInventory && _selectedVariants.isEmpty)
             ? double.tryParse(_stockController.text.trim()) ?? 0.0
             : 0.0,
+        lowStockAlertEnabled: _trackInventory && _lowStockAlertEnabled,
+        lowStockThreshold: (_trackInventory && _lowStockAlertEnabled)
+            ? double.tryParse(_lowStockController.text.trim())
+            : null,
         allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
         variant: _selectedVariants,
         choiceIds: _selectedChoiceIds,
@@ -535,6 +497,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
       // Save using store
       final success = await itemStore.addItem(item);
+      if (success) {
+        // Log opening stock so it appears in the item's stock history.
+        await StockAdjustService.recordOpeningStock(item);
+      }
 
       // Close loading
       if (mounted) Navigator.pop(context);
@@ -583,6 +549,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _priceController.clear();
       _descriptionController.clear();
       _stockController.clear();
+      _lowStockController.clear();
+      _lowStockAlertEnabled = false;
       _selectedCategoryId = null;
       _selectedCategoryName = null;
       _showCategoryError = false;
@@ -1159,20 +1127,52 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               if (!value) {
                 _allowOrderWhenOutOfStock = false;
                 _stockController.clear();
+      _lowStockController.clear();
+      _lowStockAlertEnabled = false;
               }
             }),
           ),
           if (_trackInventory) ...[
             const Divider(),
             const SizedBox(height: 10),
-            AppTextField(
-              controller: _stockController,
-              focusNode: _stockFocusNode,
-              label: 'Current Stock',
-              hint: '0',
-              icon: Icons.inventory_2_rounded,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            if (_selectedVariants.isEmpty)
+              AppTextField(
+                controller: _stockController,
+                focusNode: _stockFocusNode,
+                label: 'Current Stock',
+                hint: '0',
+                icon: Icons.inventory_2_rounded,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              )
+            else
+              Text('Stock is set per variant in More Info.',
+                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+            const SizedBox(height: 10),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Low-stock alert',
+                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+              subtitle: Text('Warn when this item runs low',
+                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+              value: _lowStockAlertEnabled,
+              activeColor: AppColors.primary,
+              onChanged: (v) => setState(() => _lowStockAlertEnabled = v),
             ),
+            if (_lowStockAlertEnabled) ...[
+              const SizedBox(height: 10),
+              Builder(builder: (_) {
+                final unit = _sellingMethod == SellingMethod.byWeight
+                    ? _selectedUnit
+                    : 'pcs';
+                return AppTextField(
+                  controller: _lowStockController,
+                  label: 'Alert threshold ($unit, optional)',
+                  hint: 'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
+                  icon: Icons.warning_amber_rounded,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                );
+              }),
+            ],
             const SizedBox(height: 10),
             SwitchListTile(
               title: Text(
@@ -1200,213 +1200,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Widget _buildTaxSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_availableTaxes.isEmpty) ...[
-            Center(
-              child: Column(
-                children: [
-                  Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 10),
-                  Text(
-                    'No taxes available',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Add taxes in Setup Wizard Tax Settings first',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            Text(
-              'Select ONE tax for this item:',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[700],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 15),
-            ..._availableTaxes.map((tax) {
-              final isSelected = _selectedTaxId == tax.id;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isSelected ? AppColors.primary : Colors.grey[300]!,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: RadioListTile<String>(
-                  value: tax.id,
-                  groupValue: _selectedTaxId,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedTaxId = value;
-                    });
-                  },
-                  title: Text(
-                    tax.taxname,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${tax.taxperecentage?.toStringAsFixed(2) ?? '0.00'}%',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  activeColor: AppColors.primary,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                ),
-              );
-            }).toList(),
-            if (_selectedTaxId != null) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green[700], size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Tax selected: ${_availableTaxes.firstWhere((t) => t.id == _selectedTaxId).taxname}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.green[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Price Preview with Tax
-              if (_priceController.text.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!, width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.receipt, color: Colors.blue[700], size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Price Preview',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.blue[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Base Price:',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          Text(
-                            '${CurrencyHelper.currentSymbol}${_calculateBasePrice().toStringAsFixed(2)}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Tax (${_calculateTotalTaxPercentage().toStringAsFixed(2)}%):',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          Text(
-                            '${CurrencyHelper.currentSymbol}${_calculateTaxAmount().toStringAsFixed(2)}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 12, thickness: 1),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Final Price:',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          Text(
-                            '${CurrencyHelper.currentSymbol}${_calculatePriceWithTax().toStringAsFixed(2)}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ],
-        ],
-      ),
-    );
+    final rate = _selectedTaxId != null ? _calculateTotalTaxPercentage() / 100 : null;
+    return TaxSelectorButton(taxRate: rate, onTap: _selectTax);
   }
 
   Widget _buildAdditionalOptionsSection() {

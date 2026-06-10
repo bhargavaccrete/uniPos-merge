@@ -13,6 +13,8 @@ class AddItemFormState extends ChangeNotifier {
   final itemNameController = TextEditingController();
   final priceController = TextEditingController();
   final descriptionController = TextEditingController();
+  final stockController = TextEditingController();
+  final lowStockThresholdController = TextEditingController();
 
   // Image
   Uint8List? selectedImage;
@@ -28,9 +30,14 @@ class AddItemFormState extends ChangeNotifier {
   // Veg/Non-Veg
   String vegCategory = 'Veg';
 
+  // Tax (taxRate is a decimal, e.g. 0.18 for 18%)
+  String? selectedTaxId;
+  double? selectedTaxRate;
+
   // Inventory
   bool trackInventory = false;
   bool allowOrderWhenOutOfStock = true;
+  bool lowStockAlertEnabled = false;
 
   // Variants, Choices, Extras
   List<Map<String, dynamic>> selectedVariants = [];
@@ -42,12 +49,17 @@ class AddItemFormState extends ChangeNotifier {
     itemNameController.clear();
     priceController.clear();
     descriptionController.clear();
+    stockController.clear();
+    lowStockThresholdController.clear();
+    lowStockAlertEnabled = false;
     selectedImage = null;
     sellingMethod = SellingMethod.byUnit;
     selectedUnit = 'kg';
     selectedCategoryId = null;
     selectedCategoryName = null;
     vegCategory = 'Veg';
+    selectedTaxId = null;
+    selectedTaxRate = null;
     trackInventory = false;
     allowOrderWhenOutOfStock = true;
     selectedVariants.clear();
@@ -89,6 +101,7 @@ class AddItemFormState extends ChangeNotifier {
         .map((v) => ItemVariante(
               variantId: v['variantId'],
               price: v['price'],
+              stockQuantity: (v['stockQuantity'] as num?)?.toDouble() ?? 0.0,
             ))
         .toList();
 
@@ -102,6 +115,15 @@ class AddItemFormState extends ChangeNotifier {
       isVeg: vegCategory,
       isSoldByWeight: sellingMethod == SellingMethod.byWeight,
       unit: sellingMethod == SellingMethod.byWeight ? selectedUnit : null,
+      // Item-level stock only for simple items; variant items track per variant.
+      stockQuantity: (trackInventory && selectedVariants.isEmpty)
+          ? (double.tryParse(stockController.text.trim()) ?? 0.0)
+          : 0.0,
+      taxRate: selectedTaxRate,
+      lowStockAlertEnabled: trackInventory && lowStockAlertEnabled,
+      lowStockThreshold: (trackInventory && lowStockAlertEnabled)
+          ? double.tryParse(lowStockThresholdController.text.trim())
+          : null,
       trackInventory: trackInventory,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
       variant: itemVariants,
@@ -121,17 +143,32 @@ class AddItemFormState extends ChangeNotifier {
       'selectedVegCategory': vegCategory,
       'selectedCategory': selectedCategoryId,
       'selectedCategoryname': selectedCategoryName,
+      'taxId': selectedTaxId,
+      'taxRate': selectedTaxRate,
+      'trackInventory': trackInventory,
       'variants': selectedVariants,
       'choiceIds': selectedChoiceIds,
       'extraIds': selectedExtraIds,
     };
   }
 
-  /// Update variants, choices, extras from AddMoreInfo result
+  /// Update variants, choices, extras and tax from AddMoreInfo result
   void updateFromMoreInfo(Map<String, dynamic> result) {
     selectedVariants = List<Map<String, dynamic>>.from(result['variants'] ?? []);
     selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
     selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
+    // More Info can also set the tax — keep it in sync so it isn't lost.
+    if (result.containsKey('taxId') || result.containsKey('taxRate')) {
+      selectedTaxId = result['taxId'] as String?;
+      selectedTaxRate = (result['taxRate'] as num?)?.toDouble();
+    }
+    notifyListeners();
+  }
+
+  /// Set tax (taxRate as decimal, e.g. 0.18). Pass nulls for "No Tax".
+  void setTax(String? id, double? rate) {
+    selectedTaxId = id;
+    selectedTaxRate = rate;
     notifyListeners();
   }
 
@@ -166,6 +203,12 @@ class AddItemFormState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Set per-item low-stock alert opt-in
+  void setLowStockAlert(bool value) {
+    lowStockAlertEnabled = value;
+    notifyListeners();
+  }
+
   /// Set allow order when out of stock
   void setAllowOrderWhenOutOfStock(bool value) {
     allowOrderWhenOutOfStock = value;
@@ -183,6 +226,8 @@ class AddItemFormState extends ChangeNotifier {
     itemNameController.dispose();
     priceController.dispose();
     descriptionController.dispose();
+    stockController.dispose();
+    lowStockThresholdController.dispose();
     super.dispose();
   }
 }

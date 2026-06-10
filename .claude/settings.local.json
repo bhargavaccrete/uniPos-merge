@@ -1,3 +1,9 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "Bash(echo \"errors: $\\(flutter analyze lib/presentation/screens/restaurant/tabbar/item_options_dialog.dart 2>&1)"
+    ]
+  },
   "outputStyle": "Learning"
 }

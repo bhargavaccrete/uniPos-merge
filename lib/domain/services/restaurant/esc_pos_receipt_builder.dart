@@ -155,7 +155,7 @@ class EscPosReceiptBuilder {
       
       String prefix = '${qty}x ';
       if (receiptData.kotStatus?.toUpperCase() == 'CANCEL') {
-        prefix = 'X ${qty}x '; // ESC/POS fallback for Cross symbol
+        prefix = 'CANCEL ${qty}x '; // plain text — no glyph fonts on thermal
       }
       
       bytes.addAll(_boldOn);
@@ -255,13 +255,9 @@ class EscPosReceiptBuilder {
 
     // ── ORDER INFO ──
 
-    // Bill# and KOT numbers
+    // Bill# only — KOT numbers are internal kitchen info, not for the customer
     if (receiptData.billNumber != null) {
       bytes.addAll(_text('Bill No: INV-${receiptData.billNumber}'));
-    }
-    if (receiptData.kotNumbers != null && receiptData.kotNumbers!.isNotEmpty) {
-      final kotStr = receiptData.kotNumbers!.map((k) => '#$k').join(', ');
-      bytes.addAll(_text('KOT: $kotStr'));
     }
 
     // Date and time

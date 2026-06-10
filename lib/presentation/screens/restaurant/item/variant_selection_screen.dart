@@ -13,10 +13,13 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 
 class VariantSelectionScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedVariants;
+  /// When true (item tracks inventory), show a stock field per variant.
+  final bool trackInventory;
 
   const VariantSelectionScreen({
     super.key,
     required this.selectedVariants,
+    this.trackInventory = false,
   });
 
   @override
@@ -27,6 +30,10 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   List<VariantModel> availableVariants = [];
   Map<String, bool> selectedVariantIds = {};
   Map<String, TextEditingController> priceControllers = {};
+  Map<String, TextEditingController> stockControllers = {};
+
+  TextEditingController _stockCtrl(String id) =>
+      stockControllers.putIfAbsent(id, () => TextEditingController());
 
   // Quick-add preset sets — one tap creates (if missing) and selects all.
   static const Map<String, List<String>> _presets = {
@@ -176,9 +183,18 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   void _initializeSelections() {
     // Initialize from existing selections
     for (var selectedVariant in widget.selectedVariants) {
-      selectedVariantIds[selectedVariant['variantId']] = true;
-      priceControllers[selectedVariant['variantId']] = TextEditingController(
+      final id = selectedVariant['variantId'];
+      selectedVariantIds[id] = true;
+      priceControllers[id] = TextEditingController(
         text: selectedVariant['price'].toString(),
+      );
+      final existingStock = selectedVariant['stockQuantity'];
+      stockControllers[id] = TextEditingController(
+        text: (existingStock == null || existingStock == 0)
+            ? ''
+            : (existingStock % 1 == 0
+                ? existingStock.toInt().toString()
+                : existingStock.toString()),
       );
     }
 
@@ -198,6 +214,9 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
     for (var controller in priceControllers.values) {
       controller.dispose();
     }
+    for (var controller in stockControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -213,10 +232,14 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
         if (variant.id.isNotEmpty) {
           final price = double.tryParse(priceControllers[variantId]?.text ?? '') ?? 0.0;
+          final stock = widget.trackInventory
+              ? (double.tryParse(stockControllers[variantId]?.text ?? '') ?? 0.0)
+              : 0.0;
           result.add({
             'variantId': variantId,
             'price': price,
             'name': variant.name,
+            'stockQuantity': stock,
           });
         }
       }
@@ -284,50 +307,78 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 borderRadius: BorderRadius.circular(12),
                 color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : AppColors.white,
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (value) {
-                      setState(() {
-                        selectedVariantIds[variant.id] = value ?? false;
-                        if (!(value ?? false)) {
-                          controller.clear();
-                        }
-                      });
-                    },
-                    activeColor: AppColors.primary,
-                  ),
-                  Expanded(
-                    child: Text(
-                      variant.name,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: isSelected ? Colors.black : AppColors.textSecondary,
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isSelected,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedVariantIds[variant.id] = value ?? false;
+                            if (!(value ?? false)) {
+                              controller.clear();
+                              _stockCtrl(variant.id).clear();
+                            }
+                          });
+                        },
+                        activeColor: AppColors.primary,
                       ),
-                    ),
+                      Expanded(
+                        child: Text(
+                          variant.name,
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: isSelected ? Colors.black : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete_outline,
+                            size: 20, color: AppColors.danger.withValues(alpha: 0.8)),
+                        onPressed: () => _confirmDeleteVariant(variant),
+                        tooltip: 'Remove variant',
+                        splashRadius: 20,
+                      ),
+                    ],
                   ),
                   if (isSelected)
-                    SizedBox(
-                      width: 110,
-                      child: AppTextField(
-                        controller: controller,
-                        hint: '0.00',
-                        prefixWidget: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                          child: Text(CurrencyHelper.currentSymbol, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                        ),
-                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, right: 8, bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: AppTextField(
+                              controller: controller,
+                              label: 'Price',
+                              hint: '0.00',
+                              prefixWidget: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                child: Text(CurrencyHelper.currentSymbol,
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primary)),
+                              ),
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            ),
+                          ),
+                          if (widget.trackInventory) ...[
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: AppTextField(
+                                controller: _stockCtrl(variant.id),
+                                label: 'Stock',
+                                hint: '0',
+                                icon: Icons.inventory_2_outlined,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                  IconButton(
-                    icon: Icon(Icons.delete_outline,
-                        size: 20, color: AppColors.danger.withValues(alpha: 0.8)),
-                    onPressed: () => _confirmDeleteVariant(variant),
-                    tooltip: 'Remove variant',
-                    splashRadius: 20,
-                  ),
                 ],
               ),
             );

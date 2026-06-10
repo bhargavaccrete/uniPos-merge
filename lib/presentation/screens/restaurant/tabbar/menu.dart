@@ -7,6 +7,7 @@ import 'package:unipos/util/color.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/day_management_service.dart';
+import '../../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
@@ -34,6 +35,101 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
+  // Sentinel category id for the "Favorites" tab.
+  static const String _kFavorites = '__favorites__';
+
+  void _toggleFavorite(Items item) {
+    itemStore.updateItem(item.copyWith(isFavorite: !item.isFavorite));
+  }
+
+  /// Tappable star overlay used on item cards to mark/unmark favorite.
+  Widget _favStar(Items item) {
+    return GestureDetector(
+      onTap: () => _toggleFavorite(item),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.85),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          item.isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
+          size: 18,
+          color: item.isFavorite ? Colors.amber : AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  /// Mobile "Favorites" section pinned at the top of the category list.
+  Widget _buildFavoritesSection(List<Items> visibleItems, String query, String lowerQuery) {
+    var favItems = visibleItems.where((i) => i.isFavorite).toList();
+    if (query.isNotEmpty) {
+      favItems = favItems.where((i) => i.name.toLowerCase().contains(lowerQuery)).toList();
+      if (favItems.isEmpty) return const SizedBox.shrink();
+    }
+    if (favItems.isEmpty) {
+      // No favorites yet — gentle hint so the section explains itself.
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 2,
+        color: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ListTile(
+          leading: const Icon(Icons.star_rounded, color: Colors.amber),
+          title: Text('Favorites',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+          subtitle: Text('Tap the ☆ on an item to pin it here',
+              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+        ),
+      );
+    }
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      color: AppColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.star_rounded, color: Colors.amber, size: 24),
+          ),
+          title: Text('Favorites',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87)),
+          subtitle: Text('${favItems.length} items',
+              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+          children: [
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              itemCount: favItems.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) {
+                final item = favItems[i];
+                return _ItemListTile(
+                  item: item,
+                  onTap: () => _handleItemTap(item),
+                  onToggleFavorite: () => _toggleFavorite(item),
+                  formatStock: _formatStockDisplay,
+                  getStockStatus: _getStockStatus,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   String? activeCategory;
   String query = '';
@@ -180,6 +276,14 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _addItemToCart(CartItem cartItem) async {
+    // First item of a not-yet-started day → offer to start it now (cancelable).
+    // Either choice still adds the item; the day is ENFORCED at checkout, so an
+    // order can never be placed without a session even if this is cancelled.
+    if (restaurantCartStore.cartItems.isEmpty &&
+        !await DayManagementService.isSessionOpen() &&
+        mounted) {
+      await promptStartDay(context);
+    }
     try {
       final result = await restaurantCartStore.addToCart(cartItem);
 
@@ -476,8 +580,13 @@ class _MenuScreenState extends State<MenuScreen> {
                           return ListView.builder(
                             controller: _listScrollController,
                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            itemCount: allCategories.length,
-                            itemBuilder: (context, index) {
+                            itemCount: allCategories.length + 1,
+                            itemBuilder: (context, rawIndex) {
+                              // Favorites section pinned at the very top.
+                              if (rawIndex == 0) {
+                                return _buildFavoritesSection(visibleItems, query, lowerQuery);
+                              }
+                              final index = rawIndex - 1;
                               final category = allCategories[index];
 
                               if (!_categoryKeys.containsKey(category.id)) {
@@ -564,6 +673,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                             return _ItemListTile(
                                               item: item,
                                               onTap: () => _handleItemTap(item),
+                                              onToggleFavorite: () => _toggleFavorite(item),
                                               formatStock: _formatStockDisplay,
                                               getStockStatus: _getStockStatus,
                                             );
@@ -624,6 +734,14 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                   ),
 
+                  // Favorites Button (pinned at top)
+                  _buildCategoryButton(
+                    icon: Icons.star_rounded,
+                    label: 'Favorites',
+                    isSelected: activeCategory == _kFavorites,
+                    onTap: () => setState(() => activeCategory = _kFavorites),
+                  ),
+
                   // All Items Button
                   _buildCategoryButton(
                     icon: Icons.grid_view,
@@ -679,7 +797,9 @@ class _MenuScreenState extends State<MenuScreen> {
                         final allItems = itemStore.items;
                         var filteredItems = allItems.where((item) => item.isEnabled).toList();
 
-                        if (activeCategory != null) {
+                        if (activeCategory == _kFavorites) {
+                          filteredItems = filteredItems.where((item) => item.isFavorite).toList();
+                        } else if (activeCategory != null) {
                           filteredItems = filteredItems.where((item) => item.categoryOfItem == activeCategory).toList();
                         }
 
@@ -788,7 +908,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
         return GestureDetector(
           onTap: isDisabled ? null : () => _handleItemTap(item),
-          child: Container(
+          child: Stack(
+            children: [
+              Container(
             decoration: BoxDecoration(
               color: isDisabled ? AppColors.surfaceMedium.withOpacity(0.5) : AppColors.white,
               borderRadius: BorderRadius.circular(16),
@@ -865,6 +987,13 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ],
             ),
+          ),
+              Positioned(
+                top: 6,
+                right: 6,
+                child: _favStar(item),
+              ),
+            ],
           ),
         );
       },
@@ -1037,9 +1166,10 @@ class _MenuScreenState extends State<MenuScreen> {
 class _ItemListTile extends StatefulWidget {
   final Items item;
   final VoidCallback onTap;
+  final VoidCallback onToggleFavorite;
   final String Function(Items) formatStock;
   final StockStatus Function(Items) getStockStatus;
-  const _ItemListTile({required this.item, required this.onTap, required this.formatStock, required this.getStockStatus});
+  const _ItemListTile({required this.item, required this.onTap, required this.onToggleFavorite, required this.formatStock, required this.getStockStatus});
 
   @override
   State<_ItemListTile> createState() => _ItemListTileState();
@@ -1101,6 +1231,19 @@ class _ItemListTileState extends State<_ItemListTile> {
                     ],
                   ),
                 ),
+                InkWell(
+                  onTap: widget.onToggleFavorite,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      widget.item.isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
+                      size: 22,
+                      color: widget.item.isFavorite ? Colors.amber : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 if (!isDisabled)
                   Container(
                     padding: const EdgeInsets.all(11),

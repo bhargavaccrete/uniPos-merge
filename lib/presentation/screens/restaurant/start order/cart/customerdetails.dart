@@ -12,6 +12,7 @@ import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/day_management_service.dart';
+import '../../../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/app_responsive.dart';
@@ -1717,6 +1718,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
       paymentStatus: 'Paid',
       completedAt: DateTime.now(),
       isTaxInclusive: pastOrder.isTaxInclusive, // Use stored tax mode from past order
+      // Carry split-payment data so the bill can print the per-method breakdown.
+      isSplitPayment: pastOrder.isSplitPayment,
+      paymentListJson: pastOrder.paymentListJson,
+      totalPaid: pastOrder.totalPaid,
+      changeReturn: pastOrder.changeReturn,
     );
 
     await showDialog(
@@ -1961,13 +1967,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   Future<void> _doSubmitOrder(CartCalculationService calculations) async {
-    // Block if no active day session — orders placed without a session are excluded from EOD
+    // No active day session yet → start the day (opening balance) right here,
+    // then continue. The day begins at the first order/settlement.
     final bool sessionOpen = await DayManagementService.isSessionOpen();
     if (!sessionOpen) {
-      NotificationService.instance.showError(
-        'No active session. Please start the day from the End Day menu first.',
-      );
-      return;
+      final started = await promptStartDay(context);
+      if (!started) {
+        if (mounted) {
+          NotificationService.instance.showError('Start the day to place the order');
+        }
+        return;
+      }
     }
 
     // Validate mobile number if entered

@@ -15,6 +15,7 @@ import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 
@@ -29,6 +30,8 @@ class _settingsScreenState extends State<Settingsscreen> {
   bool _isCurrencyExpanded = false;
   bool _isRefundWindowExpanded = false;
   bool _isTimeoutExpanded = false;
+  bool _isLowStockExpanded = false;
+  final TextEditingController _customThresholdController = TextEditingController();
 
   bool _backupEnabled = false;
   bool _hasBackupPassword = false;
@@ -38,6 +41,12 @@ class _settingsScreenState extends State<Settingsscreen> {
   void initState() {
     super.initState();
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _customThresholdController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -530,60 +539,191 @@ class _settingsScreenState extends State<Settingsscreen> {
                     context, RouteNames.restaurantOrderSettings),
               ),
               _tileDivider(),
-              ValueListenableBuilder<int>(
-                valueListenable: AppSettings.refundWindowNotifier,
-                builder: (context, win, __) => _expandableTile(
-                  context: context,
-                  title: 'Refund Window',
-                  subtitle: 'Current: ${_getRefundWindowLabel(win)}',
-                  icon: Icons.undo_rounded,
-                  color: Colors.deepPurple,
-                  isExpanded: _isRefundWindowExpanded,
-                  onTap: () => setState(() =>
-                      _isRefundWindowExpanded =
-                          !_isRefundWindowExpanded),
-                  expandedChild: Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
+              ValueListenableBuilder<Map<String, bool>>(
+                valueListenable: AppSettings.settingsNotifier,
+                builder: (context, settings, ___) {
+                  final refundsOn = settings["Allow Refunds"] ?? true;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Filterbutton(
-                          title: '30 min',
-                          selectedFilter: _getRefundWindowLabel(win),
-                          onpressed: () =>
-                              AppSettings.updateRefundWindow(30)),
-                      Filterbutton(
-                          title: '1 hr',
-                          selectedFilter: _getRefundWindowLabel(win),
-                          onpressed: () =>
-                              AppSettings.updateRefundWindow(60)),
-                      Filterbutton(
-                          title: '2 hr',
-                          selectedFilter: _getRefundWindowLabel(win),
-                          onpressed: () =>
-                              AppSettings.updateRefundWindow(120)),
-                      Filterbutton(
-                          title: '4 hr',
-                          selectedFilter: _getRefundWindowLabel(win),
-                          onpressed: () =>
-                              AppSettings.updateRefundWindow(240)),
-                      Filterbutton(
-                          title: '8 hr',
-                          selectedFilter: _getRefundWindowLabel(win),
-                          onpressed: () =>
-                              AppSettings.updateRefundWindow(480)),
-                      Filterbutton(
-                          title: '24 hr',
-                          selectedFilter: _getRefundWindowLabel(win),
-                          onpressed: () =>
-                              AppSettings.updateRefundWindow(1440)),
-                      Filterbutton(
-                          title: 'No Limit',
-                          selectedFilter: _getRefundWindowLabel(win),
-                          onpressed: () =>
-                              AppSettings.updateRefundWindow(0)),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: AppResponsive.largeSpacing(context),
+                            vertical: AppResponsive.smallSpacing(context) * 0.5),
+                        secondary: Container(
+                          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                          decoration: BoxDecoration(
+                            color: (refundsOn ? Colors.deepPurple : AppColors.textSecondary)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          ),
+                          child: Icon(Icons.undo_rounded,
+                              size: AppResponsive.iconSize(context),
+                              color: refundsOn ? Colors.deepPurple : AppColors.textSecondary),
+                        ),
+                        title: Text('Allow Refunds',
+                            style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary)),
+                        subtitle: Text(
+                          refundsOn
+                              ? 'Refunds allowed within the window below'
+                              : 'Refunds are off — no refund option appears on orders',
+                          style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary),
+                        ),
+                        value: refundsOn,
+                        activeColor: AppColors.primary,
+                        onChanged: (val) =>
+                            AppSettings.updateSetting("Allow Refunds", val),
+                      ),
+                      if (refundsOn) ...[
+                        _tileDivider(),
+                        ValueListenableBuilder<int>(
+                          valueListenable: AppSettings.refundWindowNotifier,
+                          builder: (context, win, __) => _expandableTile(
+                            context: context,
+                            title: 'Refund Window',
+                            subtitle: 'Current: ${_getRefundWindowLabel(win)}',
+                            icon: Icons.undo_rounded,
+                            color: Colors.deepPurple,
+                            isExpanded: _isRefundWindowExpanded,
+                            onTap: () => setState(() =>
+                                _isRefundWindowExpanded =
+                                    !_isRefundWindowExpanded),
+                            expandedChild: Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: [
+                                Filterbutton(
+                                    title: '30 min',
+                                    selectedFilter: _getRefundWindowLabel(win),
+                                    onpressed: () =>
+                                        AppSettings.updateRefundWindow(30)),
+                                Filterbutton(
+                                    title: '1 hr',
+                                    selectedFilter: _getRefundWindowLabel(win),
+                                    onpressed: () =>
+                                        AppSettings.updateRefundWindow(60)),
+                                Filterbutton(
+                                    title: '2 hr',
+                                    selectedFilter: _getRefundWindowLabel(win),
+                                    onpressed: () =>
+                                        AppSettings.updateRefundWindow(120)),
+                                Filterbutton(
+                                    title: '4 hr',
+                                    selectedFilter: _getRefundWindowLabel(win),
+                                    onpressed: () =>
+                                        AppSettings.updateRefundWindow(240)),
+                                Filterbutton(
+                                    title: '8 hr',
+                                    selectedFilter: _getRefundWindowLabel(win),
+                                    onpressed: () =>
+                                        AppSettings.updateRefundWindow(480)),
+                                Filterbutton(
+                                    title: '24 hr',
+                                    selectedFilter: _getRefundWindowLabel(win),
+                                    onpressed: () =>
+                                        AppSettings.updateRefundWindow(1440)),
+                                Filterbutton(
+                                    title: 'No Limit',
+                                    selectedFilter: _getRefundWindowLabel(win),
+                                    onpressed: () =>
+                                        AppSettings.updateRefundWindow(0)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ),
-                ),
+                  );
+                },
+              ),
+              _tileDivider(),
+              ValueListenableBuilder<double>(
+                valueListenable: AppSettings.lowStockThresholdNotifier,
+                builder: (context, threshold, __) {
+                  final label = threshold % 1 == 0
+                      ? threshold.toStringAsFixed(0)
+                      : threshold.toString();
+                  return _expandableTile(
+                    context: context,
+                    title: 'Low Stock Threshold',
+                    subtitle: 'Default alert when stock ≤ $label',
+                    icon: Icons.warning_amber_rounded,
+                    color: Colors.amber.shade800,
+                    isExpanded: _isLowStockExpanded,
+                    onTap: () => setState(
+                        () => _isLowStockExpanded = !_isLowStockExpanded),
+                    expandedChild: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [3, 5, 10, 15, 20, 25]
+                              .map((n) => Filterbutton(
+                                    title: '$n',
+                                    selectedFilter: label,
+                                    onpressed: () => AppSettings
+                                        .updateLowStockThreshold(n.toDouble()),
+                                  ))
+                              .toList(),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppTextField(
+                                controller: _customThresholdController,
+                                hint: 'Custom value',
+                                keyboardType: const TextInputType.numberWithOptions(
+                                    decimal: true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () {
+                                final v = double.tryParse(
+                                    _customThresholdController.text.trim());
+                                if (v == null || v <= 0) {
+                                  NotificationService.instance
+                                      .showError('Enter a valid number');
+                                  return;
+                                }
+                                AppSettings.updateLowStockThreshold(v);
+                                _customThresholdController.clear();
+                                FocusScope.of(context).unfocus();
+                              },
+                              child: Text('Set',
+                                  style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Tip: weight-based items (kg/gm) should set their own '
+                            'threshold on the item — this default suits count-based items.',
+                            style: GoogleFonts.poppins(
+                                fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),

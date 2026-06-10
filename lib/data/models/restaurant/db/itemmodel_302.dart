@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:hive/hive.dart';
 import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:unipos/util/restaurant/staticswitch.dart';
 import 'itemvariantemodel_312.dart';
 
 part 'itemmodel_302.g.dart';
@@ -78,6 +79,15 @@ class Items extends HiveObject {
   @HiveField(21)
   Map<String, Map<String, int>>? extraConstraints; // Map of extraId to {min, max}
 
+  @HiveField(22)
+  double? lowStockThreshold; // Per-item override; null = use global default
+
+  @HiveField(23, defaultValue: false)
+  bool lowStockAlertEnabled; // Per-item opt-in for low-stock alerts (the YES/NO toggle)
+
+  @HiveField(24, defaultValue: false)
+  bool isFavorite; // Pinned to the "Favorites" tab in the POS menu
+
   Items({
     required this.id,
     required this.name,
@@ -101,19 +111,49 @@ class Items extends HiveObject {
     this.editedBy,
     this.editCount = 0,
     this.extraConstraints,
+    this.lowStockThreshold,
+    this.lowStockAlertEnabled = false,
+    this.isFavorite = false,
   });
 
 // --- ADJUSTED HELPER LOGIC ---
   bool get hasVariants => variant?.isNotEmpty ?? false;
 
   bool get isInStock {
-    // This logic now safely handles a null variant list.
+    // For variant items, the ITEM's trackInventory governs; stock is read from
+    // each variant's own quantity (a variant's own trackInventory flag is
+    // unreliable — variants added later leave it null).
     if (hasVariants) {
-      // The '!' is safe here because hasVariants already checked for null and not empty.
-      return variant!.any((v) => v.isInStock);
+      if (!trackInventory) return true; // not tracking → always available
+      return variant!.any((v) => (v.stockQuantity ?? 0) > 0);
     }
     // If there are no variants, check the parent item.
     return !trackInventory || stockQuantity > 0;
+  }
+
+  /// Effective threshold: per-item override if set, else the global default.
+  double get effectiveLowStockThreshold =>
+      lowStockThreshold ?? AppSettings.lowStockThreshold;
+
+  /// True when stock is running low. Requires: inventory tracking on, the
+  /// global master switch on, this item opted-in, the item still in stock, and
+  /// the level at/below the effective threshold. For variant items, low if ANY
+  /// in-stock variant is at/below the threshold.
+  bool get isLowStock {
+    if (!trackInventory ||
+        !lowStockAlertEnabled ||
+        !AppSettings.lowStockAlertsEnabled) {
+      return false;
+    }
+    final threshold = effectiveLowStockThreshold;
+    if (threshold <= 0) return false;
+    if (hasVariants) {
+      return variant!.any((v) {
+        final qty = v.stockQuantity ?? 0;
+        return qty > 0 && qty <= threshold;
+      });
+    }
+    return stockQuantity > 0 && stockQuantity <= threshold;
   }
 
 
@@ -165,6 +205,9 @@ class Items extends HiveObject {
     String? editedBy,
     int? editCount,
     Map<String, Map<String, int>>? extraConstraints,
+    double? lowStockThreshold,
+    bool? lowStockAlertEnabled,
+    bool? isFavorite,
   }) {
     return Items(
       id: id ?? this.id,
@@ -189,6 +232,9 @@ class Items extends HiveObject {
       editedBy: editedBy ?? this.editedBy,
       editCount: editCount ?? this.editCount,
       extraConstraints: extraConstraints ?? this.extraConstraints,
+      lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+      lowStockAlertEnabled: lowStockAlertEnabled ?? this.lowStockAlertEnabled,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 
@@ -217,6 +263,9 @@ class Items extends HiveObject {
       'editedBy': editedBy,
       'editCount': editCount,
       'extraConstraints': extraConstraints,
+      'lowStockThreshold': lowStockThreshold,
+      'lowStockAlertEnabled': lowStockAlertEnabled,
+      'isFavorite': isFavorite,
     };
   }
 
@@ -300,6 +349,9 @@ class Items extends HiveObject {
         ),
       )
           : null,
+      lowStockThreshold: (map['lowStockThreshold'] as num?)?.toDouble(),
+      lowStockAlertEnabled: (map['lowStockAlertEnabled'] as bool?) ?? false,
+      isFavorite: (map['isFavorite'] as bool?) ?? false,
     );
   }
 }

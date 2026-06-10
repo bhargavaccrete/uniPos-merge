@@ -11,6 +11,7 @@ import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
+import '../../../widget/componets/common/app_text_field.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 
 class ApplyTaxScreen extends StatefulWidget {
@@ -27,10 +28,68 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
   final Set<String> _selectedItemIds = {};
   bool _isLoading = false;
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String? _activeCategoryId; // null = All categories
+
   @override
   void initState() {
     super.initState();
     itemStore.loadItems();
+    categoryStore.loadCategories();
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Items currently visible after applying the category + search filters.
+  /// This is the single source the checklist AND "Select All" both use, so
+  /// selecting all only ever affects what the user can actually see.
+  List<Items> _visibleItems(List<Items> allItems) {
+    var result = allItems;
+
+    // 1. Category filter (null = All)
+    if (_activeCategoryId != null) {
+      result = result.where((item) => item.categoryOfItem == _activeCategoryId).toList();
+    }
+
+    // 2. Search filter (case-insensitive name match)
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      result = result.where((item) => item.name.toLowerCase().contains(query)).toList();
+    }
+
+    return result;
+  }
+
+  Widget _categoryChip({required String label, required String? id}) {
+    final selected = _activeCategoryId == id;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        onSelected: (_) => setState(() => _activeCategoryId = id),
+        selectedColor: AppColors.primary,
+        backgroundColor: AppColors.surfaceLight,
+        labelStyle: GoogleFonts.poppins(
+          color: selected ? Colors.white : AppColors.textPrimary,
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: selected ? AppColors.primary : AppColors.divider),
+        ),
+      ),
+    );
   }
 
 
@@ -44,12 +103,14 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     });
   }
 
-  void _onSelectedAllChecked(bool? isChecked, List<Items> allItems){
+  void _onSelectedAllChecked(bool? isChecked, List<Items> visibleItems){
     setState(() {
+      final visibleIds = visibleItems.map((item) => item.id);
       if(isChecked ==true){
-        _selectedItemIds.addAll(allItems.map((item)=> item.id));
+        _selectedItemIds.addAll(visibleIds);
       }else{
-        _selectedItemIds.clear();
+        // Only deselect what's currently visible — keep selections in other filters.
+        _selectedItemIds.removeAll(visibleIds);
       }
     });
   }
@@ -116,8 +177,8 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
         actions: [
           Observer(
             builder: (context) {
-              final items = itemStore.items;
-              final isAllSelected = items.isNotEmpty && _selectedItemIds.length == items.length;
+              final items = _visibleItems(itemStore.items);
+              final isAllSelected = items.isNotEmpty && items.every((i) => _selectedItemIds.contains(i.id));
 
               return Padding(
                 padding: EdgeInsets.only(right: 8),
@@ -185,73 +246,58 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
             );
           }
 
+          final visibleItems = _visibleItems(items);
+
+          // Remove Tax is only meaningful when at least one selected item
+          // actually has a tax applied — otherwise there's nothing to remove.
+          final hasTaxedSelection = items.any(
+            (i) => _selectedItemIds.contains(i.id) && i.taxRate != null,
+          );
+
           return Column(
             children: [
+              // Search bar + category filter chips
               Container(
                 color: Colors.white,
-                padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Column(
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: (_selectedItemIds.isEmpty || _isLoading) ? null : _applyTaxToSelected,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey.shade300,
-                          elevation: 0,
-                          padding: EdgeInsets.symmetric(
-                            vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        icon: Icon(Icons.check_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                        label: Text(
-                          "Apply ${widget.taxToApply.taxperecentage}% Tax",
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                    AppTextField(
+                      controller: _searchController,
+                      hint: 'Search items…',
+                      icon: Icons.search_rounded,
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: (_selectedItemIds.isEmpty || _isLoading) ? null : _removeTaxFromSelected,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey.shade300,
-                          elevation: 0,
-                          padding: EdgeInsets.symmetric(
-                            vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        icon: Icon(Icons.remove_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                        label: Text(
-                          "Remove Tax",
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 38,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          _categoryChip(label: 'All', id: null),
+                          ...categoryStore.categories
+                              .map((c) => _categoryChip(label: c.name, id: c.id)),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
               Expanded(
-                child: ListView.builder(
+                child: visibleItems.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No items match your search',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
                   padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
-                  itemCount: items.length,
+                  itemCount: visibleItems.length,
                   itemBuilder: (context, index) {
-                    final item = items[index];
+                    final item = visibleItems[index];
                     final isSelected = _selectedItemIds.contains(item.id);
 
                     return Container(
@@ -402,9 +448,81 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                   },
                 ),
               ),
+              // Action buttons pinned at the bottom
+              _buildActionBar(hasTaxedSelection),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildActionBar(bool hasTaxedSelection) {
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.fromLTRB(
+        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
+        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
+        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
+        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: (_selectedItemIds.isEmpty || _isLoading) ? null : _applyTaxToSelected,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: Icon(Icons.check_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
+                label: Text(
+                  "Apply ${widget.taxToApply.taxperecentage}% Tax",
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: (_selectedItemIds.isEmpty || _isLoading || !hasTaxedSelection) ? null : _removeTaxFromSelected,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: Icon(Icons.remove_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
+                label: Text(
+                  "Remove Tax",
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/util/color.dart';
@@ -66,10 +67,38 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   double _totalPrice = 0.0;
   int _quantity = 1;
 
+  // Editable quantity field (mirrors _quantity, the source of truth).
+  final TextEditingController _qtyController = TextEditingController(text: '1');
+  final FocusNode _qtyFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
     _initializeData();
+  }
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    _qtyFocus.dispose();
+    super.dispose();
+  }
+
+  /// Apply a typed quantity. Blank/invalid reverts. A value over the available
+  /// stock ([maxQty] when [hasStockLimit]) is kept visible and flagged — Add to
+  /// Cart is blocked until it's corrected (no silent clamp / auto-add).
+  void _commitTypedQty(String text, int maxQty, bool hasStockLimit) {
+    final n = int.tryParse(text.trim());
+    if (n == null || n < 1) {
+      setState(() => _qtyController.text = '$_quantity');
+      return;
+    }
+    // Keep the typed value visible (warning already shown live via onChanged);
+    // Add to Cart stays blocked while over stock (computed in build).
+    setState(() {
+      _quantity = n;
+      _qtyController.text = '$n';
+    });
   }
 
   Future<void> _initializeData() async {
@@ -439,6 +468,14 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             final bool hasStockLimit = trackStock && !allowOutOfStock;
             final int maxQty = hasStockLimit ? (availableStock.toInt() - alreadyInCart).clamp(0, 9999) : 9999;
             final bool canIncrease = _quantity < maxQty;
+            // Live over-stock check against the selected variant's available qty.
+            final bool qtyOverStock = hasStockLimit && _quantity > maxQty;
+
+            // Keep the editable qty field in sync with _quantity (− / + changes),
+            // but never while the user is mid-edit.
+            if (!_qtyFocus.hasFocus && _qtyController.text != '$_quantity') {
+              _qtyController.text = '$_quantity';
+            }
 
             return Container(
               padding: EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -470,9 +507,42 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                             child: Padding(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6), child: Icon(Icons.remove, size: 18, color: Colors.grey.shade700)),
                           ),
                           Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            width: 44,
                             decoration: BoxDecoration(border: Border.symmetric(vertical: BorderSide(color: Colors.grey.shade300))),
-                            child: Text('$_quantity', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+                            child: TextField(
+                              controller: _qtyController,
+                              focusNode: _qtyFocus,
+                              textAlign: TextAlign.center,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                              ),
+                              // Live: update _quantity per keystroke so the Add
+                              // button disables the instant the qty goes over
+                              // stock (no need to tap away first).
+                              onChanged: (v) {
+                                final n = int.tryParse(v.trim());
+                                if (n == null || n < 1) return;
+                                final bool wasOver = hasStockLimit && _quantity > maxQty;
+                                final bool nowOver = hasStockLimit && n > maxQty;
+                                setState(() => _quantity = n);
+                                if (nowOver && !wasOver) {
+                                  NotificationService.instance.showError('Only $maxQty in stock');
+                                }
+                              },
+                              onSubmitted: (v) {
+                                _commitTypedQty(v, maxQty, hasStockLimit);
+                                _qtyFocus.unfocus();
+                              },
+                              onTapOutside: (_) {
+                                _commitTypedQty(_qtyController.text, maxQty, hasStockLimit);
+                                _qtyFocus.unfocus();
+                              },
+                            ),
                           ),
                           InkWell(
                             onTap: canIncrease
@@ -490,7 +560,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                     // Add to Cart button
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: (hasStockLimit && maxQty <= 0) ? null : _confirmAndAddItem,
+                        onPressed: ((hasStockLimit && maxQty <= 0) || qtyOverStock) ? null : _confirmAndAddItem,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,

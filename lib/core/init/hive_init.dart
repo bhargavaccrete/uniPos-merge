@@ -60,6 +60,7 @@ import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
 import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
 import 'package:unipos/data/models/restaurant/db/shift_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
+import 'package:unipos/data/models/restaurant/db/stock_movement_model.dart';
 import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:unipos/data/models/restaurant/db/session_model.dart';
@@ -336,6 +337,11 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashMovement)) {
       Hive.registerAdapter(CashMovementModelAdapter());
     }
+
+    // StockMovement - 126: manual stock add/remove log with reason + history
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockLog)) {
+      Hive.registerAdapter(StockMovementModelAdapter());
+    }
   }
 
   /// Clean up old incorrectly-named attribute boxes
@@ -344,7 +350,6 @@ class HiveInit {
     try {
       // Delete old camelCase boxes if they exist
       final oldBoxNames = ['attributeValues', 'productAttributes'];
-
       for (final boxName in oldBoxNames) {
         if (Hive.isBoxOpen(boxName)) {
           await Hive.box(boxName).clear();
@@ -426,6 +431,7 @@ class HiveInit {
     // Cash movements box (shared with restaurant mode - Cash In/Out powers the
     // Cash Drawer screen and makes EOD cash reconciliation accurate).
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+    await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
 
     _areRetailBoxesOpen = true;
   }
@@ -540,6 +546,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashMovement)) {
       Hive.registerAdapter(CashMovementModelAdapter());
     }
+    // StockMovementModel - 126: manual stock add/remove log with reason + history
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockLog)) {
+      Hive.registerAdapter(StockMovementModelAdapter());
+    }
     // CashHandoverModel - 129: 2-step shift handover between staff members
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashHandover)) {
       Hive.registerAdapter(CashHandoverModelAdapter());
@@ -608,6 +618,7 @@ class HiveInit {
 
     // Cash Management — movements (Cash In/Out) and handovers (shift transfers)
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+    await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
     await Hive.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
 
     // Saved thermal printers (Bluetooth/WiFi configuration)

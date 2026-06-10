@@ -11,6 +11,7 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../util/color.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
@@ -141,7 +142,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
 
   // ── Add staff member ─────────────────────────────────────────────────────
 
-  void _addStaff() {
+  Future<void> _addStaff() async {
     if (_isSaving) return;
 
     final firstName = _firstNameController.text.trim();
@@ -199,7 +200,22 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     });
     if (pinExists) {
       NotificationService.instance
-          .showError('This PIN is already used by another staff member.');
+          .showError('This PIN is already in use. Choose a different one.');
+      _pinFocus.requestFocus();
+      return;
+    }
+
+    // Also reject the admin's PIN so PIN-only login stays unambiguous. The admin
+    // password may not be stored yet during onboarding, so fall back to the
+    // default ('123456'). Message is generic — it never reveals it's the admin's.
+    final prefs = await SharedPreferences.getInstance();
+    final adminPass = prefs.getString('restaurant_admin_password');
+    final adminCollision = adminPass != null
+        ? RestaurantAuthHelper.verifyPassword(pin, adminPass)
+        : pin == '123456';
+    if (adminCollision) {
+      NotificationService.instance
+          .showError('This PIN is already in use. Choose a different one.');
       _pinFocus.requestFocus();
       return;
     }
@@ -490,28 +506,9 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                 ),
                 const SizedBox(height: 12),
 
-                // Username + PIN
+                // PIN (username hidden — auto-generated from first name)
                 Row(
                   children: [
-                    Expanded(
-                      child: AppTextField(
-                        controller: _usernameController,
-                        focusNode: _usernameFocus,
-                        label: 'Username',
-                        hint: 'Auto from first name',
-                        icon: Icons.alternate_email_rounded,
-                        onChanged: (v) {
-                          if (v.trim().isEmpty) {
-                            setState(() => _usernameManuallyEdited = false);
-                            _syncUsernameFromFirstName();
-                          } else {
-                            _usernameManuallyEdited = true;
-                          }
-                        },
-                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_pinFocus),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: AppTextField(
                         controller: _pinController,

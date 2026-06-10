@@ -19,7 +19,6 @@ class RestaurantLogin extends StatefulWidget {
 }
 
 class _RestaurantLoginState extends State<RestaurantLogin> {
-  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final _formkey = GlobalKey<FormState>();
 
@@ -44,7 +43,6 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -67,7 +65,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
     }
   }
 
-  /// Tries admin credentials first, then staff username + PIN.
+  /// PIN-only login. The PIN identifies whoever it is — admin first, then staff.
   Future<void> _handleLogin() async {
     if (!_formkey.currentState!.validate()) return;
 
@@ -78,15 +76,11 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final enteredUsername = _usernameController.text.trim();
-      final enteredPassword = _passwordController.text.trim();
+      final enteredPin = _passwordController.text.trim();
 
-      // ── 1. Try admin ──────────────────────────────────────────────────────
-      final storedUsername = prefs.getString(_usernameKey) ?? _defaultUsername;
+      // ── 1. Admin (PIN = stored admin password) ────────────────────────────
       final storedPassword = prefs.getString(_passwordKey) ?? _defaultPassword;
-
-      if (enteredUsername == storedUsername &&
-          RestaurantAuthHelper.verifyPassword(enteredPassword, storedPassword)) {
+      if (RestaurantAuthHelper.verifyPassword(enteredPin, storedPassword)) {
         await prefs.setBool(_isLoggedInKey, true);
         await RestaurantSession.saveAdminSession();
         await _autoClockIn('Admin', 'Admin');
@@ -99,12 +93,11 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
         return;
       }
 
-      // ── 2. Try staff (username + PIN) ─────────────────────────────────────
+      // ── 2. Staff (match PIN against active staff) ─────────────────────────
       await staffStore.loadStaff();
       final match = staffStore.staff.where(
         (s) => s.isActive &&
-            s.userName.trim() == enteredUsername &&
-            RestaurantAuthHelper.verifyPassword(enteredPassword, s.pinNo.trim()),
+            RestaurantAuthHelper.verifyPassword(enteredPin, s.pinNo.trim()),
       ).firstOrNull;
 
       if (match != null) {
@@ -121,9 +114,9 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
         return;
       }
 
-      // ── 3. Both failed ────────────────────────────────────────────────────
+      // ── 3. No match ───────────────────────────────────────────────────────
       setState(() {
-        _errorMessage = 'Invalid username or password';
+        _errorMessage = 'Invalid PIN';
         _isLoading = false;
       });
     } catch (e) {
@@ -224,28 +217,11 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     SizedBox(height: AppResponsive.height(context, 0.02)),
                   ],
 
-                  // Username Field
-                  AppTextField(
-                    controller: _usernameController,
-                    label: 'Username',
-                    hint: 'Enter username',
-                    icon: Icons.person_outline_rounded,
-                    required: true,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter username';
-                      }
-                      return null;
-                    },
-                  ),
-
-                  SizedBox(height: AppResponsive.height(context, 0.02)),
-
-                  // Password Field
+                  // PIN Field — the only credential needed
                   AppTextField(
                     controller: _passwordController,
-                    label: 'Password / PIN',
-                    hint: 'Enter password or PIN',
+                    label: 'PIN',
+                    hint: 'Enter your PIN',
                     icon: Icons.lock_outline_rounded,
                     required: true,
                     obscureText: _obscurePassword,

@@ -9,6 +9,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
+import '../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../domain/services/retail/store_settings_service.dart';
 import '../../../domain/store/restaurant/license_store.dart';
 import '../../../util/restaurant/restaurant_session.dart';
@@ -28,11 +29,14 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   DateTime? _lastBackPress;
   String _storeName = '';
   bool _hasPendingEOD = false;
+  bool _dayNotStarted = false; // day closed/not started → show a non-blocking banner
 
   @override
   void initState() {
     super.initState();
     _loadStoreName();
+    // Load items so the Inventory tile's low-stock badge is accurate on open.
+    itemStore.loadItems();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkDayStarted();
       await _startShiftIfNeeded();
@@ -61,44 +65,11 @@ class _AdminWelcomeState extends State<AdminWelcome> {
 
     if (mounted) setState(() => _hasPendingEOD = false);
 
+    // Don't force the opening-balance dialog on open — just flag it so a small
+    // non-blocking banner shows. The day starts when the first order is placed
+    // (promptStartDay, called from the order screens), or via the banner button.
     final isDayStarted = await DayManagementService.isDayStarted();
-    if (!isDayStarted && mounted) {
-      final balance = await showDialog<double>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const OpeningBalanceDialog(),
-      );
-
-      if (balance != null) {
-        // Check if admin changed the pre-filled closing balance — record ADJUSTMENT
-        final lastClosing = await DayManagementService.getLastClosingBalance();
-        final diff = balance - lastClosing;
-        if (lastClosing > 0 && diff.abs() > 0.01) {
-          final byName = RestaurantSession.staffName ??
-              (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
-          await cashMovementStore.addAdjustment(
-            signedAmount: diff, // negative if admin entered less than closing
-            reason: 'Opening balance modified',
-            note: 'Previous closing: Rs.${lastClosing.toStringAsFixed(2)}, '
-                'Opened at: Rs.${balance.toStringAsFixed(2)}',
-            staffName: byName,
-          );
-        }
-
-        // Save the opening balance to mark the day as started
-        await DayManagementService.setOpeningBalance(balance);
-
-        if (mounted) {
-          NotificationService.instance.showSuccess(
-            'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
-            // style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-          );
-
-
-
-        }
-      }
-    }
+    if (mounted) setState(() => _dayNotStarted = !isDayStarted);
   }
 
   Future<void> _startShiftIfNeeded() async {
@@ -371,6 +342,51 @@ class _AdminWelcomeState extends State<AdminWelcome> {
               ),
             ),
 
+          // Day-not-started banner (non-blocking). The day starts on the first
+          // order; this just lets the user start it early if they want.
+          if (_dayNotStarted && !_hasPendingEOD)
+            Container(
+              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.warning.withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.wb_sunny_outlined, color: AppColors.warning, size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Day not started',
+                            style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        Text('Starts automatically on your first order, or start it now.',
+                            style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final started = await promptStartDay(context);
+                      if (started && mounted) setState(() => _dayNotStarted = false);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                    child: Text('Start Day',
+                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                  ),
+                ],
+              ),
+            ),
+
           // Content
           Expanded(
             child: LayoutBuilder(
@@ -497,17 +513,52 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: EdgeInsets.all(isTablet ? 20 : 14),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  icon,
-                  size: isTablet ? 38 : 28,
-                  color: color,
-                ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(isTablet ? 20 : 14),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      icon,
+                      size: isTablet ? 38 : 28,
+                      color: color,
+                    ),
+                  ),
+                  // Low-stock count badge on the Inventory tile.
+                  if (title == 'Inventory')
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Observer(
+                        builder: (_) {
+                          final count = StockAdjustService.lowStockEntries().length;
+                          if (count == 0) return const SizedBox.shrink();
+                          return Container(
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.white, width: 1.5),
+                            ),
+                            child: Text(
+                              '$count',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
               ),
               SizedBox(height: isTablet ? 14 : 10),
               Padding(

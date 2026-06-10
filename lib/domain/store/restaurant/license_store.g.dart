@@ -38,6 +38,22 @@ mixin _$LicenseStore on _LicenseStore, Store {
               name: '_LicenseStore.deviceInfo'))
           .value;
 
+  late final _$licenseBypassedAtom =
+      Atom(name: '_LicenseStore.licenseBypassed', context: context);
+
+  @override
+  bool get licenseBypassed {
+    _$licenseBypassedAtom.reportRead();
+    return super.licenseBypassed;
+  }
+
+  @override
+  set licenseBypassed(bool value) {
+    _$licenseBypassedAtom.reportWrite(value, super.licenseBypassed, () {
+      super.licenseBypassed = value;
+    });
+  }
+
   late final _$licenseInfoAtom =
       Atom(name: '_LicenseStore.licenseInfo', context: context);
 
@@ -86,22 +102,6 @@ mixin _$LicenseStore on _LicenseStore, Store {
     });
   }
 
-  late final _$licenseBypassedAtom =
-      Atom(name: '_LicenseStore.licenseBypassed', context: context);
-
-  @override
-  bool get licenseBypassed {
-    _$licenseBypassedAtom.reportRead();
-    return super.licenseBypassed;
-  }
-
-  @override
-  set licenseBypassed(bool value) {
-    _$licenseBypassedAtom.reportWrite(value, super.licenseBypassed, () {
-      super.licenseBypassed = value;
-    });
-  }
-
   late final _$loadBypassFlagAsyncAction =
       AsyncAction('_LicenseStore.loadBypassFlag', context: context);
 
@@ -134,6 +134,14 @@ mixin _$LicenseStore on _LicenseStore, Store {
     return _$loadCachedLicenseAsyncAction.run(() => super.loadCachedLicense());
   }
 
+  late final _$validateKeyAsyncAction =
+      AsyncAction('_LicenseStore.validateKey', context: context);
+
+  @override
+  Future<bool> validateKey(String key) {
+    return _$validateKeyAsyncAction.run(() => super.validateKey(key));
+  }
+
   late final _$activateLicenseAsyncAction =
       AsyncAction('_LicenseStore.activateLicense', context: context);
 
@@ -142,22 +150,6 @@ mixin _$LicenseStore on _LicenseStore, Store {
       {String businessName = '', int businessCategory = 6}) {
     return _$activateLicenseAsyncAction.run(() => super.activateLicense(key,
         businessName: businessName, businessCategory: businessCategory));
-  }
-
-  late final _$refreshLicenseAsyncAction =
-      AsyncAction('_LicenseStore.refreshLicense', context: context);
-
-  @override
-  Future<void> refreshLicense() {
-    return _$refreshLicenseAsyncAction.run(() => super.refreshLicense());
-  }
-
-  late final _$validateKeyAsyncAction =
-      AsyncAction('_LicenseStore.validateKey', context: context);
-
-  @override
-  Future<bool> validateKey(String key) {
-    return _$validateKeyAsyncAction.run(() => super.validateKey(key));
   }
 
   late final _$checkStatusAsyncAction =
@@ -176,6 +168,31 @@ mixin _$LicenseStore on _LicenseStore, Store {
     return _$heartbeatAsyncAction.run(() => super.heartbeat());
   }
 
+  late final _$refreshLicenseAsyncAction =
+      AsyncAction('_LicenseStore.refreshLicense', context: context);
+
+  @override
+  Future<void> refreshLicense() {
+    return _$refreshLicenseAsyncAction.run(() => super.refreshLicense());
+  }
+
+  late final _$activateWithPendingKeyAsyncAction =
+      AsyncAction('_LicenseStore.activateWithPendingKey', context: context);
+
+  @override
+  Future<bool> activateWithPendingKey({required String businessName}) {
+    return _$activateWithPendingKeyAsyncAction
+        .run(() => super.activateWithPendingKey(businessName: businessName));
+  }
+
+  late final _$deactivateLicenseAsyncAction =
+      AsyncAction('_LicenseStore.deactivateLicense', context: context);
+
+  @override
+  Future<void> deactivateLicense() {
+    return _$deactivateLicenseAsyncAction.run(() => super.deactivateLicense());
+  }
+
   late final _$injectMockLicenseAsyncAction =
       AsyncAction('_LicenseStore.injectMockLicense', context: context);
 
@@ -192,14 +209,6 @@ mixin _$LicenseStore on _LicenseStore, Store {
   Future<void> injectExpiredLicense() {
     return _$injectExpiredLicenseAsyncAction
         .run(() => super.injectExpiredLicense());
-  }
-
-  late final _$deactivateLicenseAsyncAction =
-      AsyncAction('_LicenseStore.deactivateLicense', context: context);
-
-  @override
-  Future<void> deactivateLicense() {
-    return _$deactivateLicenseAsyncAction.run(() => super.deactivateLicense());
   }
 
   @override

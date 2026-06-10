@@ -83,7 +83,7 @@ class _TodaytabState extends State<Todaytab> {
         order.orderAt != null ? DateFormat('dd-MM-yyyy').format(order.orderAt!) : 'N/A',
         order.id,
         order.customerName,
-        order.paymentmode ?? 'N/A',
+        order.paymentDisplay.isNotEmpty ? order.paymentDisplay : 'N/A',
         order.orderType ?? 'N/A',
         (order.totalPrice - (order.refundAmount ?? 0.0)).toStringAsFixed(2), // Net amount after refunds
       ]);
@@ -176,7 +176,7 @@ class _TodaytabState extends State<Todaytab> {
                         DataCell(Text('#${order.id.substring(0, 8)}...')),
                         DataCell(Text(order.customerName)),
                         const DataCell(Text('-')), // Placeholder for Mobile No
-                        DataCell(Text(order.paymentmode ?? 'N/A')),
+                        DataCell(Text(order.paymentDisplay.isNotEmpty ? order.paymentDisplay : 'N/A')),
                         DataCell(Text(order.orderType ?? 'N/A')),
                         DataCell(Text((order.totalPrice - (order.refundAmount ?? 0.0)).toStringAsFixed(2))), // Show net amount
                         DataCell(IconButton( // Placeholder for a 'Details' button/icon.

@@ -279,6 +279,42 @@ class _CartScreenState extends State<CartScreen>
         }
         await loadCartItems();
       },
+      onSetQty: (item, newQty) async {
+        if (newQty < 1) return;
+        // The field only edits non-active items; active items stay staged via +/−.
+        if (_activeList.any((a) => a.id == item.id)) {
+          setState(() => item.quantity = newQty);
+          return;
+        }
+        // The field pre-validates against stock; the store enforces it too.
+        await restaurantCartStore.updateQuantity(item.id, newQty);
+        await loadCartItems();
+      },
+      // Available stock for a cart item, or null when unlimited (untracked or
+      // "allow order when out of stock"). Lets the qty field flag over-stock
+      // input and block ordering until it's corrected.
+      availableStockOf: (item) {
+        Items? inv;
+        try {
+          inv = itemStore.items.firstWhere(
+                (i) => i.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
+          );
+        } catch (_) {
+          return null;
+        }
+        if (!inv.trackInventory || inv.allowOrderWhenOutOfStock) return null;
+        if (item.variantName != null && inv.variant != null) {
+          try {
+            final v = inv.variant!.firstWhere(
+                  (vv) => _getVariantName(vv.variantId) == item.variantName,
+            );
+            return (v.stockQuantity ?? 0).toInt();
+          } catch (_) {
+            return null;
+          }
+        }
+        return inv.stockQuantity.toInt();
+      },
     );
   }
 

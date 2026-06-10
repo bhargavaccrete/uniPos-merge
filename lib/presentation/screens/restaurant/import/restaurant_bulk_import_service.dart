@@ -16,6 +16,7 @@ import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:uuid/uuid.dart';
+import 'package:unipos/core/constants/item_units.dart';
 import 'import_template_builder.dart';
 
 /// Restaurant bulk import service.
@@ -32,7 +33,9 @@ class RestaurantBulkImportService {
   Map<String, Category> _categoryCache = {};
   Map<String, Category> _categoryByNameCache = {};
   Map<String, ChoicesModel> _choiceCache = {};
+  Map<String, ChoicesModel> _choiceByNameCache = {}; // lowercased name → choice
   Map<String, Extramodel> _extraCache = {};
+  Map<String, Extramodel> _extraByNameCache = {}; // lowercased name → extra
   Map<String, VariantModel> _variantCache = {};
   Map<String, VariantModel> _variantByNameCache = {}; // For auto-create by name
   Map<double, Tax> _taxByRateCache = {}; // Cache taxes by percentage rate
@@ -245,6 +248,9 @@ class RestaurantBulkImportService {
       await choiceStore.loadChoices();
       final choices = choiceStore.choices;
       _choiceCache = {for (var choice in choices) choice.id: choice};
+      _choiceByNameCache = {
+        for (var choice in choices) choice.name.toLowerCase().trim(): choice
+      };
     } catch (e) {
     }
 
@@ -253,6 +259,9 @@ class RestaurantBulkImportService {
       await extraStore.loadExtras();
       final extras = extraStore.extras;
       _extraCache = {for (var extra in extras) extra.Id: extra};
+      _extraByNameCache = {
+        for (var extra in extras) extra.Ename.toLowerCase().trim(): extra
+      };
     } catch (e) {
     }
 
@@ -324,16 +333,13 @@ class RestaurantBulkImportService {
     // 5. Weight + Unit validation
     final isSoldByWeight = _parseBool(row['IsSoldByWeight']?.toString() ?? '', false);
     final unit = row['Unit']?.toString().trim() ?? '';
+    // Unit is required for by-weight items; any provided unit must be one the
+    // app supports (aliases like 'litre'/'pcs' are accepted and normalized).
     if (isSoldByWeight && unit.isEmpty) {
       errors.add('Row $rowNumber: Unit required when IsSoldByWeight is YES');
     }
-    // 5b. Unit must be a recognized unit (defense-in-depth; the dropdown
-    // normally prevents this, but a hand-typed/old file might not match).
-    const knownUnits = {
-      'piece', 'pcs', 'pc', 'kg', 'gram', 'gm', 'g', 'liter', 'litre', 'l', 'ml', 'unit',
-    };
-    if (unit.isNotEmpty && !knownUnits.contains(unit.toLowerCase())) {
-      errors.add('Row $rowNumber: Unrecognized Unit "$unit" (use Piece, Kg, Gram, Liter or Ml)');
+    if (unit.isNotEmpty && normalizeItemUnit(unit) == null) {
+      errors.add('Row $rowNumber: Unrecognized Unit "$unit" (use kg, gm, liter, ml or piece)');
     }
 
     // 6. Inventory validation
@@ -425,6 +431,36 @@ class RestaurantBulkImportService {
     }
     if (i < la || j < lb) edits++; // leftover trailing char
     return edits <= 1;
+  }
+
+  /// Resolve choice/extra references from one or more columns into a
+  /// de-duplicated list of IDs. Each cell may hold a name (from the dropdown)
+  /// or, for legacy files, comma-separated IDs. Unmatched values are warned.
+  List<String> _resolveRefs(
+    Map<String, dynamic> rowData, {
+    required List<String> columns,
+    required Map<String, String> byName, // lowercased name → id
+    required Map<String, dynamic> byId, // id → model (membership check only)
+    required String kind,
+    required int rowNumber,
+    required ImportResult result,
+  }) {
+    final List<String> ids = [];
+    for (final col in columns) {
+      final raw = rowData[col]?.toString().trim() ?? '';
+      if (raw.isEmpty) continue;
+      for (final token in raw.split(',')) {
+        final t = token.trim();
+        if (t.isEmpty) continue;
+        final resolved = byName[t.toLowerCase()] ?? (byId.containsKey(t) ? t : null);
+        if (resolved == null) {
+          result.warnings.add('Row $rowNumber: $kind "$t" not found, skipped');
+          continue;
+        }
+        if (!ids.contains(resolved)) ids.add(resolved);
+      }
+    }
+    return ids;
   }
 
   /// ✅ CRITICAL: Auto-create tax from rate (duplicate-safe)
@@ -619,6 +655,7 @@ class RestaurantBulkImportService {
         final success = await extraStore.addExtra(extra);
         if (success) {
           _extraCache[id] = extra;
+          _extraByNameCache[extra.Ename.toLowerCase().trim()] = extra;
           result.extrasImported++;
         }
       } catch (e) {
@@ -751,6 +788,7 @@ class RestaurantBulkImportService {
         final success = await choiceStore.addChoice(choice);
         if (success) {
           _choiceCache[id] = choice;
+          _choiceByNameCache[choice.name.toLowerCase().trim()] = choice;
           result.choicesImported++;
         }
       } catch (e) {
@@ -901,30 +939,27 @@ class RestaurantBulkImportService {
           }
         }
 
-        // Step 5: Parse comma-separated IDs and validate
-        final choiceIdsStr = rowData['ChoiceIds']?.toString().trim() ?? '';
-        List<String> choiceIds = choiceIdsStr.isEmpty
-            ? []
-            : choiceIdsStr.split(',').map((e) => e.trim()).where((id) {
-                if (id.isEmpty) return false;
-                if (!_choiceCache.containsKey(id)) {
-                  result.warnings.add('Row ${i + 1}: Choice ID "$id" not found, skipped');
-                  return false;
-                }
-                return true;
-              }).toList();
-
-        final extraIdsStr = rowData['ExtraIds']?.toString().trim() ?? '';
-        List<String> extraIds = extraIdsStr.isEmpty
-            ? []
-            : extraIdsStr.split(',').map((e) => e.trim()).where((id) {
-                if (id.isEmpty) return false;
-                if (!_extraCache.containsKey(id)) {
-                  result.warnings.add('Row ${i + 1}: Extra ID "$id" not found, skipped');
-                  return false;
-                }
-                return true;
-              }).toList();
+        // Step 5: Resolve Choice/Extra references (names → IDs).
+        // New template uses Choice1..3 / Extra1..3 dropdown names; legacy files
+        // with comma-separated ChoiceIds / ExtraIds (raw IDs) still work.
+        final List<String> choiceIds = _resolveRefs(
+          rowData,
+          columns: const ['Choice1', 'Choice2', 'Choice3', 'ChoiceIds'],
+          byName: _choiceByNameCache.map((k, v) => MapEntry(k, v.id)),
+          byId: _choiceCache,
+          kind: 'Choice',
+          rowNumber: i + 1,
+          result: result,
+        );
+        final List<String> extraIds = _resolveRefs(
+          rowData,
+          columns: const ['Extra1', 'Extra2', 'Extra3', 'ExtraIds'],
+          byName: _extraByNameCache.map((k, v) => MapEntry(k, v.Id)),
+          byId: _extraCache,
+          kind: 'Extra',
+          rowNumber: i + 1,
+          result: result,
+        );
 
         // Step 6: Auto-create tax if tax rate is specified
         final rawTaxRate = _getDoubleFromValue(rowData['TaxRate']);
@@ -937,6 +972,7 @@ class RestaurantBulkImportService {
 
         // Step 7: Create item
         final hasVariants = _parseBool(rowData['HasVariants']?.toString() ?? '', false);
+        final soldByWeight = _parseBool(rowData['IsSoldByWeight']?.toString() ?? '', false);
 
         Items item = Items(
           id: const Uuid().v4(),
@@ -945,8 +981,10 @@ class RestaurantBulkImportService {
           description: rowData['Description']?.toString().trim(),
           price: hasVariants ? null : _getDoubleFromValue(rowData['Price']),
           isVeg: rowData['VegType']?.toString().trim(),
-          unit: rowData['Unit']?.toString().trim(),
-          isSoldByWeight: _parseBool(rowData['IsSoldByWeight']?.toString() ?? '', false),
+          // Normalize to a canonical unit so the Edit screen's dropdown always
+          // has a matching option (null when blank/unrecognized).
+          unit: normalizeItemUnit(rowData['Unit']?.toString()),
+          isSoldByWeight: soldByWeight,
           trackInventory: _parseBool(rowData['TrackInventory']?.toString() ?? '', false),
           stockQuantity: _getDoubleFromValue(rowData['StockQuantity']),
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),

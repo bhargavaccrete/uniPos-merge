@@ -405,8 +405,12 @@ class _PastorderState extends State<Pastorder> {
                               ],
                               const Spacer(),
                               if ((o.paymentmode ?? '').isNotEmpty)
-                                Text(o.paymentmode!,
-                                    style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
+                                Flexible(
+                                  child: Text(o.paymentDisplay,
+                                      textAlign: TextAlign.right,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
+                                ),
                               if (isVoided) ...[
                                 const SizedBox(width: 8),
                                 Container(

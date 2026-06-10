@@ -418,7 +418,7 @@ class RestaurantPrintHelper {
         paymentType = 'NOT PAID';
       }
 
-      final saleModel = SaleModel.createWithGst(
+      var saleModel = SaleModel.createWithGst(
         saleId: invoiceId,
         customerId: order.customerName.isNotEmpty ? 'GUEST' : null,
         totalItems: order.items.length,
@@ -430,6 +430,21 @@ class RestaurantPrintHelper {
         paymentType: paymentType,
         isReturn: false,
       );
+
+      // Attach split-payment data so the receipt can print a per-method
+      // breakdown (Cash ₹400 / UPI ₹600) instead of just "SPLIT PAYMENT".
+      // copyWith preserves the cashier's entry order (createWithSplitPayment
+      // would re-sort by amount).
+      if (order.isSplitPayment == true &&
+          order.paymentListJson != null &&
+          order.paymentListJson!.isNotEmpty) {
+        saleModel = saleModel.copyWith(
+          paymentListJson: order.paymentListJson,
+          isSplitPayment: true,
+          totalPaid: order.totalPaid,
+          changeReturn: order.changeReturn,
+        );
+      }
 
       // 4. Create Customer Model (Adapter)
       CustomerModel? customerModel;

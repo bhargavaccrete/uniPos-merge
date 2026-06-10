@@ -6,13 +6,22 @@ import 'package:unipos/util/color.dart';
 import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
+import '../../../../data/models/restaurant/db/stock_movement_model.dart';
+import '../../../../data/repositories/restaurant/stock_movement_repository.dart';
+import '../../../../domain/services/restaurant/day_management_service.dart';
+import '../../../../util/restaurant/restaurant_session.dart';
+import '../../../../util/restaurant/staticswitch.dart';
+import '../../../../domain/services/restaurant/stock_adjust_service.dart';
+import 'low_stock_screen.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'stock_history_screen.dart';
 
 
 class ManageInventory extends StatefulWidget {
@@ -31,6 +40,14 @@ class _ManageInventoryState extends State<ManageInventory> {
   final Set<String> _busyKeys = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _showLowStockOnly = false;
+
+  /// Item needs attention: opted into alerts and is low or out of stock.
+  bool _isAlertItem(Items item) =>
+      item.trackInventory &&
+      item.lowStockAlertEnabled &&
+      AppSettings.lowStockAlertsEnabled &&
+      (item.isLowStock || !item.isInStock);
 
   @override
   void initState() {
@@ -71,6 +88,214 @@ class _ManageInventoryState extends State<ManageInventory> {
     return _stockControllers[key]!;
   }
 
+  final _stockRepo = StockMovementRepository();
+
+  // Reasons offered in the dropdown when adjusting stock.
+  // Tune these lists to match how this restaurant categorises stock changes.
+  static const List<String> _addReasons = [
+    'Restock / Purchase',
+    'Customer return',
+    'Stock correction',
+    'Transfer in',
+    'Other',
+  ];
+  static const List<String> _removeReasons = [
+    'Wastage / Spoilage',
+    'Theft / Loss',
+    'Stock correction',
+    'Transfer out',
+    'Sample / Complimentary',
+    'Other',
+  ];
+
+  /// Ask for a reason (+ optional note) before adjusting stock.
+  /// Returns null if the user cancels.
+  Future<({String reason, String? note})?> _promptReason({required bool isAdd}) async {
+    final reasons = isAdd ? _addReasons : _removeReasons;
+    String selectedReason = reasons.first;
+    final noteController = TextEditingController();
+
+    final result = await showDialog<({String reason, String? note})>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            isAdd ? 'Reason for Adding Stock' : 'Reason for Removing Stock',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selectedReason,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                items: reasons
+                    .map((r) => DropdownMenuItem(
+                          value: r,
+                          child: Text(r, style: GoogleFonts.poppins(fontSize: 14)),
+                        ))
+                    .toList(),
+                onChanged: (v) => setLocal(() => selectedReason = v ?? reasons.first),
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                controller: noteController,
+                hint: 'Note (optional)',
+                icon: Icons.notes_outlined,
+                maxLines: 2,
+                minLines: 1,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              onPressed: () => Navigator.pop(
+                ctx,
+                (
+                  reason: selectedReason,
+                  note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+                ),
+              ),
+              child: Text('Confirm', style: GoogleFonts.poppins(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    noteController.dispose();
+    return result;
+  }
+
+  /// Append a stock movement to the audit log.
+  Future<void> _recordMovement({
+    required Items item,
+    ItemVariante? variant,
+    required bool isAdd,
+    required double quantity,
+    required double balanceAfter,
+    required String reason,
+    String? note,
+    required String unit,
+  }) async {
+    final sessionId = await DayManagementService.getCurrentSessionId();
+    await _stockRepo.saveMovement(StockMovementModel(
+      id: const Uuid().v4(),
+      timestamp: DateTime.now(),
+      itemId: item.id,
+      variantId: variant?.variantId,
+      itemName: variant != null
+          ? '${item.name} (${_getVariantName(variant.variantId)})'
+          : item.name,
+      type: isAdd ? 'in' : 'out',
+      quantity: quantity,
+      balanceAfter: balanceAfter,
+      reason: reason,
+      note: note,
+      unit: unit,
+      staffName: RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
+      sessionId: sessionId,
+    ));
+  }
+
+  /// Stock status pill — priority: Out of Stock > Low Stock > In Stock.
+  Widget _buildStockBadge(Items item) {
+    final MaterialColor base;
+    final String label;
+    if (!item.isInStock) {
+      base = Colors.red;
+      label = 'Out of Stock';
+    } else if (item.isLowStock) {
+      base = Colors.orange;
+      label = 'Low Stock';
+    } else {
+      base = Colors.green;
+      label = 'In Stock';
+    }
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0),
+        vertical: AppResponsive.getValue(context, mobile: 5.0, tablet: 6.0, desktop: 7.0),
+      ),
+      decoration: BoxDecoration(
+        color: base.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: base.shade600, shape: BoxShape.circle),
+          ),
+          SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
+              fontWeight: FontWeight.w600,
+              color: base.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Small Low/Out pill for an individual variant (so you can see which
+  /// variant of an item needs attention, not just the item as a whole).
+  Widget _variantStatusBadge(Items item, ItemVariante variant) {
+    final qty = variant.stockQuantity ?? 0;
+    final bool out = qty <= 0;
+    final bool low = !out &&
+        item.lowStockAlertEnabled &&
+        AppSettings.lowStockAlertsEnabled &&
+        qty <= item.effectiveLowStockThreshold;
+    if (!out && !low) return const SizedBox.shrink();
+    final MaterialColor color = out ? Colors.red : Colors.orange;
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        out ? 'Out' : 'Low',
+        style: GoogleFonts.poppins(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color.shade700,
+        ),
+      ),
+    );
+  }
+
+  void _openHistory(Items item) {
+    final unit = item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StockHistoryScreen(
+          itemId: item.id,
+          itemName: item.name,
+          unit: unit,
+        ),
+      ),
+    );
+  }
+
   void _addStock(Items item, {ItemVariante? variant}) async {
     final key = variant != null ? '${item.id}_${variant.variantId}' : item.id;
     if (_busyKeys.contains(key)) return;
@@ -103,6 +328,12 @@ class _ManageInventoryState extends State<ManageInventory> {
       return;
     }
 
+    // Capture WHY before changing stock (for the audit log).
+    final reasonData = await _promptReason(isAdd: true);
+    if (reasonData == null) return;
+
+    final newBalance = (variant != null ? (variant.stockQuantity ?? 0) : item.stockQuantity) + stockToAdd;
+
     setState(() => _busyKeys.add(key));
     try {
       if (variant != null) {
@@ -130,6 +361,17 @@ class _ManageInventoryState extends State<ManageInventory> {
           stockQuantity: item.stockQuantity + stockToAdd,
         ));
       }
+
+      await _recordMovement(
+        item: item,
+        variant: variant,
+        isAdd: true,
+        quantity: stockToAdd,
+        balanceAfter: newBalance,
+        reason: reasonData.reason,
+        note: reasonData.note,
+        unit: unit,
+      );
 
       controller.clear();
 
@@ -174,7 +416,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     }
 
     // Get the current stock to perform validation
-    final currentStock = variant?.stockQuantity ?? item.stockQuantity;
+    final currentStock = variant != null ? (variant.stockQuantity ?? 0) : item.stockQuantity;
     final isWeightBased = item.isSoldByWeight;
     final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
 
@@ -193,6 +435,12 @@ class _ManageInventoryState extends State<ManageInventory> {
       }
       return;
     }
+
+    // Capture WHY before changing stock (for the audit log).
+    final reasonData = await _promptReason(isAdd: false);
+    if (reasonData == null) return;
+
+    final newBalance = currentStock - stockToRemove;
 
     setState(() => _busyKeys.add(key));
     try {
@@ -219,6 +467,17 @@ class _ManageInventoryState extends State<ManageInventory> {
           stockQuantity: item.stockQuantity - stockToRemove,
         ));
       }
+
+      await _recordMovement(
+        item: item,
+        variant: variant,
+        isAdd: false,
+        quantity: stockToRemove,
+        balanceAfter: newBalance,
+        reason: reasonData.reason,
+        note: reasonData.note,
+        unit: unit,
+      );
 
       controller.clear();
 
@@ -304,40 +563,13 @@ class _ManageInventoryState extends State<ManageInventory> {
                     ],
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0),
-                    vertical: AppResponsive.getValue(context, mobile: 5.0, tablet: 6.0, desktop: 7.0),
-                  ),
-                  decoration: BoxDecoration(
-                    color: item.isInStock
-                        ? Colors.green.withValues(alpha:0.1)
-                        : Colors.red.withValues(alpha:0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: item.isInStock ? Colors.green.shade600 : Colors.red.shade600,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        item.isInStock ? 'In Stock' : 'Out of Stock',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0),
-                          fontWeight: FontWeight.w600,
-                          color: item.isInStock ? Colors.green.shade700 : Colors.red.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
+                IconButton(
+                  onPressed: () => _openHistory(item),
+                  icon: Icon(Icons.history_rounded, size: 20, color: AppColors.primary),
+                  tooltip: 'Stock history',
+                  visualDensity: VisualDensity.compact,
                 ),
+                _buildStockBadge(item),
               ],
             ),
             SizedBox(height: 12),
@@ -381,6 +613,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                             ),
                           ),
                         ),
+                        _variantStatusBadge(item, variant),
                         Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
@@ -444,7 +677,7 @@ class _ManageInventoryState extends State<ManageInventory> {
   }
 
   Widget _buildStockRow({required Items item, ItemVariante? variant}) {
-    final currentStock = variant?.stockQuantity ?? item.stockQuantity;
+    final currentStock = variant != null ? (variant.stockQuantity ?? 0) : item.stockQuantity;
     final controllerKey =
     variant != null ? '${item.id}_${variant.variantId}' : item.id;
     final controller = _getStockController(controllerKey);
@@ -583,6 +816,56 @@ class _ManageInventoryState extends State<ManageInventory> {
             icon: const Icon(Icons.menu),
           ),
         ),
+        actions: [
+          Observer(
+            builder: (context) {
+              final count = StockAdjustService.lowStockEntries().length;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      tooltip: 'Low stock',
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LowStockScreen()),
+                      ),
+                      icon: Icon(
+                        count > 0
+                            ? Icons.notifications_active
+                            : Icons.notifications_none_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (count > 0)
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                          child: Text(
+                            '$count',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -655,6 +938,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                         .where((item) =>
                             item.categoryOfItem == category.id &&
                             item.trackInventory == true &&
+                            (!_showLowStockOnly || _isAlertItem(item)) &&
                             (_searchQuery.isEmpty || item.name.toLowerCase().contains(_searchQuery)))
                         .toList();
 
@@ -662,8 +946,8 @@ class _ManageInventoryState extends State<ManageInventory> {
                       return SizedBox.shrink();
                     }
 
-                    // Auto-expand when search is active
-                    final isExpanded = _searchQuery.isNotEmpty
+                    // Auto-expand when searching or filtering to low stock
+                    final isExpanded = (_searchQuery.isNotEmpty || _showLowStockOnly)
                         ? true
                         : (_expandedCategories[category.id] ?? false);
 
@@ -677,6 +961,10 @@ class _ManageInventoryState extends State<ManageInventory> {
                       child: Theme(
                         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
+                          // Key includes isExpanded so toggling search / low-stock
+                          // filter rebuilds the tile and re-applies initiallyExpanded
+                          // (ExpansionTile ignores initiallyExpanded changes otherwise).
+                          key: ValueKey('${category.id}_$isExpanded'),
                           tilePadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                           childrenPadding: EdgeInsets.only(bottom: 8),
                           leading: Icon(Icons.category_rounded, color: AppColors.primary, size: 20),

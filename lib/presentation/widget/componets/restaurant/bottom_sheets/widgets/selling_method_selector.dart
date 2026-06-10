@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:unipos/core/constants/item_units.dart';
 import '../../../../../../util/color.dart';
 import '../add_item_form_state.dart';
 
@@ -50,13 +51,14 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
   late SellingMethod _method;
   late String _unit;
 
-  static const _units = ['kg', 'gm', 'lbs', 'litre', 'ml', 'pcs'];
+  static const _units = kItemUnits;
 
   @override
   void initState() {
     super.initState();
     _method = widget.currentMethod;
-    _unit = widget.currentUnit;
+    // Clamp to a supported value so legacy units don't crash the dropdown.
+    _unit = normalizeItemUnit(widget.currentUnit) ?? _units.first;
   }
 
   OutlineInputBorder _border(Color c) => OutlineInputBorder(

@@ -9,7 +9,10 @@ import '../../../../../core/di/service_locator.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';
 import '../../../../../util/common/app_responsive.dart';
+import '../../../../../util/restaurant/staticswitch.dart';
+import '../../../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
+import 'tax_selector_sheet.dart';
 import 'add_category_dialog.dart';
 import '../../common/app_text_field.dart';
 import 'add_item_form_state.dart';
@@ -17,6 +20,7 @@ import 'category_selector_sheet.dart';
 import 'image_picker_sheet.dart';
 import 'veg_selector_sheet.dart';
 import 'widgets/category_selector_button.dart';
+import 'widgets/tax_selector_button.dart';
 import 'widgets/inventory_toggle.dart';
 import 'widgets/selling_method_selector.dart' show SellingMethodSheet, SellingMethodButton;
 
@@ -164,6 +168,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
     try {
       final item = await _formState.toItem();
       await itemStore.addItem(item);
+      await StockAdjustService.recordOpeningStock(item);
       widget.onItemAdded?.call();
       if (mounted) {
         Navigator.pop(context);
@@ -419,11 +424,25 @@ class _AddItemSheetState extends State<AddItemSheet> {
       const SizedBox(height: 14),
       _buildCategorySelector(),
       const SizedBox(height: 14),
+      _buildTaxSelector(),
+      const SizedBox(height: 14),
       _buildVegSelector(),
       const SizedBox(height: 14),
       _buildDescriptionField(),
       const SizedBox(height: 14),
       _buildInventoryToggle(),
+      if (_formState.trackInventory) ...[
+        if (_formState.selectedVariants.isEmpty) ...[
+          const SizedBox(height: 14),
+          _buildCurrentStockField(),
+        ] else ...[
+          const SizedBox(height: 10),
+          Text('Stock is set per variant in More Info.',
+              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+        ],
+        const SizedBox(height: 14),
+        _buildLowStockSection(),
+      ],
       const SizedBox(height: 16),
       _buildImageUploader(),
       const SizedBox(height: 24),
@@ -521,6 +540,71 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return VegSelectorButton(
       selectedCategory: _formState.vegCategory,
       onTap: _selectVegCategory,
+    );
+  }
+
+  Future<void> _selectTax() async {
+    FocusScope.of(context).unfocus();
+    final result = await TaxSelectorSheet.show(
+      context,
+      selectedTaxId: _formState.selectedTaxId,
+    );
+    if (result != null) {
+      setState(() => _formState.setTax(result.id, result.rate));
+    }
+  }
+
+  Widget _buildTaxSelector() {
+    return TaxSelectorButton(
+      taxRate: _formState.selectedTaxRate,
+      onTap: _selectTax,
+    );
+  }
+
+  Widget _buildCurrentStockField() {
+    final unit = _formState.sellingMethod == SellingMethod.byWeight
+        ? _formState.selectedUnit
+        : 'pcs';
+    return AppTextField(
+      controller: _formState.stockController,
+      label: 'Current Stock ($unit)',
+      hint: '0',
+      icon: Icons.inventory_2_rounded,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    );
+  }
+
+  Widget _buildLowStockSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('Low-stock alert',
+              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+          subtitle: Text('Warn when this item runs low',
+              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+          value: _formState.lowStockAlertEnabled,
+          activeColor: AppColors.primary,
+          onChanged: (v) => setState(() => _formState.setLowStockAlert(v)),
+        ),
+        if (_formState.lowStockAlertEnabled) ...[
+          const SizedBox(height: 8),
+          Builder(builder: (_) {
+            final unit = _formState.sellingMethod == SellingMethod.byWeight
+                ? _formState.selectedUnit
+                : 'pcs';
+            return AppTextField(
+              controller: _formState.lowStockThresholdController,
+              label: 'Alert threshold ($unit, optional)',
+              hint: 'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
+              icon: Icons.warning_amber_rounded,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            );
+          }),
+        ],
+      ],
     );
   }
 

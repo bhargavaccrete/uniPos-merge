@@ -187,6 +187,9 @@ class HiveBoxNames {
   /// Cash movement events (Cash In / Cash Out during the day)
   static const String restaurantCashMovements = 'cashMovementsBox';
 
+  /// Stock movement log (manual stock add/remove with reason + history)
+  static const String restaurantStockMovements = 'stockMovementsBox';
+
   /// Cash handover records (2-step shift handover between staff)
   static const String restaurantCashHandovers = 'cashHandoversBox';
 
@@ -281,6 +284,7 @@ class HiveBoxNames {
     restaurantCustomer,
     restaurantShift,
     restaurantCashMovements,
+    restaurantStockMovements,
     restaurantCashHandovers,
     restaurantPrinters,
     restaurantSessions,

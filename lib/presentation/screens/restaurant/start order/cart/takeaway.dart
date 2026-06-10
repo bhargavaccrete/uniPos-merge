@@ -11,6 +11,7 @@ import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/day_management_service.dart';
+import '../../../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
@@ -38,6 +39,8 @@ class Takeaway extends StatefulWidget {
   final Function(CartItem) onAddtoCart;
   final Function(CartItem) onIncreseQty;
   final Function(CartItem) onDecreseQty;
+  final Function(CartItem, int)? onSetQty; // Set quantity directly (typed input)
+  final int? Function(CartItem)? availableStockOf; // null = unlimited stock
   final List<CartItem>? originalActiveItems;
   final Map<String, int>? originalQuantities;
   final List<int>? currentKotBoundaries;
@@ -53,6 +56,8 @@ class Takeaway extends StatefulWidget {
         required this.onAddtoCart,
         required this.onIncreseQty,
         required this.onDecreseQty,
+        this.onSetQty,
+        this.availableStockOf,
         required this.isDineIn,
         this.selectedTableNo,
         this.originalActiveItems,
@@ -65,6 +70,91 @@ class Takeaway extends StatefulWidget {
 }
 
 class _TakeawayState extends State<Takeaway> {
+  // One controller + focus node per cart item, so the quantity is an inline
+  // editable field that stays in sync with − / + changes.
+  final Map<String, TextEditingController> _qtyControllers = {};
+  final Map<String, FocusNode> _qtyFocusNodes = {};
+  // itemId → available stock, for items whose typed qty exceeds it. Kept visible
+  // (not reverted) and used to DISABLE Place Order / Quick Settle until fixed.
+  final Map<String, int> _overStock = {};
+
+  TextEditingController _qtyController(CartItem item) {
+    final c = _qtyControllers.putIfAbsent(
+        item.id, () => TextEditingController(text: item.quantity.toString()));
+    // Re-sync to the live quantity (e.g. after − / +), but never while the user
+    // is mid-edit, or has an over-stock value we want to keep on screen.
+    final focused = _qtyFocusNodes[item.id]?.hasFocus ?? false;
+    if (!focused &&
+        !_overStock.containsKey(item.id) &&
+        c.text != item.quantity.toString()) {
+      c.text = item.quantity.toString();
+    }
+    return c;
+  }
+
+  FocusNode _qtyFocusNode(CartItem item) =>
+      _qtyFocusNodes.putIfAbsent(item.id, () => FocusNode());
+
+  /// Live check on every keystroke — flags over-stock so the order buttons
+  /// disable immediately (no need to tap away first). Does NOT change the cart.
+  void _onQtyChanged(CartItem item, String text) {
+    final n = int.tryParse(text.trim());
+    final avail = widget.availableStockOf?.call(item); // null = unlimited
+    final bool nowOver = n != null && avail != null && n > avail;
+    final bool wasOver = _overStock.containsKey(item.id);
+    setState(() {
+      if (nowOver) {
+        _overStock[item.id] = avail!;
+      } else {
+        _overStock.remove(item.id);
+      }
+    });
+    // Warn once, when it first goes over (not on every keystroke).
+    if (nowOver && !wasOver) {
+      NotificationService.instance.showError('Only $avail ${item.title} in stock');
+    }
+  }
+
+  /// Commit a typed quantity. Blank/invalid reverts. A value over available
+  /// stock is KEPT visible and left flagged (orders stay blocked) — never
+  /// silently clamped or auto-corrected.
+  void _commitQty(CartItem item, String text) {
+    final n = int.tryParse(text.trim());
+    if (n == null || n < 1) {
+      setState(() => _overStock.remove(item.id));
+      _qtyController(item).text = item.quantity.toString();
+      return;
+    }
+    final avail = widget.availableStockOf?.call(item); // null = unlimited
+    if (avail != null && n > avail) {
+      setState(() => _overStock[item.id] = avail); // keep typed value + flagged
+      return;
+    }
+    setState(() => _overStock.remove(item.id));
+    if (n != item.quantity && widget.onSetQty != null) {
+      widget.onSetQty!(item, n);
+    }
+  }
+
+  /// Gate for order actions — blocks if any item's typed qty exceeds stock,
+  /// naming each item with its available stock and the entered amount.
+  bool _stockOkToOrder() {
+    if (_overStock.isEmpty) return true;
+    final lines = <String>[];
+    for (final w in widget.cartItems) {
+      final it = w.item;
+      if (_overStock.containsKey(it.id)) {
+        final avail = _overStock[it.id]!;
+        final entered = _qtyControllers[it.id]?.text.trim() ?? '';
+        lines.add(entered.isEmpty
+            ? '${it.title}: only $avail in stock'
+            : '${it.title}: only $avail in stock, you entered $entered');
+      }
+    }
+    NotificationService.instance.showError(lines.join('\n'));
+    return false;
+  }
+
 
 
 
@@ -105,7 +195,7 @@ class _TakeawayState extends State<Takeaway> {
     final List<int> kotNumbers = widget.currentKotNumbers ?? existingModel.kotNumbers;
     final List<int> kotBoundaries = widget.currentKotBoundaries ?? existingModel.kotBoundaries;
 
-    List<Widget> kotSections = [];
+    List<List<Widget>> kotGroups = []; // one entry per KOT, built oldest→newest
     final allItems = widget.cartItems;
 
     int startIndex = 0;
@@ -126,39 +216,46 @@ class _TakeawayState extends State<Takeaway> {
           final kotStatus = existingModel.getKotStatus(kotNum).toLowerCase();
           final isCooked = kotStatus == 'cooked' || kotStatus == 'ready' || kotStatus == 'served' || kotStatus == 'completed';
 
+          final group = <Widget>[];
+
           // Show ACTIVE items for this KOT
           if (activeKotItems.isNotEmpty) {
-            kotSections.add(
+            group.add(
                 _buildItemSection('KOT #$kotNum - ACTIVE${isCooked ? ' (Cooked)' : ''}', isCooked ? AppColors.warning : AppColors.success, activeKotItems, isCooked: isCooked)
             );
-            kotSections.add(SizedBox(height: 16));
+            group.add(SizedBox(height: 16));
           }
 
           // Show NEW items for this KOT
           if (newKotItems.isNotEmpty) {
-            kotSections.add(
+            group.add(
                 _buildItemSection('KOT #$kotNum - NEW', Colors.blue, newKotItems)
             );
-            kotSections.add(SizedBox(height: 16));
+            group.add(SizedBox(height: 16));
           }
+
+          if (group.isNotEmpty) kotGroups.add(group);
         }
 
         startIndex = endIndex;
       }
     }
 
-    // Handle any new items added beyond the last KOT (will be part of next KOT)
+    // New items added beyond the last KOT — show them at the TOP so the cashier
+    // sees what's being added without scrolling past the already-placed order.
+    List<Widget> pendingSection = [];
     if (startIndex < allItems.length) {
       List<CartItemStatus> newItems = allItems.sublist(startIndex);
       if (newItems.isNotEmpty) {
-        kotSections.add(
-            _buildItemSection('NEW ITEMS (Pending KOT)', AppColors.warning, newItems)
-        );
+        pendingSection.add(
+            _buildItemSection('NEW ITEMS (Pending KOT)', AppColors.warning, newItems));
+        pendingSection.add(SizedBox(height: 16));
       }
     }
 
     return ListView(
-      children: kotSections,
+      // Pending items first, then KOTs newest→oldest so the latest order is on top.
+      children: [...pendingSection, ...kotGroups.reversed.expand((g) => g)],
     );
   }
 
@@ -281,19 +378,51 @@ class _TakeawayState extends State<Takeaway> {
             children: [
               if (!wrapped.isActive) ...[
                 InkWell(
-                  onTap: () => widget.onDecreseQty(item),
+                  onTap: () {
+                    _overStock.remove(item.id); // adjusting via buttons clears the flag
+                    widget.onDecreseQty(item);
+                  },
                   child: Container(
                     padding: EdgeInsets.all(btnPad),
                     decoration: BoxDecoration(border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(6)),
                     child: Icon(Icons.remove, size: iconSize, color: AppColors.textSecondary),
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Text(item.quantity.toString(), style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600)),
+                Container(
+                  width: 48,
+                  margin: EdgeInsets.symmetric(horizontal: 6),
+                  child: TextField(
+                    controller: _qtyController(item),
+                    focusNode: _qtyFocusNode(item),
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: AppColors.divider),
+                      ),
+                    ),
+                    onChanged: (v) => _onQtyChanged(item, v),
+                    onSubmitted: (v) {
+                      _commitQty(item, v);
+                      _qtyFocusNode(item).unfocus();
+                    },
+                    onTapOutside: (_) {
+                      _commitQty(item, _qtyController(item).text);
+                      _qtyFocusNode(item).unfocus();
+                    },
+                  ),
                 ),
                 InkWell(
-                  onTap: () => widget.onIncreseQty(item),
+                  onTap: () {
+                    _overStock.remove(item.id); // adjusting via buttons clears the flag
+                    widget.onIncreseQty(item);
+                  },
                   child: Container(
                     padding: EdgeInsets.all(btnPad),
                     decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6)),
@@ -550,16 +679,18 @@ class _TakeawayState extends State<Takeaway> {
 
   // NEW ORDER
   Future<void> _placeOrder(CartCalculationService calculations) async {
-    // Block if no active day session — orders placed without a session are excluded from EOD
+    if (!_stockOkToOrder()) return;
+    // No active day session yet → start the day right here (opening balance),
+    // then continue placing this order. The day begins at the first order.
     final bool sessionOpen = await DayManagementService.isSessionOpen();
     if (!sessionOpen) {
-      if (mounted) {
-        Navigator.pop(context);
-        NotificationService.instance.showError(
-          'No active session. Please start the day from the End Day menu first.',
-        );
+      final started = await promptStartDay(context);
+      if (!started) {
+        if (mounted) {
+          NotificationService.instance.showError('Start the day to place the order');
+        }
+        return;
       }
-      return;
     }
 
     final plainItems = widget.cartItems.map((w) => w.item).toList();
@@ -706,6 +837,12 @@ class _TakeawayState extends State<Takeaway> {
     mobileController.dispose();
     emailController.dispose();
     remarkController.dispose();
+    for (final c in _qtyControllers.values) {
+      c.dispose();
+    }
+    for (final f in _qtyFocusNodes.values) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -735,6 +872,7 @@ class _TakeawayState extends State<Takeaway> {
     }
   }
   Future<void> _updateExistingOrder(CartCalculationService calculations) async {
+    if (!_stockOkToOrder()) return;
     if (!widget.isexisting || widget.existingModel == null) return;
     final existingModel = widget.existingModel!;
 
@@ -1006,13 +1144,34 @@ class _TakeawayState extends State<Takeaway> {
                   children: [
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: Row(
-                        children: [
-                          if (widget.isDineIn)
-                            Text("Table ${widget.selectedTableNo}", style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: AppColors.textSecondary))
-                          else
-                            Text(widget.isexisting ? 'Existing Order' : 'New Order', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                        ],
+                      child: Center(
+                        child: widget.isDineIn
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.table_restaurant_rounded,
+                                        size: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14),
+                                        color: AppColors.primary),
+                                    const SizedBox(width: 5),
+                                    Text("Table ${widget.selectedTableNo}",
+                                        style: GoogleFonts.poppins(
+                                            fontSize: AppResponsive.getValue<double>(context, mobile: 12.5, tablet: 14),
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primary)),
+                                  ],
+                                ),
+                              )
+                            : Text(widget.isexisting ? 'Existing Order' : 'New Order',
+                                style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 15),
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary)),
                       ),
                     ),
                     Expanded(child: _buildGroupedCartItems()),
@@ -1103,11 +1262,14 @@ class _TakeawayState extends State<Takeaway> {
   Widget _buildActionButton(String label, VoidCallback onTap) {
     final btnFs = AppResponsive.getValue<double>(context, mobile: 13, tablet: 15, desktop: 16);
     final btnPad = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 18);
+    final bool blocked = _overStock.isNotEmpty; // a typed qty exceeds stock
     return ElevatedButton(
-      onPressed: onTap,
+      onPressed: blocked ? null : onTap,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        disabledBackgroundColor: AppColors.divider,
+        disabledForegroundColor: Colors.white,
         elevation: 0,
         padding: EdgeInsets.symmetric(vertical: btnPad),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1150,7 +1312,7 @@ class _TakeawayState extends State<Takeaway> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: widget.cartItems.isEmpty ? null : () {
+            onPressed: (widget.cartItems.isEmpty || _overStock.isNotEmpty) ? null : () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
                 tableid: widget.tableid, cartitems: plainItems,
                 totalPrice: calculations.grandTotal, orderType: widget.isDineIn ? 'Dine In' : 'Take Away', isSettle: true,
@@ -1376,6 +1538,7 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   void _showQuickSettleSheet(CartCalculationService calculations) {
+    if (!_stockOkToOrder()) return;
     final methods = _paymentMethodStore.enabledMethods;
     String selected = methods.isNotEmpty ? methods.first.name : 'Cash';
 
@@ -1522,6 +1685,18 @@ class _TakeawayState extends State<Takeaway> {
 
 // Replace your entire _qucikSettleNewOrder function with this one.
   Future<void> _qucikSettleNewOrder(CartCalculationService calculations, String paymentMethod) async {
+    // No active day session yet → start the day (opening balance) before the
+    // sale is recorded, so it's never excluded from EOD.
+    if (!await DayManagementService.isSessionOpen()) {
+      final started = await promptStartDay(context);
+      if (!started) {
+        if (mounted) {
+          NotificationService.instance.showError('Start the day to settle the order');
+        }
+        return;
+      }
+    }
+
     // Get the plain cart items
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 

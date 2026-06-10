@@ -282,7 +282,8 @@ class EODService {
         final refundRatio =
             order.totalPrice > 0 ? netAmount / order.totalPrice : 1.0;
         for (final entry in order.paymentList) {
-          final method = (entry['method'] as String? ?? 'Unknown');
+          // Normalise so 'Cash'/'cash'/'CASH' collapse into one bucket.
+          final method = _normalizePaymentMethod(entry['method'] as String?);
           final amt =
               ((entry['amount'] as num?)?.toDouble() ?? 0.0) * refundRatio;
           paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
@@ -290,7 +291,7 @@ class EODService {
           grandTotal += amt;
         }
       } else {
-        final paymentType = order.paymentmode ?? 'Unknown';
+        final paymentType = _normalizePaymentMethod(order.paymentmode);
         paymentTotals[paymentType] =
             (paymentTotals[paymentType] ?? 0.0) + netAmount;
         paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
@@ -311,6 +312,31 @@ class EODService {
         percentage: percentage,
       );
     }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+  }
+
+  /// Canonical display label for a payment method so case/spacing variants
+  /// (e.g. 'Cash', 'cash', 'CASH ') collapse into one bucket in summaries.
+  static String _normalizePaymentMethod(String? raw) {
+    final m = (raw ?? '').trim().toLowerCase();
+    if (m.isEmpty) return 'Unknown';
+    switch (m) {
+      case 'cash':
+        return 'Cash';
+      case 'upi':
+        return 'UPI';
+      case 'card':
+        return 'Card';
+      case 'wallet':
+        return 'Wallet';
+      case 'credit':
+        return 'Credit';
+      case 'split':
+      case 'split payment':
+        return 'Split Payment';
+      default:
+        // Title-case unknown/custom methods for a tidy label.
+        return m[0].toUpperCase() + m.substring(1);
+    }
   }
 
   static List<TaxSummary> _calculateTaxSummaries(List<PastOrderModel> orders) {

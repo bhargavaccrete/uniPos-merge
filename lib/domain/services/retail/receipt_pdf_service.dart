@@ -295,15 +295,16 @@ class ReceiptPdfService {
         if (data.kotNumber != null) ...[
           // KOT Format (simplified for kitchen)
           if (data.kotStatus?.toUpperCase() == 'CANCEL') ...[
-            pw.Container(
-              padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            pw.Center(
               child: pw.Text(
-                '******** CANCEL KOT ********',
-                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                'CANCEL KOT',
+                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
                 textAlign: pw.TextAlign.center,
               ),
             ),
             pw.SizedBox(height: 4),
+            _buildDashedLine(),
+            pw.SizedBox(height: 6),
           ],
           pw.Text(
             'KOT #: ${data.kotNumber.toString().padLeft(3, '0')}',
@@ -355,19 +356,7 @@ class ReceiptPdfService {
               ],
             ),
           ],
-          // Display all KOT numbers for this order
-          if (data.kotNumbers != null && data.kotNumbers!.isNotEmpty) ...[
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('KOT #:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                pw.Text(
-                  data.kotNumbers!.map((num) => '#$num').join(', '),
-                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
-                ),
-              ],
-            ),
-          ],
+          // KOT numbers are internal kitchen info — never shown on the customer bill
           if (showInvoiceDate) ...[
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -540,7 +529,9 @@ class ReceiptPdfService {
           _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 14),
 
           // Payment status - Show only for PAID orders (NOT PAID already shown at top)
-          if (showPaymentMethod && data.sale.paymentType != null && data.sale.paymentType != 'credit' && data.sale.paymentType != 'NOT PAID') ...[
+          // For split payments the per-method breakdown is shown in the
+          // "Payment Details" section below, so skip this single line.
+          if (showPaymentMethod && data.sale.isSplitPayment != true && data.sale.paymentType != null && data.sale.paymentType != 'credit' && data.sale.paymentType != 'NOT PAID') ...[
             _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 12),
           ],
 
@@ -1058,10 +1049,9 @@ class ReceiptPdfService {
     // Format item name with variant in parentheses: "Veg Pizza (Medium)"
     final displayName = item.size != null ? '$name (${item.size})' : name;
 
-    String prefix = '';
-    if (data.kotStatus?.toUpperCase() == 'CANCEL') {
-      prefix = '❌ ';
-    }
+    // Cancel KOT: strike through the name and flag the qty as CANCEL (a clean,
+    // font-safe marker — the old ❌ emoji had no glyph and printed as a box).
+    final bool isCancel = data.kotStatus?.toUpperCase() == 'CANCEL';
 
     return pw.Container(
       padding: const pw.EdgeInsets.only(top: 3, bottom: 3),
@@ -1071,15 +1061,23 @@ class ReceiptPdfService {
           // Item name (with variant) and quantity in a row
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Expanded(
                 child: pw.Text(
-                  '$prefix$displayName',
-                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                  displayName,
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    decoration: isCancel
+                        ? pw.TextDecoration.lineThrough
+                        : pw.TextDecoration.none,
+                  ),
                 ),
               ),
+              pw.SizedBox(width: 6),
               pw.Text(
-                'x${item.qty}',
+                isCancel ? 'CANCEL x${item.qty}' : 'x${item.qty}',
                 style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
               ),
             ],
@@ -1395,11 +1393,14 @@ class ReceiptPdfService {
     if (paymentList.length > 1 || sale.isSplitPayment == true) {
       widgets.add(
         pw.Text(
-          'PAYMENT BREAKDOWN',
-          style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+          'Payment Details',
+          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
         ),
       );
       widgets.add(pw.SizedBox(height: 4));
+
+      // Restaurant receipts use larger body text (fontSize 11) than retail (8).
+      final double rowFont = AppConfig.isRestaurant ? 11 : 8;
 
       for (final payment in paymentList) {
         final method = (payment['method'] as String?)?.toUpperCase() ?? 'OTHER';
@@ -1414,18 +1415,19 @@ class ReceiptPdfService {
             children: [
               pw.Text(
                 ref != null ? '$method (Ref: $ref)' : method,
-                style: const pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(fontSize: rowFont),
               ),
               pw.Text(
                 _formatCurrency(amount),
-                style: const pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(fontSize: rowFont),
               ),
             ],
           ),
         );
 
-        // Show cash received and change for cash payments
-        if (method == 'CASH' && received != null && received > 0) {
+        // Show cash received/change only when the customer actually overpaid
+        // (received > amount). For an exact split slice this is just noise.
+        if (method == 'CASH' && received != null && received > amount) {
           widgets.add(
             pw.Padding(
               padding: const pw.EdgeInsets.only(left: 8),

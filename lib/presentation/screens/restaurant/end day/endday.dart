@@ -1146,12 +1146,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   Future<void> _startDay() async {
-    final result = await showDialog<double>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => OpeningBalanceDialog(),
-    );
-    if (result != null && mounted) {
+    // promptStartDay shows the dialog AND actually starts the day (opening
+    // balance + adjustment). The old inline dialog only collected the amount and
+    // relied on the dashboard to start it — which no longer force-prompts.
+    final started = await promptStartDay(context);
+    if (started && mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => AdminWelcome()),
             (route) => false,
@@ -1868,13 +1867,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                 ),
               ),
               const SizedBox(width: 12),
+              // Print is intentionally NOT here — the day isn't closed yet, so
+              // printing a draft summary is premature. Print belongs to the
+              // completed-EOD flow only.
               Column(children: [
-                _iconActionButton(
-                    icon: Icons.print_rounded,
-                    label: 'Print',
-                    color: Colors.teal,
-                    onTap: _printSummary),
-                const SizedBox(height: 8),
                 _iconActionButton(
                     icon: Icons.refresh_rounded,
                     label: 'Refresh',

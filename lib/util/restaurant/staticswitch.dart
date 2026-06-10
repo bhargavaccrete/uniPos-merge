@@ -34,6 +34,12 @@ class AppSettings {
     // Staff & Shifts
     "Shift Handover": true, // Enable 2-step cash handover between staff shifts
 
+    // Inventory
+    "Low Stock Alerts": true, // Master switch for low-stock badge + toast
+
+    // Refunds
+    "Allow Refunds": true, // Master switch — when off, the Refund option is hidden everywhere
+
 
 
     // Printing
@@ -73,6 +79,9 @@ class AppSettings {
       "Tax Is Inclusive", // ✅ WORKING
       "Discount On Items", // ✅ WORKING
     ],
+    "Inventory": [
+      "Low Stock Alerts",
+    ],
     // "Printing": [
     //   // "Label Printer", // ❌ NOT IMPLEMENTED - Commented out
     //   // "Section Wise Print", // ❌ NOT IMPLEMENTED - Commented out
@@ -101,10 +110,27 @@ class AppSettings {
   static final ValueNotifier<int> refundWindowNotifier =
       ValueNotifier(_refundWindowDefault);
 
+  static const String _lowStockThresholdKey = 'lowStockThreshold';
+  static const double _lowStockThresholdDefault = 5.0;
+  static final ValueNotifier<double> lowStockThresholdNotifier =
+      ValueNotifier(_lowStockThresholdDefault);
+
   /// ---- Public Getters ----
   static Map<String, bool> get values => settingsNotifier.value;
   static String get selectedRoundOffValue => roundOffNotifier.value;
   static int get refundWindowMinutes => refundWindowNotifier.value;
+
+  /// Master switch + global default threshold for low-stock alerts.
+  static bool get lowStockAlertsEnabled => values["Low Stock Alerts"] ?? true;
+
+  /// Master switch for refunds. When false, refunds are not offered anywhere.
+  static bool get refundsEnabled => values["Allow Refunds"] ?? true;
+  static double get lowStockThreshold => lowStockThresholdNotifier.value;
+
+  static Future<void> updateLowStockThreshold(double value) async {
+    lowStockThresholdNotifier.value = value;
+    await _save();
+  }
 
   static bool getSetting(String key) => values[key] ?? false;
 
@@ -130,6 +156,7 @@ class AppSettings {
     settingsNotifier.value = Map.from(_defaultSettingValues);
     roundOffNotifier.value = _roundOffDefault;
     refundWindowNotifier.value = _refundWindowDefault;
+    lowStockThresholdNotifier.value = _lowStockThresholdDefault;
     await _save();
   }
 
@@ -139,6 +166,7 @@ class AppSettings {
     values.forEach((key, value) => prefs.setBool(key, value));
     await prefs.setString(_roundOffPrefKey, selectedRoundOffValue);
     await prefs.setInt(_refundWindowKey, refundWindowMinutes);
+    await prefs.setDouble(_lowStockThresholdKey, lowStockThreshold);
   }
 
   static Future<void> load() async {
@@ -154,6 +182,8 @@ class AppSettings {
         prefs.getString(_roundOffPrefKey) ?? _roundOffDefault;
     refundWindowNotifier.value =
         prefs.getInt(_refundWindowKey) ?? _refundWindowDefault;
+    lowStockThresholdNotifier.value =
+        prefs.getDouble(_lowStockThresholdKey) ?? _lowStockThresholdDefault;
   }
 
 

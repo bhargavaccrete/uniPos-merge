@@ -26,6 +26,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
   List<String> selectedExtraIds = [];
   String? selectedTaxId;
   double? selectedTaxRate;
+  bool _trackInventory = false;
 
   @override
   void initState() {
@@ -39,6 +40,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
       selectedExtraIds = List<String>.from(itemData['extraIds'] ?? []);
       selectedTaxId = itemData['taxId'];
       selectedTaxRate = itemData['taxRate'];
+      _trackInventory = itemData['trackInventory'] == true;
     }
   }
 
@@ -79,6 +81,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                   MaterialPageRoute(
                     builder: (context) => VariantSelectionScreen(
                       selectedVariants: selectedVariants,
+                      trackInventory: _trackInventory,
                     ),
                   ),
                 );

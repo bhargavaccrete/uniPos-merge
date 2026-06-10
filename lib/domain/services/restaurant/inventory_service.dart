@@ -1,17 +1,26 @@
 
+import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../util/restaurant/staticswitch.dart';
+import '../../../data/models/restaurant/db/stock_movement_model.dart';
+import '../../../data/repositories/restaurant/stock_movement_repository.dart';
+import '../../../util/restaurant/restaurant_session.dart';
+import 'day_management_service.dart';
 import '../common/notification_service.dart';
 
 class InventoryService {
-  static const double _lowStockThreshold = 5;
-
   static Future<void> deductStockForOrder(List<CartItem> cartItems) async {
     await itemStore.loadItems();
     await variantStore.loadVariants(); // Load variants for variant name lookup
     final items = itemStore.items;
     final List<String> lowStockAlerts = [];
+
+    // For logging each deduction to the stock movement history (reason = "Sale").
+    final stockRepo = StockMovementRepository();
+    final staffName = RestaurantSession.staffName ?? RestaurantSession.effectiveRole;
+    final sessionId = await DayManagementService.getCurrentSessionId();
 
     for (final cartItem in cartItems) {
       // Try to find by productId first (matches inventory item key)
@@ -33,8 +42,16 @@ class InventoryService {
       if (!item.trackInventory) continue;
 
       final double stockAfter;
+      final double deductedQty;
+      String? variantId;
       if (cartItem.variantName != null) {
+        deductedQty = cartItem.quantity.toDouble();
         stockAfter = await _deductVariantStock(item, cartItem);
+        try {
+          variantId = item.variant
+              ?.firstWhere((v) => _getVariantName(v.variantId) == cartItem.variantName)
+              .variantId;
+        } catch (_) {}
       } else {
         double quantityToDeduct = cartItem.quantity.toDouble();
         if (item.isSoldByWeight && cartItem.weightDisplay != null) {
@@ -42,15 +59,34 @@ class InventoryService {
           final singleWeight = _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
           quantityToDeduct = cartItem.quantity * singleWeight;
         }
+        deductedQty = quantityToDeduct;
         stockAfter = await _deductItemStock(item, quantityToDeduct);
       }
 
       final label = cartItem.variantName != null
           ? "${item.name} (${cartItem.variantName})"
           : item.name;
-      if (stockAfter < 0) {
+
+      // Log the sale deduction to the per-item stock history.
+      await stockRepo.saveMovement(StockMovementModel(
+        id: const Uuid().v4(),
+        timestamp: DateTime.now(),
+        itemId: item.id,
+        variantId: variantId,
+        itemName: label,
+        type: 'out',
+        quantity: deductedQty,
+        balanceAfter: stockAfter,
+        reason: 'Sale',
+        unit: item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs'),
+        staffName: staffName,
+        sessionId: sessionId,
+      ));
+      if (stockAfter <= 0) {
         lowStockAlerts.add("$label is out of stock");
-      } else if (stockAfter < _lowStockThreshold) {
+      } else if (item.lowStockAlertEnabled &&
+          AppSettings.lowStockAlertsEnabled &&
+          stockAfter <= item.effectiveLowStockThreshold) {
         lowStockAlerts.add("$label: ${stockAfter.toStringAsFixed(0)} ${item.unit ?? "units"} left");
       }
     }
@@ -252,6 +288,11 @@ class InventoryService {
       await itemStore.loadItems();
       await variantStore.loadVariants();
 
+      // For logging each restock to the stock movement history.
+      final stockRepo = StockMovementRepository();
+      final staffName = RestaurantSession.staffName ?? RestaurantSession.effectiveRole;
+      final sessionId = await DayManagementService.getCurrentSessionId();
+
       for (final entry in itemsToRestock.entries) {
         final cartItem = entry.key;
         final restockQuantity = entry.value;
@@ -290,8 +331,18 @@ class InventoryService {
         }
 
         // Handle variant items
+        double restoredQty;
+        double balanceAfter = 0;
+        String? variantId;
         if (cartItem.variantName != null && existingItem.variant != null) {
+          restoredQty = restockQuantity.toDouble();
           await _restoreVariantStock(existingItem, cartItem, restockQuantity);
+          try {
+            final v = existingItem.variant!
+                .firstWhere((vv) => _getVariantName(vv.variantId) == cartItem.variantName);
+            variantId = v.variantId;
+            balanceAfter = v.stockQuantity ?? 0;
+          } catch (_) {}
         } else {
           // Handle regular items (non-variant)
           double quantityToRestore = restockQuantity.toDouble();
@@ -302,8 +353,28 @@ class InventoryService {
             quantityToRestore = _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
           }
 
+          restoredQty = quantityToRestore;
           await _restoreItemStock(existingItem, quantityToRestore);
+          balanceAfter = existingItem.stockQuantity;
         }
+
+        // Log the restock (void/refund) to the per-item stock history.
+        await stockRepo.saveMovement(StockMovementModel(
+          id: const Uuid().v4(),
+          timestamp: DateTime.now(),
+          itemId: existingItem.id,
+          variantId: variantId,
+          itemName: cartItem.variantName != null
+              ? "${existingItem.name} (${cartItem.variantName})"
+              : existingItem.name,
+          type: 'in',
+          quantity: restoredQty,
+          balanceAfter: balanceAfter,
+          reason: 'Void / Refund return',
+          unit: existingItem.unit ?? (existingItem.isSoldByWeight ? 'kg' : 'pcs'),
+          staffName: staffName,
+          sessionId: sessionId,
+        ));
       }
 
       // Reload items to reflect changes in UI

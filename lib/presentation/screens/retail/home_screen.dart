@@ -510,6 +510,7 @@ class HomeScreen extends StatelessWidget {
     return InkWell(
       onTap: () {
         Navigator.push(
+
           context,
           MaterialPageRoute(builder: (context) => const StockAlertsScreen()),
         );

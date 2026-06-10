@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:unipos/util/color.dart';
+import 'package:unipos/core/constants/item_units.dart';
+import 'package:unipos/util/restaurant/staticswitch.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
@@ -12,8 +14,10 @@ import 'package:unipos/presentation/widget/componets/restaurant/componets/filter
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/restaurant/audit_trail_helper.dart';
+import 'package:unipos/domain/services/restaurant/stock_adjust_service.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -52,8 +56,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
   late TextEditingController _nameController;
   late TextEditingController _itemPriceController;
   late TextEditingController _descController;
+  late TextEditingController _lowStockController;
   late String selectedCategoryId;
   late String selectedIMGCategory;
+
+  // Tax selection (taxRate is a decimal, e.g. 0.18 for 18%)
+  String? selectedTaxId;
+  double? selectedTaxRate;
 
   Uint8List? _selectedImageBytes;
 
@@ -63,11 +72,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   String selectedFilter = 'YES';
   String allowOutOfStockFilter = 'YES';
+  String _lowStockAlertFilter = 'NO';
   bool _isSaving = false;
 
   // For managing variant selections
   late List<bool> _variantCheckedList;
   late List<TextEditingController> _variantPriceControllers;
+  late List<TextEditingController> _variantStockControllers;
 
   // For managing choice selections
   late List<bool> _choiceCheckedList;
@@ -87,12 +98,22 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _nameController = TextEditingController(text: widget.items.name);
     _itemPriceController = TextEditingController(text: widget.items.price?.toString() ?? '');
     _descController = TextEditingController(text: widget.items.description ?? '');
+    final lowStock = widget.items.lowStockThreshold;
+    _lowStockController = TextEditingController(
+      text: lowStock == null
+          ? ''
+          : (lowStock % 1 == 0 ? lowStock.toStringAsFixed(0) : lowStock.toString()),
+    );
+    _lowStockAlertFilter = widget.items.lowStockAlertEnabled ? 'YES' : 'NO';
     selectedCategoryId = widget.items.categoryOfItem ?? '';
     selectedIMGCategory = widget.items.isVeg ?? 'Veg';
+    selectedTaxRate = widget.items.taxRate;
 
     // ✅ ADDED: Initialize selling method based on existing item
     _sellingMethod = widget.items.isSoldByWeight == true ? SellingMethod.byWeight : SellingMethod.byUnit;
-    _selectedUnit = widget.items.unit ?? 'kg';
+    // Clamp to a supported value (kItemUnits); imported/legacy items may carry
+    // an unsupported unit, which would crash the DropdownButton.
+    _selectedUnit = normalizeItemUnit(widget.items.unit) ?? kItemUnits.first;
 
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true ? 'YES' : 'NO';
@@ -120,6 +141,17 @@ class _EdititemScreenState extends State<EdititemScreen> {
       final existingVariant = widget.items.variant?.firstWhere((v) => v.variantId == allVariants[index].id,
           orElse: () => ItemVariante(variantId: '', price: 0.0));
       return TextEditingController(text: existingVariant?.price.toString() ?? '');
+    });
+
+    _variantStockControllers = List.generate(allVariants.length, (index) {
+      final existingVariant = widget.items.variant?.firstWhere((v) => v.variantId == allVariants[index].id,
+          orElse: () => ItemVariante(variantId: '', price: 0.0));
+      final s = existingVariant?.stockQuantity;
+      return TextEditingController(
+        text: (s == null || s == 0)
+            ? ''
+            : (s % 1 == 0 ? s.toInt().toString() : s.toString()),
+      );
     });
 
     _choiceCheckedList = List.generate(allChoices.length, (index) {
@@ -162,8 +194,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _nameController.dispose();
     _itemPriceController.dispose();
     _descController.dispose();
+    _lowStockController.dispose();
 
     // Dispose variant price controllers
+    for (var controller in _variantStockControllers) {
+      controller.dispose();
+    }
     for (var controller in _variantPriceControllers) {
       controller.dispose();
     }
@@ -195,6 +231,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
       finalImageBytes = _selectedImageBytes;
     }
 
+    // Variant stock changes to log as adjustments after the item is saved.
+    final pendingAdjustments = <Map<String, dynamic>>[];
     List<ItemVariante> selectedVariants = [];
     for (int i = 0; i < data.allVariants.length; i++) {
       if (_variantCheckedList[i]) {
@@ -213,11 +251,27 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
         );
 
+        // When inventory tracking is on, take the edited per-variant stock;
+        // otherwise keep whatever was there.
+        final newStock = selectedFilter.toLowerCase() == 'yes'
+            ? (double.tryParse(_variantStockControllers[i].text.trim()) ??
+                existingVariant?.stockQuantity ??
+                0.0)
+            : existingVariant?.stockQuantity;
+
+        // Log an adjustment if a tracked variant's stock actually changed.
+        if (selectedFilter.toLowerCase() == 'yes' && newStock != null) {
+          final oldStock = existingVariant?.stockQuantity ?? 0.0;
+          if (newStock != oldStock) {
+            pendingAdjustments.add({'variantId': variantId, 'old': oldStock, 'new': newStock});
+          }
+        }
+
         selectedVariants.add(ItemVariante(
             variantId: variantId,
             price: double.tryParse(priceText) ?? 0.0,
             trackInventory: existingVariant?.trackInventory,
-            stockQuantity: existingVariant?.stockQuantity));
+            stockQuantity: newStock));
       }
     }
 
@@ -271,9 +325,31 @@ class _EdititemScreenState extends State<EdititemScreen> {
       unit: _sellingMethod == SellingMethod.byWeight ? _selectedUnit : null,
     );
 
+    // Set tax directly (not via copyWith) so selecting "No Tax" (null) actually
+    // clears it — copyWith's `?? this.taxRate` would otherwise keep the old rate.
+    updateItem.taxRate = selectedTaxRate;
+
+    // Low-stock alert (only meaningful when inventory tracking is on).
+    // Set directly so turning tracking/alert off clears the override.
+    final lowStockOn =
+        selectedFilter.toLowerCase() == 'yes' && _lowStockAlertFilter == 'YES';
+    updateItem.lowStockAlertEnabled = lowStockOn;
+    updateItem.lowStockThreshold =
+        lowStockOn ? double.tryParse(_lowStockController.text.trim()) : null;
+
     AuditTrailHelper.trackEdit(updateItem, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
 
     await itemStore.updateItem(updateItem);
+
+    // Log any variant stock changes so the history & running balance stay honest.
+    for (final adj in pendingAdjustments) {
+      await StockAdjustService.logAdjustment(
+        item: updateItem,
+        variantId: adj['variantId'] as String,
+        oldStock: adj['old'] as double,
+        newStock: adj['new'] as double,
+      );
+    }
 
     if (mounted) Navigator.pop(context, true);
     } finally {
@@ -393,7 +469,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     labelText: 'Select Unit',
                     border: OutlineInputBorder(),
                   ),
-                  items: ['kg', 'gm'].map((String unit) {
+                  items: kItemUnits.map((String unit) {
                     return DropdownMenuItem<String>(
                       value: unit,
                       child: Text(unit),
@@ -507,6 +583,53 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
           const SizedBox(height: 25),
 
+          // Tax Section
+          _buildSectionHeader('Tax', Icons.percent_rounded),
+          const SizedBox(height: 15),
+          InkWell(
+            onTap: () async {
+              final result = await TaxSelectorSheet.show(
+                context,
+                selectedTaxId: selectedTaxId,
+              );
+              if (result != null) {
+                setState(() {
+                  selectedTaxId = result.id;
+                  selectedTaxRate = result.rate;
+                });
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                border: Border.all(color: AppColors.divider),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.percent_rounded, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        selectedTaxRate != null
+                            ? 'Tax: ${(selectedTaxRate! * 100).toStringAsFixed(2)}%'
+                            : 'No tax applied',
+                        style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 25),
+
           // Inventory Management Section
           _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
           const SizedBox(height: 15),
@@ -608,6 +731,72 @@ class _EdititemScreenState extends State<EdititemScreen> {
                       ),
                     ],
                   ),
+                  SizedBox(height: 12),
+                  Divider(height: 1, color: Colors.grey.shade300),
+                  SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "Low-stock alert",
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Row(
+                        children: [
+                          Transform.scale(
+                            scale: 0.8,
+                            child: Filterbutton(
+                              title: 'YES',
+                              selectedFilter: _lowStockAlertFilter,
+                              onpressed: () => setState(() => _lowStockAlertFilter = 'YES'),
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Transform.scale(
+                            scale: 0.8,
+                            child: Filterbutton(
+                              title: 'NO',
+                              selectedFilter: _lowStockAlertFilter,
+                              onpressed: () => setState(() => _lowStockAlertFilter = 'NO'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (_lowStockAlertFilter == 'YES') ...[
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Alert threshold (${_sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs'})",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        SizedBox(
+                          width: 120,
+                          child: AppTextField(
+                            controller: _lowStockController,
+                            hint: 'Default ${AppSettings.lowStockThreshold.toStringAsFixed(0)}',
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -759,6 +948,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: variants.length,
               itemBuilder: (context, index) {
+                final trackOn = selectedFilter.toLowerCase() == 'yes';
                 return Row(
                   children: [
                     Checkbox(
@@ -767,13 +957,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     ),
                     Expanded(child: Text(variants[index].name)),
                     SizedBox(
-                      width: 120,
+                      width: trackOn ? 90 : 120,
                       child: AppTextField(
                         controller: _variantPriceControllers[index],
                         hint: 'Price',
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
                     ),
+                    // Per-variant stock — only when inventory tracking is on.
+                    if (trackOn && _variantCheckedList[index]) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 90,
+                        child: AppTextField(
+                          controller: _variantStockControllers[index],
+                          hint: 'Stock',
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                    ],
                   ],
                 );
               },
