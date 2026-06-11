@@ -296,7 +296,12 @@ class RestaurantBulkImportService {
   }
 
   /// ✅ CRITICAL: Row-level validation
-  ValidationResult _validateItemRow(Map<String, dynamic> row, int rowNumber) {
+  ValidationResult _validateItemRow(
+    Map<String, dynamic> row,
+    int rowNumber,
+    Set<String> existingCodes,
+    Set<String> batchCodes,
+  ) {
     List<String> errors = [];
 
     // 1. ItemName required
@@ -347,6 +352,16 @@ class RestaurantBulkImportService {
     final allowOutOfStock = row['AllowOutOfStock']?.toString().trim() ?? '';
     if (trackInventory && allowOutOfStock.isEmpty) {
       errors.add('Row $rowNumber: AllowOutOfStock required when TrackInventory is YES');
+    }
+
+    // 7. ItemCode validation
+    final itemCode = row['ItemCode']?.toString().trim() ?? '';
+    if (itemCode.isNotEmpty) {
+      if (!RegExp(r'^\d{4,5}$').hasMatch(itemCode)) {
+        errors.add('Row $rowNumber: Item code must be 4-5 digits');
+      } else if (existingCodes.contains(itemCode) || batchCodes.contains(itemCode)) {
+        errors.add('Row $rowNumber: Item code already exists. Please enter a different code.');
+      }
     }
 
     return ValidationResult(
@@ -877,6 +892,12 @@ class RestaurantBulkImportService {
     // Get header row to map columns - STRIP ASTERISKS from required field markers
     final headers = rows[0].map((e) => e.toString().trim().replaceAll('*', '')).toList();
 
+    final Set<String> existingCodes = {
+      for (var item in itemStore.items)
+        if (item.itemCode != null && item.itemCode!.isNotEmpty) item.itemCode!
+    };
+    final Set<String> batchCodes = {};
+
     // Start from row 2 to skip the instruction row (row 1)
     for (int i = 2; i < rows.length; i++) {
       try {
@@ -901,7 +922,7 @@ class RestaurantBulkImportService {
         }
 
         // Step 1: Validate row
-        final validation = _validateItemRow(rowData, i + 1);
+        final validation = _validateItemRow(rowData, i + 1, existingCodes, batchCodes);
         if (!validation.isValid) {
           result.failedRows.add(FailedRow(
             rowNumber: i + 1,
@@ -916,6 +937,30 @@ class RestaurantBulkImportService {
         if (_itemByNameCache.containsKey(itemNameLower)) {
           result.warnings.add('Row ${i + 1}: Item "${rowData['ItemName']}" already exists, skipping');
           continue;
+        }
+
+        // Auto-generate next code if blank, or use provided
+        final itemCode = rowData['ItemCode']?.toString().trim() ?? '';
+        String finalItemCode;
+        if (itemCode.isEmpty) {
+          int maxCode = 1000;
+          for (final code in existingCodes) {
+            final val = int.tryParse(code);
+            if (val != null && val >= 1000 && val <= 99999) {
+              if (val > maxCode) maxCode = val;
+            }
+          }
+          for (final code in batchCodes) {
+            final val = int.tryParse(code);
+            if (val != null && val >= 1000 && val <= 99999) {
+              if (val > maxCode) maxCode = val;
+            }
+          }
+          finalItemCode = (maxCode + 1).toString();
+          batchCodes.add(finalItemCode);
+        } else {
+          finalItemCode = itemCode;
+          batchCodes.add(finalItemCode);
         }
 
         // Step 3: Get or create category
@@ -994,6 +1039,7 @@ class RestaurantBulkImportService {
           choiceIds: choiceIds,
           extraId: extraIds,
           imageBytes: imageBytes,
+          itemCode: finalItemCode,
           createdTime: DateTime.now(),
           lastEditedTime: DateTime.now(),
           editedBy: 'BulkImport',

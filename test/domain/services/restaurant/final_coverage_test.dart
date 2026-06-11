@@ -38,7 +38,7 @@ void main() {
   // ════════════════════════════════════════════════════════════════════════
 
   group('CartItem equality operator (==)', () {
-    test('same id + title + variant + choices → equal', () {
+    test('same title + variant + choices + price → equal', () {
       final a = makeCartItem(
         id: 'item-1',
         price: 100,
@@ -47,8 +47,8 @@ void main() {
         choiceNames: ['Spicy'],
       );
       final b = makeCartItem(
-        id: 'item-1',
-        price: 200, // different price — shouldn't matter
+        id: 'item-2', // different id - shouldn't matter
+        price: 100,
         title: 'Biryani',
         variantName: 'Large',
         choiceNames: ['Spicy'],
@@ -56,9 +56,9 @@ void main() {
       expect(a == b, isTrue);
     });
 
-    test('different id → not equal', () {
+    test('different price → not equal', () {
       final a = makeCartItem(id: 'item-1', price: 100, title: 'Biryani');
-      final b = makeCartItem(id: 'item-2', price: 100, title: 'Biryani');
+      final b = makeCartItem(id: 'item-1', price: 200, title: 'Biryani');
       expect(a == b, isFalse);
     });
 

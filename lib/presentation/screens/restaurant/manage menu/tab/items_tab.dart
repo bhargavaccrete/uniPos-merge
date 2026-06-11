@@ -177,7 +177,8 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
         // Filter items by search query and selected category
         final filteredItems = allItem.where((item) {
           final matchesQuery = query.isEmpty ||
-              item.name.toLowerCase().contains(query.toLowerCase());
+              item.name.toLowerCase().contains(query.toLowerCase()) ||
+              (item.itemCode != null && item.itemCode!.toLowerCase().contains(query.toLowerCase()));
           final matchesCategory = widget.selectedCategory == null ||
               item.categoryOfItem == widget.selectedCategory;
           return matchesQuery && matchesCategory;
@@ -269,8 +270,31 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(item.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    SizedBox(height: 2),
+                                    Text(
+                                      item.name,
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (item.itemCode != null) ...[
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '#${item.itemCode}',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 4),
                                     Text(
                                       '$categoryName  •  ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((item.price ?? 0).toDouble())}',
                                       style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
@@ -331,7 +355,8 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
         // Filter items by search query and selected category
         final filteredItems = allItem.where((item) {
           final matchesQuery = query.isEmpty ||
-              item.name.toLowerCase().contains(query.toLowerCase());
+              item.name.toLowerCase().contains(query.toLowerCase()) ||
+              (item.itemCode != null && item.itemCode!.toLowerCase().contains(query.toLowerCase()));
           final matchesCategory = widget.selectedCategory == null ||
               item.categoryOfItem == widget.selectedCategory;
           return matchesQuery && matchesCategory;
@@ -424,7 +449,12 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                         ),
                       ),
                       Expanded(
-                        child: Text(item.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          item.name,
+                          style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       Transform.scale(
                         scale: 0.7,
@@ -438,6 +468,25 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                       ),
                     ],
                   ),
+                  if (item.itemCode != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '#${item.itemCode}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 4),
                   // Category + price + actions
                   Row(
                     children: [

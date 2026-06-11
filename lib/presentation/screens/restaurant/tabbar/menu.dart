@@ -66,7 +66,9 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildFavoritesSection(List<Items> visibleItems, String query, String lowerQuery) {
     var favItems = visibleItems.where((i) => i.isFavorite).toList();
     if (query.isNotEmpty) {
-      favItems = favItems.where((i) => i.name.toLowerCase().contains(lowerQuery)).toList();
+      favItems = favItems.where((i) =>
+          i.name.toLowerCase().contains(lowerQuery) ||
+          (i.itemCode != null && i.itemCode!.toLowerCase().contains(lowerQuery))).toList();
       if (favItems.isEmpty) return const SizedBox.shrink();
     }
     if (favItems.isEmpty) {
@@ -601,7 +603,8 @@ class _MenuScreenState extends State<MenuScreen> {
                               final searchFilteredItems = query.isEmpty
                                   ? categoryItems
                                   : categoryItems.where((item) {
-                                return item.name.toLowerCase().contains(lowerQuery);
+                                return item.name.toLowerCase().contains(lowerQuery) ||
+                                    (item.itemCode != null && item.itemCode!.toLowerCase().contains(lowerQuery));
                               }).toList();
 
                               // Don't show empty categories when searching
@@ -805,7 +808,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
                         if (query.isNotEmpty) {
                           final lowerQuery = query.toLowerCase();
-                          filteredItems = filteredItems.where((item) => item.name.toLowerCase().contains(lowerQuery)).toList();
+                          filteredItems = filteredItems.where((item) =>
+                              item.name.toLowerCase().contains(lowerQuery) ||
+                              (item.itemCode != null && item.itemCode!.toLowerCase().contains(lowerQuery))).toList();
                         }
 
                         if (filteredItems.isEmpty) {
@@ -948,15 +953,38 @@ class _MenuScreenState extends State<MenuScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          item.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary,
+                              ),
+                            ),
+                            if (item.itemCode != null) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '#${item.itemCode}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1217,6 +1245,24 @@ class _ItemListTileState extends State<_ItemListTile> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(widget.item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary)),
+                      if (widget.item.itemCode != null) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '#${widget.item.itemCode}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Row(
                         children: [

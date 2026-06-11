@@ -212,13 +212,13 @@ class ImportTemplateBuilder {
   void _buildItems(Worksheet s, Style header, Style instr, Worksheet categorySource,
       Worksheet choiceSource, Worksheet extraSource) {
     _setHeaders(s, [
-      'ItemName*', 'Price*', 'CategoryName*', 'VegType*', 'Description',
+      'ItemName*', 'ItemCode', 'Price*', 'CategoryName*', 'VegType*', 'Description',
       'ImageURL', 'IsSoldByWeight', 'Unit', 'TrackInventory',
       'StockQuantity', 'AllowOutOfStock', 'TaxRate', 'IsEnabled',
       'HasVariants', 'Choice1', 'Choice2', 'Choice3', 'Extra1', 'Extra2', 'Extra3',
     ], header);
     _setInstruction(s, [
-      'Required: item name', 'Required: number only', 'Required: pick a category',
+      'Required: item name', 'Optional: unique 4-5 digit code', 'Required: number only', 'Required: pick a category',
       'Required: Veg / Non-Veg / Egg', 'Optional', 'Optional image URL',
       'Yes/No', 'kg/gm/liter/ml/piece', 'Yes/No', 'Number (0 if not tracked)',
       'Yes/No', 'Number 0-100', 'Yes/No', 'Yes/No',
@@ -226,31 +226,31 @@ class ImportTemplateBuilder {
       'Pick an extra', 'Pick an extra', 'Pick an extra',
     ], instr);
 
-    _setRow(s, 3, ['Margherita Pizza', 0, 'Pizza', 'Veg', 'Classic tomato & mozzarella', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'Crust Type', 'Spice Level', '', 'Toppings', 'Cheese Options', '']);
-    _setRow(s, 4, ['Paneer Butter Masala', 220, 'Main Course', 'Veg', 'Cottage cheese in tomato cream', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
-    _setRow(s, 5, ['Masala Chai', 40, 'Beverages', 'Veg', 'Spiced Indian tea', '', 'No', '', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '', '', '', '', '']);
+    _setRow(s, 3, ['Margherita Pizza', '1001', 0, 'Pizza', 'Veg', 'Classic tomato & mozzarella', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'Crust Type', 'Spice Level', '', 'Toppings', 'Cheese Options', '']);
+    _setRow(s, 4, ['Paneer Butter Masala', '1002', 220, 'Main Course', 'Veg', 'Cottage cheese in tomato cream', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
+    _setRow(s, 5, ['Masala Chai', '1003', 40, 'Beverages', 'Veg', 'Spiced Indian tea', '', 'No', '', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '', '', '', '', '']);
     // By-weight example — shows how Unit is used (Yes + kg).
-    _setRow(s, 6, ['Kaju Katli (per kg)', 700, 'Desserts', 'Veg', 'Cashew fudge sold by weight', '', 'Yes', 'kg', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
+    _setRow(s, 6, ['Kaju Katli (per kg)', '1004', 700, 'Desserts', 'Veg', 'Cashew fudge sold by weight', '', 'Yes', 'kg', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
 
-    // Single-value dropdowns (columns are 1-based: A=1 … T=20)
+    // Single-value dropdowns (columns are 1-based: A=1 … U=21)
     _dropdownFromRange(
       s,
-      3,
+      4,
       categorySource.getRangeByName('B3:B$_listSourceLastRow'),
       prompt: 'Pick a category (add new ones in the Categories sheet).',
       addSheet: 'Categories',
     );
-    _dropdown(s, 4, vegTypes, prompt: 'Choose Veg, Non-Veg or Egg.');
-    _dropdown(s, 7, yesNo, prompt: 'Is this item sold by weight?');
-    _dropdown(s, 8, units, prompt: 'Unit of measure.');
-    _dropdown(s, 9, yesNo, prompt: 'Track stock for this item?');
-    _dropdown(s, 11, yesNo, prompt: 'Allow selling when out of stock?');
-    _dropdown(s, 13, yesNo, prompt: 'Is this item enabled/visible?');
-    _dropdown(s, 14, yesNo, prompt: 'Does this item have sizes (variants)?');
+    _dropdown(s, 5, vegTypes, prompt: 'Choose Veg, Non-Veg or Egg.');
+    _dropdown(s, 8, yesNo, prompt: 'Is this item sold by weight?');
+    _dropdown(s, 9, units, prompt: 'Unit of measure.');
+    _dropdown(s, 10, yesNo, prompt: 'Track stock for this item?');
+    _dropdown(s, 12, yesNo, prompt: 'Allow selling when out of stock?');
+    _dropdown(s, 14, yesNo, prompt: 'Is this item enabled/visible?');
+    _dropdown(s, 15, yesNo, prompt: 'Does this item have sizes (variants)?');
 
-    // Choice columns (15-17) read LIVE from the Choices sheet name column.
+    // Choice columns (16-18) read LIVE from the Choices sheet name column.
     // Choices has an instruction row, so its data starts at row 3.
-    for (final col in [15, 16, 17]) {
+    for (final col in [16, 17, 18]) {
       _dropdownFromRange(
         s,
         col,
@@ -259,9 +259,9 @@ class ImportTemplateBuilder {
         addSheet: 'Choices',
       );
     }
-    // Extra columns (18-20) read LIVE from the Extras sheet name column.
+    // Extra columns (19-21) read LIVE from the Extras sheet name column.
     // Extras has NO instruction row, so its data starts at row 2.
-    for (final col in [18, 19, 20]) {
+    for (final col in [19, 20, 21]) {
       _dropdownFromRange(
         s,
         col,

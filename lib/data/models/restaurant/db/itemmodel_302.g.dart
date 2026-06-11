@@ -43,13 +43,16 @@ class ItemsAdapter extends TypeAdapter<Items> {
       lowStockThreshold: fields[22] as double?,
       lowStockAlertEnabled: fields[23] == null ? false : fields[23] as bool,
       isFavorite: fields[24] == null ? false : fields[24] as bool,
+      itemCode: fields[25] as String?,
+      defaultChoiceOptionIds: (fields[26] as List?)?.cast<String>(),
+      taxIds: (fields[27] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Items obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -99,7 +102,13 @@ class ItemsAdapter extends TypeAdapter<Items> {
       ..writeByte(23)
       ..write(obj.lowStockAlertEnabled)
       ..writeByte(24)
-      ..write(obj.isFavorite);
+      ..write(obj.isFavorite)
+      ..writeByte(25)
+      ..write(obj.itemCode)
+      ..writeByte(26)
+      ..write(obj.defaultChoiceOptionIds)
+      ..writeByte(27)
+      ..write(obj.taxIds);
   }
 
   @override

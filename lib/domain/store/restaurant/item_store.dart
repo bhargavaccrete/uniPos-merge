@@ -54,7 +54,9 @@ abstract class _ItemStore with Store {
     if (searchQuery.isNotEmpty) {
       final lowercaseQuery = searchQuery.toLowerCase();
       result = result
-          .where((item) => item.name.toLowerCase().contains(lowercaseQuery))
+          .where((item) =>
+              item.name.toLowerCase().contains(lowercaseQuery) ||
+              (item.itemCode != null && item.itemCode!.toLowerCase().contains(lowercaseQuery)))
           .toList();
     }
 
@@ -158,6 +160,15 @@ abstract class _ItemStore with Store {
         return false;
       }
 
+      // Duplicate item code guard
+      if (item.itemCode != null && item.itemCode!.isNotEmpty) {
+        final duplicateCode = items.any((i) => i.itemCode == item.itemCode);
+        if (duplicateCode) {
+          errorMessage = 'Item code already exists. Please enter a different code.';
+          return false;
+        }
+      }
+
       await _repository.addItem(item);
       items.add(item);
 
@@ -177,6 +188,15 @@ abstract class _ItemStore with Store {
     try {
       isLoading = true;
       errorMessage = null;
+
+      // Duplicate item code guard for update
+      if (item.itemCode != null && item.itemCode!.isNotEmpty) {
+        final duplicateCode = items.any((i) => i.itemCode == item.itemCode && i.id != item.id);
+        if (duplicateCode) {
+          errorMessage = 'Item code already exists. Please enter a different code.';
+          return false;
+        }
+      }
 
       await _repository.updateItem(item);
 
@@ -356,5 +376,21 @@ abstract class _ItemStore with Store {
   @action
   Future<void> refresh() async {
     await loadItems();
+  }
+
+  /// Generate next numeric item code (e.g. starting at 1001)
+  String generateNextItemCode() {
+    int maxCode = 1000;
+    for (var item in items) {
+      if (item.itemCode != null) {
+        final codeInt = int.tryParse(item.itemCode!);
+        if (codeInt != null && codeInt >= 1000 && codeInt <= 99999) {
+          if (codeInt > maxCode) {
+            maxCode = codeInt;
+          }
+        }
+      }
+    }
+    return (maxCode + 1).toString();
   }
 }

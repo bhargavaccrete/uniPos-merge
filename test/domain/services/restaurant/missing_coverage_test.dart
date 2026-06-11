@@ -325,16 +325,15 @@ void main() {
       expect(item.isInStock, isFalse);
     });
 
-    test('with variants: variant not tracking inventory → always in stock', () {
+    test('with variants: variant not tracking inventory does not bypass parent stock limit → out of stock', () {
       final item = makeTestItem(
         trackInventory: true,
         stockQuantity: 0,
         variants: [
           ItemVariante(variantId: 'v1', price: 100, trackInventory: false, stockQuantity: 0),
-          // trackInventory=false → isInStock=true regardless of quantity
         ],
       );
-      expect(item.isInStock, isTrue);
+      expect(item.isInStock, isFalse);
     });
   });
 

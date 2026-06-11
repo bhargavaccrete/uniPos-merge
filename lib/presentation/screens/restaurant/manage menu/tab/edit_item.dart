@@ -20,6 +20,7 @@ import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart
 import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
+import '../../item/default_choice_picker.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import 'edit_category.dart';
@@ -57,11 +58,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
   late TextEditingController _itemPriceController;
   late TextEditingController _descController;
   late TextEditingController _lowStockController;
+  late TextEditingController _itemCodeController;
   late String selectedCategoryId;
   late String selectedIMGCategory;
 
-  // Tax selection (taxRate is a decimal, e.g. 0.18 for 18%)
-  String? selectedTaxId;
+  // Tax selection — multiple taxes allowed; selectedTaxRate is their summed total.
+  List<String> selectedTaxIds = [];
   double? selectedTaxRate;
 
   Uint8List? _selectedImageBytes;
@@ -82,6 +84,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // For managing choice selections
   late List<bool> _choiceCheckedList;
+  // Per-item default-selected choice options (pre-ticked in the POS).
+  List<String> _defaultChoiceOptionIds = [];
 
   late List<bool> _extraCheckedList;
   Map<String, Map<String, TextEditingController>> _extraConstraintControllers = {}; // extraId -> {min, max}
@@ -98,6 +102,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _nameController = TextEditingController(text: widget.items.name);
     _itemPriceController = TextEditingController(text: widget.items.price?.toString() ?? '');
     _descController = TextEditingController(text: widget.items.description ?? '');
+    _itemCodeController = TextEditingController(text: widget.items.itemCode ?? '');
     final lowStock = widget.items.lowStockThreshold;
     _lowStockController = TextEditingController(
       text: lowStock == null
@@ -108,6 +113,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     selectedCategoryId = widget.items.categoryOfItem ?? '';
     selectedIMGCategory = widget.items.isVeg ?? 'Veg';
     selectedTaxRate = widget.items.taxRate;
+    selectedTaxIds = List<String>.from(widget.items.taxIds ?? const []);
 
     // ✅ ADDED: Initialize selling method based on existing item
     _sellingMethod = widget.items.isSoldByWeight == true ? SellingMethod.byWeight : SellingMethod.byUnit;
@@ -157,6 +163,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _choiceCheckedList = List.generate(allChoices.length, (index) {
       return widget.items.choiceIds?.contains(allChoices[index].id) ?? false;
     });
+    _defaultChoiceOptionIds =
+        List<String>.from(widget.items.defaultChoiceOptionIds ?? const []);
 
     _extraCheckedList = List.generate(allExtra.length, (index){
       return widget.items.extraId?.contains(allExtra[index].Id) ?? false;
@@ -195,6 +203,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _itemPriceController.dispose();
     _descController.dispose();
     _lowStockController.dispose();
+    _itemCodeController.dispose();
 
     // Dispose variant price controllers
     for (var controller in _variantStockControllers) {
@@ -219,6 +228,22 @@ class _EdititemScreenState extends State<EdititemScreen> {
       NotificationService.instance.showError('Item name cannot be empty');
       return;
     }
+    
+    final itemCode = _itemCodeController.text.trim();
+    if (itemCode.isEmpty) {
+      NotificationService.instance.showError('Item code cannot be empty');
+      return;
+    }
+    if (!RegExp(r'^\d{4,5}$').hasMatch(itemCode)) {
+      NotificationService.instance.showError('Item code must be 4-5 digits');
+      return;
+    }
+    final duplicateCode = itemStore.items.any((i) => i.itemCode == itemCode && i.id != widget.items.id);
+    if (duplicateCode) {
+      NotificationService.instance.showError('Item code already exists. Please enter a different code.');
+      return;
+    }
+
     if (_isSaving) return;
     setState(() => _isSaving = true);
 
@@ -317,17 +342,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
       imageBytes: finalImageBytes,
       variant: selectedVariants,
       choiceIds: selectedChoiceIds,
+      defaultChoiceOptionIds: _defaultChoiceOptionIds,
       extraId: selectedExtraId,
       extraConstraints: extraConstraints.isNotEmpty ? extraConstraints : null,
       trackInventory: selectedFilter.toLowerCase() == 'yes',
       allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
       isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
       unit: _sellingMethod == SellingMethod.byWeight ? _selectedUnit : null,
+      itemCode: itemCode,
     );
 
     // Set tax directly (not via copyWith) so selecting "No Tax" (null) actually
     // clears it — copyWith's `?? this.taxRate` would otherwise keep the old rate.
     updateItem.taxRate = selectedTaxRate;
+    updateItem.taxIds = selectedTaxIds;
 
     // Low-stock alert (only meaningful when inventory tracking is on).
     // Set directly so turning tracking/alert off clears the override.
@@ -424,6 +452,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
             controller: _nameController,
             label: 'Item Name',
             icon: Icons.label_outline,
+          ),
+          const SizedBox(height: 15),
+          AppTextField(
+            controller: _itemCodeController,
+            label: 'Item Code',
+            icon: Icons.qr_code_scanner_rounded,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
           ),
           const SizedBox(height: 25),
 
@@ -590,12 +628,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
             onTap: () async {
               final result = await TaxSelectorSheet.show(
                 context,
-                selectedTaxId: selectedTaxId,
+                selectedTaxIds: selectedTaxIds,
               );
               if (result != null) {
                 setState(() {
-                  selectedTaxId = result.id;
-                  selectedTaxRate = result.rate;
+                  selectedTaxIds = result.ids;
+                  selectedTaxRate = result.rate == 0 ? null : result.rate;
                 });
               }
             },
@@ -861,6 +899,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ],
           if (data.allVariants.isNotEmpty) _buildVariantSection(data.allVariants),
           if (data.allChoices.isNotEmpty) _buildChoiceSection(data.allChoices),
+          if (data.allChoices.isNotEmpty && _choiceCheckedList.contains(true))
+            _buildDefaultSelectionButton(data.allChoices),
           if(data.allExtra.isNotEmpty) _buildExtrtaSection(data.allExtra),
           const SizedBox(height: 30),
           // Save Button
@@ -984,6 +1024,71 @@ class _EdititemScreenState extends State<EdititemScreen> {
         ),
       ),
     );
+  }
+
+  /// Tappable card to set this item's default-selected choice options.
+  Widget _buildDefaultSelectionButton(List<ChoicesModel> allChoices) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () => _pickItemDefaults(allChoices),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.divider),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.task_alt_outlined, color: AppColors.primary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Default Selection',
+                        style: GoogleFonts.poppins(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text('Pre-tick choice options for this item',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              if (_defaultChoiceOptionIds.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Text('${_defaultChoiceOptionIds.length}',
+                      style: GoogleFonts.poppins(
+                          color: Colors.white, fontSize: 12)),
+                ),
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_ios,
+                  size: 14, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickItemDefaults(List<ChoicesModel> allChoices) async {
+    // Choice groups currently ticked for this item.
+    final selectedChoiceIds = <String>[];
+    for (int i = 0; i < allChoices.length; i++) {
+      if (i < _choiceCheckedList.length && _choiceCheckedList[i]) {
+        selectedChoiceIds.add(allChoices[i].id);
+      }
+    }
+    final result = await showDefaultChoicePicker(
+        context, selectedChoiceIds, _defaultChoiceOptionIds);
+    if (result != null && mounted) {
+      setState(() => _defaultChoiceOptionIds = result);
+    }
   }
 
   // Helper widget for building the choices section

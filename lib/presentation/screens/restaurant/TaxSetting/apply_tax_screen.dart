@@ -62,7 +62,9 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     // 2. Search filter (case-insensitive name match)
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      result = result.where((item) => item.name.toLowerCase().contains(query)).toList();
+      result = result.where((item) =>
+          item.name.toLowerCase().contains(query) ||
+          (item.itemCode != null && item.itemCode!.toLowerCase().contains(query))).toList();
     }
 
     return result;

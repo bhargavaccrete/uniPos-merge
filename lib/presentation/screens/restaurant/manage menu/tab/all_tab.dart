@@ -114,7 +114,8 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
                           // Show category only if it has items matching the query
                           final matchingItems = catItems
                               .where((item) =>
-                                  item.name.toLowerCase().contains(queryLower))
+                                  item.name.toLowerCase().contains(queryLower) ||
+                                  (item.itemCode != null && item.itemCode!.toLowerCase().contains(queryLower)))
                               .toList();
                           if (matchingItems.isNotEmpty) {
                             categoryItemsMap[category.id] = matchingItems;

@@ -54,6 +54,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   // Required Fields
   final _itemNameController = TextEditingController();
   final _priceController = TextEditingController();
+  final _itemCodeController = TextEditingController();
   String? _selectedCategoryId;
   String? _selectedCategoryName;
 
@@ -81,10 +82,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   List<ItemVariante> _selectedVariants = [];
   List<String> _selectedChoiceIds = [];
   List<String> _selectedExtraIds = [];
+  List<String> _defaultChoiceOptionIds = []; // per-item default-selected choice options
 
   // Tax selection - SINGLE TAX ONLY
   List<Tax> _availableTaxes = [];
-  String? _selectedTaxId; // Changed from List to single nullable String
+  List<String> _selectedTaxIds = []; // multiple taxes allowed (summed)
   bool _didLoadDependencies = false; // Guard to prevent excessive reloading
 
   // Focus nodes for keyboard tab-order
@@ -92,6 +94,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   final _priceFocusNode = FocusNode();
   final _descriptionFocusNode = FocusNode();
   final _stockFocusNode = FocusNode();
+  final _codeFocusNode = FocusNode();
 
   // Double-tap guard
   bool _isSaving = false;
@@ -110,6 +113,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     super.initState();
     _loadItemCount();
     _loadTaxes();
+    _itemCodeController.text = itemStore.generateNextItemCode();
   }
 
   @override
@@ -130,10 +134,12 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     _descriptionController.dispose();
     _stockController.dispose();
     _lowStockController.dispose();
+    _itemCodeController.dispose();
     _nameFocusNode.dispose();
     _priceFocusNode.dispose();
     _descriptionFocusNode.dispose();
     _stockFocusNode.dispose();
+    _codeFocusNode.dispose();
     super.dispose();
   }
 
@@ -271,6 +277,18 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       errors.add('Category is required');
     }
 
+    final itemCode = _itemCodeController.text.trim();
+    if (itemCode.isEmpty) {
+      errors.add('Item Code is required');
+    } else if (!RegExp(r'^\d{4,5}$').hasMatch(itemCode)) {
+      errors.add('Item Code must be 4-5 digits');
+    } else {
+      final duplicateCode = itemStore.items.any((i) => i.itemCode == itemCode);
+      if (duplicateCode) {
+        errors.add('Item code already exists. Please enter a different code.');
+      }
+    }
+
     // Unit is always set (defaults to 'kg') so no validation needed
 
     return errors;
@@ -348,6 +366,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             'variants': _selectedVariants.map((v) => v.toMap()).toList(),
             'choiceIds': _selectedChoiceIds,
             'extraIds': _selectedExtraIds,
+            'defaultChoiceOptionIds': _defaultChoiceOptionIds,
             'trackInventory': _trackInventory,
           },
         ),
@@ -363,6 +382,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         }
         _selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
         _selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
+        _defaultChoiceOptionIds =
+            List<String>.from(result['defaultChoiceOptionIds'] ?? []);
       });
     }
   }
@@ -374,50 +395,30 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     FocusScope.of(context).unfocus();
     final result = await TaxSelectorSheet.show(
       context,
-      selectedTaxId: _selectedTaxId,
+      selectedTaxIds: _selectedTaxIds,
     );
     if (result != null) {
       // Reload so a tax added inside the picker is found by rate/name lookups.
       await _loadTaxes();
       if (mounted) {
-        setState(() => _selectedTaxId = result.id);
+        setState(() => _selectedTaxIds = result.ids);
       }
     }
   }
 
   // ============ CALCULATE TAX RATE - SINGLE TAX ONLY ============
 
-  /// Calculate tax rate from selected tax ID (SINGLE TAX)
-  Future<double> _calculateTotalTaxRate() async {
-    if (_selectedTaxId == null) return 0.0;
+  /// Summed decimal rate of all selected taxes (5% + 12% -> 0.17).
+  Future<double> _calculateTotalTaxRate() async =>
+      _calculateTotalTaxPercentage() / 100.0;
 
-    try {
-      final tax = _availableTaxes.firstWhere(
-        (t) => t.id == _selectedTaxId,
-        orElse: () => Tax(id: '', taxname: '', taxperecentage: 0),
-      );
-
-      if (tax.id.isNotEmpty && tax.taxperecentage != null) {
-        final taxRate = tax.taxperecentage!;
-        return taxRate / 100; // Convert percentage to decimal (5% -> 0.05)
-      }
-
-      return 0.0;
-    } catch (e) {
-      return 0.0;
-    }
-  }
-
-  /// Calculate tax percentage (synchronous version for UI) - SINGLE TAX
+  /// Summed percentage of all selected taxes (5% + 12% -> 17), for the UI.
   double _calculateTotalTaxPercentage() {
-    if (_selectedTaxId == null) return 0.0;
-
-    final tax = _availableTaxes.firstWhere(
-      (t) => t.id == _selectedTaxId,
-      orElse: () => Tax(id: '', taxname: '', taxperecentage: 0),
-    );
-
-    return tax.taxperecentage ?? 0.0;
+    double sum = 0;
+    for (final t in _availableTaxes) {
+      if (_selectedTaxIds.contains(t.id)) sum += (t.taxperecentage ?? 0);
+    }
+    return sum;
   }
 
   // ============ SAVE ITEM ============
@@ -489,8 +490,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         variant: _selectedVariants,
         choiceIds: _selectedChoiceIds,
         extraId: _selectedExtraIds,
-        taxRate: taxRate > 0 ? taxRate : null, // Apply calculated tax rate
+        defaultChoiceOptionIds: _defaultChoiceOptionIds,
+        taxRate: taxRate > 0 ? taxRate : null, // summed total of taxIds
+        taxIds: _selectedTaxIds,
         isEnabled: true,
+        itemCode: _itemCodeController.text.trim(),
         createdTime: DateTime.now(),
         editCount: 0,
       );
@@ -564,8 +568,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       _allowOrderWhenOutOfStock = false;
       _selectedVariants = [];
       _selectedChoiceIds = [];
+      _defaultChoiceOptionIds = [];
+      _selectedTaxIds = [];
       _selectedExtraIds = [];
-      _selectedTaxId = null; // Reset single tax selection
+      _itemCodeController.text = itemStore.generateNextItemCode();
     });
   }
 
@@ -838,6 +844,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             hint: 'e.g., Margherita Pizza',
             icon: Icons.restaurant_menu_rounded,
             required: true,
+            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_codeFocusNode),
+          ),
+          const SizedBox(height: 15),
+
+          // Item Code (Required)
+          AppTextField(
+            controller: _itemCodeController,
+            focusNode: _codeFocusNode,
+            label: 'Item Code',
+            hint: 'e.g., 100021',
+            icon: Icons.qr_code_scanner_rounded,
+            required: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
             onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_priceFocusNode),
           ),
           const SizedBox(height: 15),
@@ -1200,7 +1222,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Widget _buildTaxSection() {
-    final rate = _selectedTaxId != null ? _calculateTotalTaxPercentage() / 100 : null;
+    final rate = _selectedTaxIds.isNotEmpty ? _calculateTotalTaxPercentage() / 100 : null;
     return TaxSelectorButton(taxRate: rate, onTap: _selectTax);
   }
 

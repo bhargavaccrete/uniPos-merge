@@ -8,6 +8,7 @@ import 'variant_selection_screen.dart';
 import 'choice_selection_screen.dart';
 import 'extra_selection_screen.dart';
 import 'tax_selection_screen.dart';
+import 'default_choice_picker.dart';
 class AddMoreInfoScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
 
@@ -24,6 +25,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
   List<Map<String, dynamic>> selectedVariants = [];
   List<String> selectedChoiceIds = [];
   List<String> selectedExtraIds = [];
+  List<String> defaultChoiceOptionIds = []; // per-item default-selected choice options
   String? selectedTaxId;
   double? selectedTaxRate;
   bool _trackInventory = false;
@@ -38,6 +40,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
       selectedVariants = List<Map<String, dynamic>>.from(itemData['variants'] ?? []);
       selectedChoiceIds = List<String>.from(itemData['choiceIds'] ?? []);
       selectedExtraIds = List<String>.from(itemData['extraIds'] ?? []);
+      defaultChoiceOptionIds = List<String>.from(itemData['defaultChoiceOptionIds'] ?? []);
       selectedTaxId = itemData['taxId'];
       selectedTaxRate = itemData['taxRate'];
       _trackInventory = itemData['trackInventory'] == true;
@@ -57,7 +60,8 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -120,6 +124,18 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
 
             SizedBox(height: 20),
 
+            // Default Selection — only meaningful once choice groups are attached.
+            if (selectedChoiceIds.isNotEmpty) ...[
+              _buildOptionCard(
+                icon: Icons.task_alt_outlined,
+                title: 'Default Selection',
+                description: 'Pre-tick choice options this item normally comes with',
+                count: defaultChoiceOptionIds.length,
+                onTap: _pickDefaults,
+              ),
+              SizedBox(height: 20),
+            ],
+
             // Add Extras Option
             _buildOptionCard(
               icon: Icons.add_circle_outline,
@@ -172,7 +188,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
               },
             ),*/
 
-            Spacer(),
+            SizedBox(height: 30),
 
             // Bottom Buttons
             Row(
@@ -184,6 +200,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                       'variants': selectedVariants,
                       'choiceIds': selectedChoiceIds,
                       'extraIds': selectedExtraIds,
+                      'defaultChoiceOptionIds': defaultChoiceOptionIds,
                       'taxId': selectedTaxId,
                       'taxRate': selectedTaxRate,
                     }),
@@ -208,6 +225,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                       'variants': selectedVariants,
                       'choiceIds': selectedChoiceIds,
                       'extraIds': selectedExtraIds,
+                      'defaultChoiceOptionIds': defaultChoiceOptionIds,
                       'taxId': selectedTaxId,
                       'taxRate': selectedTaxRate,
                       'shouldSave': true,
@@ -228,8 +246,18 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
             SizedBox(height: 20),
           ],
         ),
+        ),
       ),
     );
+  }
+
+  /// Opens the shared picker to choose this item's default choice options.
+  Future<void> _pickDefaults() async {
+    final result = await showDefaultChoicePicker(
+        context, selectedChoiceIds, defaultChoiceOptionIds);
+    if (result != null && mounted) {
+      setState(() => defaultChoiceOptionIds = result);
+    }
   }
 
   Widget _buildTaxCard({

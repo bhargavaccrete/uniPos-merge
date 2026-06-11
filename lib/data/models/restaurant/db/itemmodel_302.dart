@@ -88,6 +88,15 @@ class Items extends HiveObject {
   @HiveField(24, defaultValue: false)
   bool isFavorite; // Pinned to the "Favorites" tab in the POS menu
 
+  @HiveField(25)
+  String? itemCode;
+
+  @HiveField(26)
+  List<String>? defaultChoiceOptionIds; // per-item default-selected choice option IDs
+
+  @HiveField(27)
+  List<String>? taxIds; // IDs of the taxes applied; taxRate holds their summed total
+
   Items({
     required this.id,
     required this.name,
@@ -114,6 +123,9 @@ class Items extends HiveObject {
     this.lowStockThreshold,
     this.lowStockAlertEnabled = false,
     this.isFavorite = false,
+    this.itemCode,
+    this.defaultChoiceOptionIds,
+    this.taxIds,
   });
 
 // --- ADJUSTED HELPER LOGIC ---
@@ -208,6 +220,9 @@ class Items extends HiveObject {
     double? lowStockThreshold,
     bool? lowStockAlertEnabled,
     bool? isFavorite,
+    String? itemCode,
+    List<String>? defaultChoiceOptionIds,
+    List<String>? taxIds,
   }) {
     return Items(
       id: id ?? this.id,
@@ -235,6 +250,9 @@ class Items extends HiveObject {
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       lowStockAlertEnabled: lowStockAlertEnabled ?? this.lowStockAlertEnabled,
       isFavorite: isFavorite ?? this.isFavorite,
+      itemCode: itemCode ?? this.itemCode,
+      defaultChoiceOptionIds: defaultChoiceOptionIds ?? this.defaultChoiceOptionIds,
+      taxIds: taxIds ?? this.taxIds,
     );
   }
 
@@ -266,6 +284,9 @@ class Items extends HiveObject {
       'lowStockThreshold': lowStockThreshold,
       'lowStockAlertEnabled': lowStockAlertEnabled,
       'isFavorite': isFavorite,
+      'itemCode': itemCode,
+      'defaultChoiceOptionIds': defaultChoiceOptionIds,
+      'taxIds': taxIds,
     };
   }
 
@@ -352,6 +373,10 @@ class Items extends HiveObject {
       lowStockThreshold: (map['lowStockThreshold'] as num?)?.toDouble(),
       lowStockAlertEnabled: (map['lowStockAlertEnabled'] as bool?) ?? false,
       isFavorite: (map['isFavorite'] as bool?) ?? false,
+      itemCode: map['itemCode']?.toString(),
+      defaultChoiceOptionIds:
+          (map['defaultChoiceOptionIds'] as List?)?.map((e) => e.toString()).toList(),
+      taxIds: (map['taxIds'] as List?)?.map((e) => e.toString()).toList(),
     );
   }
 }

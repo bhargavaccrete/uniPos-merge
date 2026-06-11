@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/models/restaurant/db/staffModel_310.dart';
 
@@ -38,13 +38,40 @@ class RestaurantSession {
   /// Fires true when the session expires due to inactivity.
   static final ValueNotifier<bool> sessionExpiredNotifier = ValueNotifier(false);
 
-  /// Resets the 15-minute inactivity timer. Called on every user touch via RestaurantGuard.
+  /// Resets the inactivity timer. Called on every user touch via RestaurantGuard.
   /// When the timer fires, sessionExpiredNotifier triggers a forced logout.
   static void resetInactivityTimer() {
     _inactivityTimer?.cancel();
     _inactivityTimer = Timer(_timeoutDuration, () {
       sessionExpiredNotifier.value = true;
     });
+  }
+
+  // ── App lifecycle ─────────────────────────────────────────────────────────
+  // Background time does NOT count toward auto-logout. Without this, a plain
+  // Timer keeps its deadline across a suspend and FIRES IMMEDIATELY on resume,
+  // logging the user out the instant they reopen the app.
+  static final _SessionLifecycleObserver _lifecycleObserver =
+      _SessionLifecycleObserver();
+  static bool _lifecycleRegistered = false;
+
+  /// Registers app pause/resume handling. Call once after the binding is ready.
+  static void initLifecycle() {
+    if (_lifecycleRegistered) return;
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
+    _lifecycleRegistered = true;
+  }
+
+  /// App went to the background → stop the timer so it can't fire or flush on
+  /// resume. (Background time is intentionally not counted.)
+  static void _onAppBackgrounded() {
+    _inactivityTimer?.cancel();
+  }
+
+  /// App returned to the foreground → treat it as fresh activity: restart the
+  /// full inactivity window. Never logs out just for having been backgrounded.
+  static void _onAppResumed() {
+    if (_isLoggedIn) resetInactivityTimer();
   }
 
   static final ValueNotifier<String>  loginTypeNotifier = ValueNotifier('admin');
@@ -86,6 +113,7 @@ class RestaurantSession {
     loginTypeNotifier.value = 'admin';
     staffRoleNotifier.value = null;
     staffNameNotifier.value = null;
+    sessionExpiredNotifier.value = false; // clear any stale expiry flag
     resetInactivityTimer();
   }
 
@@ -100,6 +128,7 @@ class RestaurantSession {
     loginTypeNotifier.value = 'staff';
     staffRoleNotifier.value = staff.isCashier;
     staffNameNotifier.value = name;
+    sessionExpiredNotifier.value = false; // clear any stale expiry flag
     resetInactivityTimer();
   }
 
@@ -165,5 +194,24 @@ class RestaurantSession {
     }
     // Other staff roles: orders only
     return feature == 'startOrder';
+  }
+}
+
+/// Observes app pause/resume so background time isn't counted as inactivity.
+class _SessionLifecycleObserver extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        RestaurantSession._onAppBackgrounded();
+        break;
+      case AppLifecycleState.resumed:
+        RestaurantSession._onAppResumed();
+        break;
+      case AppLifecycleState.inactive:
+        break; // transient (app switcher / dialog) — ignore
+    }
   }
 }

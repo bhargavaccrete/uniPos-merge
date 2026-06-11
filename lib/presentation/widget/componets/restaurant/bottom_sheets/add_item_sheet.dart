@@ -2,6 +2,7 @@
 
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -418,6 +419,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return [
       _buildItemNameField(),
       const SizedBox(height: 14),
+      _buildItemCodeField(),
+      const SizedBox(height: 14),
       _buildSellingMethodSelector(),
       const SizedBox(height: 14),
       _buildPriceField(),
@@ -460,6 +463,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
       hint: 'e.g. Margherita Pizza',
       icon: Icons.fastfood_outlined,
       required: true,
+    );
+  }
+
+  Widget _buildItemCodeField() {
+    return AppTextField(
+      controller: _formState.itemCodeController,
+      label: 'Item Code',
+      hint: 'e.g. 100021',
+      icon: Icons.qr_code_scanner_rounded,
+      required: true,
+      keyboardType: TextInputType.number,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+      ],
     );
   }
 
@@ -547,10 +564,10 @@ class _AddItemSheetState extends State<AddItemSheet> {
     FocusScope.of(context).unfocus();
     final result = await TaxSelectorSheet.show(
       context,
-      selectedTaxId: _formState.selectedTaxId,
+      selectedTaxIds: _formState.selectedTaxIds,
     );
     if (result != null) {
-      setState(() => _formState.setTax(result.id, result.rate));
+      setState(() => _formState.setTaxes(result.ids, result.rate));
     }
   }
 

@@ -8,25 +8,25 @@ import '../../../../../domain/services/restaurant/notification_service.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 
-/// Result from tax selection. [rate] is a decimal (0.18 for 18%);
-/// both null means "No Tax".
+/// Result from tax selection. Multiple taxes can be applied; [rate] is the
+/// SUMMED decimal rate (0.17 for 5% + 12%). Empty [ids] / rate 0 means "No Tax".
 class TaxSelectionResult {
-  final String? id;
-  final double? rate;
+  final List<String> ids;
+  final double rate;
 
-  TaxSelectionResult({this.id, this.rate});
+  TaxSelectionResult({this.ids = const [], this.rate = 0});
 }
 
-/// Bottom sheet for selecting a tax — mirrors [CategorySelectorSheet] so the
-/// add/edit item forms feel consistent.
+/// Bottom sheet for selecting one OR MORE taxes — mirrors [CategorySelectorSheet]
+/// so the add/edit item forms feel consistent.
 class TaxSelectorSheet extends StatefulWidget {
-  final String? selectedTaxId;
+  final List<String> selectedTaxIds;
 
-  const TaxSelectorSheet({super.key, this.selectedTaxId});
+  const TaxSelectorSheet({super.key, this.selectedTaxIds = const []});
 
   static Future<TaxSelectionResult?> show(
     BuildContext context, {
-    String? selectedTaxId,
+    List<String> selectedTaxIds = const [],
   }) {
     return showModalBottomSheet<TaxSelectionResult>(
       context: context,
@@ -35,7 +35,7 @@ class TaxSelectorSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => TaxSelectorSheet(selectedTaxId: selectedTaxId),
+      builder: (_) => TaxSelectorSheet(selectedTaxIds: selectedTaxIds),
     );
   }
 
@@ -46,10 +46,12 @@ class TaxSelectorSheet extends StatefulWidget {
 class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
   List<Tax> _taxes = [];
   bool _isLoading = true;
+  late Set<String> _selected; // currently-ticked tax IDs
 
   @override
   void initState() {
     super.initState();
+    _selected = {...widget.selectedTaxIds};
     _loadTaxes();
   }
 
@@ -58,18 +60,45 @@ class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
     if (!mounted) return;
     setState(() {
       _taxes = taxStore.taxes.toList();
+      // Drop any selected IDs that no longer exist.
+      final valid = _taxes.map((t) => t.id).toSet();
+      _selected = _selected.where(valid.contains).toSet();
       _isLoading = false;
     });
   }
 
-  void _select(String? id, double? percentage) {
+  /// Toggle a tax. id == null is the "No Tax" row → clears everything.
+  void _toggle(String? id) {
+    setState(() {
+      if (id == null) {
+        _selected.clear();
+      } else if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  /// Apply: pop the selected IDs plus their summed decimal rate.
+  void _apply() {
+    double sum = 0;
+    for (final t in _taxes) {
+      if (_selected.contains(t.id)) sum += (t.taxperecentage ?? 0) / 100.0;
+    }
     Navigator.pop(
       context,
-      TaxSelectionResult(
-        id: id,
-        rate: percentage != null ? percentage / 100.0 : null,
-      ),
+      TaxSelectionResult(ids: _selected.toList(), rate: sum),
     );
+  }
+
+  /// Total selected percentage (e.g. 17 for 5% + 12%), for the Apply label.
+  double _selectedPercent() {
+    double sum = 0;
+    for (final t in _taxes) {
+      if (_selected.contains(t.id)) sum += (t.taxperecentage ?? 0);
+    }
+    return sum;
   }
 
   @override
@@ -120,7 +149,10 @@ class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
                       Text('Select Tax',
                           style: GoogleFonts.poppins(
                               fontSize: 16, fontWeight: FontWeight.w600)),
-                      Text('${_taxes.length} tax rate${_taxes.length == 1 ? '' : 's'} available',
+                      Text(
+                          _selected.isEmpty
+                              ? 'Tap to apply one or more taxes'
+                              : '${_selected.length} selected · ${_selectedPercent().toStringAsFixed(_selectedPercent() % 1 == 0 ? 0 : 2)}% total',
                           style: GoogleFonts.poppins(
                               fontSize: 12, color: Colors.grey.shade500)),
                     ],
@@ -156,7 +188,7 @@ class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
                       id: null,
                       name: 'No Tax',
                       percentage: null,
-                      isSelected: widget.selectedTaxId == null,
+                      isSelected: _selected.isEmpty,
                     );
                   }
                   final tax = _taxes[i - 1];
@@ -164,32 +196,55 @@ class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
                     id: tax.id,
                     name: tax.taxname,
                     percentage: tax.taxperecentage,
-                    isSelected: widget.selectedTaxId == tax.id,
+                    isSelected: _selected.contains(tax.id),
                   );
                 },
               ),
             ),
 
-          // Add New Tax button
+          // Add New Tax + Apply
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _showAddTaxDialog,
-                icon: const Icon(Icons.add_circle_outline, size: 18),
-                label: Text('Add New Tax',
-                    style: GoogleFonts.poppins(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _showAddTaxDialog,
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: Text('Add Tax',
+                        style: GoogleFonts.poppins(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _apply,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      _selected.isEmpty
+                          ? 'Apply'
+                          : 'Apply ${_selectedPercent().toStringAsFixed(_selectedPercent() % 1 == 0 ? 0 : 2)}%',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -204,7 +259,7 @@ class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
     required bool isSelected,
   }) {
     return InkWell(
-      onTap: () => _select(id, percentage),
+      onTap: () => _toggle(id),
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -369,8 +424,11 @@ class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
               );
               await taxStore.addTax(newTax);
               if (ctx.mounted) Navigator.pop(ctx);
-              // Auto-select the newly added tax and close the sheet.
-              if (mounted) _select(newTax.id, percentage);
+              // Auto-tick the newly added tax; keep the sheet open for more.
+              if (mounted) {
+                setState(() => _selected.add(newTax.id));
+                _loadTaxes();
+              }
             },
             child: Text('Add Tax',
                 style: GoogleFonts.poppins(color: Colors.white)),

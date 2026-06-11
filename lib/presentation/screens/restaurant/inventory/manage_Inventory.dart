@@ -939,7 +939,9 @@ class _ManageInventoryState extends State<ManageInventory> {
                             item.categoryOfItem == category.id &&
                             item.trackInventory == true &&
                             (!_showLowStockOnly || _isAlertItem(item)) &&
-                            (_searchQuery.isEmpty || item.name.toLowerCase().contains(_searchQuery)))
+                            (_searchQuery.isEmpty ||
+                             item.name.toLowerCase().contains(_searchQuery) ||
+                             (item.itemCode != null && item.itemCode!.toLowerCase().contains(_searchQuery))))
                         .toList();
 
                     if (categoryItems.isEmpty) {

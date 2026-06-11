@@ -137,6 +137,9 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   Future<void> _prepareChoices() async {
     if (widget.item.choiceIds == null || widget.item.choiceIds!.isEmpty) return;
 
+    // Per-item default-selected options (pre-ticked, still changeable).
+    final defaults = widget.item.defaultChoiceOptionIds ?? const <String>[];
+
     // Deduplicate choice IDs to prevent same choice group showing twice
     for (String choiceId in widget.item.choiceIds!.toSet()) {
       // Use store instead of direct Hive access
@@ -144,7 +147,10 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
       if (choiceGroup != null) {
         _displayChoiceGroups.add(choiceGroup);
-      } else {
+        // Pre-select this item's defaults that belong to this group.
+        for (final opt in choiceGroup.choiceOption) {
+          if (defaults.contains(opt.id)) _selectedChoices.add(opt);
+        }
       }
     }
   }

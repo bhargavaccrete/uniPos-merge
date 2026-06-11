@@ -139,6 +139,7 @@ Future<void> _initializeApp() async {
       CurrencyHelper.load(),
       RestaurantSession.load(),
     ]);
+    RestaurantSession.initLifecycle(); // pause/resume handling for auto-logout
     print('   ✅ Restaurant settings loaded');
 
     // Start auto-backup timer (runs hourly, triggers daily backups)

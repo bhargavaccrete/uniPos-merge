@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../../core/di/service_locator.dart';
 
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
@@ -15,6 +16,12 @@ class AddItemFormState extends ChangeNotifier {
   final descriptionController = TextEditingController();
   final stockController = TextEditingController();
   final lowStockThresholdController = TextEditingController();
+  final itemCodeController = TextEditingController();
+
+  AddItemFormState() {
+    // Pre-fill next available numeric item code
+    itemCodeController.text = itemStore.generateNextItemCode();
+  }
 
   // Image
   Uint8List? selectedImage;
@@ -30,8 +37,8 @@ class AddItemFormState extends ChangeNotifier {
   // Veg/Non-Veg
   String vegCategory = 'Veg';
 
-  // Tax (taxRate is a decimal, e.g. 0.18 for 18%)
-  String? selectedTaxId;
+  // Tax — multiple taxes allowed; selectedTaxRate is their SUMMED decimal total.
+  List<String> selectedTaxIds = [];
   double? selectedTaxRate;
 
   // Inventory
@@ -43,6 +50,7 @@ class AddItemFormState extends ChangeNotifier {
   List<Map<String, dynamic>> selectedVariants = [];
   List<String> selectedChoiceIds = [];
   List<String> selectedExtraIds = [];
+  List<String> defaultChoiceOptionIds = []; // per-item default-selected choice options
 
   /// Reset all form fields to default values
   void reset() {
@@ -58,13 +66,15 @@ class AddItemFormState extends ChangeNotifier {
     selectedCategoryId = null;
     selectedCategoryName = null;
     vegCategory = 'Veg';
-    selectedTaxId = null;
+    selectedTaxIds = [];
     selectedTaxRate = null;
     trackInventory = false;
     allowOrderWhenOutOfStock = true;
     selectedVariants.clear();
     selectedChoiceIds.clear();
     selectedExtraIds.clear();
+    defaultChoiceOptionIds.clear();
+    itemCodeController.text = itemStore.generateNextItemCode();
     notifyListeners();
   }
 
@@ -87,6 +97,19 @@ class AddItemFormState extends ChangeNotifier {
 
     if (selectedCategoryId == null || selectedCategoryId!.isEmpty) {
       errors.add('Category');
+    }
+
+    // Item Code validation
+    final code = itemCodeController.text.trim();
+    if (code.isEmpty) {
+      errors.add('Item Code');
+    } else if (!RegExp(r'^\d{4,5}$').hasMatch(code)) {
+      errors.add('Item Code (must be 4-5 digits)');
+    } else {
+      final duplicateCode = itemStore.items.any((i) => i.itemCode == code);
+      if (duplicateCode) {
+        errors.add('Unique Item Code (this code already exists)');
+      }
     }
 
     return ValidationResult(
@@ -120,6 +143,7 @@ class AddItemFormState extends ChangeNotifier {
           ? (double.tryParse(stockController.text.trim()) ?? 0.0)
           : 0.0,
       taxRate: selectedTaxRate,
+      taxIds: selectedTaxIds,
       lowStockAlertEnabled: trackInventory && lowStockAlertEnabled,
       lowStockThreshold: (trackInventory && lowStockAlertEnabled)
           ? double.tryParse(lowStockThresholdController.text.trim())
@@ -129,6 +153,8 @@ class AddItemFormState extends ChangeNotifier {
       variant: itemVariants,
       choiceIds: selectedChoiceIds,
       extraId: selectedExtraIds,
+      defaultChoiceOptionIds: defaultChoiceOptionIds,
+      itemCode: itemCodeController.text.trim(),
       createdTime: DateTime.now(),
       editCount: 0,
     );
@@ -143,12 +169,13 @@ class AddItemFormState extends ChangeNotifier {
       'selectedVegCategory': vegCategory,
       'selectedCategory': selectedCategoryId,
       'selectedCategoryname': selectedCategoryName,
-      'taxId': selectedTaxId,
+      'taxIds': selectedTaxIds,
       'taxRate': selectedTaxRate,
       'trackInventory': trackInventory,
       'variants': selectedVariants,
       'choiceIds': selectedChoiceIds,
       'extraIds': selectedExtraIds,
+      'defaultChoiceOptionIds': defaultChoiceOptionIds,
     };
   }
 
@@ -157,18 +184,20 @@ class AddItemFormState extends ChangeNotifier {
     selectedVariants = List<Map<String, dynamic>>.from(result['variants'] ?? []);
     selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
     selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
+    defaultChoiceOptionIds = List<String>.from(result['defaultChoiceOptionIds'] ?? []);
     // More Info can also set the tax — keep it in sync so it isn't lost.
-    if (result.containsKey('taxId') || result.containsKey('taxRate')) {
-      selectedTaxId = result['taxId'] as String?;
+    if (result.containsKey('taxIds') || result.containsKey('taxRate')) {
+      selectedTaxIds = List<String>.from(result['taxIds'] ?? selectedTaxIds);
       selectedTaxRate = (result['taxRate'] as num?)?.toDouble();
     }
     notifyListeners();
   }
 
-  /// Set tax (taxRate as decimal, e.g. 0.18). Pass nulls for "No Tax".
-  void setTax(String? id, double? rate) {
-    selectedTaxId = id;
-    selectedTaxRate = rate;
+  /// Set the applied taxes. [ids] are the tax IDs, [rate] their summed decimal
+  /// total (e.g. 0.17 for 5% + 12%). Empty list / 0 = "No Tax".
+  void setTaxes(List<String> ids, double? rate) {
+    selectedTaxIds = ids;
+    selectedTaxRate = (rate == null || rate == 0) ? null : rate;
     notifyListeners();
   }
 
@@ -228,6 +257,7 @@ class AddItemFormState extends ChangeNotifier {
     descriptionController.dispose();
     stockController.dispose();
     lowStockThresholdController.dispose();
+    itemCodeController.dispose();
     super.dispose();
   }
 }
