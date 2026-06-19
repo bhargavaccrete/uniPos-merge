@@ -16,9 +16,23 @@ class ItemRepository {
     _categoryBox = Hive.box<Category>(HiveBoxNames.restaurantCategories);
   }
 
-  /// Get all items from Hive
+  /// Get all items from Hive.
+  ///
+  /// Collapses duplicate records that share an id. Generated/imported items were
+  /// stored via `box.addAll` (auto-increment keys), while edits use
+  /// `put(item.id)`, so an updated generated item could exist twice (old auto-key
+  /// copy + new id-keyed copy). We keep the record stored under its own id (the
+  /// canonical, most-recently-written one).
   Future<List<Items>> getAllItems() async {
-    return _itemBox.values.toList();
+    final byId = <String, Items>{};
+    for (final key in _itemBox.keys) {
+      final it = _itemBox.get(key);
+      if (it == null) continue;
+      if (!byId.containsKey(it.id) || key == it.id) {
+        byId[it.id] = it;
+      }
+    }
+    return byId.values.toList();
   }
 
   /// Add a new item to Hive
@@ -31,8 +45,20 @@ class ItemRepository {
     }
   }
 
-  /// Update an existing item in Hive
+  /// Update an existing item in Hive.
+  ///
+  /// Removes any stale copy of this item first. Generated/imported items live
+  /// under an auto-increment key (`box.addAll`), so a plain `put(item.id)` would
+  /// ADD a second record instead of overwriting — duplicating the item with
+  /// conflicting fields (e.g. favourite flag). We delete every record carrying
+  /// this id under a different key, then write the canonical id-keyed record.
   Future<void> updateItem(Items item) async {
+    final staleKeys = _itemBox.keys
+        .where((k) => k != item.id && _itemBox.get(k)?.id == item.id)
+        .toList();
+    for (final k in staleKeys) {
+      await _itemBox.delete(k);
+    }
 
     await _itemBox.put(item.id, item);
 
@@ -41,9 +67,6 @@ class ItemRepository {
     if (kIsWeb) {
       await _itemBox.flush();
     }
-
-    // Verify what was actually saved
-    final savedItem = _itemBox.get(item.id);
   }
 
   /// Delete an item from Hive

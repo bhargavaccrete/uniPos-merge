@@ -11,6 +11,7 @@ class KdsOrderDto {
   final int kotNumber; // KOT number for THIS specific KOT card
   final List<int>? allKotNumbers; // All KOT numbers for the parent order
   final bool isPartialOrder; // True if this order has multiple KOTs
+  final String? remark; // Order-level kitchen note (e.g. "no onions")
 
   KdsOrderDto({
     required this.orderId,
@@ -23,6 +24,7 @@ class KdsOrderDto {
     required this.kotNumber,
     this.allKotNumbers,
     this.isPartialOrder = false,
+    this.remark,
   });
 
   Map<String, dynamic> toJson() => {
@@ -36,6 +38,7 @@ class KdsOrderDto {
     'kotNumber': kotNumber,
     if (allKotNumbers != null) 'allKotNumbers': allKotNumbers,
     'isPartialOrder': isPartialOrder,
+    if (remark != null && remark!.trim().isNotEmpty) 'remark': remark,
   };
 }
 

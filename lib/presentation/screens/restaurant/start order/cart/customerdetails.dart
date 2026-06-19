@@ -854,28 +854,57 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
                       SizedBox(height: 5),
 
-                      if (discountApply && calculations.discountAmount > 0)
-                        Container(
-                          width: width,
-                          height: height * 0.07,
-                          padding: EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.textSecondary)),
-                          child: DropdownButtonHideUnderline(
-                              child: DropdownButton(
-                                  value: SelectedRemark,
-                                  items: remarkList.map((String dropdownValue) {
-                                    return DropdownMenuItem(
-                                      child: Text(dropdownValue),
-                                      value: dropdownValue,
-                                    );
-                                  }).toList(),
-                                  onChanged: (String? newValue) {
-                                    setState(() {
-                                      SelectedRemark = newValue!;
-                                    });
-                                  })),
+                      if (discountApply && calculations.discountAmount > 0) ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Discount Reason',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ),
+                        SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: remarkList.map((reason) {
+                            final isSelected = SelectedRemark == reason;
+                            return GestureDetector(
+                              onTap: () =>
+                                  setState(() => SelectedRemark = reason),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.divider,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Text(
+                                  reason,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                       SizedBox(height: 5),
 
                       if (calculations.discountAmount != null &&

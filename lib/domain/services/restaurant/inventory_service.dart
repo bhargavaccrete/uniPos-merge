@@ -82,12 +82,34 @@ class InventoryService {
         staffName: staffName,
         sessionId: sessionId,
       ));
+      final lowAlertsOn =
+          item.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
+      final subjectId = _lowStockSubjectId(item.id, variantId);
       if (stockAfter <= 0) {
         lowStockAlerts.add("$label is out of stock");
-      } else if (item.lowStockAlertEnabled &&
-          AppSettings.lowStockAlertsEnabled &&
-          stockAfter <= item.effectiveLowStockThreshold) {
+        if (lowAlertsOn) {
+          await notificationStore.raiseEvent(
+            eventCode: 'low_stock',
+            subjectType: 'item',
+            subjectId: subjectId,
+            data: {'name': label, 'remaining': 0, 'unit': item.unit ?? 'units'},
+          );
+        }
+      } else if (lowAlertsOn && stockAfter <= item.effectiveLowStockThreshold) {
         lowStockAlerts.add("$label: ${stockAfter.toStringAsFixed(0)} ${item.unit ?? "units"} left");
+        await notificationStore.raiseEvent(
+          eventCode: 'low_stock',
+          subjectType: 'item',
+          subjectId: subjectId,
+          data: {
+            'name': label,
+            'remaining': stockAfter,
+            'unit': item.unit ?? 'units',
+          },
+        );
+      } else {
+        // Stock healthy again — retire any prior low-stock notification.
+        await notificationStore.resolve('low_stock', 'item', subjectId);
       }
     }
 
@@ -128,6 +150,10 @@ class InventoryService {
       return '';
     }
   }
+
+  // Per-variant identity so variants of one item don't share a notification.
+  static String _lowStockSubjectId(String itemId, String? variantId) =>
+      variantId != null ? '$itemId:$variantId' : itemId;
 
   // Stock checking before placing order: checkStockAvailability
   static Future<bool> checkStockAvailability(List<CartItem> cartItems) async {
@@ -375,6 +401,10 @@ class InventoryService {
           staffName: staffName,
           sessionId: sessionId,
         ));
+
+        // Restock raises stock back up — retire any low-stock notification.
+        await notificationStore.resolve(
+          'low_stock', 'item', _lowStockSubjectId(existingItem.id, variantId));
       }
 
       // Reload items to reflect changes in UI

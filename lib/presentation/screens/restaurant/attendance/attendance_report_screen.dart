@@ -162,13 +162,14 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     });
   }
 
-  // Working days (Mon–Fri) between two dates, inclusive
+  // Operating days between two dates, inclusive. Restaurants run 7 days a week,
+  // so every calendar day counts as a working day (not just Mon–Fri).
   int _workingDaysInPeriod(DateTime start, DateTime end) {
     int count = 0;
     var d = DateTime(start.year, start.month, start.day);
     final last = DateTime(end.year, end.month, end.day);
     while (!d.isAfter(last)) {
-      if (d.weekday <= 5) count++; // 1=Mon … 5=Fri
+      count++;
       d = d.add(const Duration(days: 1));
     }
     return count;

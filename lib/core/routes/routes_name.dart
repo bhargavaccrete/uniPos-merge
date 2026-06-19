@@ -17,6 +17,7 @@ class RouteNames {
   // Restaurant - Home & Dashboard
   static const restaurantHome = '/restaurant-home';
   static const restaurantDashboard = '/restaurant-dashboard';
+  static const restaurantNotifications = '/restaurant-notifications';
 
   // Restaurant - Orders
   static const restaurantStartOrder = '/restaurant-start-order';
@@ -75,6 +76,7 @@ class RouteNames {
   static const restaurantReportsComparisionByProduct  = '/restaurant-report-comparisionbyproduct';
   static const restaurantReportsRefundDetails  = '/restaurant-report-refunddetails';
   static const restaurantReportsVoidOrderReport  = '/restaurant-report-voidorderreport';
+  static const restaurantReportsItemCancellation  = '/restaurant-report-itemcancellation';
   static const restaurantReportsDiscountOrderReport  = '/restaurant-report-discountoderreport';
   static const restaurantReportsPosOrder  = '/restaurant-report-posorderreport';
   static const restaurantReportsCustomerListByRevenue = '/restaurant-report-customerlistbyrevenue';
@@ -117,6 +119,8 @@ class RouteNames {
   static const restaurantAddPrinter = '/restaurant-addprinter';
   static const restaurantBulkImport = '/restaurant-bulk-import';
   static const restaurantDataGenratorScreen = '/restaurant-datageneratorscreen';
+  static const restaurantLicenseEmailDemo = '/restaurant-license-email-demo';
+  static const restaurantEmailSetupDemo = '/restaurant-email-setup-demo';
   static const restaurantlogin  = '/restaurant-login';
 
 

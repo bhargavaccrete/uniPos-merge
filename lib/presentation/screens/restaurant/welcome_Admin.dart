@@ -31,10 +31,16 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   bool _hasPendingEOD = false;
   bool _dayNotStarted = false; // day closed/not started → show a non-blocking banner
 
+  DateTime? _snoozeDayStartUntil;
+  DateTime? _snoozeEodUntil;
+  DateTime? _snoozeLicenseUntil;
+
   @override
   void initState() {
     super.initState();
+    _loadSnoozeStates();
     _loadStoreName();
+
     // Load items so the Inventory tile's low-stock badge is accurate on open.
     itemStore.loadItems();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -51,6 +57,43 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     if (mounted && name != null && name.isNotEmpty) {
       setState(() => _storeName = name);
     }
+  }
+
+  Future<void> _loadSnoozeStates() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dayStartStr = prefs.getString('snooze_day_start_until');
+    final eodStr = prefs.getString('snooze_eod_until');
+    final licenseStr = prefs.getString('snooze_license_until');
+
+    if (mounted) {
+      setState(() {
+        if (dayStartStr != null) {
+          final parsed = DateTime.tryParse(dayStartStr);
+          if (parsed != null && parsed.isAfter(DateTime.now())) {
+            _snoozeDayStartUntil = parsed;
+          }
+        }
+        if (eodStr != null) {
+          final parsed = DateTime.tryParse(eodStr);
+          if (parsed != null && parsed.isAfter(DateTime.now())) {
+            _snoozeEodUntil = parsed;
+          }
+        }
+        if (licenseStr != null) {
+          final parsed = DateTime.tryParse(licenseStr);
+          if (parsed != null && parsed.isAfter(DateTime.now())) {
+            _snoozeLicenseUntil = parsed;
+          }
+        }
+      });
+    }
+  }
+
+  Future<void> _snoozeAlert(String key, Duration duration) async {
+    final prefs = await SharedPreferences.getInstance();
+    final until = DateTime.now().add(duration);
+    await prefs.setString(key, until.toIso8601String());
+    await _loadSnoozeStates();
   }
 
   Future<void> _checkDayStarted() async {
@@ -161,34 +204,49 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ],
         ),
         actions: [
-          ValueListenableBuilder<String>(
-            valueListenable: RestaurantSession.loginTypeNotifier,
-            builder: (_, __, ___) {
-              final role = RestaurantSession.effectiveRole;
+          Observer(
+            builder: (context) {
+              final count = notificationStore.unreadCount;
               return Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: Center(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.person, size: isTablet ? 18 : 16, color: Colors.white),
-                        SizedBox(width: 6),
-                        Text(
-                          role,
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 13 : 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          count > 0 ? Icons.notifications_rounded : Icons.notifications_none_rounded,
+                          color: Colors.white,
+                          size: isTablet ? 24 : 22,
+                        ),
+                        onPressed: () => Navigator.pushNamed(context, RouteNames.restaurantNotifications),
+                      ),
+                      if (count > 0)
+                        Positioned(
+                          right: 4,
+                          top: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              '$count',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               );
@@ -202,26 +260,37 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           Observer(
             builder: (_) {
               final licStore = locator<LicenseStore>();
-              if (!licStore.isExpiringSoon) return const SizedBox.shrink();
+              if (!licStore.isExpiringSoon || licStore.licenseInfo == null) return const SizedBox.shrink();
               final days = licStore.licenseInfo!.daysRemaining;
+              
+              // If not expired yet (days > 0), check if snoozed
+              if (days > 0) {
+                if (_snoozeLicenseUntil != null && _snoozeLicenseUntil!.isAfter(DateTime.now())) {
+                  return const SizedBox.shrink();
+                }
+              }
+              
               return Container(
                 margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: days <= 0 ? Colors.red.shade50 : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: days <= 0 ? Colors.red.shade200 : Colors.orange.shade200),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
+                        color: days <= 0 ? Colors.red.shade100 : Colors.orange.shade100,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.timer_outlined,
-                          color: Colors.orange.shade700, size: 20),
+                      child: Icon(
+                        days <= 0 ? Icons.error_outline_rounded : Icons.timer_outlined,
+                        color: days <= 0 ? Colors.red.shade700 : Colors.orange.shade700,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -229,18 +298,21 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            days == 0
-                                ? 'License expires today!'
-                                : 'License expires in $days day${days == 1 ? '' : 's'}',
+                            days <= 0
+                                ? 'License expired!'
+                                : days == 0
+                                    ? 'License expires today!'
+                                    : 'License expires in $days day${days == 1 ? '' : 's'}',
                             style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.orange.shade800),
+                                color: days <= 0 ? Colors.red.shade800 : Colors.orange.shade800),
                           ),
                           Text(
                             'Renew your license to avoid service interruption.',
                             style: GoogleFonts.poppins(
-                                fontSize: 11, color: Colors.orange.shade700),
+                                fontSize: 11,
+                                color: days <= 0 ? Colors.red.shade700 : Colors.orange.shade700),
                           ),
                         ],
                       ),
@@ -252,7 +324,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
-                        backgroundColor: Colors.orange.shade100,
+                        backgroundColor: days <= 0 ? Colors.red.shade100 : Colors.orange.shade100,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8)),
                       ),
@@ -260,8 +332,18 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                           style: GoogleFonts.poppins(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Colors.orange.shade800)),
+                              color: days <= 0 ? Colors.red.shade800 : Colors.orange.shade800)),
                     ),
+                    // If not expired, show the snooze button
+                    if (days > 0) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(Icons.close_rounded, color: Colors.orange.shade800, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => _snoozeAlert('snooze_license_until', const Duration(hours: 24)),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -269,10 +351,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ),
 
           // Pending EOD warning banner
-          if (_hasPendingEOD)
+          if (_hasPendingEOD && (_snoozeEodUntil == null || _snoozeEodUntil!.isBefore(DateTime.now())))
             Container(
-              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.red.shade50,
                 borderRadius: BorderRadius.circular(10),
@@ -284,14 +366,14 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   Row(
                     children: [
                       Container(
-                        padding: EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.red.shade100,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,26 +383,36 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(Icons.close_rounded, color: Colors.red.shade800, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () async {
+                          await DayManagementService.snoozeEODAlert();
+                          await _snoozeAlert('snooze_eod_until', const Duration(hours: 24));
+                        },
+                      ),
                     ],
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () async {
                             await DayManagementService.snoozeEODAlert();
-                            if (mounted) setState(() => _hasPendingEOD = false);
+                            await _snoozeAlert('snooze_eod_until', const Duration(hours: 24));
                           },
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: Colors.red.shade300),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           child: Text('Continue Today', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.red.shade700)),
                         ),
                       ),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () async {
@@ -331,7 +423,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                             backgroundColor: Colors.red.shade600,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           child: Text('Complete EOD', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white)),
                         ),
@@ -344,10 +436,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
 
           // Day-not-started banner (non-blocking). The day starts on the first
           // order; this just lets the user start it early if they want.
-          if (_dayNotStarted && !_hasPendingEOD)
+          if (_dayNotStarted && !_hasPendingEOD && (_snoozeDayStartUntil == null || _snoozeDayStartUntil!.isBefore(DateTime.now())))
             Container(
-              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: AppColors.warning.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(10),
@@ -356,7 +448,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
               child: Row(
                 children: [
                   Icon(Icons.wb_sunny_outlined, color: AppColors.warning, size: 20),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,7 +460,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       ],
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   ElevatedButton(
                     onPressed: () async {
                       final started = await promptStartDay(context);
@@ -378,10 +470,17 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       backgroundColor: AppColors.primary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     ),
                     child: Text('Start Day',
                         style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(Icons.close_rounded, color: AppColors.warning, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => _snoozeAlert('snooze_day_start_until', const Duration(hours: 24)),
                   ),
                 ],
               ),
@@ -475,6 +574,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory)),
       _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings)),
       _MenuCardData('Cash Drawer',   Icons.point_of_sale_rounded,       const Color(0xFF00897B), 'cashDrawer', () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer)),
+      _MenuCardData('End of Day',    Icons.nightlight_round,            Colors.deepOrange,     'cashDrawer',   () => Navigator.pushNamed(context, RouteNames.restaurantEndDay)),
       _MenuCardData('Attendance',    Icons.access_time_rounded,         Colors.deepPurple,     'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantAttendance)),
       _MenuCardData('Logout',        Icons.logout_rounded,              Colors.red.shade700,   'logout',       () => _showLogoutDialog(context)),
     ];

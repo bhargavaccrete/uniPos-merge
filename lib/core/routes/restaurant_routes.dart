@@ -12,6 +12,8 @@ import 'package:unipos/presentation/screens/restaurant/Reports/salesbyCategory/s
 import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
 import 'package:unipos/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
 import 'package:unipos/presentation/screens/restaurant/Settings/data_generator_screen.dart';
+import 'package:unipos/presentation/screens/restaurant/Settings/license_email_flow_demo_screen.dart';
+import 'package:unipos/presentation/screens/onboarding/setup_wizard_email_flow_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/attendance/staff_attendance_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/attendance/attendance_report_screen.dart';
 import 'package:unipos/presentation/screens/restaurant/import/bulk_import_screen.dart';
@@ -33,6 +35,7 @@ import 'package:unipos/presentation/screens/restaurant/auth/restaurant_guard.dar
 
 // Restaurant - Home & Dashboard
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
+import 'package:unipos/presentation/screens/restaurant/notifications/notifications_screen.dart';
 
 // Restaurant - Orders
 import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
@@ -106,6 +109,7 @@ import '../../presentation/screens/restaurant/Reports/customer list by revenue/c
 import '../../presentation/screens/restaurant/Reports/customerList/customerlist.dart';
 import '../../presentation/screens/restaurant/Reports/expenseReport/expensereport.dart';
 import '../../presentation/screens/restaurant/Reports/void Order Report/voidOrderReport.dart';
+import '../../presentation/screens/restaurant/Reports/item Cancellation Report/itemCancellationReport.dart';
 import '../../presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
 import '../../presentation/screens/restaurant/shift/shift_report_screen.dart';
 import '../../presentation/screens/restaurant/shift/staff_performance_screen.dart';
@@ -137,6 +141,7 @@ class RestaurantRoutes {
 
     // Restaurant - Home & Dashboard
     RouteNames.restaurantHome: _guard(const AdminWelcome()),
+    RouteNames.restaurantNotifications: _guard(const NotificationsScreen()),
 
     // Restaurant - Orders
     RouteNames.restaurantStartOrder: _guard(const Startorder(), 'startOrder'),
@@ -197,6 +202,7 @@ class RestaurantRoutes {
     RouteNames.restaurantReportsCustomerListByRevenue: _guard(CustomerListByRevenue(), 'reports'),
     RouteNames.restaurantReportsExpense: _guard(ExpenseReport(), 'reports'),
     RouteNames.restaurantReportsVoidOrderReport: _guard(VoidOrderReport(), 'reports'),
+    RouteNames.restaurantReportsItemCancellation: _guard(const ItemCancellationReport(), 'reports'),
     RouteNames.restaurantShiftReport: _guard(const ShiftReportScreen(), 'reports'),
     RouteNames.restaurantStaffPerformance: _guard(const StaffPerformanceScreen(), 'reports'),
     RouteNames.restaurantCashDrawer: _guard(const CashDrawerScreen(), 'cashDrawer'),
@@ -231,6 +237,8 @@ class RestaurantRoutes {
     RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
     RouteNames.restaurantBulkImport: _guard(const RestaurantBulkImportScreen(), 'settings'),
     RouteNames.restaurantDataGenratorScreen: _guard(const DataGeneratorScreen(), 'settings'),
+    RouteNames.restaurantLicenseEmailDemo: _guard(const LicenseEmailFlowDemoScreen(), 'settings'),
+    RouteNames.restaurantEmailSetupDemo: _guard(const SetupWizardEmailFlowScreen(), 'settings'),
 
   };
 }

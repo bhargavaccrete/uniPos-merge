@@ -25,32 +25,32 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
 
   final List<WalkthroughItem> _walkthroughItems = [
     WalkthroughItem(
-      title: 'All-in-One POS Solution',
-      description: 'Manage sales, inventory, and customers from a single unified platform designed for all business types',
+      title: 'All-in-One POS',
+      description: 'Manage sales, billing, and products from a single unified platform designed for retail and restaurants',
       icon: Icons.dashboard_customize,
       color: AppColors.primary,
-      features: ['Retail', 'Restaurant'],
+      features: ['Restaurant Mode', 'Retail Mode'],
     ),
     WalkthroughItem(
-      title: 'Smart Inventory Management',
-      description: 'Track stock levels in real-time, set automatic reorder points, and manage multiple warehouses effortlessly',
+      title: 'Smart Product Management',
+      description: 'Track stock levels in real-time, get low-stock alerts, and manage menu categories and options',
       icon: Icons.inventory_2,
       color: AppColors.secondary,
-      features: ['Real-time Tracking', 'Auto Reorder', 'Multi-location'],
+      features: ['Stock Tracking', 'Low Stock Alerts', 'Menu Customization'],
     ),
     WalkthroughItem(
-      title: 'Powerful Analytics',
-      description: 'Get detailed insights into your sales performance, customer behavior, and business trends',
+      title: 'Sales & Expense Reports',
+      description: 'Monitor your daily sales, track business expenses, and view shift summaries to stay on top of your business',
       icon: Icons.analytics,
       color: AppColors.accent,
-      features: ['Sales Reports', 'Customer Insights', 'Trend Analysis'],
+      features: ['Sales Summaries', 'Expense Tracking', 'Shift Reports'],
     ),
     WalkthroughItem(
-      title: 'Seamless Payment Processing',
-      description: 'Accept all payment methods - cash, cards, digital wallets, and more with integrated payment solutions',
-      icon: Icons.payment,
+      title: 'Secure Cash & Staff',
+      description: 'Log staff attendance, track shift handovers, and record cash drawer movements',
+      icon: Icons.security,
       color: AppColors.orange,
-      features: ['Multiple Methods', 'Quick Processing', 'Secure Transactions'],
+      features: ['Cash In / Out', 'Staff Attendance', 'Secure PIN Login'],
     ),
   ];
 

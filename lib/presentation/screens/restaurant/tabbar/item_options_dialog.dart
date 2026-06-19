@@ -605,7 +605,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
               Text(
                 'Select Size',
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primary,
                 ),
@@ -637,7 +637,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
               opacity: canOrder ? 1.0 : 0.5,
               child: Container(
                 margin: EdgeInsets.only(bottom: 8),
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppColors.primary
@@ -654,8 +654,8 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 child: Row(
                   children: [
                     Container(
-                      width: 20,
-                      height: 20,
+                      width: 18,
+                      height: 18,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
@@ -677,7 +677,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                             )
                           : null,
                     ),
-                    SizedBox(width: 14),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,7 +685,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                           Text(
                             variant.name,
                             style: GoogleFonts.poppins(
-                              fontSize: 15,
+                              fontSize: 13.5,
                               fontWeight: FontWeight.w500,
                               color: isSelected ? AppColors.white : AppColors.textPrimary,
                             ),
@@ -717,7 +717,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                       ),
                     ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.white.withOpacity(0.2)
@@ -765,7 +765,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                   Text(
                     choiceGroup.name,
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                     ),
@@ -804,7 +804,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 },
                 child: Container(
                   margin: EdgeInsets.only(bottom: 8),
-                  padding: EdgeInsets.all(16),
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.primary.withOpacity(0.08) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
@@ -819,8 +819,8 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                   child: Row(
                     children: [
                       Container(
-                        width: 20,
-                        height: 20,
+                        width: 18,
+                        height: 18,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(allowMultiple ? 4 : 10),
                           border: Border.all(
@@ -842,7 +842,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                         child: Text(
                           option.name,
                           style: GoogleFonts.poppins(
-                            fontSize: 15,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w500,
                             color: AppColors.textPrimary,
                           ),
@@ -909,7 +909,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                     Text(
                       extraGroup.Ename,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
                       ),
@@ -945,7 +945,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
                 return Container(
                   margin: EdgeInsets.only(bottom: 8),
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.08) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(12),
@@ -966,7 +966,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                             Text(
                               topping.name,
                               style: GoogleFonts.poppins(
-                                fontSize: 14,
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.w500,
                                 color: AppColors.textPrimary,
                               ),

@@ -53,6 +53,7 @@ dependencies:
   google_fonts: ^8.0.2
   mobile_scanner: ^7.2.0
   flutter_svg: ^2.0.10+1
+  qr_flutter: ^4.1.0 # <- generate UPI payment QR from VPA
 
 
 
@@ -104,6 +105,9 @@ dependencies:
   geolocator: ^13.0.4
   package_info_plus: ^9.0.1
   syncfusion_flutter_xlsio: ^29.2.11
+  flutter_local_notifications: ^17.2.3 # <- local/OS notifications (offline)
+  timezone: ^0.9.4 # <- zoned scheduling for closed-app reminders
+  flutter_timezone: ^3.0.1 # <- resolves device local timezone
 
 
 

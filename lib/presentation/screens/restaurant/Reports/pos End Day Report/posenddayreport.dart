@@ -28,6 +28,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
   List<EndOfDayReport> _filteredReports = [];
   double _totalOpeningBalance = 0.0;
   double _totalClosingBalance = 0.0;
+  double _totalDiscount = 0.0;
 
   // Pagination
   int _currentPage = 0;
@@ -54,6 +55,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
     final results = <EndOfDayReport>[];
     double openingSum = 0.0;
     double closingSum = 0.0;
+    double discountSum = 0.0;
 
     for (final report in eodStore.eodReports) {
       if (_selectedDate != null) {
@@ -66,12 +68,14 @@ class _PosenddayreportState extends State<Posenddayreport> {
       results.add(report);
       openingSum += report.openingBalance;
       closingSum += report.closingBalance;
+      discountSum += report.totalDiscount;
     }
 
     setState(() {
       _filteredReports = results;
       _totalOpeningBalance = openingSum;
       _totalClosingBalance = closingSum;
+      _totalDiscount = discountSum;
       _currentPage = 0;
       _isLoading = false;
     });
@@ -114,6 +118,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
     final headers = [
       'Date',
       'Total Sales',
+      'Discount',
       'Opening Balance',
       'Closing Balance',
       'Actual Cash',
@@ -144,6 +149,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
         // FIX 1: Model has no closingDate — replaced with report date and totalSales.
         ReportExportService.formatDateTime(report.date),
         ReportExportService.formatCurrency(report.totalSales),
+        ReportExportService.formatCurrency(report.totalDiscount),
         ReportExportService.formatCurrency(report.openingBalance),
         ReportExportService.formatCurrency(report.closingBalance),
         ReportExportService.formatCurrency(report.cashReconciliation.actualCash),
@@ -164,6 +170,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
     final summary = {
       'Report Period': periodDisplay,
       'Total Reports': filteredReports.length.toString(),
+      'Total Discount': ReportExportService.formatCurrency(_totalDiscount),
       'Total Opening Balance': ReportExportService.formatCurrency(totalOpening),
       'Total Closing Balance': ReportExportService.formatCurrency(totalClosing),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
@@ -443,6 +450,15 @@ class _PosenddayreportState extends State<Posenddayreport> {
               color: Colors.green,
             ),
           ),
+          AppResponsive.horizontalSpace(context),
+          Expanded(
+            child: ReportSummaryCard(
+              title: 'Discount',
+              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscount)}',
+              icon: Icons.percent_rounded,
+              color: Colors.orange,
+            ),
+          ),
         ],
       ),
     );
@@ -455,7 +471,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
         onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(
             fontSize: isDesktop ? 17 : (isTablet ? 16 : 15),
             fontWeight: FontWeight.w600,

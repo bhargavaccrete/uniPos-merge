@@ -246,7 +246,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: AppColors.primary,
                             foregroundColor: AppColors.white,
                             padding: EdgeInsets.symmetric(
                               vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0),

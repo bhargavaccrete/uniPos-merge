@@ -35,6 +35,9 @@ class RestaurantSession {
 
   static Timer? _inactivityTimer;
 
+  /// When the app was last backgrounded — lets resume count time spent away.
+  static DateTime? _backgroundedAt;
+
   /// Fires true when the session expires due to inactivity.
   static final ValueNotifier<bool> sessionExpiredNotifier = ValueNotifier(false);
 
@@ -62,16 +65,26 @@ class RestaurantSession {
     _lifecycleRegistered = true;
   }
 
-  /// App went to the background → stop the timer so it can't fire or flush on
-  /// resume. (Background time is intentionally not counted.)
+  /// App went to the background → stop the timer and stamp the time so resume
+  /// can count how long we were away.
   static void _onAppBackgrounded() {
     _inactivityTimer?.cancel();
+    if (_isLoggedIn) _backgroundedAt = DateTime.now();
   }
 
-  /// App returned to the foreground → treat it as fresh activity: restart the
-  /// full inactivity window. Never logs out just for having been backgrounded.
+  /// App returned to the foreground. Background time DOES count toward the
+  /// timeout: if we were away at least the full window, expire now; otherwise
+  /// restart a fresh window. (Checking elapsed explicitly avoids the old bug
+  /// where a stale timer fired the instant the app reopened.)
   static void _onAppResumed() {
-    if (_isLoggedIn) resetInactivityTimer();
+    if (!_isLoggedIn) return;
+    final bgAt = _backgroundedAt;
+    _backgroundedAt = null;
+    if (bgAt != null && DateTime.now().difference(bgAt) >= _timeoutDuration) {
+      sessionExpiredNotifier.value = true;
+    } else {
+      resetInactivityTimer();
+    }
   }
 
   static final ValueNotifier<String>  loginTypeNotifier = ValueNotifier('admin');

@@ -14,6 +14,7 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
 import 'package:unipos/util/restaurant/staticswitch.dart'; // Import for AppSettings
+import 'package:unipos/util/restaurant/print_settings.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/domain/services/restaurant/esc_pos_receipt_builder.dart';
@@ -88,7 +89,7 @@ class RestaurantPrintHelper {
         // Format choices for display
         String? choicesInfo;
         if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
-          choicesInfo = 'Choices: ${item.choiceNames!.join(', ')}';
+          choicesInfo = 'Choice: ${item.choiceNames!.join(', ')}';
         }
 
         // Combine extras and choices with instruction
@@ -158,12 +159,12 @@ class RestaurantPrintHelper {
         orderTimestamp: order.timeStamp,
         orderNo: orderNo,
         isAddonKot: isAddonKot,
+        kotRemark: order.remark,
       );
 
       // 7. DIRECT THERMAL PATH — zero taps if a KOT printer is saved.
-      //    Check PrinterStore for a default KOT printer. If found, build
-      //    ESC/POS bytes and send directly via BT/WiFi. No dialog, no PDF.
-      //    If no printer saved, fall through to existing PDF path.
+      //    KOT is always thermal: it never reads PrintSettings.billFormat and
+      //    falls back to a thermal PDF (never A4) when no KOT printer exists.
       final kotPrinter = printerStore.defaultKotPrinter;
       if (kotPrinter != null && autoPrint) {
         final bytes = EscPosReceiptBuilder.buildKotTicket(
@@ -209,6 +210,7 @@ class RestaurantPrintHelper {
           orderTimestamp: order.timeStamp,
           orderNo: orderNo,
           isAddonKot: isAddonKot,
+          kotRemark: order.remark,
         );
         if (context.mounted) {
           NotificationService.instance.showSuccess(
@@ -233,6 +235,7 @@ class RestaurantPrintHelper {
           orderTimestamp: order.timeStamp,
           orderNo: orderNo,
           isAddonKot: isAddonKot,
+          kotRemark: order.remark,
         );
       }
 
@@ -351,7 +354,7 @@ class RestaurantPrintHelper {
         // Format choices for display
         String? choicesInfo;
         if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
-          choicesInfo = 'Choices: ${item.choiceNames!.join(', ')}';
+          choicesInfo = 'Choice: ${item.choiceNames!.join(', ')}';
         }
 
         // Combine extras and choices into weight field for display
@@ -387,10 +390,13 @@ class RestaurantPrintHelper {
       }).toList();
 
       // 3. Create Sale Model (Adapter: OrderModel -> SaleModel)
-      // Use last KOT number for invoice ID if available, or use order ID
-      final invoiceId = order.kotNumbers.isNotEmpty
-          ? 'KOT-${order.kotNumbers.last}'
-          : order.id.substring(0, 8).toUpperCase();
+      // Invoice/bill id must reference the ORDER, never the kitchen ticket (KOT).
+      // Using the KOT number made the customer A4 invoice read "# KOT-1".
+      // A real bill number (when settled) is passed separately via [billNumber].
+      final invoiceId =
+          (order.orderNumber != null && order.orderNumber.toString().isNotEmpty)
+              ? order.orderNumber.toString()
+              : order.id.substring(0, 8).toUpperCase();
 
       // Note: calculations.subtotal is already the base price (without tax)
       // CartCalculationService handles tax extraction for tax-inclusive mode
@@ -447,8 +453,13 @@ class RestaurantPrintHelper {
       }
 
       // 4. Create Customer Model (Adapter)
+      // Quick Settle orders are anonymous walk-ins — "Quick Settle" is just a
+      // label, not a real customer, so skip the customer block (and its loyalty
+      // points lines) on the bill.
+      final bool isAnonymous = order.customerName.trim().isEmpty ||
+          order.customerName.trim().toLowerCase() == 'quick settle';
       CustomerModel? customerModel;
-      if (order.customerName.isNotEmpty) {
+      if (!isAnonymous) {
         customerModel = CustomerModel(
           customerId: 'GUEST',
           name: order.customerName,
@@ -483,33 +494,61 @@ class RestaurantPrintHelper {
         isTaxInclusive: order.isTaxInclusive, // Use stored tax mode from order, not current app setting
         serviceCharge: calculations.serviceChargeAmount,
         isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
+        roundOff: calculations.roundOffAmount,
       );
 
-      // 6. Show Print Options — with thermal printer option if available
+      // 6. Route the bill by the user's Bill Format choice (always forced).
       final printService = locator<PrintService>();
 
-      // Pass the receipt printer reference so showPrintOptionsDialog can
-      // offer a "Print to Thermal" option at the top of the bottom sheet
-      await printService.showPrintOptionsDialog(
-        context: context,
-        sale: receiptData.sale,
-        items: receiptData.items,
-        customer: receiptData.customer,
-        storeName: receiptData.storeName,
-        storeAddress: receiptData.storeAddress,
-        storePhone: receiptData.storePhone,
-        storeEmail: receiptData.storeEmail,
-        gstNumber: receiptData.gstNumber,
-        orderType: order.orderType,
-        billNumber: billNumber,
-        kotNumbers: order.kotNumbers,
-        itemTotal: receiptData.itemTotal,
-        paymentBreakdown: paymentBreakdown,
-        loyaltyPointsDiscount: loyaltyPointsDiscount,
-        serviceCharge: calculations.serviceChargeAmount,
-        isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
-        isTaxInclusive: order.isTaxInclusive,
-      );
+      Future<void> printPdf(ReceiptFormat fmt) => printService.showPrintPreview(
+            context: context,
+            sale: receiptData.sale,
+            items: receiptData.items,
+            customer: receiptData.customer,
+            format: fmt,
+            storeName: receiptData.storeName,
+            storeAddress: receiptData.storeAddress,
+            storePhone: receiptData.storePhone,
+            storeEmail: receiptData.storeEmail,
+            gstNumber: receiptData.gstNumber,
+            orderType: order.orderType,
+            billNumber: billNumber,
+            kotNumbers: order.kotNumbers,
+            itemTotal: receiptData.itemTotal,
+            paymentBreakdown: paymentBreakdown,
+            loyaltyPointsDiscount: loyaltyPointsDiscount,
+            serviceCharge: calculations.serviceChargeAmount,
+            isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
+            isTaxInclusive: order.isTaxInclusive,
+            roundOff: calculations.roundOffAmount,
+          );
+
+      // A4 → always print an A4 invoice, ignoring any thermal billing printer.
+      if (PrintSettings.isBillFormatA4) {
+        await printPdf(ReceiptFormat.a4Invoice);
+        return;
+      }
+
+      // Thermal → print directly to the billing printer when one is configured.
+      final billingPrinter = printerStore.defaultReceiptPrinter;
+      if (billingPrinter != null) {
+        final bytes = EscPosReceiptBuilder.buildReceiptTicket(
+          receiptData: receiptData,
+          paperWidth: billingPrinter.paperSize,
+        );
+        final ok = await printerStore.sendBytes(bytes, billingPrinter);
+        if (ok) {
+          NotificationService.instance
+              .showSuccess('Bill printed to ${billingPrinter.name}');
+          return;
+        }
+        NotificationService.instance.showError(
+            'Thermal print failed: ${printerStore.errorMessage ?? "Unknown error"}. Showing PDF...');
+        // fall through to thermal PDF
+      }
+
+      // No billing printer (or thermal failed) → thermal-style 80mm PDF.
+      await printPdf(ReceiptFormat.thermal);
 
     } catch (e) {
       debugPrint('Error preparing receipt: $e');

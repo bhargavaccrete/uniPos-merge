@@ -19,6 +19,18 @@ class BackupEncryptionService {
   // Password Management
   // ---------------------------------------------------------------------------
 
+  /// Single source of truth for the backup-password policy — used by the
+  /// onboarding Security step, the Settings dialog, and the export gate.
+  /// Returns an error message to show the user, or null when the input is valid.
+  static String? validatePassword(String password, String confirm) {
+    if (password.isEmpty) return 'Please enter a backup password';
+    if (!RegExp(r'^\d{6}$').hasMatch(password)) {
+      return 'Backup password must be 6 digits';
+    }
+    if (password != confirm) return 'Backup passwords do not match';
+    return null;
+  }
+
   /// Returns true if a backup password has been configured.
   static Future<bool> hasPassword() async {
     try {
@@ -101,6 +113,65 @@ class BackupEncryptionService {
     } catch (_) {
       return null; // Wrong password or corrupted data
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Binary blob encryption (whole-file lock — nothing is browsable)
+  // ---------------------------------------------------------------------------
+
+  /// Magic header marking a UniPOS encrypted backup blob.
+  static final List<int> _blobMagic = utf8.encode('UPOSENC1'); // 8 bytes
+
+  /// Encrypts arbitrary bytes (e.g. a whole zip) into a self-contained opaque
+  /// blob: [magic][saltLen][salt][ivLen][iv][AES-CBC ciphertext]. The result
+  /// has no readable structure — it can only be opened by [decryptBytes].
+  static Uint8List encryptBytes(Uint8List data, String password) {
+    final salt = _generateSalt(); // base64 string
+    final key = _deriveKey(password, salt);
+    final iv = enc.IV.fromSecureRandom(16);
+    final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
+    final encrypted = encrypter.encryptBytes(data, iv: iv);
+
+    final saltBytes = utf8.encode(salt);
+    final out = BytesBuilder();
+    out.add(_blobMagic);
+    out.addByte(saltBytes.length);
+    out.add(saltBytes);
+    out.addByte(iv.bytes.length);
+    out.add(iv.bytes);
+    out.add(encrypted.bytes);
+    return out.toBytes();
+  }
+
+  /// Reverses [encryptBytes]. Returns null on wrong password / bad data.
+  static Uint8List? decryptBytes(Uint8List blob, String password) {
+    try {
+      if (!isEncryptedBlob(blob)) return null;
+      var p = _blobMagic.length;
+      final saltLen = blob[p++];
+      final salt = utf8.decode(blob.sublist(p, p + saltLen));
+      p += saltLen;
+      final ivLen = blob[p++];
+      final iv = enc.IV(Uint8List.fromList(blob.sublist(p, p + ivLen)));
+      p += ivLen;
+      final cipher = blob.sublist(p);
+      final key = _deriveKey(password, salt);
+      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
+      final plain = encrypter
+          .decryptBytes(enc.Encrypted(Uint8List.fromList(cipher)), iv: iv);
+      return Uint8List.fromList(plain);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// True if [bytes] begins with the UniPOS encrypted-backup magic header.
+  static bool isEncryptedBlob(List<int> bytes) {
+    if (bytes.length < _blobMagic.length) return false;
+    for (var i = 0; i < _blobMagic.length; i++) {
+      if (bytes[i] != _blobMagic[i]) return false;
+    }
+    return true;
   }
 
   // ---------------------------------------------------------------------------

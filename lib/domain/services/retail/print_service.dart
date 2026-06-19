@@ -41,6 +41,19 @@ class PrintService {
     }
   }
 
+  /// Load the UPI scan-and-pay config (shown on unpaid bills only).
+  Future<({String? id, String? payee, Uint8List? qr})> _loadUpiConfig() async {
+    try {
+      return (
+        id: await _storeSettingsService.getUpiId(),
+        payee: await _storeSettingsService.getUpiPayeeName(),
+        qr: await _storeSettingsService.getUpiQrImage(),
+      );
+    } catch (e) {
+      return (id: null, payee: null, qr: null);
+    }
+  }
+
   /// Print a sale receipt/invoice
   Future<void> printReceipt({
     required BuildContext context,
@@ -62,11 +75,13 @@ class PrintService {
     DateTime? orderTimestamp,
     String? orderNo,
     bool? isAddonKot,
+    String? kotRemark, // Restaurant: order-level kitchen note (KOT only)
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     int? loyaltyPointsDiscount, // Loyalty points redeemed
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
+    final upi = await _loadUpiConfig();
 
     final receiptData = ReceiptData(
       sale: sale,
@@ -86,9 +101,13 @@ class PrintService {
       orderTimestamp: orderTimestamp,
       orderNo: orderNo,
       isAddonKot: isAddonKot,
+      kotRemark: kotRemark,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
       loyaltyPointsDiscount: loyaltyPointsDiscount,
+      upiId: upi.id,
+      upiPayeeName: upi.payee,
+      upiQrImageBytes: upi.qr,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -123,6 +142,7 @@ class PrintService {
     DateTime? orderTimestamp,
     String? orderNo,
     bool? isAddonKot,
+    String? kotRemark, // Restaurant: order-level kitchen note (KOT only)
     int? billNumber,
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     String? paymentBreakdown, // Split payment breakdown
@@ -130,9 +150,11 @@ class PrintService {
     double? serviceCharge, // Service or delivery charge amount
     bool? isDeliveryOrder,
     bool? isTaxInclusive,
+    double? roundOff, // Rounding adjustment applied to reach grand total
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
+    final upi = await _loadUpiConfig();
 
     final receiptData = ReceiptData(
       sale: sale,
@@ -152,14 +174,19 @@ class PrintService {
       orderTimestamp: orderTimestamp,
       orderNo: orderNo,
       isAddonKot: isAddonKot,
+      kotRemark: kotRemark,
       billNumber: billNumber,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
       loyaltyPointsDiscount: loyaltyPointsDiscount,
       serviceCharge: serviceCharge,
       isDeliveryOrder: isDeliveryOrder,
+      roundOff: roundOff,
       paymentBreakdown: paymentBreakdown,
       isTaxInclusive: isTaxInclusive,
+      upiId: upi.id,
+      upiPayeeName: upi.payee,
+      upiQrImageBytes: upi.qr,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -225,6 +252,7 @@ class PrintService {
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
+    final upi = await _loadUpiConfig();
 
     final receiptData = ReceiptData(
       sale: sale,
@@ -247,6 +275,9 @@ class PrintService {
       isDeliveryOrder: isDeliveryOrder,
       paymentBreakdown: paymentBreakdown,
       isTaxInclusive: isTaxInclusive,
+      upiId: upi.id,
+      upiPayeeName: upi.payee,
+      upiQrImageBytes: upi.qr,
     );
 
     final pdf = format == ReceiptFormat.thermal
@@ -298,6 +329,7 @@ class PrintService {
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
+    final upi = await _loadUpiConfig();
 
     final receiptData = ReceiptData(
       sale: sale,
@@ -316,6 +348,9 @@ class PrintService {
       isDeliveryOrder: isDeliveryOrder,
       paymentBreakdown: paymentBreakdown,
       isTaxInclusive: isTaxInclusive,
+      upiId: upi.id,
+      upiPayeeName: upi.payee,
+      upiQrImageBytes: upi.qr,
     );
 
     final pdf = format == ReceiptFormat.thermal

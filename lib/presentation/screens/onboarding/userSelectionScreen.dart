@@ -70,7 +70,9 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
   }
 
   void _navigateToSetupWizard() {
-    Navigator.pushNamed(context, '/license-key-entry');
+    // Licensing now happens inside the wizard's Verify Email (OTP) step, so a
+    // new user goes straight to setup rather than the standalone key page.
+    Navigator.pushNamed(context, '/setup-wizard');
   }
 
   void _showRestoreDialog() {
@@ -421,11 +423,11 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
             Expanded(
               child: Text(
                 'Your data is stored locally and encrypted. Always keep regular backups to prevent data loss.',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.darkNeutral.withOpacity(0.8),
                 ),
-
               ),
             ),
           ],

@@ -186,11 +186,13 @@ class _BluthoothhState extends State<Bluthooth> {
             // can lose type info in some MobX versions
             ...devices.map((d) {
               final DiscoveredPrinter device = d as DiscoveredPrinter;
-              return Card(
-                elevation: 1,
+              return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider),
+                ),
                 child: ListTile(
                   leading: Icon(Icons.bluetooth,
                       color: AppColors.info),
@@ -250,29 +252,23 @@ class _BluthoothhState extends State<Bluthooth> {
                   fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            ...btPrinters.map((printer) => Card(
-                  elevation: 1,
+            ...btPrinters.map((printer) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
                   child: ListTile(
-                    leading: Icon(
-                      (printerStore.defaultKotPrinter?.id == printer.id ||
-                          printerStore.defaultReceiptPrinter?.id == printer.id)
-                          ? Icons.star
-                          : Icons.bluetooth_connected,
-                      color: (printerStore.defaultKotPrinter?.id == printer.id ||
-                          printerStore.defaultReceiptPrinter?.id == printer.id)
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
-                    ),
+                    leading:
+                        Icon(Icons.bluetooth_connected, color: AppColors.info),
                     title: Text(
                       printer.name,
                       style:
                           GoogleFonts.poppins(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
-                      '${printer.address} | ${printer.paperSize}mm | ${printer.role.toUpperCase()}',
+                      '${printer.address} | ${printer.paperSize}mm',
                       style: GoogleFonts.poppins(
                           fontSize: 12, color: AppColors.textSecondary),
                     ),
@@ -354,7 +350,8 @@ class _BluthoothhState extends State<Bluthooth> {
     final nameController =
         TextEditingController(text: device.name ?? 'BT Printer');
     int paperSize = 80;
-    String role = 'both';
+    // Role is assigned later by the slot on the Printer Management screen.
+    const String role = 'receipt';
 
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
@@ -417,41 +414,6 @@ class _BluthoothhState extends State<Bluthooth> {
                     Text('80mm', style: GoogleFonts.poppins(fontSize: 13)),
                   ],
                 ),
-                const SizedBox(height: 8),
-
-                // Role
-                Text('Printer Role',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
-                Row(
-                  children: [
-                    Radio<String>(
-                      value: 'kot',
-                      groupValue: role,
-                      onChanged: (v) =>
-                          setDialogState(() => role = v!),
-                      activeColor: AppColors.primary,
-                    ),
-                    Text('KOT', style: GoogleFonts.poppins(fontSize: 13)),
-                    Radio<String>(
-                      value: 'receipt',
-                      groupValue: role,
-                      onChanged: (v) =>
-                          setDialogState(() => role = v!),
-                      activeColor: AppColors.primary,
-                    ),
-                    Text('Receipt',
-                        style: GoogleFonts.poppins(fontSize: 13)),
-                    Radio<String>(
-                      value: 'both',
-                      groupValue: role,
-                      onChanged: (v) =>
-                          setDialogState(() => role = v!),
-                      activeColor: AppColors.primary,
-                    ),
-                    Text('Both', style: GoogleFonts.poppins(fontSize: 13)),
-                  ],
-                ),
               ],
             ),
           ),
@@ -475,7 +437,10 @@ class _BluthoothhState extends State<Bluthooth> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary),
+                  backgroundColor: AppColors.primary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10))),
               child: Text('Save',
                   style: GoogleFonts.poppins(color: Colors.white)),
             ),

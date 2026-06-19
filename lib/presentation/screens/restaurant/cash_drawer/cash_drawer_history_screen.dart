@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
@@ -496,114 +493,47 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     }
   }
 
-  // ── PDF ─────────────────────────────────────────────────────────────────────
-  // PDF uses fixed pt sizes — AppResponsive is screen-only.
+  // ── Export (Excel + PDF via the shared report service) ──────────────────────
+  // Routes through ReportExportService so the drawer ledger exports to BOTH
+  // Excel and PDF, consistent with every other report.
 
-  Future<void> _printReport() async {
-    final pdf      = pw.Document();
-    final currency = CurrencyHelper.currentSymbol;
-    final fmt      = DateFormat('dd MMM yyyy  HH:mm');
-    final dateFmt  = DateFormat('dd MMM yyyy');
+  Future<void> _exportReport() async {
+    final fmt     = DateFormat('dd MMM yyyy  HH:mm');
+    final dateFmt = DateFormat('dd MMM yyyy');
 
-    // Load cached Poppins fonts (supports ₹ and other currency symbols)
-    final fontBytes = await ReportExportService.loadFontBytes();
-    final boldFontBytes = await ReportExportService.loadBoldFontBytes();
-    final font = pw.Font.ttf(ByteData.sublistView(fontBytes));
-    final fontBold = pw.Font.ttf(ByteData.sublistView(boldFontBytes));
+    final headers = [
+      'Date / Time', 'Type', 'Staff', 'In', 'Out', 'Balance', 'Reason / Note',
+    ];
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(24),
-        build: (ctx) => [
-          pw.Text('Cash Drawer History',
-              style: pw.TextStyle(font: fontBold, fontSize: 18, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 4),
-          pw.Text('${dateFmt.format(_fromDate)}  –  ${dateFmt.format(_toDate)}',
-              style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey700)),
-          pw.SizedBox(height: 14),
+    final data = _filteredRows.map((r) => [
+      fmt.format(r.timestamp),
+      r.typeName,
+      r.staffName,
+      r.inAmount  > 0 ? ReportExportService.formatCurrency(r.inAmount)  : '—',
+      r.outAmount > 0 ? ReportExportService.formatCurrency(r.outAmount) : '—',
+      ReportExportService.formatCurrency(r.runningBalance),
+      (r.note != null && r.note!.isNotEmpty) ? '${r.reason} — ${r.note}' : r.reason,
+    ]).toList();
 
-          // Summary
-          pw.Container(
-            padding: const pw.EdgeInsets.all(10),
-            decoration: pw.BoxDecoration(
-                color: PdfColors.grey100, borderRadius: pw.BorderRadius.circular(6)),
-            child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
-              _pdfSummaryCol('Total In',
-                  '$currency${DecimalSettings.formatAmount(_totalIn)}', PdfColors.green700, font: font, fontBold: fontBold),
-              _pdfSummaryCol('Total Out',
-                  '$currency${DecimalSettings.formatAmount(_totalOut)}', PdfColors.red700, font: font, fontBold: fontBold),
-              _pdfSummaryCol('Net',
-                  '$currency${DecimalSettings.formatAmount(_net)}',
-                  _net >= 0 ? PdfColors.green700 : PdfColors.red700, font: font, fontBold: fontBold),
-              _pdfSummaryCol('Entries', '${_filteredRows.length}', PdfColors.grey800, font: font, fontBold: fontBold),
-            ]),
-          ),
-          pw.SizedBox(height: 14),
+    final periodName = '${dateFmt.format(_fromDate)} – ${dateFmt.format(_toDate)}';
+    final summary = {
+      'Report Period': periodName,
+      'Total In':  ReportExportService.formatCurrency(_totalIn),
+      'Total Out': ReportExportService.formatCurrency(_totalOut),
+      'Net':       ReportExportService.formatCurrency(_net),
+      'Entries':   _filteredRows.length.toString(),
+      'Generated': ReportExportService.formatDateTime(DateTime.now()),
+    };
 
-          // Table
-          pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-            columnWidths: {
-              0: const pw.FixedColumnWidth(112),
-              1: const pw.FixedColumnWidth(72),
-              2: const pw.FixedColumnWidth(68),
-              3: const pw.FixedColumnWidth(62),
-              4: const pw.FixedColumnWidth(62),
-              5: const pw.FixedColumnWidth(72),
-              6: const pw.FlexColumnWidth(),
-            },
-            children: [
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                children: [
-                  'Date / Time', 'Type', 'Staff',
-                  'IN ($currency)', 'OUT ($currency)',
-                  'Balance ($currency)', 'Reason / Note',
-                ]
-                    .map((h) => pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                          child: pw.Text(h,
-                              style: pw.TextStyle(
-                                  font: fontBold, fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                        ))
-                    .toList(),
-              ),
-              ..._filteredRows.map((r) => pw.TableRow(
-                children: [
-                  fmt.format(r.timestamp),
-                  r.typeName,
-                  r.staffName,
-                  r.inAmount  > 0 ? '$currency${DecimalSettings.formatAmount(r.inAmount)}'  : '—',
-                  r.outAmount > 0 ? '$currency${DecimalSettings.formatAmount(r.outAmount)}' : '—',
-                  '$currency${DecimalSettings.formatAmount(r.runningBalance)}',
-                  r.note != null ? '${r.reason} — ${r.note}' : r.reason,
-                ]
-                    .map((cell) => pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-                          child: pw.Text(cell, style: pw.TextStyle(font: font, fontSize: 8)),
-                        ))
-                    .toList(),
-              )),
-            ],
-          ),
-        ],
-      ),
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'cash_drawer_history_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      reportTitle: 'Cash Drawer History - $periodName',
+      headers: headers,
+      data: data,
+      summary: summary,
     );
-
-    await Printing.layoutPdf(onLayout: (_) => pdf.save());
   }
-
-  pw.Widget _pdfSummaryCol(String label, String value, PdfColor color, {pw.Font? font, pw.Font? fontBold}) => pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.Text(label,
-          style: pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey600)),
-      pw.Text(value,
-          style: pw.TextStyle(
-              font: fontBold, fontSize: 12, fontWeight: pw.FontWeight.bold, color: color)),
-    ],
-  );
 
   // ── Build ────────────────────────────────────────────────────────────────────
 
@@ -630,8 +560,9 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.print_outlined),
-            onPressed: _filteredRows.isEmpty ? null : _printReport,
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'Export Report',
+            onPressed: _filteredRows.isEmpty ? null : _exportReport,
           ),
         ],
       ),

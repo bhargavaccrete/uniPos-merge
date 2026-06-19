@@ -9,6 +9,8 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import 'package:unipos/util/common/currency_helper.dart';
+import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:intl/intl.dart';
 import 'package:unipos/util/restaurant/restaurant_session.dart';
 import 'package:unipos/util/color.dart';
 import 'package:unipos/core/di/service_locator.dart';
@@ -22,6 +24,7 @@ import 'package:unipos/domain/services/restaurant/data_clear_service.dart';
 import 'package:unipos/domain/services/restaurant/day_management_service.dart';
 import 'package:unipos/domain/services/restaurant/eod_service.dart';
 import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:unipos/domain/services/restaurant/esc_pos_receipt_builder.dart';
 import 'package:unipos/domain/services/restaurant/inventory_service.dart';
 import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
@@ -202,6 +205,16 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       final openAttendance = attendanceBox.values.where((r) => r.isOpen).toList();
       
       if (openAttendance.isNotEmpty) {
+        // Skip the "Staff Still Clocked In" prompt when the only person still
+        // clocked in is the one running EOD — just clock them out silently.
+        // Resolve the current user's name exactly as login clocks them in:
+        // admin → 'Admin' (admin_login.dart), staff → their name (restaurant_login.dart).
+        final currentName = RestaurantSession.staffName ??
+            (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+        final onlySelf =
+            openAttendance.every((r) => r.staffName == currentName);
+
+        if (!onlySelf) {
         final hInset = !AppResponsive.isMobile(context)
             ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
             : 24.0;
@@ -231,7 +244,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
         if (confirmedAttendance != true) return;
         
-        // Force clock out all remaining staff
+        }
+
+        // Clock out the remaining open staff — the self-only silent case, or
+        // everyone after the confirm dialog above.
         for (final r in openAttendance) {
           await attendanceStore.clockOut(r.id);
         }
@@ -259,6 +275,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
       // Save report first — if this throws, session stays open and user can retry
       await EODService.saveEODReport(report);
+
+      // Keep the just-generated report as the current one so the Safe Drop
+      // dialog's Print action can render the complete EOD (it was cleared to
+      // null above while the loading spinner showed).
+      _currentReport = report;
 
       // Report is committed. Now close session in a finally block so it ALWAYS
       // runs — prevents stuck-open session on shift/snooze cleanup failure.
@@ -411,26 +432,50 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                           color: Colors.teal.shade600,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                         ),
-                        child: Column(
+                        child: Stack(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
+                            // Full-width box keeps the title block centred even
+                            // though the Stack also holds the corner print icon.
+                            SizedBox(
+                              width: double.infinity,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.savings_rounded, size: 36, color: Colors.white),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'End of Day — Safe Drop',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Closed by: $closerName',
+                                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white70),
+                                  ),
+                                ],
                               ),
-                              child: const Icon(Icons.savings_rounded, size: 36, color: Colors.white),
                             ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'End of Day — Safe Drop',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Closed by: $closerName',
-                              style: GoogleFonts.poppins(fontSize: 12, color: Colors.white70),
+                            // Print the complete EOD report. Secondary action →
+                            // small corner icon, not a button beside Confirm.
+                            // The report is already saved at this point.
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: IconButton(
+                                tooltip: 'Print EOD Report',
+                                icon: const Icon(Icons.print_rounded, color: Colors.white),
+                                onPressed: () => _printSummary(
+                                  withdrawalCash: double.tryParse(withdrawalController.text) ?? 0,
+                                  closerName: closerName,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -1049,7 +1094,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     NotificationService.instance.showError(message);
   }
 
-  Future<void> _printSummary() async {
+  Future<void> _printSummary({double withdrawalCash = 0, String? closerName}) async {
     if (_currentReport == null) {
       _showError('No report data to print');
       return;
@@ -1061,65 +1106,157 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     final date = report.date;
     final dateStr = '${date.day}/${date.month}/${date.year}';
 
-    final font     = await PdfGoogleFonts.poppinsRegular();
+    // ── Shared settlement values (thermal + PDF render the same data) ──
+    // totalSales is the grand total (incl. tax) → acts as GROSS; NET = GROSS - tax - roundOff.
+    final roundOff = report.roundOff;
+    final grossSale = report.totalSales;
+    final tax = report.totalTax;
+    final netSale = grossSale - tax - roundOff;
+    final cashRecon = report.cashReconciliation;
+    final shiftUser = closerName ??
+        (RestaurantSession.staffName ??
+            (RestaurantSession.isAdmin ? 'Admin' : 'Staff'));
+    final shiftStart = selectedDate;
+    final shiftEnd = DateTime.now();
+    final orderTypes = report.orderSummaries
+        .map((o) => (name: o.orderType, amount: o.totalAmount))
+        .toList();
+    final paymentMethods = report.paymentSummaries
+        .map((p) => (name: p.paymentType, amount: p.totalAmount))
+        .toList();
+    final orderTypeTotal = orderTypes.fold<double>(0, (s, o) => s + o.amount);
+    // Total Credit = sum of the 'Credit' payment method.
+    final totalCredit = paymentMethods
+        .where((p) => p.name.toLowerCase() == 'credit')
+        .fold<double>(0, (s, p) => s + p.amount);
+
+    // ── THERMAL SETTLEMENT RECEIPT (preferred) ──
+    // Uses the saved receipt printer (or KOT printer as fallback). Falls through
+    // to the PDF path below if no thermal printer is configured or the send fails.
+    final printer =
+        printerStore.defaultReceiptPrinter ?? printerStore.defaultKotPrinter;
+    if (printer != null) {
+      final bytes = EscPosReceiptBuilder.buildEodSettlementTicket(
+        paperWidth: printer.paperSize,
+        storeName: storeName,
+        currencySymbol: symbol,
+        shiftUser: shiftUser,
+        shiftStart: shiftStart,
+        shiftEnd: shiftEnd,
+        orderTypes: orderTypes,
+        totalSale: netSale,
+        discount: report.totalDiscount,
+        netSale: netSale,
+        tax: tax,
+        roundOff: roundOff,
+        grossSale: grossSale,
+        cash: cashRecon.actualCash,
+        totalCredit: totalCredit,
+        openingBalance: report.openingBalance,
+        cashExpense: report.cashExpenses,
+        totalExpense: report.totalExpenses,
+        drawerBalance: report.closingBalance,
+        withdrawalCash: withdrawalCash,
+        cashDifference: cashRecon.difference,
+        paymentMethods: paymentMethods,
+        noOfBill: report.totalOrderCount,
+        reprintBill: 0,
+        cancelledBill: report.cancelledOrderCount,
+        cancelledBillAmount: report.cancelledOrderAmount,
+        cancelledProducts: 0,
+        cancelledProductsAmount: 0,
+        saleReturnAmount: report.totalRefunds,
+        finalAmount: grossSale,
+      );
+
+      final success = await printerStore.sendBytes(bytes, printer);
+      if (success) {
+        NotificationService.instance
+            .showSuccess('Settlement printed to ${printer.name}');
+        return;
+      }
+      NotificationService.instance.showError(
+          'Thermal print failed: ${printerStore.errorMessage ?? "Unknown error"}. Showing PDF...');
+      // fall through to PDF
+    }
+
+    // ── PDF FALLBACK — same SETTLEMENT layout on an 80mm roll ──
+    final font = await PdfGoogleFonts.poppinsRegular();
     final boldFont = await PdfGoogleFonts.poppinsBold();
+    final df = DateFormat('dd-MM-yyyy hh:mm:ss a');
+    String money(double v) => DecimalSettings.formatAmount(v);
+    final dur = shiftEnd.difference(shiftStart);
+    String two(int n) => n.toString().padLeft(2, '0');
+    final durationStr =
+        '${two(dur.inHours)}:${two(dur.inMinutes % 60)}:${two(dur.inSeconds % 60)}';
 
     await Printing.layoutPdf(
-      name: 'EOD_Summary_$dateStr',
+      name: 'EOD_Settlement_$dateStr',
       onLayout: (_) {
         final doc = pw.Document();
         doc.addPage(
           pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.all(32),
+            pageFormat: PdfPageFormat.roll80,
+            margin: const pw.EdgeInsets.all(10),
             theme: pw.ThemeData.withFont(base: font, bold: boldFont),
             build: (pw.Context ctx) => pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
                 pw.Center(
                   child: pw.Text(storeName,
-                      style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(
+                          fontSize: 15, fontWeight: pw.FontWeight.bold)),
                 ),
-                pw.Center(child: pw.Text('End of Day Summary – $dateStr')),
-                pw.SizedBox(height: 4),
-                pw.Divider(),
-                pw.SizedBox(height: 8),
-                _pdfRow('Opening Balance', '$symbol ${report.openingBalance.toStringAsFixed(2)}'),
-                pw.SizedBox(height: 12),
-                pw.Text('Order Summary', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
-                pw.SizedBox(height: 4),
-                ...report.orderSummaries.map((o) =>
-                    _pdfRow('${o.orderType} (${o.orderCount} orders)',
-                        '$symbol ${o.totalAmount.toStringAsFixed(2)}')),
-                pw.SizedBox(height: 12),
-                pw.Text('Payment Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
-                pw.SizedBox(height: 4),
-                ...report.paymentSummaries.map((p) =>
-                    _pdfRow('${p.paymentType} (${p.transactionCount} txns)',
-                        '$symbol ${p.totalAmount.toStringAsFixed(2)}')),
-                pw.SizedBox(height: 12),
-                if (report.taxSummaries.isNotEmpty) ...[
-                  pw.Text('Tax Breakdown', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
-                  pw.SizedBox(height: 4),
-                  ...report.taxSummaries.map((t) =>
-                      _pdfRow('${t.taxName} (${t.taxRate}%)', '$symbol ${t.taxAmount.toStringAsFixed(2)}')),
-                  pw.SizedBox(height: 12),
-                ],
-                pw.Divider(),
-                _pdfRow('Total Discount', '$symbol ${report.totalDiscount.toStringAsFixed(2)}'),
-                _pdfRow('Total Tax', '$symbol ${report.totalTax.toStringAsFixed(2)}'),
-                _pdfRow('Total Expenses', '$symbol ${report.totalExpenses.toStringAsFixed(2)}'),
-                pw.SizedBox(height: 4),
-                pw.Divider(thickness: 1.5),
-                pw.SizedBox(height: 4),
-                _pdfRow('TOTAL SALES',
-                    '$symbol ${report.totalSales.toStringAsFixed(2)}',
-                    bold: true),
-                pw.SizedBox(height: 4),
-                _pdfRow('Expected Cash',
-                    '$symbol ${(report.openingBalance + expectedCash - cashExpenses).toStringAsFixed(2)}'),
-                pw.SizedBox(height: 16),
-                pw.Center(child: pw.Text('Generated by UniPOS', style: const pw.TextStyle(fontSize: 10))),
+                pw.Center(
+                  child: pw.Text('SETTLEMENT RECEIPT',
+                      style: pw.TextStyle(
+                          fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                ),
+                _pdfDash(),
+                _pdfSettleRow('SHIFT USER:', shiftUser),
+                _pdfSettleRow('SHIFT START:', df.format(shiftStart)),
+                _pdfSettleRow('SHIFT END:', df.format(shiftEnd)),
+                _pdfSettleRow('DURATION:', durationStr),
+                _pdfDash(),
+                ...orderTypes.map((o) =>
+                    _pdfSettleRow(o.name.toUpperCase(), money(o.amount))),
+                _pdfSettleRow('TOTAL (ORDER TYPE)', money(orderTypeTotal)),
+                _pdfDash(),
+                _pdfSettleRow('TOTAL SALE:', money(netSale)),
+                _pdfSettleRow('DISCOUNT:', money(report.totalDiscount)),
+                _pdfSettleRow('NET SALE:', money(netSale)),
+                _pdfSettleRow('TAX:', money(tax)),
+                _pdfSettleRow('ROUND OFF:', money(roundOff)),
+                _pdfSettleRow('GROSS SALE:', money(grossSale), bold: true),
+                _pdfDash(),
+                _pdfSettleRow('CASH', money(cashRecon.actualCash)),
+                _pdfSettleRow('TOTAL CREDIT:', money(totalCredit)),
+                _pdfSettleRow('OPENING BALANCE:', money(report.openingBalance)),
+                _pdfSettleRow('CASH EXPENSE:', money(report.cashExpenses)),
+                _pdfSettleRow('TOTAL EXPENSE:', money(report.totalExpenses)),
+                _pdfSettleRow('DRAWER BALANCE:', money(report.closingBalance)),
+                _pdfSettleRow('WITHDRAWAL CASH:', money(withdrawalCash)),
+                _pdfSettleRow('CASH DIFFERENCE:', money(cashRecon.difference)),
+                _pdfDash(),
+                ...paymentMethods.map((p) =>
+                    _pdfSettleRow(p.name.toUpperCase(), money(p.amount))),
+                if (paymentMethods.isNotEmpty) _pdfDash(),
+                _pdfSettleRow('NO OF BILL:', '${report.totalOrderCount}'),
+                _pdfSettleRow('REPRINT BILL:', '0'),
+                _pdfSettleRow('CANCELLED BILL:', '${report.cancelledOrderCount}'),
+                _pdfSettleRow('CANCELLED BILL AMOUNT:', money(report.cancelledOrderAmount)),
+                _pdfSettleRow('CANCELLED PRODUCTS:', '0'),
+                _pdfSettleRow('CANCELLED PRODUCTS AMOUNT:', money(0)),
+                _pdfSettleRow('SALE RETURN AMOUNT:', money(report.totalRefunds)),
+                _pdfDash(),
+                _pdfSettleRow('FINAL AMOUNT:', '$symbol ${money(grossSale)}',
+                    bold: true, large: true),
+                _pdfDash(),
+                pw.Center(
+                  child: pw.Text('THANK YOU...!',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                ),
               ],
             ),
           ),
@@ -1129,19 +1266,33 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     );
   }
 
-  pw.Widget _pdfRow(String label, String value, {bool bold = false}) {
-    final style = bold
-        ? pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)
-        : const pw.TextStyle(fontSize: 12);
+  pw.Widget _pdfSettleRow(String label, String value,
+      {bool bold = false, bool large = false}) {
+    final style = pw.TextStyle(
+      fontSize: large ? 13 : 9.5,
+      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+    );
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(label, style: style),
+          pw.Expanded(child: pw.Text(label, style: style)),
+          pw.SizedBox(width: 8),
           pw.Text(value, style: style),
         ],
       ),
+    );
+  }
+
+  pw.Widget _pdfDash() {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 3),
+      child: pw.Text(List.filled(60, '-').join(),
+          maxLines: 1,
+          overflow: pw.TextOverflow.clip,
+          style: const pw.TextStyle(fontSize: 9)),
     );
   }
 

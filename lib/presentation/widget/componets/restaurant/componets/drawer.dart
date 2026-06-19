@@ -643,6 +643,12 @@ class _DrawerrState extends State<Drawerr> {
                       ),
                       onPressed: () async {
                         final outerContext = context;
+                        // Backups are always encrypted — make sure a password is set first.
+                        if (!await UnifiedBackupService
+                            .ensureBackupPassword(outerContext)) {
+                          return;
+                        }
+                        if (!outerContext.mounted) return;
                         Navigator.pop(outerContext);
 
                         final navigatorState =
@@ -725,6 +731,12 @@ class _DrawerrState extends State<Drawerr> {
                       ),
                       onPressed: () async {
                         final outerContext = context;
+                        // Backups are always encrypted — make sure a password is set first.
+                        if (!await UnifiedBackupService
+                            .ensureBackupPassword(outerContext)) {
+                          return;
+                        }
+                        if (!outerContext.mounted) return;
                         Navigator.pop(outerContext);
 
                         final navigatorState =
@@ -809,51 +821,22 @@ class _DrawerrState extends State<Drawerr> {
                         ),
                       ),
                       onPressed: () async {
-                        Navigator.pop(context);
+                        Navigator.pop(context); // close the backup menu
 
-                        final navigatorState =
-                            Navigator.of(context, rootNavigator: true);
-
-                        final importHInset = !AppResponsive.isMobile(context)
-                            ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                            : 24.0;
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (BuildContext dialogContext) {
-                            return WillPopScope(
-                              onWillPop: () async => false,
-                              child: AlertDialog(
-                                insetPadding: EdgeInsets.symmetric(horizontal: importHInset, vertical: 24),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const CircularProgressIndicator(),
-                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-                                    Text(
-                                      'Importing backup...\nPlease wait',
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-
+                        // importData shows its OWN file picker and (for encrypted
+                        // backups) a password prompt. Do NOT pre-show a blocking
+                        // "Importing…" modal here — a non-dismissible barrier sits
+                        // on top of that prompt, so the import would silently never
+                        // ask for the password.
                         bool importSuccess = false;
                         try {
                           importSuccess =
                               await UnifiedBackupService.importData(context);
                         } catch (e) {
                           debugPrint('Import error in drawer: $e');
-                        } finally {
-                          if (navigatorState.mounted) {
-                            navigatorState.pop();
-                          }
+                        }
 
-                          if (importSuccess) {
+                        if (importSuccess) {
                             await Future.delayed(Duration(milliseconds: 300));
 
                             final globalContext =
@@ -901,7 +884,6 @@ class _DrawerrState extends State<Drawerr> {
                               );
                             }
                           }
-                        }
                       },
                     ),
                   ],

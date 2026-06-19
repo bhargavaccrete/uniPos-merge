@@ -369,12 +369,13 @@ class _CartScreenState extends State<CartScreen>
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
     return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         title: Text(
-          isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length})',
+          isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length} ${_combinedList.length == 1 ? 'item' : 'items'})',
           style: GoogleFonts.poppins(
             color: Colors.white,
             fontSize: AppResponsive.getValue(context, mobile: 17, tablet: 19),
@@ -425,7 +426,16 @@ class _CartScreenState extends State<CartScreen>
               children: [
                 // Order type tabs
                 Container(
-                  color: AppColors.white,
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 12, vertical: isTablet ? 10 : 8),
                   child: Row(
                     children: [

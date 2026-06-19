@@ -221,6 +221,11 @@ static Future<void> deleteOrder (String id )async{
     final updatedKotNumbers = [...existingOrder.kotNumbers, newKotNumber];
     final updatedBoundaries = [...existingOrder.kotBoundaries, combinedItems.length];
 
+    // Stamp the new add-on KOT so the KDS timer starts from when it was added.
+    final updatedKotTimestamps =
+        Map<int, DateTime>.from(existingOrder.kotTimestamps ?? {});
+    updatedKotTimestamps[newKotNumber] = DateTime.now();
+
     // Create updated order
     final updatedOrder = existingOrder.copyWith(
       items: combinedItems,
@@ -228,6 +233,7 @@ static Future<void> deleteOrder (String id )async{
       kotNumbers: updatedKotNumbers,
       itemCountAtLastKot: combinedItems.length,
       kotBoundaries: updatedBoundaries,
+      kotTimestamps: updatedKotTimestamps,
     );
 
     // Save to database

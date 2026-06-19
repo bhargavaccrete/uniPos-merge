@@ -5,6 +5,7 @@ import 'package:unipos/core/config/app_config.dart';
 
 // Unified backup service (works for both modes)
 import 'package:unipos/domain/services/common/unified_backup_service.dart';
+import 'package:unipos/domain/services/common/backup_encryption_service.dart';
 
 // Legacy backup implementations (kept for backward compatibility, not actively used)
 // import 'package:unipos/domain/services/retail/backup_service.dart';
@@ -129,6 +130,14 @@ class AutoBackupService {
 
   /// Perform the actual backup (mode-aware)
   static Future<void> _performBackup() async {
+    // Backups are always encrypted. With no password set there is no way to
+    // encrypt (and no UI to prompt here), so skip — the start-of-day prompt and
+    // Settings nudge the user to set one.
+    if (!await BackupEncryptionService.hasPassword()) {
+      debugPrint('⏭️  Auto-backup skipped: no backup password set');
+      return;
+    }
+
     isBackingUp.value = true;
     try {
       debugPrint('📦 Starting automatic backup for ${AppConfig.businessMode.name} mode...');

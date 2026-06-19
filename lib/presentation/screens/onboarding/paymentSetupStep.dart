@@ -1,8 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:unipos/core/di/service_locator.dart';
+import 'package:unipos/domain/services/retail/store_settings_service.dart';
 import '../../../util/common/app_responsive.dart';
+import '../../../util/common/upi_qr_helper.dart';
+import 'package:unipos/models/payment_method.dart';
+import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/stores/payment_method_store.dart';
 import '../../../util/color.dart';
 import '../../../util/common/currency_helper.dart';
@@ -26,6 +32,15 @@ class PaymentSetupStep extends StatefulWidget {
 class _PaymentSetupStepState extends State<PaymentSetupStep> {
   late PaymentMethodStore _store;
   bool _isInitialized = false;
+
+  final StoreSettingsService _storeSettings = StoreSettingsService();
+  final TextEditingController _upiIdController = TextEditingController();
+  final TextEditingController _upiPayeeController = TextEditingController();
+
+  /// Drives the QR preview. Updated off the keystroke frame (debounced) so the
+  /// CustomPaint subtree never rebuilds during text-input processing.
+  final ValueNotifier<String> _upiQrData = ValueNotifier<String>('');
+  Timer? _qrDebounce;
 
   /// Values that belong to the 6 built-in default methods.
   /// Custom-added methods will have different values, making them deletable.
@@ -64,6 +79,269 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     super.initState();
     _store = locator<PaymentMethodStore>();
     _initializeStore();
+    _loadUpiSettings();
+  }
+
+  @override
+  void dispose() {
+    _qrDebounce?.cancel();
+    _upiQrData.dispose();
+    _upiIdController.dispose();
+    _upiPayeeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUpiSettings() async {
+    final upiId = await _storeSettings.getUpiId();
+    final upiPayee = await _storeSettings.getUpiPayeeName();
+    if (!mounted) return;
+    setState(() {
+      _upiIdController.text = upiId ?? '';
+      _upiPayeeController.text = upiPayee ?? '';
+    });
+    _refreshUpiPreview();
+  }
+
+  /// Immediately recompute the UPI string driving the QR preview.
+  void _refreshUpiPreview() {
+    _upiQrData.value = _upiIdController.text.trim().isEmpty
+        ? ''
+        : UpiQrHelper.buildUpiUri(_upiIdController.text,
+            payee: _upiPayeeController.text);
+  }
+
+  /// Debounced preview update fired from field onChanged callbacks.
+  void _scheduleUpiPreview() {
+    _qrDebounce?.cancel();
+    _qrDebounce =
+        Timer(const Duration(milliseconds: 350), _refreshUpiPreview);
+  }
+
+
+  void _showEditDialog(PaymentMethod method) async {
+    final nameController = TextEditingController(text: method.name);
+    if (method.value == 'upi') {
+      final upiId = await _storeSettings.getUpiId();
+      final upiPayee = await _storeSettings.getUpiPayeeName();
+      _upiIdController.text = upiId ?? '';
+      _upiPayeeController.text = upiPayee ?? '';
+      _refreshUpiPreview();
+    }
+
+    if (!mounted) return;
+    
+    final editHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: editHInset, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding: EdgeInsets.zero,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.edit_rounded,
+                          size: 24,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Edit Payment Method',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: AppColors.divider),
+                
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppTextField(
+                        controller: nameController,
+                        label: 'Method Name',
+                        hint: 'Enter method name',
+                        icon: Icons.payment_rounded,
+                        required: true,
+                      ),
+                      if (method.value == 'upi') ...[
+                        const SizedBox(height: 16),
+                        AppTextField(
+                          controller: _upiIdController,
+                          label: 'Merchant UPI ID (VPA)',
+                          hint: 'e.g., merchant@okhdfc',
+                          icon: Icons.alternate_email_rounded,
+                          onChanged: (_) => _scheduleUpiPreview(),
+                        ),
+                        const SizedBox(height: 16),
+                        AppTextField(
+                          controller: _upiPayeeController,
+                          label: 'Payee Name (Optional)',
+                          hint: 'Falls back to Store Name',
+                          icon: Icons.person_outline_rounded,
+                          onChanged: (_) => _scheduleUpiPreview(),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Payment QR Preview',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ValueListenableBuilder<String>(
+                          valueListenable: _upiQrData,
+                          builder: (context, qrData, _) => Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceLight,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: qrData.isEmpty
+                                ? Column(
+                                    children: [
+                                      Icon(Icons.qr_code_2,
+                                          size: 48,
+                                          color: AppColors.textSecondary
+                                              .withValues(alpha: 0.5)),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Enter a UPI ID to generate the QR code',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary),
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: AppColors.divider),
+                                        ),
+                                        child: SizedBox(
+                                          width: 160,
+                                          height: 160,
+                                          child: QrImageView(
+                                            data: qrData,
+                                            version: QrVersions.auto,
+                                            size: 160,
+                                            gapless: true,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Auto-generated from the UPI ID above',
+                                        style: GoogleFonts.poppins(
+                                            fontSize: 11,
+                                            color: AppColors.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                nameController.dispose();
+                Navigator.pop(context);
+              },
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameController.text.isNotEmpty) {
+                  final updatedMethod = method.copyWith(
+                    name: nameController.text,
+                    value: nameController.text.toLowerCase().replaceAll(' ', '_'),
+                  );
+                  await _store.updatePaymentMethod(updatedMethod);
+                  if (method.value == 'upi') {
+                    await _storeSettings.setUpiId(_upiIdController.text);
+                    await _storeSettings.setUpiPayeeName(_upiPayeeController.text);
+                    // Generate the QR from the UPI ID and store it so receipts
+                    // keep printing the same merchant QR.
+                    final qrBytes = await UpiQrHelper.generateQrBytes(
+                      _upiIdController.text,
+                      payee: _upiPayeeController.text,
+                    );
+                    await _storeSettings.setUpiQrImage(qrBytes);
+                  }
+                  nameController.dispose();
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Update',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _initializeStore() async {
@@ -875,7 +1153,6 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
               ),
             ),
 
-            // Toggle
             Switch(
               value: enabled,
               onChanged: (_) =>
@@ -883,6 +1160,27 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
               activeColor: AppColors.primary,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
+            if (enabled) ...[
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  onPressed: () => _showEditDialog(method),
+                  icon: const Icon(
+                    Icons.edit_rounded,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  tooltip: 'Edit Method',
+                  splashRadius: 20,
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(8),
+                ),
+              ),
+            ],
 
             // Delete (custom methods only)
             if (!isDefault) ...[
@@ -957,4 +1255,5 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
       ),
     );
   }
+
 }

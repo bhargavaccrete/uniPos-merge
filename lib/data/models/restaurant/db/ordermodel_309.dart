@@ -118,6 +118,10 @@ class OrderModel extends HiveObject {
   @HiveField(35)
   final DateTime? lastModifiedAt; // When the order was last modified
 
+  @HiveField(36)
+  final Map<int, DateTime>? kotTimestamps; // When each KOT was created; add-on
+  // KOTs differ from the order's timeStamp. First KOT falls back to timeStamp.
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -159,6 +163,7 @@ class OrderModel extends HiveObject {
     this.sessionId,
     this.lastModifiedBy,
     this.lastModifiedAt,
+    this.kotTimestamps,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -201,6 +206,7 @@ class OrderModel extends HiveObject {
     String? sessionId,
     String? lastModifiedBy,
     DateTime? lastModifiedAt,
+    Map<int, DateTime>? kotTimestamps,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -239,6 +245,7 @@ class OrderModel extends HiveObject {
       sessionId: sessionId ?? this.sessionId,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
+      kotTimestamps: kotTimestamps ?? this.kotTimestamps,
     );
   }
 

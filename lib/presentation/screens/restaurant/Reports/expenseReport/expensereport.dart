@@ -595,7 +595,7 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
         onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(fontSize: isDesktop ? 17 : (isTablet ? 16 : 15), fontWeight: FontWeight.w600),
         ),
         style: ElevatedButton.styleFrom(

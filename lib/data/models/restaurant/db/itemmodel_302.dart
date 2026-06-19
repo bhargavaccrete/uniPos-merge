@@ -184,13 +184,33 @@ class Items extends HiveObject {
     return finalPrice - basePrice;
   }
 
-  void applyTax(double newRate) {
-    taxRate = newRate;
+  /// Adds tax [taxId] (decimal [rate], e.g. 0.05) to this item — max 2 taxes.
+  /// taxRate is kept as the SUM of the applied taxes (same as the multi-select
+  /// item editor). Returns true if applied, false if skipped (already applied,
+  /// or the item is already at the 2-tax limit).
+  bool applyTax(String taxId, double rate) {
+    final ids = List<String>.from(taxIds ?? const <String>[]);
+    if (ids.contains(taxId)) return false; // already applied
+    if (ids.length >= 2) return false; // cap at 2 taxes per item
+    ids.add(taxId);
+    taxIds = ids;
+    taxRate = (taxRate ?? 0) + rate;
     save();
+    return true;
   }
 
-  void removeTax() {
-    taxRate = null;
+  /// Removes tax [taxId] (decimal [rate]) and lowers taxRate by that amount.
+  void removeTax(String taxId, double rate) {
+    final ids = List<String>.from(taxIds ?? const <String>[]);
+    if (!ids.remove(taxId)) return; // wasn't applied
+    if (ids.isEmpty) {
+      taxIds = null;
+      taxRate = null;
+    } else {
+      taxIds = ids;
+      final r = (taxRate ?? 0) - rate;
+      taxRate = r > 0 ? r : null;
+    }
     save();
   }
 

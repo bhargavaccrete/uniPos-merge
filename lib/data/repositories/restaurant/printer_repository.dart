@@ -7,9 +7,9 @@ import '../../models/restaurant/db/saved_printer_model.dart';
 /// Handles all Hive database operations for printer configuration.
 ///
 /// Default printer assignments are stored in SharedPreferences (not on the
-/// model's isDefault field) so that KOT default and Receipt default are
-/// truly independent. A single printer with role='both' can be the default
-/// for KOT, Receipt, or both simultaneously without conflict.
+/// model's isDefault field). The KOT and Receipt defaults are MUTUALLY
+/// EXCLUSIVE — a single physical printer can be the default for only ONE
+/// role; assigning it to one role releases it from the other.
 class PrinterRepository {
   late Box<SavedPrinterModel> _printerBox;
 
@@ -70,12 +70,21 @@ class PrinterRepository {
 
   /// Set a printer as default for a specific role ('kot' or 'receipt').
   ///
-  /// Stored in SharedPreferences — completely independent per role.
-  /// Setting KOT default does NOT affect Receipt default and vice versa.
+  /// Mutually exclusive: if this printer is currently the OTHER role's default,
+  /// that assignment is released first — one printer can't be both Billing and
+  /// Kitchen at once.
   Future<void> setDefaultPrinter(String id, String role) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = role == 'kot' ? _defaultKotPrinterKey : _defaultReceiptPrinterKey;
-    await prefs.setString(key, id);
+    final thisKey =
+        role == 'kot' ? _defaultKotPrinterKey : _defaultReceiptPrinterKey;
+    final otherKey =
+        role == 'kot' ? _defaultReceiptPrinterKey : _defaultKotPrinterKey;
+
+    // Release this printer from the other role if it held it.
+    if (prefs.getString(otherKey) == id) {
+      await prefs.remove(otherKey);
+    }
+    await prefs.setString(thisKey, id);
   }
 
   /// Clear default assignment for a role

@@ -202,6 +202,12 @@ class HiveBoxNames {
   /// Staff attendance clock-in/out records
   static const String restaurantAttendance = 'restaurantAttendanceBox';
 
+  /// Persisted app notifications (low stock, EOD, backup, license, etc.)
+  static const String restaurantNotifications = 'restaurantNotificationsBox';
+
+  /// Item-level cancellation audit (items cancelled from a placed order, with reason)
+  static const String restaurantItemCancellations = 'restaurantItemCancellationsBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode
@@ -289,6 +295,8 @@ class HiveBoxNames {
     restaurantPrinters,
     restaurantSessions,
     restaurantAttendance,
+    restaurantNotifications,
+    restaurantItemCancellations,
   ];
 
   /// All common box names (shared between retail and restaurant)

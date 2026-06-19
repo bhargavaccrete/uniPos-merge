@@ -21,6 +21,9 @@ import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/ta
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../item/default_choice_picker.dart';
+import '../../item/variant_selection_screen.dart';
+import '../../item/choice_selection_screen.dart';
+import '../../item/extra_selection_screen.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import 'edit_category.dart';
@@ -76,6 +79,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
   String allowOutOfStockFilter = 'YES';
   String _lowStockAlertFilter = 'NO';
   bool _isSaving = false;
+
+  // Live option catalogs (mutable so options created via "+ New" appear
+  // immediately without re-loading and discarding in-progress edits).
+  List<VariantModel> _allVariants = [];
+  List<ChoicesModel> _allChoices = [];
+  List<Extramodel> _allExtra = [];
 
   // For managing variant selections
   late List<bool> _variantCheckedList;
@@ -135,6 +144,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
     final allChoices = choiceStore.choices.toList();
     final allExtra = extraStore.extras.toList();
     final allItems = itemStore.items.toList();
+
+    // Mirror into mutable state so "+ New" can grow these lists in place.
+    _allVariants = allVariants;
+    _allChoices = allChoices;
+    _allExtra = allExtra;
 
     // The rest of the function remains the same, as it correctly
     // pre-selects the variants and choices.
@@ -259,10 +273,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
     // Variant stock changes to log as adjustments after the item is saved.
     final pendingAdjustments = <Map<String, dynamic>>[];
     List<ItemVariante> selectedVariants = [];
-    for (int i = 0; i < data.allVariants.length; i++) {
+    for (int i = 0; i < _allVariants.length; i++) {
       if (_variantCheckedList[i]) {
         final priceText = _variantPriceControllers[i].text.trim();
-        final variantId = data.allVariants[i].id;
+        final variantId = _allVariants[i].id;
 
         // ✅ FIX: Preserve existing stock quantities when editing
         // Find the existing variant with this variantId to preserve stock data
@@ -301,25 +315,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
     }
 
     List<String> selectedChoiceIds = [];
-    for (int i = 0; i < data.allChoices.length; i++) {
+    for (int i = 0; i < _allChoices.length; i++) {
       if (_choiceCheckedList[i]) {
-        selectedChoiceIds.add(data.allChoices[i].id);
+        selectedChoiceIds.add(_allChoices[i].id);
       }
     }
 
 
     List<String> selectedExtraId = [];
-    for(int i = 0 ; i < data.allExtra.length; i++ ){
+    for(int i = 0 ; i < _allExtra.length; i++ ){
       if(_extraCheckedList[i]){
-        selectedExtraId.add(data.allExtra[i].Id);
+        selectedExtraId.add(_allExtra[i].Id);
       }
     }
 
     // Build extra constraints map from controllers
     Map<String, Map<String, int>> extraConstraints = {};
-    for(int i = 0 ; i < data.allExtra.length; i++ ){
+    for(int i = 0 ; i < _allExtra.length; i++ ){
       if(_extraCheckedList[i]){
-        final extraId = data.allExtra[i].Id;
+        final extraId = _allExtra[i].Id;
         final minText = _extraConstraintControllers[extraId]?['min']?.text.trim() ?? '';
         final maxText = _extraConstraintControllers[extraId]?['max']?.text.trim() ?? '';
 
@@ -892,16 +906,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
           const SizedBox(height: 25),
 
-          // Variants, Choices & Extras Section
-          if (data.allVariants.isNotEmpty || data.allChoices.isNotEmpty || data.allExtra.isNotEmpty) ...[
-            _buildSectionHeader('Additional Options', Icons.extension),
-            const SizedBox(height: 15),
-          ],
-          if (data.allVariants.isNotEmpty) _buildVariantSection(data.allVariants),
-          if (data.allChoices.isNotEmpty) _buildChoiceSection(data.allChoices),
-          if (data.allChoices.isNotEmpty && _choiceCheckedList.contains(true))
-            _buildDefaultSelectionButton(data.allChoices),
-          if(data.allExtra.isNotEmpty) _buildExtrtaSection(data.allExtra),
+          // Variants, Choices & Extras Section — always shown so new options can
+          // be created here (via the "+ New" button in each section header).
+          _buildSectionHeader('Additional Options', Icons.extension),
+          const SizedBox(height: 15),
+          _buildVariantSection(_allVariants),
+          _buildChoiceSection(_allChoices),
+          if (_choiceCheckedList.contains(true))
+            _buildDefaultSelectionButton(_allChoices),
+          _buildExtrtaSection(_allExtra),
           const SizedBox(height: 30),
           // Save Button
           SizedBox(
@@ -955,6 +968,106 @@ class _EdititemScreenState extends State<EdititemScreen> {
     );
   }
 
+  // Small "+ New" action shown in each option section header.
+  Widget _addNewButton(VoidCallback onTap) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.add, size: 16),
+      label: Text('New',
+          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  // "+ New" opens the SAME create dialog used in the Add-Item flow (no full-page
+  // navigation). After a new option is created in its store, the matching list
+  // is rebuilt: existing rows keep their controllers/selection (no lost edits),
+  // newly-created options are appended and auto-ticked.
+  Future<void> _addNewVariants() async {
+    await showAddVariantDialog(context, onAdded: _refreshVariants);
+  }
+
+  void _refreshVariants() {
+    final old = _allVariants;
+    final fresh = variantStore.variants.toList();
+    final checked = <bool>[];
+    final prices = <TextEditingController>[];
+    final stocks = <TextEditingController>[];
+    for (final v in fresh) {
+      final i = old.indexWhere((o) => o.id == v.id);
+      if (i != -1) {
+        checked.add(_variantCheckedList[i]);
+        prices.add(_variantPriceControllers[i]);
+        stocks.add(_variantStockControllers[i]);
+      } else {
+        checked.add(true); // newly created → auto-tick
+        prices.add(TextEditingController());
+        stocks.add(TextEditingController());
+      }
+    }
+    setState(() {
+      _allVariants = fresh;
+      _variantCheckedList = checked;
+      _variantPriceControllers = prices;
+      _variantStockControllers = stocks;
+    });
+  }
+
+  Future<void> _addNewChoices() async {
+    await showAddChoiceDialog(context, onAdded: _refreshChoices);
+  }
+
+  void _refreshChoices() {
+    final old = _allChoices;
+    final fresh = choiceStore.choices.toList();
+    final checked = <bool>[];
+    for (final c in fresh) {
+      final i = old.indexWhere((o) => o.id == c.id);
+      checked.add(i != -1 ? _choiceCheckedList[i] : true);
+    }
+    setState(() {
+      _allChoices = fresh;
+      _choiceCheckedList = checked;
+    });
+  }
+
+  Future<void> _addNewExtras() async {
+    await showAddExtraDialog(context, onAdded: _refreshExtras);
+  }
+
+  void _refreshExtras() {
+    final old = _allExtra;
+    final fresh = extraStore.extras.toList();
+    final checked = <bool>[];
+    for (final e in fresh) {
+      final i = old.indexWhere((o) => o.Id == e.Id);
+      checked.add(i != -1 ? _extraCheckedList[i] : true);
+      // Ensure every extra has min/max constraint controllers (new ones fresh).
+      _extraConstraintControllers.putIfAbsent(e.Id, () {
+        final gMin = e.minimum, gMax = e.maximum;
+        return {
+          'min': TextEditingController(
+              text: (gMin != null && gMin != 0) ? gMin.toString() : ''),
+          'max': TextEditingController(
+              text: (gMax != null && gMax != 0) ? gMax.toString() : ''),
+        };
+      });
+      _extraHasConstraints.putIfAbsent(
+          e.Id,
+          () => (e.minimum != null && e.minimum != 0) ||
+              (e.maximum != null && e.maximum != 0));
+    }
+    setState(() {
+      _allExtra = fresh;
+      _extraCheckedList = checked;
+    });
+  }
+
   // Helper widget for building the variants section
   Widget _buildVariantSection(List<VariantModel> variants) {
     return Card(
@@ -980,9 +1093,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     color: Colors.black87,
                   ),
                 ),
+                const Spacer(),
+                _addNewButton(_addNewVariants),
               ],
             ),
             const Divider(),
+            if (variants.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('No variants yet. Tap "New" to add one.',
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, color: AppColors.textSecondary)),
+              ),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -1117,9 +1239,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     color: Colors.black87,
                   ),
                 ),
+                const Spacer(),
+                _addNewButton(_addNewChoices),
               ],
             ),
             const Divider(),
+            if (choices.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('No choices yet. Tap "New" to add one.',
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, color: AppColors.textSecondary)),
+              ),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -1163,9 +1294,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     color: Colors.black87,
                   ),
                 ),
+                const Spacer(),
+                _addNewButton(_addNewExtras),
               ],
             ),
             const Divider(),
+            if (extra.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('No extras yet. Tap "New" to add one.',
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, color: AppColors.textSecondary)),
+              ),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -1367,6 +1507,13 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
                               builder: (context) => EditCategory(category: category),
                             ),
                           );
+                          // Re-pull from the store so the renamed category shows
+                          // immediately (mirrors _onAddNewCategory's refresh).
+                          if (mounted) {
+                            setState(() {
+                              _currentCategories = categoryStore.categories.toList();
+                            });
+                          }
                         },
                       ),
                       IconButton(

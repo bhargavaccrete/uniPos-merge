@@ -145,6 +145,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
   Map<String, double> _paymentTypeTotals = {};
   double _totalSales = 0.0;
   double _totalExpenses = 0.0;
+  double _totalDiscount = 0.0;
   double _totalOpeningBalance = 0.0;
   double _totalClosingBalance = 0.0;
   int _reportCount = 0;
@@ -238,6 +239,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     final paymentTypeTotals = <String, double>{};
     double totalSales = 0.0;
     double totalExpenses = 0.0;
+    double totalDiscount = 0.0;
     final matchedReports = <EndOfDayReport>[];
 
     if (hasRange) {
@@ -261,6 +263,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
 
         totalSales += report.totalSales;
         totalExpenses += report.totalExpenses;
+        totalDiscount += report.totalDiscount;
       }
     }
 
@@ -279,6 +282,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
       _paymentTypeTotals = paymentTypeTotals;
       _totalSales = totalSales;
       _totalExpenses = totalExpenses;
+      _totalDiscount = totalDiscount;
       _totalOpeningBalance = openingBalance;
       _totalClosingBalance = closingBalance;
       _reportCount = matchedReports.length;
@@ -298,6 +302,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     // Add financial summary
     dataRows.add(['Opening Balance', ReportExportService.formatCurrency(_totalOpeningBalance)]);
     dataRows.add(['Total Sales', ReportExportService.formatCurrency(_totalSales)]);
+    dataRows.add(['Total Discount', ReportExportService.formatCurrency(_totalDiscount)]);
     dataRows.add(['Total Expenses', ReportExportService.formatCurrency(_totalExpenses)]);
     dataRows.add(['Net Amount', ReportExportService.formatCurrency(_totalSales - _totalExpenses)]);
     dataRows.add(['Closing Balance', ReportExportService.formatCurrency(_totalClosingBalance)]);
@@ -327,6 +332,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
       'Period': periodName,
       'Days Covered': _reportCount.toString(),
       'Total Sales': ReportExportService.formatCurrency(_totalSales),
+      'Total Discount': ReportExportService.formatCurrency(_totalDiscount),
       'Total Expenses': ReportExportService.formatCurrency(_totalExpenses),
       'Net Amount': ReportExportService.formatCurrency(_totalSales - _totalExpenses),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
@@ -1171,6 +1177,8 @@ class _ClosingReportViewState extends State<ClosingReportView> {
           _buildFinancialRow('Opening Balance:', _totalOpeningBalance, Colors.indigo.shade600),
           SizedBox(height: 8),
           _buildFinancialRow('Total Sales:', _totalSales, Colors.green.shade700),
+          SizedBox(height: 8),
+          _buildFinancialRow('Total Discount:', _totalDiscount, Colors.orange.shade700),
           SizedBox(height: 8),
           _buildFinancialRow('Total Expenses:', _totalExpenses, Colors.red.shade700, isNegative: true),
           Divider(thickness: 1, height: 20),

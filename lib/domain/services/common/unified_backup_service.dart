@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb, compute;
 import 'package:universal_html/html.dart' as html;
@@ -11,6 +12,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/core/config/app_config.dart';
+import 'package:unipos/main.dart' show navigatorKey;
 import 'package:unipos/domain/services/common/backup_encryption_service.dart';
 import 'package:unipos/core/di/service_locator.dart';
 import 'package:unipos/core/constants/hive_box_names.dart';
@@ -92,29 +94,58 @@ import 'package:unipos/data/models/retail/hive_model/billing_tab_model_173.dart'
 // Serialises data map to JSON string in a background isolate.
 String _jsonEncodeMap(Map<String, dynamic> data) => jsonEncode(data);
 
-// Decodes a ZIP file (CPU-heavy) in a background isolate. Returns file entries
-// as list of {name, bytes} maps — only data/meta/enc/item_img/prod_img files.
-List<Map<String, dynamic>> _decodeZipInIsolate(List<int> zipBytes) {
-  final archive = ZipDecoder().decodeBytes(zipBytes);
+// Decodes a password-protected (WinZip-AES) ZIP → file entries (CPU-heavy, runs
+// in an isolate). [password] decrypts each entry's content.
+List<Map<String, dynamic>> _decodeZipInIsolate((List<int>, String?) args) {
+  final (zipBytes, password) = args;
+  final archive = ZipDecoder().decodeBytes(zipBytes, password: password);
   return archive
       .where((f) => f.content != null)
       .map((f) => {'name': f.name, 'bytes': f.content as List<int>})
       .toList();
 }
 
-// Encodes a list of {name, bytes} entries into a ZIP Uint8List in a separate isolate.
-Uint8List? _encodeArchiveInIsolate(List<Map<String, dynamic>> entries) {
+// Encodes entries into a password-protected (WinZip-AES) ZIP. The file LIST is
+// visible, but every entry's CONTENT is AES-encrypted — opening/extracting any
+// file requires the password. Runs in an isolate.
+Uint8List? _encodeArchiveInIsolate((List<Map<String, dynamic>>, String?) args) {
+  final (entries, password) = args;
   final archive = Archive();
   for (final entry in entries) {
     final bytes = entry['bytes'] as List<int>;
     archive.addFile(ArchiveFile(entry['name'] as String, bytes.length, bytes));
   }
-  final result = ZipEncoder().encode(archive);
+  final result = ZipEncoder(password: password).encode(archive);
   return result == null ? null : Uint8List.fromList(result);
 }
 
 class UnifiedBackupService {
   static const String _backupDirectoryName = 'UniPOS_Backups';
+
+  /// Shown when an import is rejected for not being encrypted.
+  static const String _unencryptedMsg =
+      'This backup is not encrypted and cannot be restored. '
+      'Only password-protected backups are supported.';
+
+  /// SharedPreferences keys NEVER backed up or restored — device-bound
+  /// (device id / license / printers / captain net config) or session/transient.
+  /// Restoring these to another device would break licensing/printing.
+  static const Set<String> _prefsDenylist = {
+    // Device & license (security-critical, per-device)
+    'unipos_device_id', 'unipos_device_id_source', 'unipos_license_token',
+    'unipos_pending_license_key', 'unipos_last_seen_epoch', 'unipos_license_bypass',
+    // Hardware / network config
+    'default_kot_printer_id', 'default_receipt_printer_id',
+    'captain_pos_ip', 'captain_logged_in', 'captain_staff_id', 'is_captain_mode',
+    // Session / auth state (re-established on login)
+    'restaurant_is_logged_in', 'restaurant_login_type', 'restaurant_staff_role',
+    'restaurant_staff_name', 'restaurant_current_shift_id',
+    'admin_session', 'admin_username', 'admin_session_timestamp',
+    // Transient / regenerated
+    'last_backup_date', 'auto_backup_enabled', 'first_time_pos',
+    'first_time_pos_v2', 'last_eod_date', 'retail_last_eod_date',
+    'pendingEod_snoozed_date', 'dev_rsa_keypair_v1',
+  };
 
   /// ---------------------------
   /// 🔧 HELPER: Deep clean map for JSON serialization
@@ -174,35 +205,38 @@ class UnifiedBackupService {
       final data = await _collectAllData();
       final jsonString = jsonEncode(data);
 
+      // Encryption is mandatory — never write plaintext on web either.
       final password = await BackupEncryptionService.getStoredPassword();
-      final isEncrypted = password != null && password.isNotEmpty;
+      if (password == null || password.isEmpty) {
+        throw Exception(
+            'No backup password set — refusing to write an unencrypted backup');
+      }
+      const isEncrypted = true;
+
+      // Password-protected zip: data.json's content is AES-encrypted, so it
+      // can't be opened without the password.
+      final encryptedDataMap = BackupEncryptionService.encryptData(jsonString, password);
+      final encryptedJsonString = jsonEncode(encryptedDataMap);
 
       final archive = Archive();
-      if (isEncrypted) {
-        final encResult = BackupEncryptionService.encryptData(jsonString, password);
-        final meta = jsonEncode({
-          'encrypted': true,
-          'salt': encResult['salt'],
-          'iv': encResult['iv'],
-          'version': '2.0.0',
-        });
-        final encBytes = utf8.encode(encResult['encryptedData']!);
-        final metaBytes = utf8.encode(meta);
-        archive.addFile(ArchiveFile('data.enc', encBytes.length, encBytes));
-        archive.addFile(ArchiveFile('backup_meta.json', metaBytes.length, metaBytes));
-      } else {
-        final jsonBytes = utf8.encode(jsonString);
-        archive.addFile(ArchiveFile('data.json', jsonBytes.length, jsonBytes));
+      final jsonBytes = utf8.encode(encryptedJsonString);
+      archive.addFile(ArchiveFile('data.json', jsonBytes.length, jsonBytes));
+
+      final zipData = ZipEncoder(password: password).encode(archive);
+      if (zipData == null) throw Exception("ZIP creation failed");
+      if (_looksLikePlainBackup(zipData)) {
+        throw Exception(
+            'Backup encryption failed — refusing to write a readable file');
       }
 
-      final zipData = ZipEncoder().encode(archive);
-      if (zipData == null) throw Exception("ZIP creation failed");
+      // Encrypt the entire ZIP bytes to fully protect the zip file (header & filenames)
+      final protectedZipData = BackupEncryptionService.encryptBytes(Uint8List.fromList(zipData), password);
 
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
       final suffix = isEncrypted ? 'encrypted' : 'backup';
       final fileName = 'UniPOS_${suffix}_$timestamp.zip';
 
-      final blob = html.Blob([Uint8List.fromList(zipData)]);
+      final blob = html.Blob([protectedZipData]);
       final url = html.Url.createObjectUrlFromBlob(blob);
       html.AnchorElement(href: url)
         ..setAttribute('download', fileName)
@@ -310,45 +344,38 @@ class UnifiedBackupService {
       Map<String, dynamic> data;
 
       if (fileName.toLowerCase().endsWith('.json')) {
-        data = jsonDecode(utf8.decode(rawBytes));
-      } else {
-        // ZIP — decode synchronously (no background isolate on web)
-        final entries = _decodeZipInIsolate(rawBytes.toList());
-        debugPrint("📦 Web ZIP: ${entries.length} files");
+        // Plain-JSON backups are unencrypted — rejected.
+        throw Exception(_unencryptedMsg);
+      }
 
-        List<int>? jsonBytes;
-        List<int>? encBytes;
-        List<int>? metaBytes;
+      final String? password = await _showPasswordDialog(context);
+      if (password == null) throw Exception("Restore cancelled: no password");
 
-        for (final f in entries) {
-          final name = (f['name'] as String).toLowerCase();
-          if (name == 'data.json') jsonBytes = f['bytes'] as List<int>;
-          if (name == 'data.enc') encBytes = f['bytes'] as List<int>;
-          if (name == 'backup_meta.json') metaBytes = f['bytes'] as List<int>;
+      List<Map<String, dynamic>> entries;
+      if (BackupEncryptionService.isEncryptedBlob(rawBytes)) {
+        // New protected backup: decrypt the outer layer first
+        final decryptedZip = BackupEncryptionService.decryptBytes(rawBytes, password);
+        if (decryptedZip == null) {
+          throw Exception("Wrong password — cannot open backup");
         }
-
-        if (metaBytes != null && encBytes != null) {
-          debugPrint("🔐 Web: encrypted backup detected");
-          final meta = jsonDecode(utf8.decode(metaBytes)) as Map<String, dynamic>;
-          // Always prompt — stored password is for creating backups only.
-          if (!context.mounted) throw Exception("Context not mounted");
-          final String? password = await _showPasswordDialog(context);
-          if (password == null) throw Exception("Restore cancelled: no password");
-
-          final decrypted = BackupEncryptionService.decryptData(
-            encryptedBase64: utf8.decode(encBytes),
-            salt: meta['salt'] as String,
-            ivBase64: meta['iv'] as String,
-            password: password,
-          );
-          if (decrypted == null) throw Exception("Wrong password — cannot decrypt");
-          data = jsonDecode(decrypted);
-        } else if (jsonBytes != null) {
-          data = jsonDecode(utf8.decode(jsonBytes));
-        } else {
-          throw Exception("No data file found in ZIP");
+        try {
+          entries = _decodeZipInIsolate((decryptedZip.toList(), password));
+        } catch (_) {
+          throw Exception("Wrong password or corrupted backup entries");
+        }
+      } else {
+        // Legacy backup: check if plain
+        if (_looksLikePlainBackup(rawBytes.toList())) {
+          throw Exception(_unencryptedMsg);
+        }
+        try {
+          entries = _decodeZipInIsolate((rawBytes.toList(), password));
+        } catch (_) {
+          throw Exception("Wrong password — cannot open backup");
         }
       }
+
+      data = await _restoreEntries(entries, password);
 
       final backupMode = _detectModeFromBackup(data);
       debugPrint("📦 Web import: detected mode = $backupMode");
@@ -358,6 +385,7 @@ class UnifiedBackupService {
       return true;
     } catch (e, st) {
       debugPrint("❌ Web import failed: $e\n$st");
+      _showImportError(context, e);
       return false;
     }
   }
@@ -381,8 +409,8 @@ class UnifiedBackupService {
       Map<String, dynamic> data;
 
       if (extension == '.json') {
-        final jsonString = await file.readAsString();
-        data = jsonDecode(jsonString);
+        // Plain-JSON backups are unencrypted — rejected.
+        throw Exception(_unencryptedMsg);
       } else {
         // Pass a password dialog as the provider for encrypted backups
         data = await _extractZipBackup(
@@ -402,8 +430,21 @@ class UnifiedBackupService {
     } catch (e, stackTrace) {
       debugPrint("❌ Import from file path failed: $e");
       debugPrint("Stack trace: $stackTrace");
+      _showImportError(context, e);
       return false;
     }
+  }
+
+  /// Surfaces the reason an import failed (e.g. unencrypted backup, wrong
+  /// password) to the user instead of failing silently. Uses the global
+  /// navigator context so it shows even if the caller's context went stale.
+  static void _showImportError(BuildContext context, Object e) {
+    final ctx = navigatorKey.currentContext ?? context;
+    if (!ctx.mounted) return;
+    final msg = e.toString().replaceFirst('Exception: ', '');
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+    );
   }
 
   /// ---------------------------
@@ -413,8 +454,13 @@ class UnifiedBackupService {
     final controller = TextEditingController();
     bool obscure = true;
 
+    // Use the global navigator context — the caller's context can go stale
+    // after the system file-picker round-trip, which would silently skip this
+    // prompt (and let an encrypted import appear to "not ask" for a password).
+    final dialogContext = navigatorKey.currentContext ?? context;
+
     return showDialog<String>(
-      context: context,
+      context: dialogContext,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
@@ -457,6 +503,107 @@ class UnifiedBackupService {
         ),
       ),
     );
+  }
+
+  /// ---------------------------
+  /// 🔧 ENSURE A BACKUP PASSWORD EXISTS (prompt to set one if missing)
+  /// ---------------------------
+  /// Returns true if a backup password is set (or was just set), false if the
+  /// user cancelled. Manual export entry points call this before exporting so a
+  /// backup is never attempted without encryption.
+  static Future<bool> ensureBackupPassword(BuildContext context) async {
+    if (await BackupEncryptionService.hasPassword()) return true;
+    if (!context.mounted) return false;
+    return await _showSetBackupPasswordDialog(context);
+  }
+
+  /// Validates a new backup password against its confirmation.
+  /// Returns an error message to show the user, or null when the input is valid.
+  static String? _validateBackupPassword(String password, String confirm) =>
+      BackupEncryptionService.validatePassword(password, confirm);
+
+  /// Prompts the user to set a backup password (with confirmation).
+  /// Saves it via BackupEncryptionService and returns true on success.
+  static Future<bool> _showSetBackupPasswordDialog(BuildContext context) async {
+    final pwdController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool obscure = true;
+    String? error;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.lock_outline, color: Colors.orange),
+              SizedBox(width: 8),
+              Expanded(child: Text('Set Backup Password')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                  'Backups are encrypted with this password. You will need it '
+                  'to restore — it cannot be recovered if lost.'),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: pwdController,
+                obscureText: obscure,
+                autofocus: true,
+                label: 'Backup Password (6 digits)',
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                suffixIcon: IconButton(
+                  icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => obscure = !obscure),
+                ),
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                controller: confirmController,
+                obscureText: obscure,
+                label: 'Confirm Password',
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 10),
+                Text(error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final pwd = pwdController.text.trim();
+                final confirm = confirmController.text.trim();
+                final err = _validateBackupPassword(pwd, confirm);
+                if (err != null) {
+                  setState(() => error = err);
+                  return;
+                }
+                await BackupEncryptionService.setPassword(pwd);
+                if (ctx.mounted) Navigator.pop(ctx, true);
+              },
+              child: const Text('Set Password'),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result ?? false;
   }
 
   /// ---------------------------
@@ -1092,6 +1239,44 @@ class UnifiedBackupService {
       exportMap["paymentMethods"] = [];
     }
 
+    // ✅ Non-Hive settings: SharedPreferences (admin PIN, store/UPI, currency,
+    // toggles, print settings…) minus the device-bound denylist, each tagged
+    // with its type so the JSON round-trip restores int vs double correctly.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localPrefs = <Map<String, dynamic>>[];
+      for (final key in prefs.getKeys()) {
+        if (_prefsDenylist.contains(key)) continue;
+        final value = prefs.get(key);
+        if (value == null) continue;
+        final String type = value is bool
+            ? 'bool'
+            : value is int
+                ? 'int'
+                : value is double
+                    ? 'double'
+                    : value is List
+                        ? 'stringList'
+                        : 'string';
+        localPrefs.add({'key': key, 'type': type, 'value': value});
+      }
+      exportMap["localPrefs"] = localPrefs;
+      debugPrint("📦 Local prefs exported: ${localPrefs.length}");
+    } catch (e) {
+      debugPrint("⚠️ Local prefs export error: $e");
+      exportMap["localPrefs"] = [];
+    }
+
+    // ✅ Backup password (flutter_secure_storage) so a restored device keeps it.
+    try {
+      final pwd = await BackupEncryptionService.getStoredPassword();
+      exportMap["secureCreds"] =
+          (pwd != null && pwd.isNotEmpty) ? [{'backupPassword': pwd}] : [];
+    } catch (e) {
+      debugPrint("⚠️ Secure creds export error: $e");
+      exportMap["secureCreds"] = [];
+    }
+
     debugPrint("📦 Total items exported: ${exportMap.values.fold(0, (sum, list) => sum + list.length)}");
 
     return {
@@ -1119,29 +1304,21 @@ class UnifiedBackupService {
       // 1️⃣ Serialize data to JSON string (CPU-heavy — runs off main thread)
       final jsonString = await compute(_jsonEncodeMap, data);
 
-      // 2️⃣ Check if encryption is enabled
+      // 2️⃣ Encryption is mandatory — a backup password MUST be set.
+      // We never write plaintext: no password ⇒ no backup.
       final password = await BackupEncryptionService.getStoredPassword();
-      final isEncrypted = password != null && password.isNotEmpty;
-
-      // 3️⃣ Build list of archive entries (name + bytes)
-      final entries = <Map<String, dynamic>>[];
-
-      if (isEncrypted) {
-        debugPrint("🔐 Encrypting backup data...");
-        final encResult = BackupEncryptionService.encryptData(jsonString, password);
-        final meta = jsonEncode({
-          'encrypted': true,
-          'salt': encResult['salt'],
-          'iv': encResult['iv'],
-          'version': '2.0.0',
-        });
-        entries.add({'name': 'data.enc',         'bytes': utf8.encode(encResult['encryptedData']!)});
-        entries.add({'name': 'backup_meta.json', 'bytes': utf8.encode(meta)});
-        debugPrint("🔐 Backup encrypted successfully");
-      } else {
-        debugPrint("📦 JSON size: ${jsonString.length} bytes");
-        entries.add({'name': 'data.json', 'bytes': utf8.encode(jsonString)});
+      if (password == null || password.isEmpty) {
+        throw Exception(
+            'No backup password set — refusing to write an unencrypted backup');
       }
+      const isEncrypted = true;
+
+      // 3️⃣ Build archive entries. Encrypt data.json's content using BackupEncryptionService.
+      final encryptedDataMap = BackupEncryptionService.encryptData(jsonString, password);
+      final encryptedJsonString = jsonEncode(encryptedDataMap);
+
+      final entries = <Map<String, dynamic>>[];
+      entries.add({'name': 'data.json', 'bytes': utf8.encode(encryptedJsonString)});
 
       // 4️⃣ Add item images as named binary entries (item_img_{id})
       // Always included — stored as efficient binary, NOT as JSON integers.
@@ -1176,14 +1353,24 @@ class UnifiedBackupService {
         }
       }
 
-      // 5️⃣ Encode ZIP in a background isolate — keeps UI responsive
-      final zipData = await compute(_encodeArchiveInIsolate, entries);
+      // 5️⃣ Encode a password-protected (AES) ZIP in a background isolate.
+      final zipData = await compute(_encodeArchiveInIsolate, (entries, password));
 
       if (zipData == null || zipData.isEmpty) {
         throw Exception("ZIP creation failed");
       }
 
-      debugPrint("📦 ZIP created: ${zipData.length} bytes (${(zipData.length / 1024 / 1024).toStringAsFixed(2)} MB)");
+      // Safety net: never persist a backup whose data can be read without the
+      // password (i.e. if ZIP encryption silently failed).
+      if (_looksLikePlainBackup(zipData)) {
+        throw Exception(
+            'Backup encryption failed — refusing to write a readable file');
+      }
+
+      // 5b️⃣ Encrypt the entire ZIP bytes to fully protect the zip file (header & filenames)
+      final protectedZipData = BackupEncryptionService.encryptBytes(zipData, password);
+
+      debugPrint("📦 ZIP created: ${zipData.length} bytes. Protected ZIP blob: ${protectedZipData.length} bytes");
 
       // 6️⃣ Save ZIP to destination
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
@@ -1205,7 +1392,7 @@ class UnifiedBackupService {
         throw Exception("No save location specified");
       }
 
-      await outputFile.writeAsBytes(zipData);
+      await outputFile.writeAsBytes(protectedZipData);
 
       debugPrint("✅ Backup saved: ${outputFile.path}");
       debugPrint("✅ Encrypted: $isEncrypted");
@@ -1221,99 +1408,109 @@ class UnifiedBackupService {
   /// ---------------------------
   /// 🔧 EXTRACT ZIP BACKUP
   /// ---------------------------
-  /// [passwordProvider] is called only if the backup is encrypted.
-  /// It should return the password entered by the user, or null to cancel.
+  /// Backups are password-protected (AES) zips. We prompt for the password,
+  /// then decrypt the whole archive with it. [passwordProvider] returns the
+  /// entered password, or null to cancel.
   static Future<Map<String, dynamic>> _extractZipBackup(
     File file, {
     Future<String?> Function()? passwordProvider,
   }) async {
     final zipBytes = await file.readAsBytes();
-    // Decode ZIP in background isolate — avoids freezing UI on large files
-    final entries = await compute(_decodeZipInIsolate, zipBytes);
 
-    debugPrint("📦 Extracted ZIP: ${entries.length} files");
-
-    final appDir = await getApplicationDocumentsDirectory();
-    final restoreDir = Directory('${appDir.path}/restored_backup');
-
-    if (restoreDir.existsSync()) {
-      await restoreDir.delete(recursive: true);
+    if (passwordProvider == null) {
+      throw Exception("Backup is encrypted but no password provider was given");
     }
-    restoreDir.createSync(recursive: true);
+    final password = await passwordProvider();
+    if (password == null) throw Exception("Restore cancelled: no password entered");
 
-    File? jsonFile;
-    File? metaFile;
-    File? encFile;
+    List<Map<String, dynamic>> entries;
+    if (BackupEncryptionService.isEncryptedBlob(zipBytes)) {
+      // New protected backup: decrypt the outer layer first
+      final decryptedZip = BackupEncryptionService.decryptBytes(zipBytes, password);
+      if (decryptedZip == null) {
+        throw Exception("Wrong password — cannot open backup");
+      }
+      try {
+        entries = await compute(_decodeZipInIsolate, (decryptedZip.toList(), password));
+      } catch (_) {
+        throw Exception("Wrong password or corrupted backup entries");
+      }
+    } else {
+      // Legacy backup: check if plain
+      if (_looksLikePlainBackup(zipBytes)) {
+        throw Exception(_unencryptedMsg);
+      }
+      try {
+        entries = await compute(_decodeZipInIsolate, (zipBytes.toList(), password));
+      } catch (_) {
+        throw Exception("Wrong password — cannot open backup");
+      }
+    }
 
-    final productDir = Directory('${appDir.path}/product_images');
+    return _restoreEntries(entries, password);
+  }
+
+  /// True if the zip's data.json can be read WITHOUT a password (i.e. it's
+  /// unencrypted). A WinZip-AES entry yields garbage when read with no password,
+  /// so jsonDecode throws and we return false.
+  static bool _looksLikePlainBackup(List<int> zipBytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      final dataFile = archive.findFile('data.json');
+      if (dataFile == null) return false;
+      jsonDecode(utf8.decode(dataFile.content));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Writes images to product_images/ (skipped on web) and returns the parsed
+  /// data.json map.
+  static Future<Map<String, dynamic>> _restoreEntries(
+      List<Map<String, dynamic>> entries, String password) async {
+    Directory? productDir;
+    if (!kIsWeb) {
+      final appDir = await getApplicationDocumentsDirectory();
+      productDir = Directory('${appDir.path}/product_images');
+    }
+    List<int>? dataBytes;
 
     for (final f in entries) {
       final name = f['name'] as String;
       final bytes = f['bytes'] as List<int>;
-      // ignore: parameter_assignments
-      final content = bytes;
 
-      // item_img_{id} files go straight to product_images/ for restore
       if (name.startsWith('item_img_') || name.startsWith('prod_img_')) {
+        if (productDir == null) continue; // no filesystem on web
         if (!productDir.existsSync()) productDir.createSync(recursive: true);
         final imgName = name.startsWith('prod_img_')
             ? name.replaceFirst('prod_img_', '')
             : name;
         File('${productDir.path}/$imgName')
           ..createSync(recursive: true)
-          ..writeAsBytesSync(content);
-        continue;
+          ..writeAsBytesSync(bytes);
+      } else if (name.toLowerCase() == 'data.json') {
+        dataBytes = bytes;
       }
-
-      final outFile = File(p.join(restoreDir.path, name))
-        ..createSync(recursive: true)
-        ..writeAsBytesSync(content);
-
-      if (name.toLowerCase() == 'data.json') jsonFile = outFile;
-      if (name.toLowerCase() == 'backup_meta.json') metaFile = outFile;
-      if (name.toLowerCase() == 'data.enc') encFile = outFile;
     }
 
-    // --- ENCRYPTED BACKUP ---
-    if (metaFile != null && encFile != null) {
-      debugPrint("🔐 Encrypted backup detected");
+    if (dataBytes == null) throw Exception("Backup data file missing in ZIP");
 
-      final meta = jsonDecode(await metaFile.readAsString()) as Map<String, dynamic>;
-      final salt = meta['salt'] as String;
-      final iv = meta['iv'] as String;
-      final encryptedData = await encFile.readAsString();
-
-      // Always prompt the user on restore — stored password is for creating backups only.
-      // This ensures the person restoring actually knows the password.
-      if (passwordProvider == null) {
-        throw Exception("Backup is encrypted but no password provider was given");
-      }
-      final password = await passwordProvider();
-      if (password == null) throw Exception("Restore cancelled: no password entered");
-
-      // Attempt decryption
-      final jsonString = BackupEncryptionService.decryptData(
-        encryptedBase64: encryptedData,
-        salt: salt,
-        ivBase64: iv,
+    final jsonMap = jsonDecode(utf8.decode(dataBytes)) as Map<String, dynamic>;
+    if (jsonMap.containsKey('encryptedData') && jsonMap.containsKey('salt') && jsonMap.containsKey('iv')) {
+      final decrypted = BackupEncryptionService.decryptData(
+        encryptedBase64: jsonMap['encryptedData'],
+        salt: jsonMap['salt'],
+        ivBase64: jsonMap['iv'],
         password: password,
       );
-
-      if (jsonString == null) {
-        throw Exception("Wrong password — cannot decrypt backup");
+      if (decrypted == null) {
+        throw Exception("Wrong password or corrupted backup data inside ZIP");
       }
-
-      debugPrint("🔐 Backup decrypted successfully");
-      return jsonDecode(jsonString);
+      return jsonDecode(decrypted) as Map<String, dynamic>;
+    } else {
+      return jsonMap;
     }
-
-    // --- PLAIN BACKUP ---
-    if (jsonFile == null) {
-      throw Exception("Backup data file missing in ZIP");
-    }
-
-    final jsonString = await jsonFile.readAsString();
-    return jsonDecode(jsonString);
   }
 
   /// ---------------------------
@@ -1523,7 +1720,66 @@ class UnifiedBackupService {
       debugPrint("📦 AppConfig already restored from backup - skipping manual update");
     }
 
+    // ✅ Restore non-Hive settings (admin PIN, store/UPI, prefs, backup password)
+    await _restoreLocalSettings(backupData);
+
     debugPrint("✅ Data restoration completed!");
+  }
+
+  /// Restores SharedPreferences (`localPrefs`) + the backup password
+  /// (`secureCreds`) saved by `_collectAllData`. Re-applies the denylist so a
+  /// tampered backup can't overwrite device id / license / printer keys.
+  static Future<void> _restoreLocalSettings(Map<String, dynamic> backupData) async {
+    try {
+      final localPrefs = backupData['localPrefs'];
+      if (localPrefs is List && localPrefs.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        int n = 0;
+        for (final entry in localPrefs) {
+          if (entry is! Map) continue;
+          final key = entry['key'] as String?;
+          final type = entry['type'] as String?;
+          final value = entry['value'];
+          if (key == null || _prefsDenylist.contains(key) || value == null) {
+            continue;
+          }
+          switch (type) {
+            case 'bool':
+              await prefs.setBool(key, value as bool);
+              break;
+            case 'int':
+              await prefs.setInt(key, (value as num).toInt());
+              break;
+            case 'double':
+              await prefs.setDouble(key, (value as num).toDouble());
+              break;
+            case 'stringList':
+              await prefs.setStringList(
+                  key, (value as List).map((e) => e.toString()).toList());
+              break;
+            default:
+              await prefs.setString(key, value.toString());
+          }
+          n++;
+        }
+        debugPrint("📦 Local prefs restored: $n");
+      }
+    } catch (e) {
+      debugPrint("⚠️ Local prefs restore error: $e");
+    }
+
+    try {
+      final creds = backupData['secureCreds'];
+      if (creds is List && creds.isNotEmpty) {
+        final pwd = (creds.first as Map)['backupPassword'] as String?;
+        if (pwd != null && pwd.isNotEmpty) {
+          await BackupEncryptionService.setPassword(pwd);
+          debugPrint("📦 Backup password restored");
+        }
+      }
+    } catch (e) {
+      debugPrint("⚠️ Secure creds restore error: $e");
+    }
   }
 
   /// ---------------------------

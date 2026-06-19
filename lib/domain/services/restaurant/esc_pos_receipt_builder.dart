@@ -3,6 +3,8 @@ import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/util/restaurant/print_settings.dart';
+import 'package:unipos/domain/services/restaurant/tax_breakdown.dart';
+import 'package:unipos/core/di/service_locator.dart' show taxStore;
 
 /// Builds raw ESC/POS byte arrays for thermal printers.
 ///
@@ -136,6 +138,15 @@ class EscPosReceiptBuilder {
       orderLine += DateFormat('HH:mm').format(receiptData.orderTimestamp!);
     }
     if (orderLine.isNotEmpty) bytes.addAll(_text(orderLine));
+
+    // Order-level kitchen note (e.g. "No onions") — printed in bold so the
+    // kitchen can't miss it. KOT only.
+    final kotRemark = receiptData.kotRemark?.trim() ?? '';
+    if (kotRemark.isNotEmpty) {
+      bytes.addAll(_boldOn);
+      bytes.addAll(_text('Note: $kotRemark'));
+      bytes.addAll(_boldOff);
+    }
 
     bytes.addAll(_divider(cols));
 
@@ -328,7 +339,27 @@ class EscPosReceiptBuilder {
     // ── TOTALS SECTION ──
     // This mirrors the bill summary from customerdetails.dart
 
-    final isTaxInclusive = receiptData.isTaxInclusive ?? false;
+    // Per-rate base for the GST table. item.price is mode-adjusted (divided by
+    // 1+rate for exclusive display), so use item.total — which restores the true
+    // base and sums to Sub Total.
+    // Derive the tax mode from the order totals (stored flag can be stale).
+    // Fall back to the receipt's own line gross so the detector never has to
+    // rely on the stale inclusive flag (which mis-classified exclusive bills).
+    final double itemsGross =
+        receiptData.items.fold<double>(0, (s, it) => s + it.total);
+    final double grossTotal = receiptData.itemTotal ?? itemsGross;
+    final isTaxInclusive = (grossTotal > 0)
+        ? TaxBreakdown.isInclusiveFromTotals(
+            grossBeforeDiscount: grossTotal,
+            discount: sale.discountAmount ?? 0,
+            taxAmount: sale.totalGstAmount ?? 0,
+            grandTotal: sale.grandTotal ?? 0,
+            serviceCharge: receiptData.serviceCharge ?? 0,
+            loyaltyDiscount:
+                (receiptData.loyaltyPointsDiscount ?? 0).toDouble(),
+            fallback: receiptData.isTaxInclusive ?? false,
+          )
+        : (receiptData.isTaxInclusive ?? false);
 
     // Sub Total
     if (PrintSettings.showSubtotal) {
@@ -351,10 +382,30 @@ class EscPosReceiptBuilder {
           cols)));
     }
 
-    // Tax (GST) — only show when tax-exclusive (tax-inclusive shows footer note instead)
-    if (!isTaxInclusive && PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
+    // Tax block — per-rate GST summary, shown in BOTH modes when GST applies.
+    // (0% bills produce no lines and skip the whole block.)
+    final taxLines = TaxBreakdown.compute(
+      items: receiptData.items
+          .map((it) => (gross: it.total, ratePercent: it.gstRate ?? 0))
+          .toList(),
+      billDiscount: sale.discountAmount ?? 0,
+      isTaxInclusive: isTaxInclusive,
+      reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
+    );
+    if (PrintSettings.showTax && taxLines.isNotEmpty) {
+      final totalGst = sale.totalGstAmount ?? 0; // authoritative — matches order
+      bytes.addAll(_divider(cols));
       bytes.addAll(
-          _text(_formatTotalRow('GST', _fmt(sale.totalGstAmount ?? 0), cols)));
+          _text(_formatRow4('Tax', 'Taxable', 'GST', 'Total', cols)));
+      for (final l in taxLines) {
+        bytes.addAll(_text(_formatRow4(_taxLabel(l.ratePercent),
+            _fmt(l.taxable), _fmt(l.gst), _fmt(l.taxable + l.gst), cols)));
+      }
+      bytes.addAll(_divider(cols));
+      bytes.addAll(_text(_formatTotalRow(
+          isTaxInclusive ? 'Total GST (Incl)' : 'Total GST:',
+          _fmt(totalGst),
+          cols)));
     }
 
     // Service / Delivery Charge (only show if > 0)
@@ -364,6 +415,15 @@ class EscPosReceiptBuilder {
           : 'Service Charge';
       bytes.addAll(_text(
           _formatTotalRow(chargeLabel, _fmt(receiptData.serviceCharge!), cols)));
+    }
+
+    // Round Off (only show if a rounding adjustment was applied)
+    if ((receiptData.roundOff ?? 0).abs() > 0.009) {
+      final ro = receiptData.roundOff!;
+      bytes.addAll(_text(_formatTotalRow(
+          'Round Off',
+          '${ro >= 0 ? '+' : '-'}$currency${_fmt(ro.abs())}',
+          cols)));
     }
 
     // ── GRAND TOTAL ──
@@ -418,6 +478,141 @@ class EscPosReceiptBuilder {
     bytes.addAll(_cut);
 
     return bytes;
+  }
+
+  /// Build the End-of-Day SETTLEMENT receipt.
+  ///
+  /// All values are passed in pre-computed by the caller (endday.dart) so this
+  /// stays a pure formatter. Untracked lines (round off, credit, cancelled
+  /// bills/products, etc.) are passed as 0 and still printed, matching the
+  /// store's expected settlement template.
+  static List<int> buildEodSettlementTicket({
+    required int paperWidth,
+    required String storeName,
+    String? storeSubtitle,
+    required String currencySymbol,
+    required String shiftUser,
+    required DateTime shiftStart,
+    required DateTime shiftEnd,
+    required List<({String name, double amount})> orderTypes,
+    required double totalSale,
+    required double discount,
+    required double netSale,
+    required double tax,
+    required double roundOff,
+    required double grossSale,
+    required double cash,
+    required double totalCredit,
+    required double openingBalance,
+    required double cashExpense,
+    required double totalExpense,
+    required double drawerBalance,
+    required double withdrawalCash,
+    required double cashDifference,
+    required List<({String name, double amount})> paymentMethods,
+    required int noOfBill,
+    required int reprintBill,
+    required int cancelledBill,
+    required double cancelledBillAmount,
+    required int cancelledProducts,
+    required double cancelledProductsAmount,
+    required double saleReturnAmount,
+    required double finalAmount,
+  }) {
+    final cols = _columnsForPaper(paperWidth);
+    final b = <int>[];
+    final df = DateFormat('dd-MM-yyyy hh:mm:ss a');
+
+    b.addAll(_init);
+
+    // ── HEADER ──
+    b.addAll(_alignCenter);
+    b.addAll(_boldOn);
+    b.addAll(_sizeDouble);
+    b.addAll(_text(storeName));
+    b.addAll(_sizeNormal);
+    if (storeSubtitle != null && storeSubtitle.isNotEmpty) {
+      b.addAll(_text(storeSubtitle));
+    }
+    b.addAll(_text('SETTLEMENT RECEIPT'));
+    b.addAll(_boldOff);
+    b.addAll(_alignLeft);
+    b.addAll(_divider(cols));
+
+    // ── SHIFT INFO ──
+    b.addAll(_text('SHIFT USER: $shiftUser'));
+    b.addAll(_text('SHIFT START: ${df.format(shiftStart)}'));
+    b.addAll(_text('SHIFT END: ${df.format(shiftEnd)}'));
+    b.addAll(_text('DURATION: ${_fmtDuration(shiftEnd.difference(shiftStart))}'));
+    b.addAll(_divider(cols));
+
+    // ── ORDER TYPES ──
+    for (final o in orderTypes) {
+      b.addAll(_text(_formatTotalRow(o.name.toUpperCase(), _fmt(o.amount), cols)));
+    }
+    final orderTypeTotal = orderTypes.fold<double>(0, (s, o) => s + o.amount);
+    b.addAll(_text(_formatTotalRow('TOTAL (ORDER TYPE)', _fmt(orderTypeTotal), cols)));
+    b.addAll(_divider(cols));
+
+    // ── SALES ──
+    b.addAll(_text(_formatTotalRow('TOTAL SALE:', _fmt(totalSale), cols)));
+    b.addAll(_text(_formatTotalRow('DISCOUNT:', _fmt(discount), cols)));
+    b.addAll(_text(_formatTotalRow('NET SALE:', _fmt(netSale), cols)));
+    b.addAll(_text(_formatTotalRow('TAX:', _fmt(tax), cols)));
+    b.addAll(_text(_formatTotalRow('ROUND OFF:', _fmt(roundOff), cols)));
+    b.addAll(_boldOn);
+    b.addAll(_text(_formatTotalRow('GROSS SALE:', _fmt(grossSale), cols)));
+    b.addAll(_boldOff);
+    b.addAll(_divider(cols));
+
+    // ── CASH / DRAWER ──
+    b.addAll(_text(_formatTotalRow('CASH', _fmt(cash), cols)));
+    b.addAll(_text(_formatTotalRow('TOTAL CREDIT:', _fmt(totalCredit), cols)));
+    b.addAll(_text(_formatTotalRow('OPENING BALANCE:', _fmt(openingBalance), cols)));
+    b.addAll(_text(_formatTotalRow('CASH EXPENSE:', _fmt(cashExpense), cols)));
+    b.addAll(_text(_formatTotalRow('TOTAL EXPENSE:', _fmt(totalExpense), cols)));
+    b.addAll(_text(_formatTotalRow('DRAWER BALANCE:', _fmt(drawerBalance), cols)));
+    b.addAll(_text(_formatTotalRow('WITHDRAWAL CASH:', _fmt(withdrawalCash), cols)));
+    b.addAll(_text(_formatTotalRow('CASH DIFFERENCE:', _fmt(cashDifference), cols)));
+    b.addAll(_divider(cols));
+
+    // ── PAYMENT METHODS ──
+    for (final p in paymentMethods) {
+      b.addAll(_text(_formatTotalRow(p.name.toUpperCase(), _fmt(p.amount), cols)));
+    }
+    if (paymentMethods.isNotEmpty) b.addAll(_divider(cols));
+
+    // ── BILL COUNTS ──
+    b.addAll(_text(_formatTotalRow('NO OF BILL:', '$noOfBill', cols)));
+    b.addAll(_text(_formatTotalRow('REPRINT BILL:', '$reprintBill', cols)));
+    b.addAll(_text(_formatTotalRow('CANCELLED BILL:', '$cancelledBill', cols)));
+    b.addAll(_text(_formatTotalRow('CANCELLED BILL AMOUNT:', _fmt(cancelledBillAmount), cols)));
+    b.addAll(_text(_formatTotalRow('CANCELLED PRODUCTS:', '$cancelledProducts', cols)));
+    b.addAll(_text(_formatTotalRow('CANCELLED PRODUCTS AMOUNT:', _fmt(cancelledProductsAmount), cols)));
+    b.addAll(_text(_formatTotalRow('SALE RETURN AMOUNT:', _fmt(saleReturnAmount), cols)));
+    b.addAll(_doubleDivider(cols));
+
+    // ── FINAL AMOUNT ──
+    b.addAll(_boldOn);
+    b.addAll(_sizeDoubleHeight);
+    b.addAll(_text(_formatTotalRow('FINAL AMOUNT:', '$currencySymbol ${_fmt(finalAmount)}', cols)));
+    b.addAll(_sizeNormal);
+    b.addAll(_boldOff);
+    b.addAll(_divider(cols));
+
+    // ── FOOTER ──
+    b.addAll(_alignCenter);
+    b.addAll(_text('THANK YOU...!'));
+    b.addAll(_feed(4));
+    b.addAll(_cut);
+
+    return b;
+  }
+
+  /// Format a duration as HH:mm:ss (e.g. shift length 04:22:56).
+  static String _fmtDuration(Duration d) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.inHours)}:${two(d.inMinutes % 60)}:${two(d.inSeconds % 60)}';
   }
 
   /// Build a simple test ticket to verify printer connection.
@@ -502,6 +697,35 @@ class EscPosReceiptBuilder {
     return truncatedName.padRight(nameWidth) +
         qty.padLeft(qtyWidth) +
         amount.padLeft(amountWidth);
+  }
+
+  /// 4-column row for the GST table (Tax | Taxable | GST | Total).
+  /// First column (tax name) left-aligned; the 3 amounts right-aligned.
+  static String _formatRow4(
+      String c1, String c2, String c3, String c4, int cols) {
+    final wNum = (cols ~/ 5).clamp(6, 12);
+    final w1 = (cols - wNum * 3) < 6 ? 6 : (cols - wNum * 3);
+    String padR(String s, int width) =>
+        s.length > width ? s.substring(0, width) : s.padLeft(width);
+    final first = c1.length > w1 ? c1.substring(0, w1) : c1.padRight(w1);
+    return first + padR(c2, wNum) + padR(c3, wNum) + padR(c4, wNum);
+  }
+
+  /// Label for a GST rate, e.g. "GST1 (5%)". Uses the configured tax name when a
+  /// single tax matches the rate; falls back to "GST (rate%)".
+  static String _taxLabel(double ratePercent) {
+    final rateStr = ratePercent % 1 == 0
+        ? ratePercent.toStringAsFixed(0)
+        : ratePercent.toStringAsFixed(2);
+    String name = 'GST';
+    for (final t in taxStore.taxes) {
+      if (((t.taxperecentage ?? 0) - ratePercent).abs() < 0.001 &&
+          t.taxname.trim().isNotEmpty) {
+        name = t.taxname.trim();
+        break;
+      }
+    }
+    return '$name ($rateStr%)';
   }
 
   /// Format a totals row: "Sub Total              560.00"

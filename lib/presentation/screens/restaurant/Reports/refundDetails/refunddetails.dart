@@ -273,6 +273,7 @@ class _RefundDataViewState extends State<RefundDataView> {
       'Payment Method',
       'Order Type',
       'Refund Amount',
+      'Refunded By',
       'Reason'
     ];
 
@@ -291,6 +292,7 @@ class _RefundDataViewState extends State<RefundDataView> {
         order.paymentmode ?? 'N/A',
         order.orderType ?? 'N/A',
         ReportExportService.formatCurrency(order.refundAmount ?? 0.0),
+        order.refundedBy ?? '—',
         reason,
       ];
     }).toList();
@@ -625,7 +627,7 @@ class _RefundDataViewState extends State<RefundDataView> {
         onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(fontSize: isDesktop ? 17 : (isTablet ? 16 : 15), fontWeight: FontWeight.w600),
         ),
         style: ElevatedButton.styleFrom(
@@ -729,6 +731,7 @@ class _RefundDataViewState extends State<RefundDataView> {
                 DataColumn(label: Text('Payment', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
                 DataColumn(label: Text('Type', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
                 DataColumn(label: Text('Amount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
+                DataColumn(label: Text('Refunded By', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
                 DataColumn(label: Text('Reason', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
               ],
               rows: pageOrders.map((order) {
@@ -766,6 +769,7 @@ class _RefundDataViewState extends State<RefundDataView> {
                     ),
                     DataCell(Text(order.orderType ?? 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textSecondary))),
                     DataCell(Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(order.refundAmount ?? 0.0)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: Colors.red.shade600, fontWeight: FontWeight.w600))),
+                    DataCell(Text(order.refundedBy ?? '—', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
                     DataCell(
                       Container(
                         constraints: BoxConstraints(maxWidth: 200),

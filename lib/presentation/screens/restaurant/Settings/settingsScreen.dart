@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -55,15 +54,19 @@ class _settingsScreenState extends State<Settingsscreen> {
     if (mounted) setState(() => _deviceIdResult = result);
     final backupEnabled = await AutoBackupService.isAutoBackupEnabled();
     final hasPassword = await BackupEncryptionService.hasPassword();
+    if (!mounted) return;
     setState(() {
       _backupEnabled = backupEnabled;
       _hasBackupPassword = hasPassword;
     });
   }
 
+
   Future<void> _showSetPasswordDialog({bool isChange = false}) async {
     final pwdController = TextEditingController();
+    final confirmController = TextEditingController();
     bool obscure = true;
+    String? error;
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -75,22 +78,62 @@ class _settingsScreenState extends State<Settingsscreen> {
             style: GoogleFonts.poppins(
                 fontSize: 16, fontWeight: FontWeight.w600),
           ),
-          content: AppTextField(
-            controller: pwdController,
-            label: 'Password',
-            hint: 'Enter password',
-            icon: Icons.lock_outline_rounded,
-            obscureText: obscure,
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscure
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                size: 20,
-                color: AppColors.textSecondary,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: pwdController,
+                label: 'Password (6 digits)',
+                hint: 'Enter 6-digit password',
+                icon: Icons.lock_outline_rounded,
+                obscureText: obscure,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscure
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () => setDlgState(() => obscure = !obscure),
+                ),
               ),
-              onPressed: () => setDlgState(() => obscure = !obscure),
-            ),
+              const SizedBox(height: 12),
+              AppTextField(
+                controller: confirmController,
+                label: 'Confirm Password',
+                icon: Icons.lock_outline_rounded,
+                obscureText: obscure,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 15, color: Colors.orange.shade700),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "Backups can't be recovered without this password.",
+                      style: GoogleFonts.poppins(
+                          fontSize: 11.5, color: Colors.orange.shade800),
+                    ),
+                  ),
+                ],
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(error!,
+                    style:
+                        GoogleFonts.poppins(color: Colors.red, fontSize: 12)),
+              ],
+            ],
           ),
           actions: [
             TextButton(
@@ -107,13 +150,17 @@ class _settingsScreenState extends State<Settingsscreen> {
               ),
               onPressed: () async {
                 final pwd = pwdController.text.trim();
-                if (pwd.isNotEmpty) {
-                  await BackupEncryptionService.setPassword(pwd);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  setState(() => _hasBackupPassword = true);
+                final err = BackupEncryptionService.validatePassword(
+                    pwd, confirmController.text.trim());
+                if (err != null) {
+                  setDlgState(() => error = err);
+                  return;
                 }
+                await BackupEncryptionService.setPassword(pwd);
+                if (ctx.mounted) Navigator.pop(ctx);
+                setState(() => _hasBackupPassword = true);
               },
-              child: Text('Confirm',
+              child: Text(isChange ? 'Update' : 'Confirm',
                   style: GoogleFonts.poppins(
                       color: Colors.white, fontWeight: FontWeight.w600)),
             ),
@@ -728,6 +775,8 @@ class _settingsScreenState extends State<Settingsscreen> {
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
+
+
             // ── 4. Staff & Shifts ───────────────────────────────────────
             _sectionHeader(context, 'Staff & Shifts', Icons.people_rounded),
             _sectionCard(context, [
@@ -808,6 +857,22 @@ class _settingsScreenState extends State<Settingsscreen> {
                 Icons.verified_rounded,
                 AppColors.primary,
                 () => Navigator.pushNamed(context, RouteNames.restaurantLicensing),
+              ),
+              _navTile(
+                context,
+                'License via Email (Demo)',
+                'Preview the email-based key request flow',
+                Icons.mark_email_read_rounded,
+                AppColors.info,
+                () => Navigator.pushNamed(context, RouteNames.restaurantLicenseEmailDemo),
+              ),
+              _navTile(
+                context,
+                'Email Setup Flow (Demo)',
+                'Full onboarding wizard with email licensing',
+                Icons.auto_awesome_rounded,
+                AppColors.info,
+                () => Navigator.pushNamed(context, RouteNames.restaurantEmailSetupDemo),
               ),
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),

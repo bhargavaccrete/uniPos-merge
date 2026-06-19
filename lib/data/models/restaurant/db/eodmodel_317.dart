@@ -58,6 +58,15 @@ class EndOfDayReport extends HiveObject{
   @HiveField(16)
   final String? mode; // 'retail' or 'restaurant' (nullable for backward compatibility)
 
+  @HiveField(17)
+  final double roundOff; // Sum of per-order rounding adjustments for the shift
+
+  @HiveField(18)
+  final int cancelledOrderCount; // VOID/CANCELLED orders in the shift
+
+  @HiveField(19)
+  final double cancelledOrderAmount; // Total value of those cancelled orders
+
   EndOfDayReport({
     required this.date,
     required this.openingBalance,
@@ -76,6 +85,9 @@ class EndOfDayReport extends HiveObject{
     required this.totalExpenses,
     required this.cashExpenses,
     this.mode, // Nullable - null means restaurant (for backward compatibility)
+    this.roundOff = 0,
+    this.cancelledOrderCount = 0,
+    this.cancelledOrderAmount = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -97,6 +109,9 @@ class EndOfDayReport extends HiveObject{
       'totalExpenses': totalExpenses,
       'cashExpenses': cashExpenses,
       'mode': mode,
+      'roundOff': roundOff,
+      'cancelledOrderCount': cancelledOrderCount,
+      'cancelledOrderAmount': cancelledOrderAmount,
     };
   }
 
@@ -119,6 +134,9 @@ class EndOfDayReport extends HiveObject{
       totalExpenses: (map['totalExpenses'] ?? 0).toDouble(),
       cashExpenses: (map['cashExpenses'] ?? 0).toDouble(),
       mode: map['mode'],
+      roundOff: (map['roundOff'] ?? 0).toDouble(),
+      cancelledOrderCount: map['cancelledOrderCount'] ?? 0,
+      cancelledOrderAmount: (map['cancelledOrderAmount'] ?? 0).toDouble(),
     );
   }
 

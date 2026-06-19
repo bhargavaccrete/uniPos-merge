@@ -57,11 +57,14 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle_outline),
-            onPressed: () => _showAddExtraDialog(),
-            tooltip: 'Add New Extra',
-          ),
+          // Empty state shows a prominent centred button instead, so the
+          // app-bar action only appears once at least one extra exists.
+          if (availableExtras.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.add_circle_outline),
+              onPressed: () => _showAddExtraDialog(),
+              tooltip: 'Add New Extra',
+            ),
         ],
       ),
       body: Column(
@@ -409,12 +412,41 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
                 : 24.0;
             return AlertDialog(
               insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-              title: Text(
-                'Add Extra Category',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              title: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.add_circle_outline,
+                        color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Add Extra Category',
+                            style: GoogleFonts.poppins(
+                                fontSize: 16.5, fontWeight: FontWeight.w700)),
+                        Text('Group toppings customers can add',
+                            style: GoogleFonts.poppins(
+                                fontSize: 11.5,
+                                color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actionsAlignment: MainAxisAlignment.center,
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -442,29 +474,31 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
                       final Set<String> selectedVariants = data['selectedVariants'];
 
                       return Container(
-                        margin: EdgeInsets.only(bottom: 15),
+                        margin: EdgeInsets.only(bottom: 14),
                         padding: EdgeInsets.all(12),
                         decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
                           border: Border.all(color: AppColors.divider),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (toppingData.length > 1)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Topping ${index + 1}',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 13,
-                                    ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Topping ${index + 1}',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    color: AppColors.primary,
                                   ),
-                                  IconButton(
-                                    icon: Icon(Icons.remove_circle, color: Colors.red, size: 20),
-                                    onPressed: () {
+                                ),
+                                if (toppingData.length > 1)
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () {
                                       final removed = toppingData[index];
                                       setDialogState(() => toppingData.removeAt(index));
                                       // Dispose AFTER the rebuild removes the
@@ -478,10 +512,15 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
                                             .forEach((c) => c.dispose());
                                       });
                                     },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2),
+                                      child: Icon(Icons.delete_outline,
+                                          color: AppColors.danger, size: 20),
+                                    ),
                                   ),
-                                ],
-                              ),
-                            SizedBox(height: 8),
+                              ],
+                            ),
+                            SizedBox(height: 10),
                             AppTextField(
                               controller: data['nameController'],
                               label: 'Topping Name',
@@ -619,24 +658,38 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
                         ),
                       );
                     }),
-                    SizedBox(height: 10),
-                    TextButton.icon(
-                      onPressed: () {
-                        setDialogState(() {
-                          toppingData.add({
-                            'nameController': TextEditingController(),
-                            'priceController': TextEditingController(),
-                            'isVeg': true,
-                            'hasSize': false,
-                            'variantPriceControllers': <String, TextEditingController>{},
-                            'selectedVariants': <String>{},
+                    SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          setDialogState(() {
+                            toppingData.add({
+                              'nameController': TextEditingController(),
+                              'priceController': TextEditingController(),
+                              'isVeg': true,
+                              'hasSize': false,
+                              'variantPriceControllers': <String, TextEditingController>{},
+                              'selectedVariants': <String>{},
+                            });
                           });
-                        });
-                      },
-                      icon: Icon(Icons.add_circle_outline, color: AppColors.primary),
-                      label: Text(
-                        'Add Another Topping',
-                        style: GoogleFonts.poppins(color: AppColors.primary),
+                        },
+                        icon: Icon(Icons.add_circle_outline,
+                            color: AppColors.primary, size: 18),
+                        label: Text(
+                          'Add Another Topping',
+                          style: GoogleFonts.poppins(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(
+                              color: AppColors.primary.withValues(alpha: 0.4)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -717,10 +770,17 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 22, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: Text(
                     'Save',
-                    style: GoogleFonts.poppins(color: Colors.white),
+                    style: GoogleFonts.poppins(
+                        color: Colors.white, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -764,4 +824,15 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
       ),
     );
   }
+}
+
+/// Public entry point so other screens (e.g. item edit) can open the SAME
+/// "Add Extra" dialog used in the Add-Item flow. [onAdded] fires after the
+/// extra is created so the caller can refresh its list.
+Future<void> showAddExtraDialog(BuildContext context,
+    {required VoidCallback onAdded}) {
+  return showDialog(
+    context: context,
+    builder: (_) => _AddExtraDialog(onAdded: onAdded),
+  );
 }

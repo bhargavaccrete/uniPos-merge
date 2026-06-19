@@ -52,7 +52,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
 
   String _selectedRole = 'Cashier';
   final List<String> _retailRoles = ['Manager', 'Cashier', 'Sales', 'Inventory'];
-  final List<String> _restaurantRoles = ['Manager', 'Waiter', 'Cashier', 'Chef'];
+  final List<String> _restaurantRoles = ['Manager', 'Cashier', 'Waiter'];
 
   static const _roleIcons = {
     'Manager':   Icons.manage_accounts_rounded,
@@ -92,6 +92,21 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   void initState() {
     super.initState();
     _firstNameController.addListener(_syncUsernameFromFirstName);
+    _loadExistingStaff();
+  }
+
+  /// Reload staff already saved to storage so the list survives navigating away
+  /// and back (the PageView can dispose this off-screen step, wiping local
+  /// state). Storage is the source of truth — staff are persisted on Add.
+  Future<void> _loadExistingStaff() async {
+    if (AppConfig.isRetail) {
+      if (!Hive.isBoxOpen('retail_staff')) return;
+      final box = Hive.box<RetailStaffModel>('retail_staff');
+      setState(() => _staffMembers = box.values.toList());
+    } else {
+      await staffStore.loadStaff();
+      if (mounted) setState(() => _staffMembers = staffStore.staff.toList());
+    }
   }
 
   void _syncUsernameFromFirstName() {
@@ -223,8 +238,11 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     setState(() => _isSaving = true);
 
     try {
+      // Persist immediately so the staff survives leaving and returning to this
+      // step (storage is the source of truth — see _loadExistingStaff).
+      final bool saved;
       if (AppConfig.isRetail) {
-        _staffMembers.add(RetailStaffModel(
+        final newStaff = RetailStaffModel(
           id: _uuid.v4(),
           firstName: firstName,
           lastName: _lastNameController.text.trim(),
@@ -243,9 +261,12 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
           canVoidTransactions: _selectedRole == 'Manager',
           canOpenCashDrawer: true,
           createdAt: DateTime.now(),
-        ));
+        );
+        await Hive.box<RetailStaffModel>('retail_staff').put(newStaff.id, newStaff);
+        _staffMembers.add(newStaff);
+        saved = true;
       } else {
-        _staffMembers.add(StaffModel(
+        final newStaff = StaffModel(
           id: _uuid.v4(),
           userName: username,
           firstName: firstName,
@@ -255,7 +276,15 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
           emailId: _emailController.text.trim(),
           pinNo: RestaurantAuthHelper.hashPassword(pin),
           createdAt: DateTime.now(),
-        ));
+        );
+        saved = await staffStore.addStaff(newStaff);
+        if (saved) _staffMembers.add(newStaff);
+      }
+
+      if (!saved) {
+        NotificationService.instance
+            .showError(staffStore.errorMessage ?? 'Failed to add staff member');
+        return;
       }
 
       // Clear form
@@ -273,38 +302,16 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     }
   }
 
-  void _deleteStaff(int index) {
-    setState(() => _staffMembers.removeAt(index));
-  }
-
-  // ── Save all to Hive ─────────────────────────────────────────────────────
-
-  Future<bool> _saveStaffToDatabase() async {
-    try {
-      if (AppConfig.isRetail) {
-        final box = Hive.box<RetailStaffModel>('retail_staff');
-        for (final staff in _staffMembers) {
-          if (staff is RetailStaffModel) {
-            await box.put(staff.id, staff);
-            debugPrint('Saved retail staff: ${staff.fullName}');
-          }
-        }
-      } else {
-        for (final staff in _staffMembers) {
-          if (staff is StaffModel) {
-            await staffStore.addStaff(staff);
-            debugPrint('Saved restaurant staff: ${staff.firstName} ${staff.lastName}');
-          }
-        }
-      }
-      return true;
-    } catch (e) {
-      debugPrint('Error saving staff: $e');
-      if (mounted) {
-        NotificationService.instance.showError('Failed to save staff: $e');
-      }
-      return false;
+  Future<void> _deleteStaff(int index) async {
+    final staff = _staffMembers[index];
+    // Remove from storage too — staff are persisted on Add, so a list-only
+    // removal would reappear after _loadExistingStaff.
+    if (staff is RetailStaffModel) {
+      await Hive.box<RetailStaffModel>('retail_staff').delete(staff.id);
+    } else if (staff is StaffModel) {
+      await staffStore.deleteStaff(staff.id);
     }
+    if (mounted) setState(() => _staffMembers.removeAt(index));
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -670,16 +677,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
       }
     }
 
-    setState(() => _isSavingAll = true);
-    try {
-      if (_staffMembers.isNotEmpty) {
-        final ok = await _saveStaffToDatabase();
-        if (!ok) return;
-      }
-      widget.onNext();
-    } finally {
-      if (mounted) setState(() => _isSavingAll = false);
-    }
+    // Staff are already persisted as they're added, so just advance.
+    widget.onNext();
   }
 
   Widget _buildNavSection() {
@@ -819,12 +818,6 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                                 fontWeight: FontWeight.w600,
                                 color: roleColor)),
                       ),
-                      const SizedBox(width: 8),
-                      // Username
-                      Text(username,
-                          style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: AppColors.textSecondary)),
                     ],
                   ),
                   const SizedBox(height: 2),

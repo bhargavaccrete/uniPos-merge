@@ -477,7 +477,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                     onPressed: comparisonData.isNotEmpty ? _exportReport : null,
                     icon: const Icon(Icons.file_download_outlined),
                     label: Text(
-                      'Export to Excel',
+                      'Export Report',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.buttonFontSize(context),
                         fontWeight: FontWeight.w600,

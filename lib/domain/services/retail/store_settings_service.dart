@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:unipos/data/repositories/business_details_repository.dart';
@@ -13,6 +14,10 @@ class StoreSettingsService {
   static const String _keyStoreCity = 'store_city';
   static const String _keyStoreState = 'store_state';
   static const String _keyStorePincode = 'store_pincode';
+  // Offline UPI "scan & pay" config printed on unpaid bills.
+  static const String _keyUpiId = 'store_upi_id';
+  static const String _keyUpiPayee = 'store_upi_payee';
+  static const String _keyUpiQr = 'store_upi_qr_b64'; // base64-encoded QR image
 
   final _businessDetailsRepo = BusinessDetailsRepository();
 
@@ -74,6 +79,49 @@ class StoreSettingsService {
   Future<bool> setGSTNumber(String gst) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.setString(_keyStoreGST, gst);
+  }
+
+  // ── UPI (offline scan-and-pay on the bill) ─────────────────────────────────
+
+  /// Merchant UPI ID / VPA (e.g. "merchant@okhdfc"). Null/empty = not set.
+  Future<String?> getUpiId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyUpiId);
+  }
+
+  Future<bool> setUpiId(String upiId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString(_keyUpiId, upiId.trim());
+  }
+
+  /// Payee name shown in the UPI deep link (falls back to store name).
+  Future<String?> getUpiPayeeName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyUpiPayee);
+  }
+
+  Future<bool> setUpiPayeeName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString(_keyUpiPayee, name.trim());
+  }
+
+  /// Merchant's own static UPI QR image (printed as-is if provided).
+  Future<Uint8List?> getUpiQrImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final b64 = prefs.getString(_keyUpiQr);
+    if (b64 == null || b64.isEmpty) return null;
+    try {
+      return base64Decode(b64);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Save (or clear, when [bytes] is null) the merchant QR image.
+  Future<bool> setUpiQrImage(Uint8List? bytes) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (bytes == null) return prefs.remove(_keyUpiQr);
+    return prefs.setString(_keyUpiQr, base64Encode(bytes));
   }
 
   /// Get owner name
@@ -226,6 +274,9 @@ class StoreSettingsService {
       await prefs.remove(_keyStorePhone);
       await prefs.remove(_keyStoreEmail);
       await prefs.remove(_keyStoreGST);
+      await prefs.remove(_keyUpiId);
+      await prefs.remove(_keyUpiPayee);
+      await prefs.remove(_keyUpiQr);
       await prefs.remove(_keyOwnerName);
       await prefs.remove(_keyStoreCity);
       await prefs.remove(_keyStoreState);

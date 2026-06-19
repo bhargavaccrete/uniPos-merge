@@ -177,6 +177,7 @@ class _AdminLoginState extends State<AdminLogin> {
                   icon: Icons.lock_outline,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 6,
                   enabled: !isLocked,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'PIN is required';

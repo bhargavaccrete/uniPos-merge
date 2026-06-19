@@ -354,14 +354,12 @@ class RestaurantBulkImportService {
       errors.add('Row $rowNumber: AllowOutOfStock required when TrackInventory is YES');
     }
 
-    // 7. ItemCode validation
+    // 7. ItemCode validation — format only. A duplicate code is NOT a hard
+    // error here; the import loop skips it with a warning, consistent with how
+    // a duplicate item name is handled.
     final itemCode = row['ItemCode']?.toString().trim() ?? '';
-    if (itemCode.isNotEmpty) {
-      if (!RegExp(r'^\d{4,5}$').hasMatch(itemCode)) {
-        errors.add('Row $rowNumber: Item code must be 4-5 digits');
-      } else if (existingCodes.contains(itemCode) || batchCodes.contains(itemCode)) {
-        errors.add('Row $rowNumber: Item code already exists. Please enter a different code.');
-      }
+    if (itemCode.isNotEmpty && !RegExp(r'^\d{4,5}$').hasMatch(itemCode)) {
+      errors.add('Row $rowNumber: Item code must be 4-5 digits');
     }
 
     return ValidationResult(
@@ -582,16 +580,24 @@ class RestaurantBulkImportService {
 
         String id = _getValue(row, 0);
         String name = _getValue(row, 1);
+        final nameKey = name.toLowerCase().trim();
 
-        // Check cache instead of DB
+        // Skip duplicates by ID...
         if (_categoryCache.containsKey(id)) {
           result.warnings.add('Category $id already exists, skipping');
+          continue;
+        }
+        // ...and by name (case-insensitive) so "Pizza"/"pizza" don't both get
+        // created when one already exists (manually or from another row).
+        if (_categoryByNameCache.containsKey(nameKey)) {
+          result.warnings.add(
+              'Category "${name.trim()}" already exists — skipped duplicate');
           continue;
         }
 
         Category category = Category(
           id: id,
-          name: name,
+          name: name.trim(),
           createdTime: DateTime.now(),
           editCount: 0,
         );
@@ -599,7 +605,7 @@ class RestaurantBulkImportService {
         final success = await categoryStore.addCategory(category);
         if (success) {
           _categoryCache[id] = category;
-          _categoryByNameCache[name.toLowerCase()] = category;
+          _categoryByNameCache[nameKey] = category;
           result.categoriesImported++;
         }
       } catch (e) {
@@ -932,35 +938,46 @@ class RestaurantBulkImportService {
           continue;
         }
 
-        // Step 2: Duplicate check — skip if item with same name already exists
+        // Step 2: If an item with this name already exists, UPDATE it from the
+        // imported row (price, category, choices, extras, variants…) instead of
+        // skipping — so re-imports enrich items added manually or earlier.
         final itemNameLower = (rowData['ItemName']?.toString().trim() ?? '').toLowerCase();
-        if (_itemByNameCache.containsKey(itemNameLower)) {
-          result.warnings.add('Row ${i + 1}: Item "${rowData['ItemName']}" already exists, skipping');
-          continue;
-        }
+        final Items? existingItem = _itemByNameCache[itemNameLower];
 
-        // Auto-generate next code if blank, or use provided
-        final itemCode = rowData['ItemCode']?.toString().trim() ?? '';
+        // Item code: when updating keep the existing item's code; otherwise
+        // honour a provided code (skipping clashes) or auto-generate one.
+        final providedCode = rowData['ItemCode']?.toString().trim() ?? '';
         String finalItemCode;
-        if (itemCode.isEmpty) {
-          int maxCode = 1000;
-          for (final code in existingCodes) {
-            final val = int.tryParse(code);
-            if (val != null && val >= 1000 && val <= 99999) {
-              if (val > maxCode) maxCode = val;
-            }
-          }
-          for (final code in batchCodes) {
-            final val = int.tryParse(code);
-            if (val != null && val >= 1000 && val <= 99999) {
-              if (val > maxCode) maxCode = val;
-            }
-          }
-          finalItemCode = (maxCode + 1).toString();
-          batchCodes.add(finalItemCode);
+        if (existingItem != null) {
+          finalItemCode = existingItem.itemCode ?? providedCode;
         } else {
-          finalItemCode = itemCode;
-          batchCodes.add(finalItemCode);
+          // Skip rows whose explicit ItemCode is already taken — a warning, not
+          // a failure. Blank codes fall through to auto-generation below.
+          if (providedCode.isNotEmpty &&
+              (existingCodes.contains(providedCode) || batchCodes.contains(providedCode))) {
+            result.warnings.add('Row ${i + 1}: Item code "$providedCode" already exists, skipping');
+            continue;
+          }
+          if (providedCode.isEmpty) {
+            int maxCode = 1000;
+            for (final code in existingCodes) {
+              final val = int.tryParse(code);
+              if (val != null && val >= 1000 && val <= 99999) {
+                if (val > maxCode) maxCode = val;
+              }
+            }
+            for (final code in batchCodes) {
+              final val = int.tryParse(code);
+              if (val != null && val >= 1000 && val <= 99999) {
+                if (val > maxCode) maxCode = val;
+              }
+            }
+            finalItemCode = (maxCode + 1).toString();
+            batchCodes.add(finalItemCode);
+          } else {
+            finalItemCode = providedCode;
+            batchCodes.add(finalItemCode);
+          }
         }
 
         // Step 3: Get or create category
@@ -1020,7 +1037,7 @@ class RestaurantBulkImportService {
         final soldByWeight = _parseBool(rowData['IsSoldByWeight']?.toString() ?? '', false);
 
         Items item = Items(
-          id: const Uuid().v4(),
+          id: existingItem?.id ?? const Uuid().v4(),
           name: rowData['ItemName']?.toString().trim() ?? '',
           categoryOfItem: categoryId,
           description: rowData['Description']?.toString().trim(),
@@ -1035,21 +1052,29 @@ class RestaurantBulkImportService {
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
           taxRate: taxRateValue,
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
-          variant: [],
+          // Preserve existing variants; the variant pass overrides them when the
+          // import file actually carries variant rows for this item.
+          variant: existingItem?.variant ?? [],
           choiceIds: choiceIds,
           extraId: extraIds,
-          imageBytes: imageBytes,
+          imageBytes: imageBytes ?? existingItem?.imageBytes,
           itemCode: finalItemCode,
-          createdTime: DateTime.now(),
+          createdTime: existingItem?.createdTime ?? DateTime.now(),
           lastEditedTime: DateTime.now(),
           editedBy: 'BulkImport',
-          editCount: 0,
+          editCount: existingItem?.editCount ?? 0,
         );
 
-        final success = await itemStore.addItem(item);
+        final success = existingItem != null
+            ? await itemStore.updateItem(item)
+            : await itemStore.addItem(item);
         if (success) {
+          if (existingItem != null) {
+            result.warnings.add(
+                'Row ${i + 1}: Item "${item.name}" already existed — updated from import');
+          }
           result.itemsImported++;
-          // Update cache so duplicate rows within this same import batch are also skipped
+          // Keep cache fresh so later rows in this batch see the latest version
           _itemByNameCache[item.name.toLowerCase().trim()] = item;
         }
 

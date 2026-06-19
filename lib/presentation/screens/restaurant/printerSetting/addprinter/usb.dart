@@ -162,13 +162,15 @@ class _UsbState extends State<Usb> {
             const SizedBox(height: 8),
             ...devices.map((d) {
               final DiscoveredPrinter device = d as DiscoveredPrinter;
-              return Card(
-                elevation: 1,
+              return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider),
+                ),
                 child: ListTile(
-                  leading: Icon(Icons.usb, color: AppColors.secondary),
+                  leading: Icon(Icons.usb, color: AppColors.info),
                   title: Text(
                     device.name ?? 'USB Printer',
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -213,30 +215,20 @@ class _UsbState extends State<Usb> {
                 style: GoogleFonts.poppins(
                     fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            ...usbPrinters.map((printer) => Card(
-                  elevation: 1,
+            ...usbPrinters.map((printer) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
                   child: ListTile(
-                    leading: Icon(
-                      (printerStore.defaultKotPrinter?.id == printer.id ||
-                              printerStore.defaultReceiptPrinter?.id ==
-                                  printer.id)
-                          ? Icons.star
-                          : Icons.usb,
-                      color: (printerStore.defaultKotPrinter?.id ==
-                                  printer.id ||
-                              printerStore.defaultReceiptPrinter?.id ==
-                                  printer.id)
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
-                    ),
+                    leading: Icon(Icons.usb, color: AppColors.info),
                     title: Text(printer.name,
                         style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                      '${printer.address} | ${printer.paperSize}mm | ${printer.role.toUpperCase()}',
+                      '${printer.address} | ${printer.paperSize}mm',
                       style: GoogleFonts.poppins(
                           fontSize: 12, color: AppColors.textSecondary),
                     ),
@@ -296,7 +288,8 @@ class _UsbState extends State<Usb> {
     final nameController =
         TextEditingController(text: device.name ?? 'USB Printer');
     int paperSize = 80;
-    String role = 'both';
+    // Role is assigned later by the slot on the Printer Management screen.
+    const String role = 'receipt';
 
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
@@ -350,36 +343,6 @@ class _UsbState extends State<Usb> {
                     Text('80mm', style: GoogleFonts.poppins(fontSize: 13)),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text('Printer Role',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
-                Row(
-                  children: [
-                    Radio<String>(
-                        value: 'kot',
-                        groupValue: role,
-                        onChanged: (v) =>
-                            setDialogState(() => role = v!),
-                        activeColor: AppColors.primary),
-                    Text('KOT', style: GoogleFonts.poppins(fontSize: 13)),
-                    Radio<String>(
-                        value: 'receipt',
-                        groupValue: role,
-                        onChanged: (v) =>
-                            setDialogState(() => role = v!),
-                        activeColor: AppColors.primary),
-                    Text('Receipt',
-                        style: GoogleFonts.poppins(fontSize: 13)),
-                    Radio<String>(
-                        value: 'both',
-                        groupValue: role,
-                        onChanged: (v) =>
-                            setDialogState(() => role = v!),
-                        activeColor: AppColors.primary),
-                    Text('Both', style: GoogleFonts.poppins(fontSize: 13)),
-                  ],
-                ),
               ],
             ),
           ),
@@ -403,7 +366,10 @@ class _UsbState extends State<Usb> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary),
+                  backgroundColor: AppColors.primary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10))),
               child: Text('Save',
                   style: GoogleFonts.poppins(color: Colors.white)),
             ),

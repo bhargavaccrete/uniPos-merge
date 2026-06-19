@@ -252,6 +252,73 @@ abstract class _LicenseStore with Store {
     }
   }
 
+  // ── Self-Signup (Email OTP) ───────────────────────────────────────────────
+
+  @observable
+  bool isRequestingOtp = false;
+
+  @observable
+  bool isVerifying = false;
+
+  @observable
+  String? signupError;
+
+  /// Server-authoritative OTP expiry (UTC). The UI counts down against this.
+  @observable
+  DateTime? otpExpiresAt;
+
+  /// Registers the business and triggers the OTP email. [signup] comes from
+  /// SetupWizardStore.buildSignupBody(). Returns true on success.
+  @action
+  Future<bool> requestSignupOtp(Map<String, dynamic> signup) async {
+    isRequestingOtp = true;
+    signupError = null;
+    try {
+      final data = await _api.requestSignupOtp(signup);
+      otpExpiresAt = DateTime.tryParse(data['expiresat'] as String? ?? '');
+      return true;
+    } on LicenseApiException catch (e) {
+      signupError = e.message;
+      return false;
+    } finally {
+      isRequestingOtp = false;
+    }
+  }
+
+  /// Verifies the OTP. On success the server emails the license key, which the
+  /// user enters manually on the next phase. Returns true on success.
+  @action
+  Future<bool> verifyOtp(String email, String otp) async {
+    isVerifying = true;
+    signupError = null;
+    try {
+      await _api.verifyOtp(email, otp);
+      return true;
+    } on LicenseApiException catch (e) {
+      signupError = e.message;
+      return false;
+    } finally {
+      isVerifying = false;
+    }
+  }
+
+  /// Re-sends the OTP and refreshes [otpExpiresAt]. Returns true on success.
+  @action
+  Future<bool> resendOtp(String email) async {
+    isRequestingOtp = true;
+    signupError = null;
+    try {
+      final data = await _api.resendOtp(email);
+      otpExpiresAt = DateTime.tryParse(data['expiresat'] as String? ?? '');
+      return true;
+    } on LicenseApiException catch (e) {
+      signupError = e.message;
+      return false;
+    } finally {
+      isRequestingOtp = false;
+    }
+  }
+
   // ── Activation ────────────────────────────────────────────────────────────
 
   @action

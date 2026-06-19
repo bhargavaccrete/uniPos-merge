@@ -123,13 +123,21 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final double rate = widget.taxToApply.taxperecentage! / 100.0;
+      final tax = widget.taxToApply;
+      final double rate = tax.taxperecentage! / 100.0;
+      int applied = 0;
+      int skipped = 0;
 
       for (String id in _selectedItemIds) {
         try {
           final item = itemStore.items.firstWhere((item) => item.id == id);
-          item.applyTax(rate);
-          await itemStore.updateItem(item);
+          // Adds the tax (max 2 per item); skips if already applied or at cap.
+          if (item.applyTax(tax.id, rate)) {
+            applied++;
+            await itemStore.updateItem(item);
+          } else {
+            skipped++;
+          }
         } catch (e) {
           // item not found, skip
         }
@@ -138,7 +146,10 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
       setState(() => _selectedItemIds.clear());
 
       NotificationService.instance.showSuccess(
-        '${widget.taxToApply.taxname} (${widget.taxToApply.taxperecentage}%) applied to selected items.',
+        skipped > 0
+            ? '${tax.taxname} (${tax.taxperecentage}%) applied to $applied item(s). '
+                '$skipped skipped (already taxed or at the 2-tax limit).'
+            : '${tax.taxname} (${tax.taxperecentage}%) applied to $applied item(s).',
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -150,10 +161,12 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final tax = widget.taxToApply;
+      final double rate = tax.taxperecentage! / 100.0;
       for (String id in _selectedItemIds) {
         try {
           final item = itemStore.items.firstWhere((item) => item.id == id);
-          item.removeTax();
+          item.removeTax(tax.id, rate);
           await itemStore.updateItem(item);
         } catch (e) {
           // item not found, skip
@@ -163,7 +176,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
       setState(() => _selectedItemIds.clear());
 
       NotificationService.instance.showSuccess(
-        'Tax removed from selected items.',
+        '${tax.taxname} removed from selected items.',
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

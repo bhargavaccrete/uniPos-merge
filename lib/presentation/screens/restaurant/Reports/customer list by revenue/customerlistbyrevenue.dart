@@ -11,6 +11,8 @@ import 'package:unipos/util/common/app_responsive.dart';
 import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 
+enum _RevPeriod { all, today, week, month, year, custom }
+
 class CustomerListByRevenue extends StatefulWidget {
   const CustomerListByRevenue({super.key});
 
@@ -26,6 +28,11 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
   List<CustomerRevenueData> _customers = [];
   double _totalRevenue = 0.0;
   int _totalOrders = 0;
+
+  // Period filter (default: all-time).
+  _RevPeriod _period = _RevPeriod.all;
+  DateTime? _fromDate;
+  DateTime? _toDate;
 
   // Pagination
   int _currentPage = 0;
@@ -50,9 +57,17 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     double revenueSum = 0.0;
     int orderSum = 0;
 
+    final (start, end) = _periodBounds();
+
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
+
+      // Period filter — orders without a timestamp can't be placed in a range.
+      if (start != null && end != null) {
+        final at = order.orderAt;
+        if (at == null || at.isBefore(start) || !at.isBefore(end)) continue;
+      }
 
       String customerName = order.customerName.trim();
       if (customerName.isEmpty) {
@@ -92,6 +107,120 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       _currentPage = 0;
       _isLoading = false;
     });
+  }
+
+  /// Half-open [start, end) bounds for the selected period; (null, null) for
+  /// all-time or an incomplete custom range.
+  (DateTime?, DateTime?) _periodBounds() {
+    final now = DateTime.now();
+    switch (_period) {
+      case _RevPeriod.all:
+        return (null, null);
+      case _RevPeriod.today:
+        final s = DateTime(now.year, now.month, now.day);
+        return (s, s.add(const Duration(days: 1)));
+      case _RevPeriod.week:
+        final s = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
+        return (s, s.add(const Duration(days: 7)));
+      case _RevPeriod.month:
+        return (DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 1));
+      case _RevPeriod.year:
+        return (DateTime(now.year, 1, 1), DateTime(now.year + 1, 1, 1));
+      case _RevPeriod.custom:
+        if (_fromDate == null || _toDate == null) return (null, null);
+        return (
+          DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day),
+          DateTime(_toDate!.year, _toDate!.month, _toDate!.day)
+              .add(const Duration(days: 1)),
+        );
+    }
+  }
+
+  Future<void> _onPeriodSelected(_RevPeriod p) async {
+    if (p == _RevPeriod.custom) {
+      final range = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now(),
+        initialDateRange: (_fromDate != null && _toDate != null)
+            ? DateTimeRange(start: _fromDate!, end: _toDate!)
+            : null,
+      );
+      if (range == null) return;
+      setState(() {
+        _fromDate = range.start;
+        _toDate = range.end;
+        _period = p;
+      });
+    } else {
+      setState(() => _period = p);
+    }
+    // Data is already loaded — just re-aggregate for the new period.
+    _buildCustomerData();
+  }
+
+  String _periodLabel(_RevPeriod p) {
+    switch (p) {
+      case _RevPeriod.all:
+        return 'All';
+      case _RevPeriod.today:
+        return 'Today';
+      case _RevPeriod.week:
+        return 'This Week';
+      case _RevPeriod.month:
+        return 'This Month';
+      case _RevPeriod.year:
+        return 'This Year';
+      case _RevPeriod.custom:
+        if (_fromDate != null && _toDate != null) {
+          return '${DateFormat('dd MMM').format(_fromDate!)} – ${DateFormat('dd MMM').format(_toDate!)}';
+        }
+        return 'Custom';
+    }
+  }
+
+  Widget _buildPeriodFilter(BuildContext context) {
+    Widget chip(_RevPeriod p) {
+      final selected = _period == p;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          label: Text(_periodLabel(p)),
+          selected: selected,
+          showCheckmark: false,
+          onSelected: (_) => _onPeriodSelected(p),
+          selectedColor: AppColors.primary,
+          backgroundColor: AppColors.white,
+          labelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textPrimary,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: selected ? AppColors.primary : AppColors.divider),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 40,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            chip(_RevPeriod.all),
+            chip(_RevPeriod.today),
+            chip(_RevPeriod.week),
+            chip(_RevPeriod.month),
+            chip(_RevPeriod.year),
+            chip(_RevPeriod.custom),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _exportReport() async {
@@ -178,26 +307,28 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       );
     }
 
-    if (_customers.isEmpty) {
-      return _buildEmptyState(context);
-    }
-
     return SingleChildScrollView(
       padding: AppResponsive.padding(context),
       child: AppResponsive.constrainedContent(
         context: context,
         child: Column(
           children: [
-            _buildSummaryCards(context),
-            SizedBox(height: 16),
-            _buildRefreshButton(context, isTablet),
-            SizedBox(height: 16),
-            _buildExportButton(context, isTablet),
-            SizedBox(height: 16),
-            _buildCustomersTable(context, isTablet),
-            if (_customers.length > _rowsPerPage) ...[
+            _buildPeriodFilter(context),
+            const SizedBox(height: 16),
+            if (_customers.isEmpty)
+              _buildEmptyState(context)
+            else ...[
+              _buildSummaryCards(context),
               SizedBox(height: 16),
-              _buildPaginationControls(),
+              _buildRefreshButton(context, isTablet),
+              SizedBox(height: 16),
+              _buildExportButton(context, isTablet),
+              SizedBox(height: 16),
+              _buildCustomersTable(context, isTablet),
+              if (_customers.length > _rowsPerPage) ...[
+                SizedBox(height: 16),
+                _buildPaginationControls(),
+              ],
             ],
           ],
         ),
@@ -321,7 +452,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
         onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(
             fontSize: isDesktop ? 17 : (isTablet ? 16 : 15),
             fontWeight: FontWeight.w600,

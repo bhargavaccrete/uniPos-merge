@@ -277,7 +277,7 @@ class _SalesDataViewState extends State<SalesDataView> {
       }
       return [
         ReportExportService.formatDateTime(order.orderAt),
-        order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
+        order.billNumber != null ? 'INV ${order.billNumber}' : '#${(order.id.length > 8 ? order.id.substring(0, 8) : order.id)}',
         order.customerName,
         order.paymentDisplay.isNotEmpty ? order.paymentDisplay : 'N/A',
         order.orderType ?? 'N/A',
@@ -767,7 +767,7 @@ class _SalesDataViewState extends State<SalesDataView> {
                 return DataRow(
                   cells: [
                     DataCell(Text(order.orderAt != null ? DateFormat('dd-MM-yy\nHH:mm').format(order.orderAt!) : 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
-                    DataCell(Text(order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
+                    DataCell(Text(order.billNumber != null ? 'INV ${order.billNumber}' : '#${(order.id.length > 8 ? order.id.substring(0, 8) : order.id)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
                     DataCell(Text(order.customerName, style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
                     DataCell(
                       Container(

@@ -146,13 +146,37 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
       }
     }
 
-    // 4. Group orders by staffName via shiftId
+    // 4. Group orders by staffName.
+    //    Mirrors ShiftRepository.getOrdersForShift so discounts/refunds draw
+    //    from the SAME order set the shift sales aggregates use:
+    //      • shiftId matches a shift in this period → that staff
+    //      • shiftId == null → the staff whose shift time-window contains orderAt
+    //        (legacy / missed assignment fallback)
+    //      • shiftId set but not in this period → skip (belongs elsewhere)
     final Map<String, List<dynamic>> ordersByStaff = {};
     for (final o in allOrders) {
       final sid = o.shiftId;
-      if (sid != null && shiftIdToStaff.containsKey(sid)) {
-        final name = shiftIdToStaff[sid]!;
-        ordersByStaff.putIfAbsent(name, () => []).add(o);
+
+      if (sid != null) {
+        final name = shiftIdToStaff[sid];
+        if (name != null) {
+          ordersByStaff.putIfAbsent(name, () => []).add(o);
+        }
+        continue; // non-null shiftId not in this period → skip
+      }
+
+      // Null shiftId — attribute by time window (same rule as getOrdersForShift).
+      final at = o.orderAt;
+      if (at == null) continue;
+      outer:
+      for (final entry in byStaff.entries) {
+        for (final s in entry.value) {
+          final end = s.endTime ?? DateTime.now();
+          if (!at.isBefore(s.startTime) && !at.isAfter(end)) {
+            ordersByStaff.putIfAbsent(entry.key, () => []).add(o);
+            break outer;
+          }
+        }
       }
     }
 

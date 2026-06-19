@@ -7,6 +7,7 @@ import 'package:unipos/stores/payment_method_store.dart';
 import 'package:unipos/util/common/currency_helper.dart';
 import 'package:unipos/util/common/decimal_settings.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:unipos/util/color.dart';
 
 /// Payment entry for split payment
 class PaymentEntry {
@@ -378,143 +379,58 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header: label + (split) delete
           Row(
             children: [
-              // Payment Method Dropdown
-              Expanded(
-                flex: 2,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-                  ),
-                  child: Observer(
-                    builder: (_) {
-                      // Check if store is loading
-                      if (_paymentMethodStore.isLoading) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        );
-                      }
-
-                      final enabledMethods = _paymentMethodStore.enabledMethods;
-
-                      // If no enabled methods, show empty state
-                      if (enabledMethods.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            'No payment methods configured',
-                            style: TextStyle(fontSize: 13, color: Colors.grey),
-                          ),
-                        );
-                      }
-
-                      // Get already selected payment methods (excluding current entry)
-                      final selectedMethods = _payments
-                          .where((p) => p.id != payment.id)
-                          .map((p) => p.method)
-                          .toSet();
-
-                      // Filter out already selected methods for other entries
-                      final availableMethods = enabledMethods
-                          .where((m) => !selectedMethods.contains(m.value) || m.value == payment.method)
-                          .toList();
-
-                      // Validate current payment method exists in available methods
-                      final currentMethodExists = availableMethods.any((m) => m.value == payment.method);
-                      final currentMethod = currentMethodExists ? payment.method : availableMethods.first.value;
-
-                      // Update payment method if it doesn't exist
-                      if (!currentMethodExists) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _updatePaymentMethod(index, availableMethods.first.value);
-                        });
-                      }
-
-                      return DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: currentMethod,
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 20),
-                          items: availableMethods.map((method) {
-                            return DropdownMenuItem<String>(
-                              value: method.value,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _getIcon(method.iconName),
-                                    size: 18,
-                                    color: const Color(0xFF6B6B6B),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    method.name,
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              _updatePaymentMethod(index, value);
-                            }
-                          },
-                        ),
-                      );
-                    },
+              const Expanded(
+                child: Text(
+                  'Payment Method',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B6B6B),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-
-              // Amount Input
-              Expanded(
-                flex: 2,
-                child: AppTextField(
-                  controller: payment.amountController,
-                  hint: '0.00',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                  prefixWidget: Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 4),
-                    child: Text('${CurrencyHelper.currentSymbol} ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  ),
-                  suffixIcon: _remaining > 0 && payment.amount < widget.billTotal
-                      ? IconButton(
-                          icon: const Icon(Icons.add_circle, color: Color(0xFF4CAF50), size: 20),
-                          tooltip: 'Fill remaining',
-                          onPressed: () => _fillRemaining(index),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        )
-                      : null,
-                  onChanged: (value) => _updatePaymentAmount(index, value),
-                ),
-              ),
-
-              // Delete Button
-              if (_payments.length > 1) ...[
-                const SizedBox(width: 4),
+              if (_payments.length > 1)
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                   onPressed: () => _removePaymentEntry(index),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
-              ],
             ],
+          ),
+          const SizedBox(height: 8),
+
+          // Payment method selector (chips)
+          _buildMethodSelector(index, payment),
+          const SizedBox(height: 12),
+
+          // Amount Input
+          AppTextField(
+            controller: payment.amountController,
+            hint: '0.00',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            ],
+            prefixWidget: Padding(
+              padding: const EdgeInsets.only(left: 12, right: 4),
+              child: Text('${CurrencyHelper.currentSymbol} ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            ),
+            suffixIcon: _remaining > 0 && payment.amount < widget.billTotal
+                ? IconButton(
+                    icon: const Icon(Icons.add_circle, color: Color(0xFF4CAF50), size: 20),
+                    tooltip: 'Fill remaining',
+                    onPressed: () => _fillRemaining(index),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  )
+                : null,
+            onChanged: (value) => _updatePaymentAmount(index, value),
           ),
 
           // Reference ID Field (for UPI/Card)
@@ -535,6 +451,93 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildMethodSelector(int index, PaymentEntry payment) {
+    return Observer(
+      builder: (_) {
+        if (_paymentMethodStore.isLoading) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+
+        final enabledMethods = _paymentMethodStore.enabledMethods;
+        if (enabledMethods.isEmpty) {
+          return const Text(
+            'No payment methods configured',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          );
+        }
+
+        // Hide methods already used by other split entries.
+        final selectedMethods = _payments
+            .where((p) => p.id != payment.id)
+            .map((p) => p.method)
+            .toSet();
+        final availableMethods = enabledMethods
+            .where((m) =>
+                !selectedMethods.contains(m.value) || m.value == payment.method)
+            .toList();
+
+        // Repair selection if the current method is no longer available.
+        final currentMethodExists =
+            availableMethods.any((m) => m.value == payment.method);
+        if (!currentMethodExists) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _updatePaymentMethod(index, availableMethods.first.value);
+          });
+        }
+
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: availableMethods.map((method) {
+            final isSelected = method.value == payment.method;
+            return GestureDetector(
+              onTap: () => _updatePaymentMethod(index, method.value),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color:
+                        isSelected ? AppColors.primary : const Color(0xFFE8E8E8),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getIcon(method.iconName),
+                      size: 16,
+                      color: isSelected ? Colors.white : const Color(0xFF6B6B6B),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      method.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color:
+                            isSelected ? Colors.white : const Color(0xFF1A1A1A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 

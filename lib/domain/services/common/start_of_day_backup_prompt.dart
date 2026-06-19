@@ -40,6 +40,10 @@ class StartOfDayBackupPrompt {
     final doBackup = await _showPromptDialog(context, isEncrypted: hasPassword, password: password);
     if (doBackup != true || !context.mounted) return;
 
+    // Backups are always encrypted — prompt to set a password if none exists.
+    if (!await UnifiedBackupService.ensureBackupPassword(context)) return;
+    if (!context.mounted) return;
+
     await _runWithOverlay(context);
   }
 

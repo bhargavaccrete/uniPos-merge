@@ -20,6 +20,8 @@ import '../../../../../util/restaurant/restaurant_session.dart';
 
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../data/models/restaurant/db/item_cancellation_model_134.dart';
+import '../../../../../data/repositories/restaurant/item_cancellation_repository.dart';
 import '../../../../widget/componets/common/app_text_field.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
@@ -77,6 +79,10 @@ class _TakeawayState extends State<Takeaway> {
   // itemId → available stock, for items whose typed qty exceeds it. Kept visible
   // (not reverted) and used to DISABLE Place Order / Quick Settle until fixed.
   final Map<String, int> _overStock = {};
+
+  // itemId → reason entered when cancelling an active (KOT'd) item. Read at
+  // commit time (_updateExistingOrder) to write the item-cancellation audit.
+  final Map<String, String> _cancelReasons = {};
 
   TextEditingController _qtyController(CartItem item) {
     final c = _qtyControllers.putIfAbsent(
@@ -286,15 +292,20 @@ class _TakeawayState extends State<Takeaway> {
   Widget buildCartItemRow(CartItemStatus wrapped, {bool isCooked = false}) {
     final item = wrapped.item;
 
-    final String? variantLine = item.variantName;
-    final List<String> addOns = [];
+    // Variant + weight on their own line, e.g. "Medium • 12 Inch"
+    final List<String> detailParts = [];
+    if (item.variantName != null && item.variantName!.isNotEmpty) detailParts.add(item.variantName!);
+    if (item.weightDisplay != null && item.weightDisplay!.isNotEmpty) detailParts.add(item.weightDisplay!);
+    final String? detailLine = detailParts.isNotEmpty ? detailParts.join(' • ') : null;
 
-    // Choices — deduplicated
+    // Choices — deduplicated, on a labeled line
+    String? choiceLine;
     if (item.choiceNames != null && item.choiceNames!.isNotEmpty) {
-      addOns.addAll(item.choiceNames!.toSet());
+      choiceLine = 'Choice: ${item.choiceNames!.toSet().join(', ')}';
     }
 
-    // Extras — grouped by name with price
+    // Extras — grouped by name with price, on a labeled line
+    String? extraLine;
     if (item.extras != null && item.extras!.isNotEmpty) {
       Map<String, Map<String, dynamic>> groupedExtras = {};
       for (var extra in item.extras!) {
@@ -315,16 +326,15 @@ class _TakeawayState extends State<Takeaway> {
           groupedExtras[key] = {'displayName': displayName, 'price': price, 'quantity': itemQuantity};
         }
       }
-      addOns.addAll(groupedExtras.entries.map((e) {
+      final parts = groupedExtras.entries.map((e) {
         final d = e.value;
         final qty = d['quantity'] as int;
         final name = d['displayName'] as String;
         final price = d['price'] as double;
         return qty > 1 ? '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})' : '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
-      }));
+      }).toList();
+      if (parts.isNotEmpty) extraLine = 'Extra: ${parts.join(', ')}';
     }
-
-    final String? addOnsLine = addOns.isNotEmpty ? addOns.join(', ') : null;
 
     final nameFs = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 17);
     final variantFs = AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 15);
@@ -337,8 +347,11 @@ class _TakeawayState extends State<Takeaway> {
     final hPad = AppResponsive.getValue<double>(context, mobile: 12, tablet: 16, desktop: 20);
     final vPad = AppResponsive.getValue<double>(context, mobile: 5, tablet: 7, desktop: 8);
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad + 3),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.divider)),
+      ),
       child: Row(
         children: [
           // Item name + variant + modifiers
@@ -347,26 +360,30 @@ class _TakeawayState extends State<Takeaway> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Item name + variant inline
-                Text.rich(
-                  TextSpan(
-                    text: item.title,
-                    style: GoogleFonts.poppins(fontSize: nameFs, fontWeight: FontWeight.w500),
-                    children: [
-                      if (variantLine != null)
-                        TextSpan(text: '  $variantLine', style: GoogleFonts.poppins(fontSize: variantFs, fontWeight: FontWeight.w400, color: AppColors.textSecondary)),
-                      if (item.weightDisplay != null)
-                        TextSpan(text: '  ${item.weightDisplay}', style: GoogleFonts.poppins(fontSize: modFs, fontWeight: FontWeight.w400, color: AppColors.textSecondary)),
-                    ],
-                  ),
+                // Item name
+                Text(
+                  item.title,
+                  style: GoogleFonts.poppins(fontSize: nameFs, fontWeight: FontWeight.w600),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                // Choices + extras — one line, comma separated, wraps naturally
-                if (addOnsLine != null)
+                // Variant • weight on its own line
+                if (detailLine != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(addOnsLine, style: GoogleFonts.poppins(fontSize: modFs, color: AppColors.textSecondary)),
+                    child: Text(detailLine, style: GoogleFonts.poppins(fontSize: variantFs, color: AppColors.textSecondary)),
+                  ),
+                // Choices — labeled line
+                if (choiceLine != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(choiceLine, style: GoogleFonts.poppins(fontSize: modFs, color: AppColors.textSecondary)),
+                  ),
+                // Extras — labeled line
+                if (extraLine != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(extraLine, style: GoogleFonts.poppins(fontSize: modFs, color: AppColors.textSecondary)),
                   ),
               ],
             ),
@@ -473,6 +490,8 @@ class _TakeawayState extends State<Takeaway> {
 
   void _showCancelDialog(BuildContext context, CartItem item) {
     int cancelQty = 1;
+    final reasonController = TextEditingController();
+    String? reasonError;
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
         : 24.0;
@@ -523,6 +542,24 @@ class _TakeawayState extends State<Takeaway> {
                     )
                   else
                     Text('Cancel 1x ${item.title}?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
+                  SizedBox(height: 14),
+                  TextField(
+                    controller: reasonController,
+                    minLines: 1,
+                    maxLines: 2,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: GoogleFonts.poppins(fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Reason for cancellation',
+                      labelStyle: GoogleFonts.poppins(fontSize: 13),
+                      hintText: 'e.g. Customer changed mind',
+                      errorText: reasonError,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onChanged: (_) {
+                      if (reasonError != null) setState(() => reasonError = null);
+                    },
+                  ),
                   SizedBox(height: 10),
                   Text('This will print a Cancel KOT for the kitchen.', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
                 ],
@@ -538,6 +575,12 @@ class _TakeawayState extends State<Takeaway> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () {
+                    final reason = reasonController.text.trim();
+                    if (reason.isEmpty) {
+                      setState(() => reasonError = 'Reason is required');
+                      return;
+                    }
+                    _cancelReasons[item.id] = reason;
                     Navigator.pop(ctx);
                     for (int i = 0; i < cancelQty; i++) {
                       widget.onDecreseQty(item);
@@ -947,12 +990,18 @@ class _TakeawayState extends State<Takeaway> {
     List<int> updatedKotBoundaries = List<int>.from(widget.currentKotBoundaries ?? existingModel.kotBoundaries);
     Map<int, String> updatedKotStatuses = Map<int, String>.from(existingModel.kotStatuses ?? {});
 
+    // Per-KOT creation times — stamp the new add-on KOT with "now" so the KDS
+    // timer reflects when these items were actually added, not the order time.
+    final updatedKotTimestamps =
+        Map<int, DateTime>.from(existingModel.kotTimestamps ?? {});
+
     int? newAddedKotNumber;
     if (hasNewItems) {
       newAddedKotNumber = await orderStore.getNextKotNumber();
       updatedKotNumbers.add(newAddedKotNumber);
       updatedKotBoundaries.add(currentActiveItems.length + newlyAddedItems.length);
       updatedKotStatuses[newAddedKotNumber] = 'Processing';
+      updatedKotTimestamps[newAddedKotNumber] = DateTime.now();
     }
 
     final currentSessionId = await DayManagementService.getCurrentSessionId();
@@ -971,6 +1020,7 @@ class _TakeawayState extends State<Takeaway> {
       itemCountAtLastKot: allCurrentItems.length,
       kotBoundaries: updatedKotBoundaries,
       kotStatuses: updatedKotStatuses,
+      kotTimestamps: updatedKotTimestamps,
       sessionId: currentSessionId ?? existingModel.sessionId,
     );
 
@@ -981,6 +1031,40 @@ class _TakeawayState extends State<Takeaway> {
     if (stockToRestore.isNotEmpty) await InventoryService.restoreStockForOrder(stockToRestore);
     if (stockToDeduct.isNotEmpty)  await InventoryService.deductStockForOrder(stockToDeduct);
     if (hasNewItems) await InventoryService.deductStockForOrder(newlyAddedItems);
+
+    // Audit: log each cancelled/reduced item with its reason for the
+    // Item Cancellation Report. Failure here must never block the order update.
+    if (hasCorrection) {
+      try {
+        final repo = locator<ItemCancellationRepository>();
+        final staff = RestaurantSession.staffName ??
+            (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+        final sessionId = await DayManagementService.getCurrentSessionId();
+        final ts = DateTime.now();
+        Future<void> rec(CartItem it, int qty) async {
+          final kot = getKotNumberForItem(it.id);
+          await repo.add(ItemCancellationModel(
+            id: const Uuid().v4(),
+            itemName: it.title,
+            variantName: it.variantName,
+            quantity: qty,
+            amount: it.price * qty,
+            reason: _cancelReasons[it.id] ?? 'No reason given',
+            orderId: existingModel.id,
+            kotNumber: kot == 0 ? null : kot,
+            staffName: staff,
+            timestamp: ts,
+            sessionId: sessionId,
+            orderType: existingModel.orderType,
+            tableNo: existingModel.tableNo,
+          ));
+        }
+        for (final it in removedItems) await rec(it, it.quantity);
+        for (final it in stockToRestore) await rec(it, it.quantity);
+      } catch (e) {
+        debugPrint('Item-cancellation audit failed: $e');
+      }
+    }
 
     // WebSocket: new items KOT
     if (hasNewItems && newAddedKotNumber != null) {
@@ -1003,9 +1087,21 @@ class _TakeawayState extends State<Takeaway> {
     // WebSocket: correction (removals / quantity reductions)
     if (hasCorrection) {
       try {
+        // KOT numbers the cancelled/reduced items belonged to (parsed from the
+        // "Cancelled/Reduced from KOT #X" instruction) — lets the KDS name the ticket.
+        final modifiedKots = correctionItems
+            .map((i) {
+              final m = RegExp(r'#(\d+)').firstMatch(i.instruction ?? '');
+              return m != null ? int.tryParse(m.group(1)!) : null;
+            })
+            .where((e) => e != null)
+            .toSet()
+            .toList();
         ws.broadcastEvent({
           'type': 'ORDER_MODIFIED',
           'orderId': updateOrder.id,
+          'orderNumber': updateOrder.orderNumber,
+          'kotNumbers': modifiedKots,
           'tableNo': updateOrder.tableNo,
           'removedItems': removedItems.map((i) => {'id': i.id, 'title': i.title, 'quantity': i.quantity}).toList(),
           'reducedItems': stockToRestore.map((i) => {'id': i.id, 'title': i.title, 'reducedBy': i.quantity}).toList(),
@@ -1083,6 +1179,9 @@ class _TakeawayState extends State<Takeaway> {
   @override
   Widget build(BuildContext context) {
     final plainItems  = widget.cartItems.map((w)=> w.item).toList();
+    // Total unit quantity (sum of every line's qty) — distinct from the AppBar's
+    // line-item count, so it's labeled "Qty" to avoid the two numbers contradicting.
+    final int totalQty = widget.cartItems.fold(0, (sum, w) => sum + w.item.quantity);
 
     // ✅ FIX: Use saved values from existing order to show correct total
     final double discountValue;
@@ -1143,7 +1242,7 @@ class _TakeawayState extends State<Takeaway> {
               : Column(
                   children: [
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: EdgeInsets.fromLTRB(16, 10, 16, 6),
                       child: Center(
                         child: widget.isDineIn
                             ? Container(
@@ -1167,11 +1266,25 @@ class _TakeawayState extends State<Takeaway> {
                                   ],
                                 ),
                               )
-                            : Text(widget.isexisting ? 'Existing Order' : 'New Order',
-                                style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 15),
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textSecondary)),
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(widget.isexisting ? 'Existing Order' : 'New Order',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 15),
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textSecondary)),
+                                ],
+                              ),
                       ),
                     ),
                     Expanded(child: _buildGroupedCartItems()),
@@ -1183,13 +1296,31 @@ class _TakeawayState extends State<Takeaway> {
         SafeArea(
           top: false,
           child: Container(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: EdgeInsets.fromLTRB(16, 14, 16, 16),
           decoration: BoxDecoration(
             color: AppColors.white,
-            border: Border(top: BorderSide(color: AppColors.divider)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, -2),
+              ),
+            ],
           ),
           child: Column(
             children: [
+              // Total unit quantity — labeled "Qty" to disambiguate from the AppBar line-item count
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total Qty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 15), color: AppColors.textSecondary)),
+                    Text('$totalQty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 15), fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1214,7 +1345,7 @@ class _TakeawayState extends State<Takeaway> {
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
     if (widget.isdelivery) {
-      return SizedBox(width: double.infinity, child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations)));
+      return SizedBox(width: double.infinity, child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations), icon: Icons.check_circle_outline));
     }
 
     return Column(
@@ -1228,41 +1359,41 @@ class _TakeawayState extends State<Takeaway> {
                   tableid: widget.tableid, existingModel: widget.existingModel,
                   cartitems: plainItems, totalPrice: calculations.grandTotal,
                 ))),
+                icon: Icons.payments_outlined,
               ),
             ),
             SizedBox(width: 8),
-            Expanded(child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations))),
+            Expanded(
+              child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations),
+                  icon: Icons.check_circle_outline),
+            ),
           ],
         ),
         SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: widget.cartItems.isEmpty || widget.existingModel == null ? null : () async {
+          child: _buildActionButton(
+            'Print Bill',
+            () async {
               try {
                 await RestaurantPrintHelper.printBillForActiveOrder(context: context, order: widget.existingModel!, currentItems: plainItems);
               } catch (e) {
                 NotificationService.instance.showError('Failed to print bill');
               }
             },
-            icon: Icon(Icons.print_outlined, size: 16),
-            label: Text('Print Bill', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-            style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              side: BorderSide(color: AppColors.primary),
-              foregroundColor: AppColors.primary,
-            ),
+            icon: Icons.print_outlined,
+            enabled: !(widget.cartItems.isEmpty || widget.existingModel == null),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildActionButton(String label, VoidCallback onTap) {
+  /// Solid primary cart action button — same color for every action.
+  Widget _buildActionButton(String label, VoidCallback onTap, {IconData? icon, bool enabled = true}) {
     final btnFs = AppResponsive.getValue<double>(context, mobile: 13, tablet: 15, desktop: 16);
-    final btnPad = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 18);
-    final bool blocked = _overStock.isNotEmpty; // a typed qty exceeds stock
+    final btnPad = AppResponsive.getValue<double>(context, mobile: 12, tablet: 13, desktop: 15);
+    final bool blocked = _overStock.isNotEmpty || !enabled; // a typed qty exceeds stock, or caller-disabled
     return ElevatedButton(
       onPressed: blocked ? null : onTap,
       style: ElevatedButton.styleFrom(
@@ -1272,9 +1403,27 @@ class _TakeawayState extends State<Takeaway> {
         disabledForegroundColor: Colors.white,
         elevation: 0,
         padding: EdgeInsets.symmetric(vertical: btnPad),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      child: Text(label, style: GoogleFonts.poppins(fontSize: btnFs, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: btnFs + 4),
+            SizedBox(width: 6),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(fontSize: btnFs, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1289,7 +1438,7 @@ class _TakeawayState extends State<Takeaway> {
             tableid: widget.tableid, cartitems: plainItems,
             totalPrice: calculations.grandTotal, orderType: 'Delivery', isSettle: true,
           )));
-        }),
+        }, icon: Icons.check_circle_outline),
       );
     }
 
@@ -1302,29 +1451,27 @@ class _TakeawayState extends State<Takeaway> {
                 nameSuggestions = []; phoneSuggestions = [];
                 showNameSuggestions = false; showPhoneSuggestions = false;
                 _showPlaceOrderDialog(height, calculations);
-              }),
+              }, icon: Icons.check_circle_outline),
             ),
             SizedBox(width: 8),
-            Expanded(child: _buildActionButton('Quick Settle', () => _showQuickSettleSheet(calculations))),
+            Expanded(
+              child: _buildActionButton('Quick Settle', () => _showQuickSettleSheet(calculations), icon: Icons.bolt),
+            ),
           ],
         ),
         SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
-          child: OutlinedButton(
-            onPressed: (widget.cartItems.isEmpty || _overStock.isNotEmpty) ? null : () {
+          child: _buildActionButton(
+            'Settle & Print Bill',
+            () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
                 tableid: widget.tableid, cartitems: plainItems,
                 totalPrice: calculations.grandTotal, orderType: widget.isDineIn ? 'Dine In' : 'Take Away', isSettle: true,
               )));
             },
-            style: OutlinedButton.styleFrom(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              side: BorderSide(color: AppColors.primary),
-              foregroundColor: AppColors.primary,
-            ),
-            child: Text('Settle & Print Bill', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+            icon: Icons.print_outlined,
+            enabled: !widget.cartItems.isEmpty,
           ),
         ),
       ],

@@ -32,6 +32,10 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   Map<String, TextEditingController> priceControllers = {};
   Map<String, TextEditingController> stockControllers = {};
 
+  /// Existing selections are applied once (first load), not on every reload —
+  /// re-applying would re-add just-deleted variants and re-touch controllers.
+  bool _initialized = false;
+
   TextEditingController _stockCtrl(String id) =>
       stockControllers.putIfAbsent(id, () => TextEditingController());
 
@@ -102,13 +106,16 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
     );
 
     if (confirmed == true) {
-      final removedController = priceControllers.remove(variant.id);
+      final removedPrice = priceControllers.remove(variant.id);
+      final removedStock = stockControllers.remove(variant.id);
       selectedVariantIds.remove(variant.id);
       await variantStore.deleteVariant(variant.id);
       _loadVariants();
       // Dispose after the rebuild removes the row, never while it's mounted.
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => removedController?.dispose());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        removedPrice?.dispose();
+        removedStock?.dispose();
+      });
     }
   }
 
@@ -163,11 +170,9 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   void _loadVariants() {
     final variants = variantStore.variants.toList();
 
-    // Ensure we don't leak controllers
+    // Ensure a controller exists for every variant (reuse if already present).
     for (var variant in variants) {
-      if (!priceControllers.containsKey(variant.id)) {
-        priceControllers[variant.id] = TextEditingController();
-      }
+      priceControllers.putIfAbsent(variant.id, () => TextEditingController());
       selectedVariantIds.putIfAbsent(variant.id, () => false);
     }
 
@@ -175,37 +180,41 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
       setState(() {
         availableVariants = variants;
       });
-      _initializeSelections();
+      // Apply the item's existing selections only on the first load.
+      if (!_initialized) {
+        _initializeSelections();
+        _initialized = true;
+      }
     }
   }
 
 
   void _initializeSelections() {
-    // Initialize from existing selections
+    // Initialize from existing selections.
+    // Reuse any controller already in the map (set its text) instead of
+    // replacing it — replacing leaks the old controller and orphans the
+    // EditableText still bound to it, which destabilises the element tree.
     for (var selectedVariant in widget.selectedVariants) {
       final id = selectedVariant['variantId'];
       selectedVariantIds[id] = true;
-      priceControllers[id] = TextEditingController(
-        text: selectedVariant['price'].toString(),
-      );
+
+      final price = selectedVariant['price'];
+      priceControllers.putIfAbsent(id, () => TextEditingController());
+      priceControllers[id]!.text = price?.toString() ?? '';
+
       final existingStock = selectedVariant['stockQuantity'];
-      stockControllers[id] = TextEditingController(
-        text: (existingStock == null || existingStock == 0)
-            ? ''
-            : (existingStock % 1 == 0
-                ? existingStock.toInt().toString()
-                : existingStock.toString()),
-      );
+      stockControllers.putIfAbsent(id, () => TextEditingController());
+      stockControllers[id]!.text = (existingStock == null || existingStock == 0)
+          ? ''
+          : (existingStock % 1 == 0
+              ? existingStock.toInt().toString()
+              : existingStock.toString());
     }
 
-    // Initialize controllers for all variants
+    // Ensure controllers exist for every available variant.
     for (var variant in availableVariants) {
-      if (!priceControllers.containsKey(variant.id)) {
-        priceControllers[variant.id] = TextEditingController();
-      }
-      if (!selectedVariantIds.containsKey(variant.id)) {
-        selectedVariantIds[variant.id] = false;
-      }
+      priceControllers.putIfAbsent(variant.id, () => TextEditingController());
+      selectedVariantIds.putIfAbsent(variant.id, () => false);
     }
   }
 
@@ -259,20 +268,85 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle_outline),
-            onPressed: () => _showAddVariantDialog(),
-            tooltip: 'Add New Variant',
-          ),
+          // Empty state shows a prominent centred button instead, so the
+          // app-bar action only appears once at least one variant exists.
+          if (availableVariants.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.add_circle_outline),
+              onPressed: () => _showAddVariantDialog(),
+              tooltip: 'Add New Variant',
+            ),
         ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: _buildVariantList(),
+            child: availableVariants.isEmpty
+                ? _buildEmptyState()
+                : _buildVariantList(),
           ),
           _buildBottomButtons(),
         ],
+      ),
+    );
+  }
+
+  /// Empty state — matches the Choice/Extra selection screens: the single add
+  /// control lives in the app bar, so the empty state just guides the user to it.
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.straighten_outlined,
+              size: 80,
+              color: AppColors.divider,
+            ),
+            SizedBox(height: 20),
+            Text(
+              'No Variants Available',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Create your first variant to get started',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 30),
+            CommonButton(
+              onTap: () => _showAddVariantDialog(),
+              bgcolor: AppColors.primary,
+              bordercircular: 10,
+              height: 50,
+              width: 200,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'Add Variant',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -297,6 +371,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             final controller = priceControllers[variant.id]!;
 
             return Container(
+              key: ValueKey(variant.id),
               margin: EdgeInsets.only(bottom: 12),
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -382,7 +457,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -748,4 +823,132 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
   }
  */
+}
+
+/// Public entry point so other screens (e.g. item edit) can open the SAME
+/// "Add Variant" dialog used in the Add-Item flow. [onAdded] fires after a
+/// variant is created so the caller can refresh its list.
+Future<void> showAddVariantDialog(BuildContext context,
+    {required VoidCallback onAdded}) {
+  return showDialog(
+    context: context,
+    builder: (_) => _AddVariantDialog(onAdded: onAdded),
+  );
+}
+
+class _AddVariantDialog extends StatefulWidget {
+  final VoidCallback onAdded;
+  const _AddVariantDialog({required this.onAdded});
+
+  @override
+  State<_AddVariantDialog> createState() => _AddVariantDialogState();
+}
+
+class _AddVariantDialogState extends State<_AddVariantDialog> {
+  final _nameController = TextEditingController();
+
+  static const Map<String, List<String>> _presetSets = {
+    'Small / Medium / Large': ['Small', 'Medium', 'Large'],
+    'Half / Full': ['Half', 'Full'],
+    'Regular / Large': ['Regular', 'Large'],
+  };
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  /// Create any missing variants from a preset set (existing names are skipped).
+  Future<void> _applyPreset(List<String> names) async {
+    final existing = variantStore.variants.toList();
+    for (final name in names) {
+      final already =
+          existing.any((v) => v.name.toLowerCase() == name.toLowerCase());
+      if (!already) {
+        await variantStore.addVariant(VariantModel(id: const Uuid().v4(), name: name));
+      }
+    }
+    widget.onAdded();
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _addSingle() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      NotificationService.instance.showError('Please enter a variant name');
+      return;
+    }
+    await variantStore.addVariant(VariantModel(id: const Uuid().v4(), name: name));
+    widget.onAdded();
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2)
+            .clamp(40.0, 200.0)
+        : 24.0;
+    return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
+      title: Text('Add New Variant',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Enter variant name (e.g., Small, Medium, Large)',
+                style: GoogleFonts.poppins(
+                    fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 15),
+            AppTextField(
+              controller: _nameController,
+              label: 'Variant Name',
+              hint: 'e.g. Small, Medium, Large',
+              icon: Icons.tune_rounded,
+            ),
+            const SizedBox(height: 20),
+            Text('Suggestions',
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _presetSets.entries.map((e) {
+                return OutlinedButton(
+                  onPressed: () => _applyPreset(e.value),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(e.key,
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, fontWeight: FontWeight.w500)),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel',
+              style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: _addSingle,
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+          child: Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
+        ),
+      ],
+    );
+  }
 }

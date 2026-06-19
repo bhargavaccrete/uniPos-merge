@@ -180,45 +180,54 @@ Future<Response> captainSendOrderHandler(Request request) async {
       );
     }
 
-    // Check for existing active order on this table
-    if (tableNo != null) {
-      final existing = await HiveOrders.getActiveOrderByTableId(tableNo);
-      if (existing != null) {
-        // Add items to existing order as new KOT
-        final updated = await HiveOrders.updateOrderWithNewItems(
-          existingOrder: existing,
-          newItems: newItems,
-        );
-        await InventoryService.deductStockForOrder(newItems);
-        // Update table total
+    // Resolve the order to append to: an explicit orderId (from "Add Items")
+    // wins — this is the only way to append to a Take Away order, which has no
+    // table to match on. Otherwise fall back to the table's active order.
+    final explicitOrderId = data['orderId'] as String?;
+    OrderModel? existing;
+    if (explicitOrderId != null && explicitOrderId.isNotEmpty) {
+      existing = await HiveOrders.getOrderById(explicitOrderId);
+    } else if (tableNo != null) {
+      existing = await HiveOrders.getActiveOrderByTableId(tableNo);
+    }
+
+    if (existing != null) {
+      // Add items to the existing order as a new KOT.
+      final updated = await HiveOrders.updateOrderWithNewItems(
+        existingOrder: existing,
+        newItems: newItems,
+      );
+      await InventoryService.deductStockForOrder(newItems);
+      // Update table total (dine-in only — Take Away has no table).
+      if (updated.tableNo != null && updated.tableNo!.isNotEmpty) {
         await tableStore.updateTableStatus(
-          tableNo,
+          updated.tableNo!,
           'Cooking',
           total: updated.totalPrice,
           orderId: updated.id,
           orderTime: updated.timeStamp,
         );
-        broadcastEvent({
-          'type': 'NEW_ITEMS_ADDED',
-          'orderId': updated.id,
-          'kotNumber': updated.kotNumbers.last,
-          'newItemCount': newItems.length,
-          'tableNo': tableNo,
-        });
-        final addedResponse = {
-          'success': true,
-          'orderId': updated.id,
-          'kotNumber': updated.kotNumbers.last,
-          'addedToExisting': true,
-        };
-        if (requestId != null && requestId.isNotEmpty) {
-          _orderRequestCache[requestId] = _IdempotencyEntry(addedResponse);
-        }
-        return Response.ok(
-          jsonEncode(addedResponse),
-          headers: {'Content-Type': 'application/json'},
-        );
       }
+      broadcastEvent({
+        'type': 'NEW_ITEMS_ADDED',
+        'orderId': updated.id,
+        'kotNumber': updated.kotNumbers.last,
+        'newItemCount': newItems.length,
+        'tableNo': updated.tableNo,
+      });
+      final addedResponse = {
+        'success': true,
+        'orderId': updated.id,
+        'kotNumber': updated.kotNumbers.last,
+        'addedToExisting': true,
+      };
+      if (requestId != null && requestId.isNotEmpty) {
+        _orderRequestCache[requestId] = _IdempotencyEntry(addedResponse);
+      }
+      return Response.ok(
+        jsonEncode(addedResponse),
+        headers: {'Content-Type': 'application/json'},
+      );
     }
 
     // Get current session ID
@@ -351,6 +360,7 @@ Future<Response> captainModifyOrderHandler(Request request, String orderId) asyn
     broadcastEvent({
       'type': 'CANCEL_KOT',
       'orderId': orderId,
+      'orderNumber': order.orderNumber,
       'cancelKotNumber': cancelKotNumber,
       'tableNo': order.tableNo,
       'cancelledItems': cancelledItems.map((i) => {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
@@ -31,6 +32,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
   late TextEditingController _addressController;
+  late TextEditingController _cityController;
+  late TextEditingController _stateController;
+  late TextEditingController _countryController;
+  late TextEditingController _pincodeController;
   late TextEditingController _gstController;
   late TextEditingController _panController;
 
@@ -49,6 +54,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _phoneController = TextEditingController(text: _val(widget.store.phone, '7845963574'));
     _emailController = TextEditingController(text: _val(widget.store.email, 'info@apple.com'));
     _addressController = TextEditingController(text: _val(widget.store.address, 'Infocity, Gandhinnagar'));
+    _cityController = TextEditingController(text: _val(widget.store.city, 'Gandhinagar'));
+    _stateController = TextEditingController(text: _val(widget.store.state, 'Gujarat'));
+    _countryController = TextEditingController(text: _val(widget.store.country, 'India'));
+    _pincodeController = TextEditingController(text: _val(widget.store.pincode, '382355'));
     _gstController = TextEditingController(text: _val(widget.store.gstin, 'GVFU415151YVBF'));
     _panController = TextEditingController(text: _val(widget.store.pan, 'FU415151YVBF'));
   }
@@ -60,6 +69,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _phoneController.dispose();
     _emailController.dispose();
     _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _countryController.dispose();
+    _pincodeController.dispose();
     _gstController.dispose();
     _panController.dispose();
     super.dispose();
@@ -71,6 +84,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     widget.store.setPhone(_phoneController.text);
     widget.store.setEmail(_emailController.text);
     widget.store.setAddress(_addressController.text);
+    widget.store.setCity(_cityController.text);
+    widget.store.setState(_stateController.text);
+    widget.store.setCountry(_countryController.text);
+    widget.store.setPincode(_pincodeController.text);
     widget.store.setGstin(_gstController.text);
     widget.store.setPan(_panController.text);
   }
@@ -475,6 +492,22 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     );
   }
 
+  // ── Phone validation ──────────────────────────────────────────────────────────
+
+  /// Validates the store phone number. Returns an error string to show under
+  /// the field, or null when the value is acceptable.
+  ///
+  /// The keyboard already restricts input to digits and caps length at 10,
+  /// so this is the final gate before the form is allowed to advance.
+  String? _validatePhone(String? v) {
+    final value = (v ?? '').trim();
+    if (value.isEmpty) return 'Phone is required';
+    if (!RegExp(r'^\d{10}$').hasMatch(value)) {
+      return 'Enter a valid 10-digit number';
+    }
+    return null;
+  }
+
   // ── Contact section (phone + email + address) ─────────────────────────────────
 
   Widget _buildContactSection(BuildContext context, {required bool isTablet}) {
@@ -495,9 +528,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   icon: Icons.phone_rounded,
                   required: true,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onChanged: (v) => widget.store.setPhone(v),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Phone is required' : null,
+                  validator: _validatePhone,
                 ),
               ),
               SizedBox(width: AppResponsive.mediumSpacing(context)),
@@ -517,10 +551,78 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           AppTextField(
             controller: _addressController,
             label: 'Store Address',
-            hint: 'Street, City, State',
+            hint: 'Street / Area',
             icon: Icons.location_on_rounded,
+            required: true,
             maxLines: isTablet ? 2 : 3,
             onChanged: (v) => widget.store.setAddress(v),
+            validator: (v) =>
+                (v == null || v.isEmpty) ? 'Address is required' : null,
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: AppTextField(
+                  controller: _cityController,
+                  label: 'City',
+                  hint: 'e.g. Gandhinagar',
+                  icon: Icons.location_city_rounded,
+                  required: true,
+                  onChanged: (v) => widget.store.setCity(v),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'City is required' : null,
+                ),
+              ),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
+              Expanded(
+                child: AppTextField(
+                  controller: _stateController,
+                  label: 'State',
+                  hint: 'e.g. Gujarat',
+                  icon: Icons.map_rounded,
+                  required: true,
+                  onChanged: (v) => widget.store.setState(v),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'State is required' : null,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: AppTextField(
+                  controller: _countryController,
+                  label: 'Country',
+                  hint: 'e.g. India',
+                  icon: Icons.public_rounded,
+                  required: true,
+                  onChanged: (v) => widget.store.setCountry(v),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Country is required' : null,
+                ),
+              ),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
+              Expanded(
+                child: AppTextField(
+                  controller: _pincodeController,
+                  label: 'Pincode',
+                  hint: 'e.g. 382355',
+                  icon: Icons.pin_drop_rounded,
+                  required: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: (v) => widget.store.setPincode(v),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Pincode is required' : null,
+                ),
+              ),
+            ],
           ),
         ],
       ),

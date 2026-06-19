@@ -9,6 +9,7 @@ import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../widget/componets/common/primary_app_bar.dart';
 import 'captain_login_screen.dart';
+import 'widgets/captain_item_customization_sheet.dart';
 
 class CaptainHomeScreen extends StatefulWidget {
   const CaptainHomeScreen({super.key});
@@ -31,6 +32,9 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
 
   String? _selectedCategoryId;
   Map<String, dynamic>? _selectedTable;
+  // When set (via "Add Items" on an order), new items append to THIS order —
+  // works for Take Away too, where there's no table to match on.
+  String? _addingToOrderId;
 
   final List<CartItem> _cart = [];
 
@@ -83,7 +87,13 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
           _choices = List<Map<String, dynamic>>.from(menu['choices'] ?? []);
           _extras = List<Map<String, dynamic>>.from(menu['extras'] ?? []);
           _tables = List<Map<String, dynamic>>.from(jsonDecode(tablesRes.body) as List);
-          _selectedCategoryId = _categories.isNotEmpty ? _categories.first['id'] as String? : null;
+          // Default to the first category that actually has items (skip empties).
+          final firstNonEmpty = _categories.cast<Map<String, dynamic>?>().firstWhere(
+                (c) => _items.any((i) =>
+                    i['isEnabled'] != false && i['categoryOfItem'] == c!['id']),
+                orElse: () => null,
+              );
+          _selectedCategoryId = firstNonEmpty?['id'] as String?;
           _isLoading = false;
         });
       } else {
@@ -170,11 +180,42 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  List<Map<String, dynamic>> get _filteredItems => _selectedCategoryId == null
-      ? _items.where((i) => i['isEnabled'] != false).toList()
-      : _items.where((i) =>
-          i['isEnabled'] != false &&
-          i['categoryOfItem'] == _selectedCategoryId).toList();
+  // Sentinel id for the pinned "Favourites" view (mirrors the POS menu).
+  static const String _kFavorites = '__favorites__';
+
+  bool get _hasFavorites =>
+      _items.any((i) => i['isEnabled'] != false && i['isFavorite'] == true);
+
+  List<Map<String, dynamic>> get _filteredItems {
+    if (_selectedCategoryId == _kFavorites) {
+      return _items
+          .where((i) => i['isEnabled'] != false && i['isFavorite'] == true)
+          .toList();
+    }
+    if (_selectedCategoryId == null) {
+      return _items.where((i) => i['isEnabled'] != false).toList();
+    }
+    return _items
+        .where((i) =>
+            i['isEnabled'] != false && i['categoryOfItem'] == _selectedCategoryId)
+        .toList();
+  }
+
+  // Favourites (if any) pinned on top, then only categories that contain at
+  // least one enabled item (hide empties).
+  List<Map<String, dynamic>> get _visibleCategories {
+    final cats = _categories
+        .where((c) => _items.any((i) =>
+            i['isEnabled'] != false && i['categoryOfItem'] == c['id']))
+        .toList();
+    if (_hasFavorites) {
+      return [
+        {'id': _kFavorites, 'name': 'Favourites'},
+        ...cats,
+      ];
+    }
+    return cats;
+  }
 
   int _cartQuantityFor(String productId) {
     return _cart.where((c) => c.productId == productId).fold(0, (sum, c) => sum + c.quantity);
@@ -187,7 +228,8 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
     final variants = item['variant'] as List?;
     final choiceIds = item['choiceIds'] as List?;
     final extraIds = item['extraId'] as List?;
-    return (variants?.isNotEmpty ?? false) ||
+    return (item['isSoldByWeight'] == true) ||
+           (variants?.isNotEmpty ?? false) ||
            (choiceIds?.isNotEmpty ?? false) ||
            (extraIds?.isNotEmpty ?? false);
   }
@@ -282,73 +324,37 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
       };
     }).toList();
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => _ItemCustomizationSheet(
-        item: item,
-        variants: itemVariants,
-        choices: itemChoices,
-        extras: itemExtras,
-        onAddToCart: (variant, choiceNames, extras, instruction) {
-          _addCustomizedItem(
-            item,
-            variant: variant,
-            choiceNames: choiceNames,
-            extras: extras,
-            instruction: instruction,
-          );
-        },
-      ),
-    );
-  }
-
-  void _addCustomizedItem(
-    Map<String, dynamic> item, {
-    Map<String, dynamic>? variant,
-    List<String> choiceNames = const [],
-    List<Map<String, dynamic>> extras = const [],
-    String? instruction,
-  }) {
-    // When variant selected: variant price IS the item price (not additive to base)
-    // This matches start order ItemOptionsDialog._recalculateTotal() behaviour
-    final variantPrice = (variant?['price'] as num?)?.toDouble();
-    final baseItemPrice = (item['price'] as num?)?.toDouble() ?? 0.0;
-    final extrasTotal = extras.fold(0.0, (sum, e) =>
-        sum + ((e['price'] as num?)?.toDouble() ?? 0.0) * ((e['quantity'] as int?) ?? 1));
-    final totalPrice = (variantPrice ?? baseItemPrice) + extrasTotal;
-
     final categoryName = _categories
         .cast<Map<String, dynamic>?>()
         .firstWhere((c) => c!['id'] == item['categoryOfItem'], orElse: () => null)
         ?['name'] as String?;
 
-    setState(() {
-      _cart.add(CartItem(
-        id: '${item['id']}_${DateTime.now().millisecondsSinceEpoch}',
-        productId: item['id'] as String,
-        title: item['name'] as String,
-        price: totalPrice,
-        isStockManaged: item['trackInventory'] as bool? ?? false,
-        variantName: variant?['name'] as String?,
-        variantPrice: variantPrice,
-        choiceNames: choiceNames.isEmpty ? null : choiceNames,
-        extras: extras.isEmpty ? null : extras,
-        instruction: instruction,
-        taxRate: (item['taxRate'] as num?)?.toDouble(),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      // CaptainItemCustomizationSheet clones the POS ItemOptionsDialog logic and
+      // returns the finished CartItem — single price source, no POS mismatch.
+      builder: (_) => CaptainItemCustomizationSheet(
+        item: item,
+        variants: List<Map<String, dynamic>>.from(itemVariants),
+        choices: List<Map<String, dynamic>>.from(itemChoices),
+        extras: List<Map<String, dynamic>>.from(itemExtras),
         categoryName: categoryName,
-      ));
-    });
+        onAdd: (cart) => setState(() => _cart.add(cart)),
+      ),
+    );
   }
 
   // ── Send Order ─────────────────────────────────────────────────────────────
 
-  bool get _tableHasActiveOrder =>
-      _selectedTable != null &&
-      (_selectedTable!['currentOrderId'] as String?)?.isNotEmpty == true;
+  bool get _isAddingToExisting =>
+      _addingToOrderId != null ||
+      (_selectedTable != null &&
+          (_selectedTable!['currentOrderId'] as String?)?.isNotEmpty == true);
 
   Future<void> _sendOrder() async {
     if (_cart.isEmpty) return;
@@ -357,7 +363,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
     if (!confirmed) return;
 
     try {
-      _showLoadingDialog(_tableHasActiveOrder ? 'Adding to order...' : 'Sending order...');
+      _showLoadingDialog(_isAddingToExisting ? 'Adding to order...' : 'Sending order...');
 
       // Unique per-attempt ID — server uses this to reject duplicates
       final requestId = '${_staffId}_${DateTime.now().millisecondsSinceEpoch}';
@@ -369,6 +375,8 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
           'items': _cart.map((c) => c.toMap()).toList(),
           'orderType': _selectedTable != null ? 'Dine In' : 'Take Away',
           'tableNo': _selectedTable?['id'],
+          // Append to THIS order if we're adding items (handles Take Away too).
+          if (_addingToOrderId != null) 'orderId': _addingToOrderId,
           'totalPrice': _cartTotal,
           'staffId': _staffId,
           'requestId': requestId,
@@ -384,6 +392,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
         setState(() {
           _cart.clear();
           _selectedTable = null;
+          _addingToOrderId = null;
           _currentTab = 1; // switch to Orders tab
         });
         await Future.wait([_loadMenuAndTables(), _loadActiveOrders()]);
@@ -400,7 +409,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
   }
 
   Future<bool> _showSendConfirmDialog() async {
-    final isAdding = _tableHasActiveOrder;
+    final isAdding = _isAddingToExisting;
     return await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
@@ -433,7 +442,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isAdding ? AppColors.warning : AppColors.accent,
+                  backgroundColor: isAdding ? AppColors.warning : AppColors.primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () => Navigator.pop(context, true),
@@ -491,11 +500,19 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
         tables: _tables,
         selected: _selectedTable,
         onSelect: (t) {
-          setState(() => _selectedTable = t);
+          // Manually choosing a table starts a fresh order context — drop any
+          // "adding to existing order" mode so items don't append unexpectedly.
+          setState(() {
+            _selectedTable = t;
+            _addingToOrderId = null;
+          });
           Navigator.pop(context);
         },
         onClear: () {
-          setState(() => _selectedTable = null);
+          setState(() {
+            _selectedTable = null;
+            _addingToOrderId = null;
+          });
           Navigator.pop(context);
         },
       ),
@@ -521,7 +538,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
             cart: _cart,
             total: _cartTotal,
             selectedTable: _selectedTable,
-            isAddingToOrder: _tableHasActiveOrder,
+            isAddingToOrder: _isAddingToExisting,
             onRemove: (item) {
               _removeCartItem(item);
               setSheetState(() {});
@@ -586,12 +603,12 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
               if (i == 1) _loadActiveOrders();
             },
             backgroundColor: Colors.white,
-            indicatorColor: AppColors.accent.withOpacity(0.15),
+            indicatorColor: AppColors.primary.withOpacity(0.15),
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             destinations: [
               NavigationDestination(
                 icon: Icon(Icons.restaurant_menu_outlined, color: AppColors.textSecondary),
-                selectedIcon: Icon(Icons.restaurant_menu, color: AppColors.accent),
+                selectedIcon: Icon(Icons.restaurant_menu, color: AppColors.primary),
                 label: 'New Order',
               ),
               NavigationDestination(
@@ -603,7 +620,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
                 selectedIcon: Badge(
                   isLabelVisible: _activeOrders.isNotEmpty,
                   label: Text('${_activeOrders.length}'),
-                  child: Icon(Icons.receipt_long, color: AppColors.accent),
+                  child: Icon(Icons.receipt_long, color: AppColors.primary),
                 ),
                 label: 'Orders',
               ),
@@ -617,14 +634,11 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
 
   AppBar _buildAppBar() {
     return buildPrimaryAppBar(
-      titleWidget: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Captain App',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-          Text(_staffName,
-              style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
-        ],
+      automaticallyImplyLeading: false, // post-login root — no back button
+      titleWidget: Text(
+        _staffName.isNotEmpty ? _staffName : 'Captain',
+        style: GoogleFonts.poppins(
+            color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
       ),
       actions: [
         // Table selector
@@ -663,9 +677,16 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _loadMenuAndTables,
-            icon: const Icon(Icons.refresh),
-            label: Text('Retry', style: GoogleFonts.poppins()),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: Text('Retry',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
           ),
         ],
       ),
@@ -673,13 +694,55 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
   }
 
   Widget _buildBody() {
-    return Row(
+    return Column(
       children: [
-        // Category sidebar
-        _buildCategorySidebar(),
-        // Item grid
-        Expanded(child: _buildItemGrid()),
+        if (_addingToOrderId != null) _buildAddingBanner(),
+        Expanded(
+          child: Row(
+            children: [
+              // Category sidebar
+              _buildCategorySidebar(),
+              // Item grid
+              Expanded(child: _buildItemGrid()),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  // Shows when new items will append to an existing order (vs. a fresh one).
+  Widget _buildAddingBanner() {
+    return Container(
+      width: double.infinity,
+      color: AppColors.primary.withOpacity(0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.add_task_rounded, size: 18, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Adding items to an existing order',
+              style: GoogleFonts.poppins(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() {
+              _addingToOrderId = null;
+              _selectedTable = null;
+            }),
+            child: Text('Cancel',
+                style: GoogleFonts.poppins(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.danger)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -689,10 +752,11 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
       color: Colors.white,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _categories.length,
+        itemCount: _visibleCategories.length,
         itemBuilder: (_, i) {
-          final cat = _categories[i];
+          final cat = _visibleCategories[i];
           final isSelected = cat['id'] == _selectedCategoryId;
+          final isFav = cat['id'] == _kFavorites;
           return GestureDetector(
             onTap: () => setState(() => _selectedCategoryId = cat['id'] as String?),
             child: AnimatedContainer(
@@ -700,22 +764,33 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.accent.withOpacity(0.12) : Colors.transparent,
+                color: isSelected ? AppColors.primary.withOpacity(0.12) : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
                 border: isSelected
-                    ? Border.all(color: AppColors.accent, width: 1.5)
+                    ? Border.all(color: AppColors.primary, width: 1.5)
                     : null,
               ),
-              child: Text(
-                cat['name'] as String? ?? '',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: isSelected ? AppColors.accent : AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isFav)
+                    Icon(Icons.star_rounded,
+                        size: 18,
+                        color: isSelected ? AppColors.primary : Colors.amber),
+                  Text(
+                    cat['name'] as String? ?? '',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: (isSelected || isFav)
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
           );
@@ -776,7 +851,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
                   icon: const Icon(Icons.refresh),
                   onPressed: _loadActiveOrders,
                   tooltip: 'Refresh',
-                  color: AppColors.accent,
+                  color: AppColors.primary,
                 ),
             ],
           ),
@@ -815,7 +890,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
     final status = order['status'] as String? ?? '';
-    final tableNo = order['tableNo'] as String? ?? 'Take Away';
+    final headerLabel = _orderHeaderLabel(order);
     final total = (order['total'] as num?)?.toDouble() ?? 0.0;
     final items = order['items'] as List? ?? [];
     final timeStamp = order['timeStamp'] as String?;
@@ -866,7 +941,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
                 children: [
                   Row(
                     children: [
-                      Text('Table $tableNo',
+                      Text(headerLabel,
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
                       const SizedBox(width: 8),
                       Container(
@@ -906,12 +981,22 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
     );
   }
 
+  // "Table 5" for dine-in; otherwise the order type ("Take Away"/"Delivery").
+  String _orderHeaderLabel(Map<String, dynamic> order) {
+    final orderType = (order['orderType'] as String? ?? '').trim();
+    final tableNo = (order['tableNo'] as String? ?? '').trim();
+    if (orderType.toLowerCase().contains('dine') && tableNo.isNotEmpty) {
+      return 'Table $tableNo';
+    }
+    return orderType.isNotEmpty ? orderType : 'Order';
+  }
+
   Color _orderStatusColor(String status) {
     switch (status) {
       case 'Processing': return AppColors.info;
       case 'Cooking':    return AppColors.warning;
       case 'Ready':      return AppColors.success;
-      case 'Running':    return AppColors.accent;
+      case 'Running':    return AppColors.primary;
       case 'Served':     return Colors.purple;
       default:           return AppColors.textSecondary;
     }
@@ -939,14 +1024,20 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
         order: order,
         onAddItems: () {
           Navigator.pop(context);
-          // Pre-select this table then switch to New Order tab
+          // Remember the order so new items APPEND to it (works for Take Away
+          // too, where there's no table to match on). Pre-select the table when
+          // it's a dine-in order so the header reflects it.
           final tableNo = order['tableNo'] as String?;
-          if (tableNo != null) {
-            final tableMatch = _tables.cast<Map<String, dynamic>?>()
+          Map<String, dynamic>? tableMatch;
+          if (tableNo != null && tableNo.isNotEmpty) {
+            tableMatch = _tables.cast<Map<String, dynamic>?>()
                 .firstWhere((t) => t!['id'] == tableNo, orElse: () => null);
-            if (tableMatch != null) setState(() => _selectedTable = tableMatch);
           }
-          setState(() => _currentTab = 0);
+          setState(() {
+            _addingToOrderId = order['orderId'] as String?;
+            if (tableMatch != null) _selectedTable = tableMatch;
+            _currentTab = 0;
+          });
         },
         onUpdateStatus: (status) {
           Navigator.pop(context);
@@ -972,7 +1063,7 @@ class _CaptainHomeScreenState extends State<CaptainHomeScreen> {
       onTap: _showCartSheet,
       child: Container(
         height: 64,
-        color: AppColors.accent,
+        color: AppColors.primary,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
           children: [
@@ -1110,9 +1201,9 @@ class _ItemCard extends StatelessWidget {
                       child: imageData != null
                           ? Image.memory(imageData, width: double.infinity, fit: BoxFit.cover)
                           : Container(
-                              color: AppColors.accent.withOpacity(0.08),
+                              color: AppColors.primary.withOpacity(0.08),
                               child: Center(
-                                child: Icon(Icons.fastfood, size: 36, color: AppColors.accent.withOpacity(0.4)),
+                                child: Icon(Icons.fastfood, size: 36, color: AppColors.primary.withOpacity(0.4)),
                               ),
                             ),
                     ),
@@ -1167,7 +1258,7 @@ class _ItemCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.accent,
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -1205,7 +1296,7 @@ class _ItemCard extends StatelessWidget {
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: isDisabled ? AppColors.textSecondary : AppColors.accent,
+                              color: isDisabled ? AppColors.textSecondary : AppColors.primary,
                             ),
                           ),
                           // +/- controls (hidden when disabled)
@@ -1232,10 +1323,10 @@ class _ItemCard extends StatelessWidget {
                                       width: 22,
                                       height: 22,
                                       decoration: BoxDecoration(
-                                        color: AppColors.accent.withOpacity(0.12),
+                                        color: AppColors.primary.withOpacity(0.12),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: Icon(Icons.add, size: 14, color: AppColors.accent),
+                                      child: Icon(Icons.add, size: 14, color: AppColors.primary),
                                     ),
                                   ),
                                 ],
@@ -1247,7 +1338,7 @@ class _ItemCard extends StatelessWidget {
                                   width: 22,
                                   height: 22,
                                   decoration: BoxDecoration(
-                                    color: AppColors.accent,
+                                    color: AppColors.primary,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Icon(Icons.add, size: 14, color: Colors.white),
@@ -1313,17 +1404,23 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
       case 'Processing': return AppColors.info;
       case 'Cooking':    return AppColors.warning;
       case 'Ready':      return AppColors.success;
-      case 'Running':    return AppColors.accent;
+      case 'Running':    return AppColors.primary;
       case 'Served':     return Colors.purple;
       default:           return AppColors.textSecondary;
     }
   }
 
+  // Per-unit price = price - discount (CartItem.finalItemPrice). `totalPrice` is
+  // a computed getter and is NOT in the item map sent over HTTP, so never read it.
+  double _unitPriceOf(Map<String, dynamic> it) {
+    final base = (it['price'] as num?)?.toDouble() ?? 0.0;
+    final discount = (it['discount'] as num?)?.toDouble() ?? 0.0;
+    return (base - discount).clamp(0.0, double.infinity);
+  }
+
   double get _editTotal => _items.asMap().entries.fold(0.0, (sum, e) {
     final newQty = _quantities[e.key.toString()] ?? 0;
-    final unitPrice = ((e.value['totalPrice'] as num?)?.toDouble() ?? 0.0) /
-        (((e.value['quantity'] as num?)?.toInt() ?? 1));
-    return sum + unitPrice * newQty;
+    return sum + _unitPriceOf(e.value) * newQty;
   });
 
   bool get _hasChanges {
@@ -1365,7 +1462,11 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final status   = widget.order['status'] as String? ?? '';
-    final tableNo  = widget.order['tableNo'] as String? ?? 'Take Away';
+    final orderType = (widget.order['orderType'] as String? ?? '').trim();
+    final tableNo  = (widget.order['tableNo'] as String? ?? '').trim();
+    final headerLabel = (orderType.toLowerCase().contains('dine') && tableNo.isNotEmpty)
+        ? 'Table $tableNo'
+        : (orderType.isNotEmpty ? orderType : 'Order');
     final total    = (widget.order['total'] as num?)?.toDouble() ?? 0.0;
     final kotNums  = (widget.order['kotNumbers'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final color    = _statusColor(status);
@@ -1398,7 +1499,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Table $tableNo',
+                      Text(headerLabel,
                           style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
                       Row(
                         children: [
@@ -1439,7 +1540,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                   child: Text(
                     _editMode ? 'Cancel' : 'Edit',
                     style: GoogleFonts.poppins(
-                      color: _editMode ? AppColors.danger : AppColors.accent,
+                      color: _editMode ? AppColors.danger : AppColors.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1469,9 +1570,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                 final variant = it['variantName'] as String?;
                 final origQty = (it['quantity'] as num?)?.toInt() ?? 1;
                 final currentQty = _quantities[i.toString()] ?? origQty;
-                final price = (it['totalPrice'] as num?)?.toDouble()
-                    ?? (it['price'] as num?)?.toDouble() ?? 0.0;
-                final unitPrice = price / origQty;
+                final unitPrice = _unitPriceOf(it);
                 final choices = (it['choiceNames'] as List?)?.cast<String>() ?? [];
                 final extras = it['extras'] as List? ?? [];
                 final note = it['instruction'] as String?;
@@ -1489,14 +1588,14 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                           Container(
                             width: 28, height: 28,
                             decoration: BoxDecoration(
-                              color: AppColors.accent.withOpacity(0.1),
+                              color: AppColors.primary.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Center(
                               child: Text('$origQty',
                                   style: GoogleFonts.poppins(
                                       fontSize: 12, fontWeight: FontWeight.bold,
-                                      color: AppColors.accent)),
+                                      color: AppColors.primary)),
                             ),
                           )
                         else
@@ -1551,7 +1650,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                                   decoration: BoxDecoration(
                                     color: currentQty >= origQty
                                         ? Colors.grey.withOpacity(0.1)
-                                        : AppColors.accent.withOpacity(0.1),
+                                        : AppColors.primary.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Icon(
@@ -1559,7 +1658,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                                     size: 16,
                                     color: currentQty >= origQty
                                         ? Colors.grey
-                                        : AppColors.accent,
+                                        : AppColors.primary,
                                   ),
                                 ),
                               ),
@@ -1606,7 +1705,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                         Text(
                           _editMode
                               ? '₹${(unitPrice * currentQty).toStringAsFixed(0)}'
-                              : '₹${price.toStringAsFixed(0)}',
+                              : '₹${(unitPrice * origQty).toStringAsFixed(0)}',
                           style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600, fontSize: 14,
                               color: isCancelled && _editMode ? AppColors.danger : null),
@@ -1648,8 +1747,8 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                           label: Text('Add Items',
                               style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.accent,
-                            side: BorderSide(color: AppColors.accent),
+                            foregroundColor: AppColors.primary,
+                            side: BorderSide(color: AppColors.primary),
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
@@ -1754,14 +1853,14 @@ class _TablePickerSheet extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.accent
+                          ? AppColors.primary
                           : isOccupied
                               ? AppColors.danger.withOpacity(0.1)
                               : AppColors.success.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isSelected
-                            ? AppColors.accent
+                            ? AppColors.primary
                             : isOccupied
                                 ? AppColors.danger.withOpacity(0.4)
                                 : AppColors.success.withOpacity(0.4),
@@ -1935,7 +2034,7 @@ class _CartSheet extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onSend,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isAddingToOrder ? AppColors.warning : AppColors.accent,
+                    backgroundColor: isAddingToOrder ? AppColors.warning : AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
@@ -1949,424 +2048,6 @@ class _CartSheet extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── Item Customization Sheet ───────────────────────────────────────────────────
-
-class _ItemCustomizationSheet extends StatefulWidget {
-  final Map<String, dynamic> item;
-  final List<Map<String, dynamic>> variants;
-  final List<Map<String, dynamic>> choices;   // [{id, name, choiceOption:[{id,name}]}]
-  final List<Map<String, dynamic>> extras;    // [{id, Ename, topping:[{name,price}]}]
-  final void Function(
-    Map<String, dynamic>? variant,
-    List<String> choiceNames,
-    List<Map<String, dynamic>> extras,
-    String? instruction,
-  ) onAddToCart;
-
-  const _ItemCustomizationSheet({
-    required this.item,
-    required this.variants,
-    required this.choices,
-    required this.extras,
-    required this.onAddToCart,
-  });
-
-  @override
-  State<_ItemCustomizationSheet> createState() => _ItemCustomizationSheetState();
-}
-
-class _ItemCustomizationSheetState extends State<_ItemCustomizationSheet> {
-  Map<String, dynamic>? _selectedVariant;
-  // choiceId → set of selected option names
-  final Map<String, Set<String>> _selectedChoiceOptions = {};
-  // name → {price, categoryName, categoryId} (matches POS extras format)
-  final Map<String, Map<String, dynamic>> _selectedToppings = {};
-  final TextEditingController _instructionController = TextEditingController();
-
-  bool _variantOutOfStock(Map<String, dynamic> v) {
-    final track = v['trackInventory'] as bool? ?? false;
-    if (!track) return false;
-    return ((v['stockQuantity'] as num?)?.toDouble() ?? 0.0) <= 0;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // Pre-select first in-stock variant (mirrors ItemOptionsDialog._prepareVariants)
-    if (widget.variants.isNotEmpty) {
-      _selectedVariant = widget.variants.firstWhere(
-        (v) => !_variantOutOfStock(v),
-        orElse: () => widget.variants.first,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _instructionController.dispose();
-    super.dispose();
-  }
-
-  // Variant price IS the item price when selected (not additive)
-  // Mirrors ItemOptionsDialog._recalculateTotal()
-  double get _totalPrice {
-    final double base;
-    if (_selectedVariant != null) {
-      base = (_selectedVariant!['price'] as num?)?.toDouble() ?? 0.0;
-    } else {
-      base = (widget.item['price'] as num?)?.toDouble() ?? 0.0;
-    }
-    final extrasAdd = _selectedToppings.values
-        .fold(0.0, (s, e) => s + ((e['price'] as num?)?.toDouble() ?? 0.0));
-    return base + extrasAdd;
-  }
-
-  void _submit() {
-    final allChoiceNames = _selectedChoiceOptions.values
-        .expand((names) => names)
-        .toList();
-
-    // Build extras in POS format: {name, displayName, price, categoryName, categoryId, quantity}
-    final extrasList = _selectedToppings.entries.map((entry) {
-      final data = entry.value;
-      final catName = data['categoryName'] as String? ?? '';
-      return <String, dynamic>{
-        'name': entry.key,
-        'displayName': catName.isNotEmpty ? '$catName - ${entry.key}' : entry.key,
-        'price': data['price'],
-        'categoryName': catName,
-        'categoryId': data['categoryId'] ?? '',
-        'quantity': 1,
-      };
-    }).toList();
-
-    widget.onAddToCart(
-      _selectedVariant,
-      allChoiceNames,
-      extrasList,
-      _instructionController.text.trim().isEmpty ? null : _instructionController.text.trim(),
-    );
-
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      maxChildSize: 0.92,
-      minChildSize: 0.4,
-      expand: false,
-      builder: (_, scrollController) => Column(
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.item['name'] as String? ?? '',
-                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        'Customise your order',
-                        style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '₹${_totalPrice.toStringAsFixed(2)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.accent,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 20),
-
-          // Scrollable options
-          Expanded(
-            child: ListView(
-              controller: scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                // ── Variants ──────────────────────────────────────────────
-                if (widget.variants.isNotEmpty) ...[
-                  _sectionHeader('Choose Variant', required: true),
-                  ...widget.variants.map((v) {
-                    final isSelected = _selectedVariant?['id'] == v['id'];
-                    final vPrice = (v['price'] as num?)?.toDouble() ?? 0.0;
-                    final outOfStock = _variantOutOfStock(v);
-                    return _OptionTile(
-                      title: v['name'] as String? ?? '',
-                      subtitle: outOfStock
-                          ? 'Out of Stock'
-                          : '₹${vPrice.toStringAsFixed(vPrice.truncateToDouble() == vPrice ? 0 : 2)}',
-                      isSelected: isSelected,
-                      isRadio: true,
-                      isDisabled: outOfStock,
-                      onTap: outOfStock ? () {} : () => setState(() => _selectedVariant = v),
-                    );
-                  }),
-                  const SizedBox(height: 16),
-                ],
-
-                // ── Choices ───────────────────────────────────────────────
-                for (final choice in widget.choices) ...[
-                  _sectionHeader(choice['name'] as String? ?? 'Choice'),
-                  ...() {
-                    final opts = List<Map<String, dynamic>>.from(
-                        choice['choiceOption'] as List? ?? []);
-                    final choiceId = choice['id'] as String;
-                    _selectedChoiceOptions.putIfAbsent(choiceId, () => {});
-                    return opts.map((opt) {
-                      final optName = opt['name'] as String? ?? '';
-                      final isSelected = _selectedChoiceOptions[choiceId]!.contains(optName);
-                      return _OptionTile(
-                        title: optName,
-                        isSelected: isSelected,
-                        isRadio: false,
-                        onTap: () => setState(() {
-                          if (isSelected) {
-                            _selectedChoiceOptions[choiceId]!.remove(optName);
-                          } else {
-                            _selectedChoiceOptions[choiceId]!.add(optName);
-                          }
-                        }),
-                      );
-                    });
-                  }(),
-                  const SizedBox(height: 16),
-                ],
-
-                // ── Extras ────────────────────────────────────────────────
-                for (final extra in widget.extras) ...[
-                  _sectionHeader(extra['Ename'] as String? ?? 'Extras'),
-                  ...() {
-                    final toppings = List<Map<String, dynamic>>.from(
-                        extra['topping'] as List? ?? []);
-                    final catName = extra['Ename'] as String? ?? '';
-                    final catId = extra['id'] as String? ?? '';
-                    return toppings.map((t) {
-                      final tName = t['name'] as String? ?? '';
-                      final tPrice = (t['price'] as num?)?.toDouble() ?? 0.0;
-                      final isSelected = _selectedToppings.containsKey(tName);
-                      return _OptionTile(
-                        title: tName,
-                        subtitle: tPrice > 0 ? '+₹${tPrice.toStringAsFixed(2)}' : null,
-                        isSelected: isSelected,
-                        isRadio: false,
-                        onTap: () => setState(() {
-                          if (isSelected) {
-                            _selectedToppings.remove(tName);
-                          } else {
-                            _selectedToppings[tName] = {
-                              'price': tPrice,
-                              'categoryName': catName,
-                              'categoryId': catId,
-                            };
-                          }
-                        }),
-                      );
-                    });
-                  }(),
-                  const SizedBox(height: 16),
-                ],
-
-                // ── Instruction ───────────────────────────────────────────
-                _sectionHeader('Special Instruction (optional)'),
-                TextField(
-                  controller: _instructionController,
-                  maxLines: 2,
-                  style: GoogleFonts.poppins(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'e.g. Less spicy, no onions...',
-                    hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: AppColors.divider),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: AppColors.divider),
-                    ),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                ),
-                const SizedBox(height: 80), // space for bottom button
-              ],
-            ),
-          ),
-
-          // Add to cart button
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: const Offset(0, -2))],
-            ),
-            child: ElevatedButton(
-              onPressed: _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                minimumSize: const Size(double.infinity, 52),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text(
-                'Add to Cart  •  ₹${_totalPrice.toStringAsFixed(2)}',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionHeader(String title, {bool required = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          if (required) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.danger.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'Required',
-                style: GoogleFonts.poppins(fontSize: 10, color: AppColors.danger, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ── Option Tile ────────────────────────────────────────────────────────────────
-
-class _OptionTile extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final bool isSelected;
-  final bool isRadio;
-  final bool isDisabled;
-  final VoidCallback onTap;
-
-  const _OptionTile({
-    required this.title,
-    required this.isSelected,
-    required this.isRadio,
-    required this.onTap,
-    this.subtitle,
-    this.isDisabled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isDisabled ? null : onTap,
-      child: Opacity(
-        opacity: isDisabled ? 0.45 : 1.0,
-        child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.accent.withOpacity(0.08) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? AppColors.accent : AppColors.divider,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            // Radio or Checkbox indicator
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: isRadio ? BoxShape.circle : BoxShape.rectangle,
-                borderRadius: isRadio ? null : BorderRadius.circular(5),
-                border: Border.all(
-                  color: isSelected ? AppColors.accent : AppColors.textSecondary,
-                  width: 2,
-                ),
-                color: isSelected ? AppColors.accent : Colors.transparent,
-              ),
-              child: isSelected
-                  ? Icon(
-                      isRadio ? Icons.circle : Icons.check,
-                      size: 12,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                  color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-                ),
-              ),
-            ),
-            if (subtitle != null)
-              Text(
-                subtitle!,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: isDisabled
-                      ? AppColors.danger
-                      : isSelected ? AppColors.accent : AppColors.textSecondary,
-                ),
-              ),
-          ],
-        ),
-      ),
-      ),
     );
   }
 }

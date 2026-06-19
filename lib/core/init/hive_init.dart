@@ -65,6 +65,8 @@ import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:unipos/data/models/restaurant/db/session_model.dart';
 import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
+import 'package:unipos/data/models/restaurant/db/app_notification_model.dart';
+import 'package:unipos/data/models/restaurant/db/item_cancellation_model_134.dart';
 
 /// Hive Initialization Class
 /// Handles all adapter registrations and box openings
@@ -566,6 +568,14 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAttendance)) {
       Hive.registerAdapter(AttendanceModelAdapter());
     }
+    // AppNotificationModel - 133: persisted notifications
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAppNotification)) {
+      Hive.registerAdapter(AppNotificationModelAdapter());
+    }
+    // ItemCancellationModel - 134: item-level cancellation audit
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItemCancellation)) {
+      Hive.registerAdapter(ItemCancellationModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -629,6 +639,10 @@ class HiveInit {
 
     // Staff attendance
     await Hive.openBox<AttendanceModel>(HiveBoxNames.restaurantAttendance);
+    // App notifications
+    await Hive.openBox<AppNotificationModel>(HiveBoxNames.restaurantNotifications);
+    // Item-level cancellation audit
+    await Hive.openBox<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations);
 
     _areRestaurantBoxesOpen = true;
   }

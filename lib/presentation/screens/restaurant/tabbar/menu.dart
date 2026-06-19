@@ -63,31 +63,24 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   /// Mobile "Favorites" section pinned at the top of the category list.
-  Widget _buildFavoritesSection(List<Items> visibleItems, String query, String lowerQuery) {
+  Widget _buildFavoritesSection(List<Items> visibleItems, String query, String lowerQuery, List<CartItem> cartItems) {
     var favItems = visibleItems.where((i) => i.isFavorite).toList();
     if (query.isNotEmpty) {
       favItems = favItems.where((i) =>
           i.name.toLowerCase().contains(lowerQuery) ||
           (i.itemCode != null && i.itemCode!.toLowerCase().contains(lowerQuery))).toList();
-      if (favItems.isEmpty) return const SizedBox.shrink();
     }
-    if (favItems.isEmpty) {
-      // No favorites yet — gentle hint so the section explains itself.
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        elevation: 2,
-        color: AppColors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: ListTile(
-          leading: const Icon(Icons.star_rounded, color: Colors.amber),
-          title: Text('Favorites',
-              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-          subtitle: Text('Tap the ☆ on an item to pin it here',
-              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
-        ),
-      );
-    }
+    // No favorites yet (or none match the search) — hide the section entirely,
+    // just like the Favorites strip chip. It appears only once an item is starred.
+    if (favItems.isEmpty) return const SizedBox.shrink();
+    // Register key + controller under the favorites sentinel so the quick-nav
+    // strip can expand/scroll to it via the same _selectStripCategory path as a
+    // real category section.
+    _categoryKeys.putIfAbsent(_kFavorites, () => GlobalKey());
+    _expansionControllers.putIfAbsent(_kFavorites, () => ExpansibleController());
+
     return Card(
+      key: _categoryKeys[_kFavorites],
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       color: AppColors.white,
@@ -95,7 +88,10 @@ class _MenuScreenState extends State<MenuScreen> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          initiallyExpanded: true,
+          controller: _expansionControllers[_kFavorites],
+          // Collapsed by default — opens on tap (or auto-opens during search),
+          // matching the category tiles below.
+          initiallyExpanded: query.isNotEmpty,
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -118,11 +114,14 @@ class _MenuScreenState extends State<MenuScreen> {
               itemBuilder: (context, i) {
                 final item = favItems[i];
                 return _ItemListTile(
+                  key: ValueKey('${item.id}_${item.isFavorite}'),
                   item: item,
                   onTap: () => _handleItemTap(item),
                   onToggleFavorite: () => _toggleFavorite(item),
                   formatStock: _formatStockDisplay,
                   getStockStatus: _getStockStatus,
+                  cartEntries:
+                      cartItems.where((c) => c.productId == item.id).toList(),
                 );
               },
             ),
@@ -153,6 +152,29 @@ class _MenuScreenState extends State<MenuScreen> {
       setState(() {
         query = _searchController.text;
       });
+    });
+  }
+
+  /// Expand all category sections while a search is active (collapse when
+  /// cleared). Scheduled from build() so it runs AFTER the search results have
+  /// been laid out — only then are the tiles attached to their controllers.
+  /// `initiallyExpanded` alone doesn't work: it applies only on a tile's first
+  /// build, so sections already on screen stay collapsed when the search starts.
+  String _lastExpandQuery = '';
+  void _syncSearchExpansion() {
+    if (query == _lastExpandQuery) return;
+    final expanding = query.isNotEmpty;
+    _lastExpandQuery = query;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final controller in _expansionControllers.values) {
+        try {
+          expanding ? controller.expand() : controller.collapse();
+        } catch (_) {
+          // Tile not attached yet (off-screen) — it picks up the state via
+          // `initiallyExpanded` when first built.
+        }
+      }
     });
   }
 
@@ -492,39 +514,35 @@ class _MenuScreenState extends State<MenuScreen> {
                     // Horizontal category quick-nav strip — replaces the category FAB
                     Observer(
                       builder: (_) {
-                        final cats = categoryStore.categories;
-                        if (cats.isEmpty) return const SizedBox.shrink();
+                        final enabledItems =
+                            itemStore.items.where((i) => i.isEnabled).toList();
+                        final cats =
+                            categoryStore.categoriesWithItems(enabledItems);
+                        // Show a Favorites pill first, but only when there are
+                        // favorites to jump to (mirrors hiding empty categories).
+                        final hasFav = enabledItems.any((i) => i.isFavorite);
+                        if (cats.isEmpty && !hasFav) return const SizedBox.shrink();
                         return SizedBox(
                           height: 34,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 10),
-                            itemCount: cats.length,
+                            itemCount: cats.length + (hasFav ? 1 : 0),
                             separatorBuilder: (_, __) => const SizedBox(width: 8),
                             itemBuilder: (context, i) {
-                              final cat = cats[i];
-                              final isActive = activeCategory == cat.id;
-                              return GestureDetector(
+                              if (hasFav && i == 0) {
+                                return _buildStripChip(
+                                  label: 'Favorites',
+                                  icon: Icons.star_rounded,
+                                  isActive: activeCategory == _kFavorites,
+                                  onTap: () => _selectStripCategory(_kFavorites),
+                                );
+                              }
+                              final cat = cats[i - (hasFav ? 1 : 0)];
+                              return _buildStripChip(
+                                label: cat.name,
+                                isActive: activeCategory == cat.id,
                                 onTap: () => _selectStripCategory(cat.id),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: isActive ? AppColors.primary : AppColors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isActive ? AppColors.primary : AppColors.divider,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    cat.name,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: isActive ? Colors.white : AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
                               );
                             },
                           ),
@@ -578,18 +596,31 @@ class _MenuScreenState extends State<MenuScreen> {
                           final allItems = itemStore.items;
                           final visibleItems = allItems.where((item) => item.isEnabled).toList();
                           final lowerQuery = query.toLowerCase();
+                          // Snapshot the cart HERE (synchronously, inside the
+                          // Observer) so the cards react to add/remove/qty —
+                          // ListView item builders run lazily and wouldn't track.
+                          final cartItems = restaurantCartStore.cartItems.toList();
+
+                          // Hide categories with no items — the order screen only
+                          // needs categories you can actually pick from.
+                          final categories =
+                              categoryStore.categoriesWithItems(visibleItems);
+
+                          // Auto-open category sections while searching (runs
+                          // post-frame, once per query change).
+                          _syncSearchExpansion();
 
                           return ListView.builder(
                             controller: _listScrollController,
                             padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            itemCount: allCategories.length + 1,
+                            itemCount: categories.length + 1,
                             itemBuilder: (context, rawIndex) {
                               // Favorites section pinned at the very top.
                               if (rawIndex == 0) {
-                                return _buildFavoritesSection(visibleItems, query, lowerQuery);
+                                return _buildFavoritesSection(visibleItems, query, lowerQuery, cartItems);
                               }
                               final index = rawIndex - 1;
-                              final category = allCategories[index];
+                              final category = categories[index];
 
                               if (!_categoryKeys.containsKey(category.id)) {
                                 _categoryKeys[category.id] = GlobalKey();
@@ -653,35 +684,27 @@ class _MenuScreenState extends State<MenuScreen> {
                                       ),
                                     ),
                                     children: [
-                                      if (searchFilteredItems.isEmpty)
-                                        Padding(
-                                          padding: EdgeInsets.all(20),
-                                          child: Text(
-                                            'No items in this category',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 12,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        )
-                                      else
-                                        ListView.separated(
-                                          shrinkWrap: true,
-                                          physics: NeverScrollableScrollPhysics(),
-                                          padding: EdgeInsets.fromLTRB(12, 0, 12, 12),
-                                          itemCount: searchFilteredItems.length,
-                                          separatorBuilder: (_, __) => SizedBox(height: 8),
-                                          itemBuilder: (context, itemIndex) {
-                                            final item = searchFilteredItems[itemIndex];
-                                            return _ItemListTile(
-                                              item: item,
-                                              onTap: () => _handleItemTap(item),
-                                              onToggleFavorite: () => _toggleFavorite(item),
-                                              formatStock: _formatStockDisplay,
-                                              getStockStatus: _getStockStatus,
-                                            );
-                                          },
-                                        ),
+                                      ListView.separated(
+                                        shrinkWrap: true,
+                                        physics: NeverScrollableScrollPhysics(),
+                                        padding: EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                        itemCount: searchFilteredItems.length,
+                                        separatorBuilder: (_, __) => SizedBox(height: 8),
+                                        itemBuilder: (context, itemIndex) {
+                                          final item = searchFilteredItems[itemIndex];
+                                          return _ItemListTile(
+                                            key: ValueKey('${item.id}_${item.isFavorite}'),
+                                            item: item,
+                                            onTap: () => _handleItemTap(item),
+                                            onToggleFavorite: () => _toggleFavorite(item),
+                                            formatStock: _formatStockDisplay,
+                                            getStockStatus: _getStockStatus,
+                                            cartEntries: cartItems
+                                                .where((c) => c.productId == item.id)
+                                                .toList(),
+                                          );
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -724,7 +747,10 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
           child: Observer(
             builder: (_) {
-              final allCategories = categoryStore.categories;
+              final enabledItems =
+                  itemStore.items.where((i) => i.isEnabled).toList();
+              final allCategories =
+                  categoryStore.categoriesWithItems(enabledItems);
               return Column(
                 children: [
                   // Search Bar
@@ -797,6 +823,8 @@ class _MenuScreenState extends State<MenuScreen> {
                     Observer(
                       builder: (_) {
                         final hasItems = restaurantCartStore.cartItems.isNotEmpty;
+                        // Tracked cart snapshot for the in-cart badges/highlight.
+                        final cartItems = restaurantCartStore.cartItems.toList();
                         final allItems = itemStore.items;
                         var filteredItems = allItems.where((item) => item.isEnabled).toList();
 
@@ -840,7 +868,7 @@ class _MenuScreenState extends State<MenuScreen> {
                               childAspectRatio: aspectRatio,
                             ),
                             itemCount: filteredItems.length,
-                            itemBuilder: (context, index) => _buildGridItemCard(filteredItems[index]),
+                            itemBuilder: (context, index) => _buildGridItemCard(filteredItems[index], cartItems),
                           ),
                         );
                       },
@@ -901,9 +929,14 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  Widget _buildGridItemCard(Items item) {
+  Widget _buildGridItemCard(Items item, List<CartItem> cartItems) {
     final stockStatus = _getStockStatus(item);
     final isDisabled = stockStatus == StockStatus.outOfStock;
+    // Cart entries for this item (snapshot tracked at the grid Observer top).
+    final cartEntries =
+        cartItems.where((c) => c.productId == item.id).toList();
+    final int cartQty = cartEntries.fold<int>(0, (s, c) => s + c.quantity);
+    final bool inCart = cartQty > 0;
 
     return ValueListenableBuilder<Map<String, bool>>(
       valueListenable: AppSettings.settingsNotifier,
@@ -917,14 +950,28 @@ class _MenuScreenState extends State<MenuScreen> {
             children: [
               Container(
             decoration: BoxDecoration(
-              color: isDisabled ? AppColors.surfaceMedium.withOpacity(0.5) : AppColors.white,
+              color: isDisabled
+                  ? AppColors.surfaceMedium.withOpacity(0.5)
+                  : inCart
+                      ? AppColors.primary.withOpacity(0.12)
+                      : AppColors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: isDisabled ? AppColors.divider : AppColors.divider.withOpacity(0.5)),
+              // In-cart items get a bold primary border + glow so they stand out.
+              border: Border.all(
+                color: inCart
+                    ? AppColors.primary
+                    : (isDisabled
+                        ? AppColors.divider
+                        : AppColors.divider.withOpacity(0.5)),
+                width: inCart ? 2 : 1,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
+                  color: inCart
+                      ? AppColors.primary.withOpacity(0.25)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: inCart ? 10 : 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -957,7 +1004,9 @@ class _MenuScreenState extends State<MenuScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item.name,
+                              (item.itemCode != null && item.itemCode!.isNotEmpty)
+                                  ? '${item.itemCode} ${item.name}'
+                                  : item.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.poppins(
@@ -966,24 +1015,6 @@ class _MenuScreenState extends State<MenuScreen> {
                                 color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary,
                               ),
                             ),
-                            if (item.itemCode != null) ...[
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '#${item.itemCode}',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                         Row(
@@ -998,14 +1029,43 @@ class _MenuScreenState extends State<MenuScreen> {
                                   color: AppColors.primary,
                                 ),
                               ),
-                            if (!isDisabled)
-                              Container(
-                                padding: EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(Icons.add, color: AppColors.white, size: 16),
+            if (!isDisabled)
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(Icons.add, color: AppColors.white, size: 16),
+                                  ),
+                                  if (inCart)
+                                    Positioned(
+                                      top: -7,
+                                      right: -7,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(3),
+                                        constraints: const BoxConstraints(
+                                            minWidth: 18, minHeight: 18),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accent,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                              color: Colors.white, width: 1.5),
+                                        ),
+                                        child: Text(
+                                          '$cartQty',
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.poppins(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                           ],
                         ),
@@ -1021,11 +1081,52 @@ class _MenuScreenState extends State<MenuScreen> {
                 right: 6,
                 child: _favStar(item),
               ),
+              // "In cart" pill at the top-left mirrors the favourite star.
+              if (inCart)
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.shopping_cart_rounded,
+                            size: 11, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          _gridCartLabel(cartEntries, cartQty),
+                          style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         );
       },
     );
+  }
+
+  /// Short cart label for the grid pill: total qty, or variant breakdown when
+  /// the item was added with variants (e.g. "Large ×2, Regular ×1").
+  String _gridCartLabel(List<CartItem> entries, int qty) {
+    final hasVariants =
+        entries.any((c) => (c.variantName ?? '').isNotEmpty);
+    if (!hasVariants) return 'In cart · $qty';
+    return entries
+        .map((c) =>
+            '${(c.variantName ?? '').isNotEmpty ? c.variantName : 'Regular'} ×${c.quantity}')
+        .join(', ');
   }
 
   Widget _buildItemImageForGrid(Items item) {
@@ -1042,6 +1143,47 @@ class _MenuScreenState extends State<MenuScreen> {
     return 'N/A';
   }
 
+  /// A single pill in the horizontal quick-nav strip. Shared by the Favorites
+  /// chip and the per-category chips.
+  Widget _buildStripChip({
+    required String label,
+    IconData? icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? AppColors.primary : AppColors.divider,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: isActive ? Colors.white : Colors.amber),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isActive ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _selectStripCategory(String categoryId) {
     // Collapse the previously active category
     if (activeCategory != null && activeCategory != categoryId) {
@@ -1053,8 +1195,11 @@ class _MenuScreenState extends State<MenuScreen> {
 
     // Phase 1: jumpTo estimated offset so ListView.builder renders the item.
     // Off-screen items have null currentContext — ensureVisible is a no-op without this.
+    // Favorites is always the first row (index 0); categories follow it.
     final cats = categoryStore.categories;
-    final idx = cats.indexWhere((c) => c.id == categoryId);
+    final idx = categoryId == _kFavorites
+        ? 0
+        : cats.indexWhere((c) => c.id == categoryId);
     if (idx >= 0 && _listScrollController.hasClients) {
       try {
         final max = _listScrollController.position.maxScrollExtent;
@@ -1197,7 +1342,10 @@ class _ItemListTile extends StatefulWidget {
   final VoidCallback onToggleFavorite;
   final String Function(Items) formatStock;
   final StockStatus Function(Items) getStockStatus;
-  const _ItemListTile({required this.item, required this.onTap, required this.onToggleFavorite, required this.formatStock, required this.getStockStatus});
+  /// Cart entries for THIS item (matched by productId). Drives the in-cart
+  /// quantity badge, highlight, and per-variant "in cart" summary.
+  final List<CartItem> cartEntries;
+  const _ItemListTile({super.key, required this.item, required this.onTap, required this.onToggleFavorite, required this.formatStock, required this.getStockStatus, this.cartEntries = const []});
 
   @override
   State<_ItemListTile> createState() => _ItemListTileState();
@@ -1210,6 +1358,9 @@ class _ItemListTileState extends State<_ItemListTile> {
   Widget build(BuildContext context) {
     final stockStatus = widget.getStockStatus(widget.item);
     final isDisabled = stockStatus == StockStatus.outOfStock;
+    final int cartQty =
+        widget.cartEntries.fold<int>(0, (s, c) => s + c.quantity);
+    final bool inCart = cartQty > 0;
 
     return ValueListenableBuilder<Map<String, bool>>(
       valueListenable: AppSettings.settingsNotifier,
@@ -1226,9 +1377,35 @@ class _ItemListTileState extends State<_ItemListTile> {
             padding: const EdgeInsets.all(14),
             transform: Matrix4.identity()..scale(_isPressed ? 0.98 : 1.0),
             decoration: BoxDecoration(
-              color: _isPressed ? AppColors.primary.withOpacity(0.08) : isDisabled ? AppColors.surfaceMedium.withOpacity(0.5) : AppColors.white,
+              color: _isPressed
+                  ? AppColors.primary.withOpacity(0.08)
+                  : isDisabled
+                      ? AppColors.surfaceMedium.withOpacity(0.5)
+                      : inCart
+                          ? AppColors.primary.withOpacity(0.12)
+                          : AppColors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _isPressed ? AppColors.primary.withOpacity(0.3) : isDisabled ? AppColors.divider : AppColors.divider.withOpacity(0.5)),
+              // Items already in the cart get a bold primary border + soft glow
+              // so they clearly stand out while ordering.
+              border: Border.all(
+                color: _isPressed
+                    ? AppColors.primary.withOpacity(0.3)
+                    : inCart
+                        ? AppColors.primary
+                        : isDisabled
+                            ? AppColors.divider
+                            : AppColors.divider.withOpacity(0.5),
+                width: (inCart && !_isPressed) ? 2 : 1,
+              ),
+              boxShadow: (inCart && !_isPressed)
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.22),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null,
             ),
             child: Row(
               children: [
@@ -1244,25 +1421,14 @@ class _ItemListTileState extends State<_ItemListTile> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary)),
-                      if (widget.item.itemCode != null) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '#${widget.item.itemCode}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
+                      Text(
+                        (widget.item.itemCode != null && widget.item.itemCode!.isNotEmpty)
+                            ? '${widget.item.itemCode} ${widget.item.name}'
+                            : widget.item.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary),
+                      ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
@@ -1274,6 +1440,11 @@ class _ItemListTileState extends State<_ItemListTile> {
                           ],
                         ],
                       ),
+                      // In-cart summary: total qty, or per-variant breakdown.
+                      if (inCart) ...[
+                        const SizedBox(height: 6),
+                        _buildCartSummary(),
+                      ],
                     ],
                   ),
                 ),
@@ -1291,20 +1462,92 @@ class _ItemListTileState extends State<_ItemListTile> {
                 ),
                 const SizedBox(width: 4),
                 if (!isDisabled)
-                  Container(
-                    padding: const EdgeInsets.all(11),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
-                    ),
-                    child: const Icon(Icons.add_rounded, color: AppColors.white, size: 20),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
+                        ),
+                        child: const Icon(Icons.add_rounded, color: AppColors.white, size: 20),
+                      ),
+                      // Count badge — how many of this item are in the cart.
+                      if (inCart)
+                        Positioned(
+                          top: -6,
+                          right: -6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            constraints:
+                                const BoxConstraints(minWidth: 20, minHeight: 20),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: Text(
+                              '$cartQty',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  /// Compact in-cart summary: "2 in cart" or per-variant "Large ×2, Regular ×1".
+  Widget _buildCartSummary() {
+    final hasVariants =
+        widget.cartEntries.any((c) => (c.variantName ?? '').isNotEmpty);
+    final String label;
+    if (hasVariants) {
+      label = widget.cartEntries
+          .map((c) =>
+              '${(c.variantName ?? '').isNotEmpty ? c.variantName : 'Regular'} ×${c.quantity}')
+          .join(', ');
+    } else {
+      final qty =
+          widget.cartEntries.fold<int>(0, (s, c) => s + c.quantity);
+      label = '$qty in cart';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.shopping_cart_rounded,
+              size: 12, color: AppColors.primary),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

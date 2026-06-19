@@ -338,40 +338,6 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
             if (_refundReasonController.text.trim().isEmpty) {
               setState(() => _showReasonError = true);
               NotificationService.instance.showError('Reason is required! Please enter a reason for this refund.');
-              // Also show a dialog for emphasis
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  title: Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Reason Required',
-                          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
-                        ),
-                      ),
-                    ],
-                  ),
-                  content: Text(
-                    'Please provide a reason for this refund. This is mandatory for record-keeping and audit purposes.',
-                    style: GoogleFonts.poppins(fontSize: 14, height: 1.5),
-                  ),
-                  actions: [
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      ),
-                      child: Text('OK', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              );
               return;
             }
 

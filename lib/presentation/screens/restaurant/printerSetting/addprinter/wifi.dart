@@ -30,7 +30,9 @@ class _WifiLanState extends State<WifiLan> {
 
   // Selection state for radio buttons
   int _paperSize = 80; // 58 or 80 mm
-  String _role = 'both'; // 'kot' | 'receipt' | 'both'
+  // Role is assigned later by the slot on the Printer Management screen
+  // (Billing vs Kitchen); a neutral default is fine here.
+  final String _role = 'receipt';
 
   // UI feedback state
   bool _isTesting = false;
@@ -77,19 +79,35 @@ class _WifiLanState extends State<WifiLan> {
   // ════════════════════════════════════════════════════════════════════════
 
   Widget _buildAddPrinterForm() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2)),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section title
+            // Section title with icon chip
             Row(
               children: [
-                Icon(Icons.wifi, color: AppColors.primary),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.wifi, color: AppColors.primary, size: 18),
+                ),
+                const SizedBox(width: 10),
                 Text(
                   'Add WiFi/LAN Printer',
                   style: GoogleFonts.poppins(
@@ -156,35 +174,6 @@ class _WifiLanState extends State<WifiLan> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            // Role selector — determines which print jobs go to this printer
-            // KOT = kitchen tickets, Receipt = customer bills, Both = everything
-            Text('Printer Role',
-                style: GoogleFonts.poppins(
-                    fontSize: 13, fontWeight: FontWeight.w500)),
-            Row(
-              children: [
-                _radioOption<String>(
-                  value: 'kot',
-                  groupValue: _role,
-                  label: 'KOT',
-                  onChanged: (v) => setState(() => _role = v!),
-                ),
-                _radioOption<String>(
-                  value: 'receipt',
-                  groupValue: _role,
-                  label: 'Receipt',
-                  onChanged: (v) => setState(() => _role = v!),
-                ),
-                _radioOption<String>(
-                  value: 'both',
-                  groupValue: _role,
-                  label: 'Both',
-                  onChanged: (v) => setState(() => _role = v!),
-                ),
-              ],
-            ),
             const SizedBox(height: 16),
 
             // Action buttons — Test and Save
@@ -200,12 +189,16 @@ class _WifiLanState extends State<WifiLan> {
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.wifi_find),
+                        : const Icon(Icons.wifi_find, size: 18),
                     label: Text(_isTesting ? 'Testing...' : 'Test Connection',
-                        style: GoogleFonts.poppins(fontSize: 13)),
+                        style: GoogleFonts.poppins(
+                            fontSize: 13, fontWeight: FontWeight.w500)),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: const BorderSide(color: AppColors.primary),
+                      foregroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      side: const BorderSide(color: AppColors.primary, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ),
@@ -221,13 +214,18 @@ class _WifiLanState extends State<WifiLan> {
                             height: 16,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.save, color: Colors.white),
+                        : const Icon(Icons.save, color: Colors.white, size: 18),
                     label: Text(_isSaving ? 'Saving...' : 'Save Printer',
                         style: GoogleFonts.poppins(
-                            fontSize: 13, color: Colors.white)),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ),
@@ -272,29 +270,22 @@ class _WifiLanState extends State<WifiLan> {
             ),
             const SizedBox(height: 8),
             // Each saved printer as a card with info + actions
-            ...wifiPrinters.map((printer) => Card(
-                  elevation: 1,
+            ...wifiPrinters.map((printer) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
                   child: ListTile(
-                    // Star icon if this is the default printer
-                    leading: Icon(
-                      (printerStore.defaultKotPrinter?.id == printer.id ||
-                          printerStore.defaultReceiptPrinter?.id == printer.id)
-                          ? Icons.star : Icons.print_outlined,
-                      color: (printerStore.defaultKotPrinter?.id == printer.id ||
-                          printerStore.defaultReceiptPrinter?.id == printer.id)
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
-                    ),
+                    leading: Icon(Icons.wifi, color: AppColors.info),
                     // Printer name + connection details
                     title: Text(
                       printer.name,
                       style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
-                      '${printer.address} | ${printer.paperSize}mm | ${printer.role.toUpperCase()}',
+                      '${printer.address} | ${printer.paperSize}mm',
                       style: GoogleFonts.poppins(
                           fontSize: 12, color: AppColors.textSecondary),
                     ),

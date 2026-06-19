@@ -102,6 +102,70 @@ mixin _$LicenseStore on _LicenseStore, Store {
     });
   }
 
+  late final _$isRequestingOtpAtom =
+      Atom(name: '_LicenseStore.isRequestingOtp', context: context);
+
+  @override
+  bool get isRequestingOtp {
+    _$isRequestingOtpAtom.reportRead();
+    return super.isRequestingOtp;
+  }
+
+  @override
+  set isRequestingOtp(bool value) {
+    _$isRequestingOtpAtom.reportWrite(value, super.isRequestingOtp, () {
+      super.isRequestingOtp = value;
+    });
+  }
+
+  late final _$isVerifyingAtom =
+      Atom(name: '_LicenseStore.isVerifying', context: context);
+
+  @override
+  bool get isVerifying {
+    _$isVerifyingAtom.reportRead();
+    return super.isVerifying;
+  }
+
+  @override
+  set isVerifying(bool value) {
+    _$isVerifyingAtom.reportWrite(value, super.isVerifying, () {
+      super.isVerifying = value;
+    });
+  }
+
+  late final _$signupErrorAtom =
+      Atom(name: '_LicenseStore.signupError', context: context);
+
+  @override
+  String? get signupError {
+    _$signupErrorAtom.reportRead();
+    return super.signupError;
+  }
+
+  @override
+  set signupError(String? value) {
+    _$signupErrorAtom.reportWrite(value, super.signupError, () {
+      super.signupError = value;
+    });
+  }
+
+  late final _$otpExpiresAtAtom =
+      Atom(name: '_LicenseStore.otpExpiresAt', context: context);
+
+  @override
+  DateTime? get otpExpiresAt {
+    _$otpExpiresAtAtom.reportRead();
+    return super.otpExpiresAt;
+  }
+
+  @override
+  set otpExpiresAt(DateTime? value) {
+    _$otpExpiresAtAtom.reportWrite(value, super.otpExpiresAt, () {
+      super.otpExpiresAt = value;
+    });
+  }
+
   late final _$loadBypassFlagAsyncAction =
       AsyncAction('_LicenseStore.loadBypassFlag', context: context);
 
@@ -140,6 +204,31 @@ mixin _$LicenseStore on _LicenseStore, Store {
   @override
   Future<bool> validateKey(String key) {
     return _$validateKeyAsyncAction.run(() => super.validateKey(key));
+  }
+
+  late final _$requestSignupOtpAsyncAction =
+      AsyncAction('_LicenseStore.requestSignupOtp', context: context);
+
+  @override
+  Future<bool> requestSignupOtp(Map<String, dynamic> signup) {
+    return _$requestSignupOtpAsyncAction
+        .run(() => super.requestSignupOtp(signup));
+  }
+
+  late final _$verifyOtpAsyncAction =
+      AsyncAction('_LicenseStore.verifyOtp', context: context);
+
+  @override
+  Future<bool> verifyOtp(String email, String otp) {
+    return _$verifyOtpAsyncAction.run(() => super.verifyOtp(email, otp));
+  }
+
+  late final _$resendOtpAsyncAction =
+      AsyncAction('_LicenseStore.resendOtp', context: context);
+
+  @override
+  Future<bool> resendOtp(String email) {
+    return _$resendOtpAsyncAction.run(() => super.resendOtp(email));
   }
 
   late final _$activateLicenseAsyncAction =
@@ -218,6 +307,10 @@ licenseBypassed: ${licenseBypassed},
 licenseInfo: ${licenseInfo},
 isLoading: ${isLoading},
 errorMessage: ${errorMessage},
+isRequestingOtp: ${isRequestingOtp},
+isVerifying: ${isVerifying},
+signupError: ${signupError},
+otpExpiresAt: ${otpExpiresAt},
 status: ${status},
 isLicensed: ${isLicensed},
 isExpiringSoon: ${isExpiringSoon},

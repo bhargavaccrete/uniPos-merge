@@ -189,6 +189,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
   double _totalVoidAmount = 0.0;
   int _totalVoidCount = 0;
   double _averageVoidAmount = 0.0;
+  String _mostCommonReason = '—';
 
   // Custom date range
   DateTime? _startDate;
@@ -286,9 +287,10 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       endBound = _endDate!.add(const Duration(days: 1));
     }
 
+    final reasonCounts = <String, int>{};
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status != 'VOID' && status != 'VOIDED') continue;
+      if (status != 'VOID' && status != 'VOIDED' && status != 'CANCELLED') continue;
       if (order.orderAt == null) continue;
       if (isCustom && !hasCustomRange) continue;
 
@@ -298,6 +300,19 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
 
       results.add(order);
       totalAmount += order.totalPrice;
+
+      final reason = (order.voidReason ?? '').trim();
+      if (reason.isNotEmpty) {
+        reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
+      }
+    }
+
+    // Most frequently entered void reason (blank reasons ignored).
+    String mostCommonReason = '—';
+    if (reasonCounts.isNotEmpty) {
+      mostCommonReason = reasonCounts.entries
+          .reduce((a, b) => b.value > a.value ? b : a)
+          .key;
     }
 
     results.sort((a, b) =>
@@ -308,6 +323,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       _totalVoidCount = results.length;
       _totalVoidAmount = totalAmount;
       _averageVoidAmount = _totalVoidCount > 0 ? totalAmount / _totalVoidCount : 0.0;
+      _mostCommonReason = mostCommonReason;
       _currentPage = 0;
       _isLoading = false;
     });
@@ -348,6 +364,23 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                   ),
           ),
 
+          // Most common void reason — full width so the reason text has room.
+          if (_voidOrders.isNotEmpty && _mostCommonReason != '—')
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
+                0,
+                AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
+                AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
+              ),
+              child: ReportSummaryCard(
+                title: 'Top Void Reason',
+                value: _mostCommonReason,
+                icon: Icons.report_problem_outlined,
+                color: Colors.red,
+              ),
+            ),
+
           // Export Button
           if (_voidOrders.isNotEmpty)
             Padding(
@@ -362,7 +395,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                     size: AppResponsive.getValue(context, mobile: 20.0, desktop: 22.0),
                   ),
                   label: Text(
-                    'Export to CSV',
+                    'Export Report',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 15.0, desktop: 16.0),
                       fontWeight: FontWeight.w600,
@@ -991,7 +1024,17 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                   ),
                   DataColumn(
                     label: Text(
-                      'Status',
+                      'Voided By',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'Reason',
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
                         fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
@@ -1079,21 +1122,22 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                         }),
                       ),
                       DataCell(
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                            vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
+                        Text(
+                          order.voidedBy ?? '—',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
+                        ),
+                      ),
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
                           child: Text(
-                            'Void',
+                            order.voidReason ?? '—',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(context, mobile: 12.0, desktop: 13.0),
-                              fontWeight: FontWeight.w600,
-                              color: Colors.red,
+                              fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
                             ),
                           ),
                         ),
@@ -1122,7 +1166,8 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       'Customer',
       'Payment Method',
       'Amount',
-      'Status'
+      'Voided By',
+      'Reason',
     ];
 
     // Prepare data rows
@@ -1132,7 +1177,8 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       order.customerName ?? 'Guest',
       order.paymentmode ?? 'N/A',
       ReportExportService.formatCurrency(order.totalPrice ?? 0.0),
-      'Void',
+      order.voidedBy ?? '—',
+      order.voidReason ?? '—',
     ]).toList();
 
     // Prepare summary
@@ -1142,6 +1188,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       'Total Void Orders': _totalVoidCount.toString(),
       'Total Void Amount': ReportExportService.formatCurrency(_totalVoidAmount),
       'Average Void Amount': ReportExportService.formatCurrency(_averageVoidAmount),
+      'Top Void Reason': _mostCommonReason,
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
     };
 

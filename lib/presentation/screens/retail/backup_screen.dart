@@ -116,6 +116,10 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Future<void> _createBackup() async {
     try {
+      // Backups are always encrypted — make sure a password is set first.
+      if (!await UnifiedBackupService.ensureBackupPassword(context)) return;
+      if (!mounted) return;
+
       setState(() => _isLoading = true);
 
       // Use UnifiedBackupService to create ZIP backup

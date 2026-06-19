@@ -12,6 +12,8 @@ import '../../../../widget/componets/common/report_summary_card.dart';
 import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
 import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
 
+enum _CustPeriod { all, today, week, month, year, custom }
+
 class CustomerListReport extends StatefulWidget {
   const CustomerListReport({super.key});
 
@@ -35,6 +37,11 @@ class _CustomerListReportState extends State<CustomerListReport> {
   int _activeCustomers = 0;
   double _totalRevenue = 0.0;
 
+  // Period filter (default: all-time).
+  _CustPeriod _period = _CustPeriod.all;
+  DateTime? _fromDate;
+  DateTime? _toDate;
+
   @override
   void initState() {
     super.initState();
@@ -53,12 +60,20 @@ class _CustomerListReportState extends State<CustomerListReport> {
   /// Build order lookup map once, then compute customer data in single pass.
   /// O(orders + customers) instead of O(customers × orders).
   void _buildCustomerData() {
+    final (start, end) = _periodBounds();
+
     // Step 1: Build indexed lookup — O(orders)
     final ordersByName = <String, List<_OrderStats>>{};
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
       // Skip VOID/VOIDED — not valid sales
       if (status == 'VOID' || status == 'VOIDED') continue;
+
+      // Period filter — orders without a timestamp can't be placed in a range.
+      if (start != null && end != null) {
+        final at = order.orderAt;
+        if (at == null || at.isBefore(start) || !at.isBefore(end)) continue;
+      }
 
       final key = order.customerName.trim().toLowerCase();
       if (key.isEmpty) continue;
@@ -108,6 +123,10 @@ class _CustomerListReportState extends State<CustomerListReport> {
           }
         }
       }
+
+      // Date-scoped view (option B): when a period is active, list only
+      // customers who actually ordered within it.
+      if (_period != _CustPeriod.all && totalOrders == 0) continue;
 
       result.add(CustomerReportData(
         srNo: 0, // assigned after filtering
@@ -189,6 +208,120 @@ class _CustomerListReportState extends State<CustomerListReport> {
       _currentPage = 0;
       _isLoading = false;
     });
+  }
+
+  /// Half-open [start, end) bounds for the selected period; (null, null) for
+  /// all-time or an incomplete custom range.
+  (DateTime?, DateTime?) _periodBounds() {
+    final now = DateTime.now();
+    switch (_period) {
+      case _CustPeriod.all:
+        return (null, null);
+      case _CustPeriod.today:
+        final s = DateTime(now.year, now.month, now.day);
+        return (s, s.add(const Duration(days: 1)));
+      case _CustPeriod.week:
+        final s = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
+        return (s, s.add(const Duration(days: 7)));
+      case _CustPeriod.month:
+        return (DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 1));
+      case _CustPeriod.year:
+        return (DateTime(now.year, 1, 1), DateTime(now.year + 1, 1, 1));
+      case _CustPeriod.custom:
+        if (_fromDate == null || _toDate == null) return (null, null);
+        return (
+          DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day),
+          DateTime(_toDate!.year, _toDate!.month, _toDate!.day)
+              .add(const Duration(days: 1)),
+        );
+    }
+  }
+
+  Future<void> _onPeriodSelected(_CustPeriod p) async {
+    if (p == _CustPeriod.custom) {
+      final range = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now(),
+        initialDateRange: (_fromDate != null && _toDate != null)
+            ? DateTimeRange(start: _fromDate!, end: _toDate!)
+            : null,
+      );
+      if (range == null) return;
+      setState(() {
+        _fromDate = range.start;
+        _toDate = range.end;
+        _period = p;
+      });
+    } else {
+      setState(() => _period = p);
+    }
+    // Re-aggregate (period scopes which orders count) then re-filter/sort.
+    _buildCustomerData();
+  }
+
+  String _periodLabel(_CustPeriod p) {
+    switch (p) {
+      case _CustPeriod.all:
+        return 'All';
+      case _CustPeriod.today:
+        return 'Today';
+      case _CustPeriod.week:
+        return 'This Week';
+      case _CustPeriod.month:
+        return 'This Month';
+      case _CustPeriod.year:
+        return 'This Year';
+      case _CustPeriod.custom:
+        if (_fromDate != null && _toDate != null) {
+          return '${DateFormat('dd MMM').format(_fromDate!)} – ${DateFormat('dd MMM').format(_toDate!)}';
+        }
+        return 'Custom';
+    }
+  }
+
+  Widget _buildPeriodFilter(BuildContext context) {
+    Widget chip(_CustPeriod p) {
+      final selected = _period == p;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          label: Text(_periodLabel(p)),
+          selected: selected,
+          showCheckmark: false,
+          onSelected: (_) => _onPeriodSelected(p),
+          selectedColor: AppColors.primary,
+          backgroundColor: Colors.white,
+          labelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textPrimary,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: selected ? AppColors.primary : AppColors.divider),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 40,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            chip(_CustPeriod.all),
+            chip(_CustPeriod.today),
+            chip(_CustPeriod.week),
+            chip(_CustPeriod.month),
+            chip(_CustPeriod.year),
+            chip(_CustPeriod.custom),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _exportReport() async {
@@ -304,6 +437,10 @@ class _CustomerListReportState extends State<CustomerListReport> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Period filter
+                            _buildPeriodFilter(context),
+                            SizedBox(height: AppResponsive.smallSpacing(context)),
+
                             // Summary Cards
                             Row(
                               children: [

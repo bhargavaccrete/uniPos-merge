@@ -163,6 +163,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         isTablet: isTablet,
                       ),
                       _buildReportCard(
+                        icon: Icons.remove_circle_outline,
+                        title: 'Item Cancellation Report',
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsItemCancellation),
+                        iconColor: Colors.red,
+                        isTablet: isTablet,
+                      ),
+                      _buildReportCard(
                         icon: Icons.note_alt_outlined,
                         title: 'Discount Order Reports',
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsDiscountOrderReport),

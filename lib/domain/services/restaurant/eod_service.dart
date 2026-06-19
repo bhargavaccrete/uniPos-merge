@@ -175,6 +175,27 @@ class EODService {
       remarks: remarks,
     );
 
+    // Cancelled/voided orders (excluded from sales) — count + value for the receipt.
+    final cancelledOrders = allDayOrders
+        .where((o) => _isExcluded(o.orderStatus?.toUpperCase() ?? ''))
+        .toList();
+    final cancelledOrderCount = cancelledOrders.length;
+    final cancelledOrderAmount =
+        cancelledOrders.fold<double>(0.0, (s, o) => s + o.totalPrice);
+
+    // Round-off: per-order rounding delta = final total − (taxable + tax − discount + service).
+    // subTotal is stored as the pre-tax taxable base in both tax modes, so this is mode-independent.
+    double roundOffSum = 0.0;
+    for (final o in activeDayOrders) {
+      if (o.subTotal == null) continue;
+      final raw = o.subTotal! +
+          (o.gstAmount ?? 0) -
+          (o.Discount ?? 0) +
+          (o.serviceCharge ?? 0);
+      final delta = o.totalPrice - raw;
+      if (delta.abs() >= 0.005) roundOffSum += double.parse(delta.toStringAsFixed(2));
+    }
+
     final reportId = _uuid.v4();
 
     return EndOfDayReport(
@@ -194,6 +215,9 @@ class EODService {
       totalRefunds: totalRefunds,
       totalExpenses: totalExpenses,
       cashExpenses: cashExpenses,
+      roundOff: double.parse(roundOffSum.toStringAsFixed(2)),
+      cancelledOrderCount: cancelledOrderCount,
+      cancelledOrderAmount: cancelledOrderAmount,
     );
   }
 

@@ -53,13 +53,14 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       sessionId: fields[33] as String?,
       lastModifiedBy: fields[34] as String?,
       lastModifiedAt: fields[35] as DateTime?,
+      kotTimestamps: (fields[36] as Map?)?.cast<int, DateTime>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, OrderModel obj) {
     writer
-      ..writeByte(36)
+      ..writeByte(37)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -131,7 +132,9 @@ class OrderModelAdapter extends TypeAdapter<OrderModel> {
       ..writeByte(34)
       ..write(obj.lastModifiedBy)
       ..writeByte(35)
-      ..write(obj.lastModifiedAt);
+      ..write(obj.lastModifiedAt)
+      ..writeByte(36)
+      ..write(obj.kotTimestamps);
   }
 
   @override

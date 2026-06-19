@@ -108,10 +108,10 @@ class _CaptainSetupScreenState extends State<CaptainSetupScreen> {
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.1),
+                          color: AppColors.primary.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.wifi, size: 40, color: AppColors.accent),
+                        child: Icon(Icons.wifi, size: 40, color: AppColors.primary),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -195,7 +195,7 @@ class _CaptainSetupScreenState extends State<CaptainSetupScreen> {
                     CommonButton(
                       width: double.infinity,
                       onTap: _isTesting ? () {} : _testAndConnect,
-                      bgcolor: _isTesting ? Colors.grey : AppColors.accent,
+                      bgcolor: _isTesting ? Colors.grey : AppColors.primary,
                       child: _isTesting
                           ? const SizedBox(
                               height: 22,

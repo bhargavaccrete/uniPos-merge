@@ -277,7 +277,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       final original = netTotal + discount;
       return [
         ReportExportService.formatDateTime(order.orderAt),
-        order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}',
+        order.billNumber != null ? 'INV ${order.billNumber}' : '#${(order.id.length > 8 ? order.id.substring(0, 8) : order.id)}',
         order.customerName.isNotEmpty ? order.customerName : 'Guest',
         order.paymentmode ?? 'N/A',
         order.orderType ?? 'N/A',
@@ -667,7 +667,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
         onPressed: _exportReport,
         icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
         label: Text(
-          'Export to Excel',
+          'Export Report',
           style: GoogleFonts.poppins(fontSize: isDesktop ? 17 : (isTablet ? 16 : 15), fontWeight: FontWeight.w600),
         ),
         style: ElevatedButton.styleFrom(
@@ -728,7 +728,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                 return DataRow(
                   cells: [
                     DataCell(Text(order.orderAt != null ? DateFormat('dd-MM-yy\nHH:mm').format(order.orderAt!) : 'N/A', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
-                    DataCell(Text(order.billNumber != null ? 'INV ${order.billNumber}' : '#${order.id.substring(0, 8)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
+                    DataCell(Text(order.billNumber != null ? 'INV ${order.billNumber}' : '#${(order.id.length > 8 ? order.id.substring(0, 8) : order.id)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w500))),
                     DataCell(Text(order.customerName.isNotEmpty ? order.customerName : 'Guest', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary))),
                     DataCell(
                       Container(

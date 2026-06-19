@@ -55,6 +55,18 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
   }
 
   void _loadFromStore() {
+    // Restore the FULL list the user built (synced via setTaxRates) — not just
+    // the single default — so returning to this step shows every tax added,
+    // not only the default one.
+    final rates = widget.store.taxRates;
+    if (rates != null && rates.isNotEmpty) {
+      _taxes = rates.map((r) => r as TaxItem).toList();
+      // Guarantee exactly one default.
+      if (!_taxes.any((t) => t.isDefault)) {
+        _taxes[0] = TaxItem(_taxes[0].name, _taxes[0].rate, true);
+      }
+      return;
+    }
     if (widget.store.taxName.isNotEmpty && widget.store.taxRate > 0) {
       _taxes = [TaxItem(widget.store.taxName, widget.store.taxRate, true)];
     }
@@ -91,23 +103,36 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
   Future<void> _saveTaxesToDatabase() async {
     if (!AppConfig.isRestaurant) return;
     try {
-      final existingTaxes = await taxStore.taxes.toList();
-      final existingTaxMap = <String, Tax>{};
-      for (final tax in existingTaxes) {
-        existingTaxMap[tax.taxname.toLowerCase()] = tax;
-      }
-      for (final taxItem in _taxes) {
-        final existingTax = existingTaxMap[taxItem.name.toLowerCase()];
-        if (existingTax != null) {
-          existingTax.taxperecentage = taxItem.rate;
-          await taxStore.updateTax(existingTax);
-        } else {
-          final tax = Tax(
+      final existingTaxes = taxStore.taxes.toList();
+
+      // Identify a tax by name + rate, so multiple same-named rates
+      // (GST 5/12/18) stay distinct instead of collapsing onto one name.
+      String keyOf(String name, double rate) =>
+          '${name.trim().toLowerCase()}|$rate';
+
+      final existingByKey = <String, Tax>{
+        for (final tax in existingTaxes)
+          keyOf(tax.taxname, tax.taxperecentage ?? 0.0): tax,
+      };
+
+      // Add every tax in the list that isn't already in the DB.
+      final desiredKeys = <String>{};
+      for (final item in _taxes) {
+        final key = keyOf(item.name, item.rate);
+        desiredKeys.add(key);
+        if (!existingByKey.containsKey(key)) {
+          await taxStore.addTax(Tax(
             id: _uuid.v4(),
-            taxname: taxItem.name,
-            taxperecentage: taxItem.rate,
-          );
-          await taxStore.addTax(tax);
+            taxname: item.name,
+            taxperecentage: item.rate,
+          ));
+        }
+      }
+
+      // Delete taxes the user removed (present in the DB, absent from the list).
+      for (final tax in existingTaxes) {
+        if (!desiredKeys.contains(keyOf(tax.taxname, tax.taxperecentage ?? 0.0))) {
+          await taxStore.deleteTax(tax.id);
         }
       }
     } catch (e) {

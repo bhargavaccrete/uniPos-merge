@@ -609,8 +609,8 @@ class _manageStaffState extends State<manageStaff> {
                     // ── PIN ──────────────────────────────────────────
                     AppTextField(
                       controller: pinNoController,
-                      label: 'PIN (4–6 digits)',
-                      hint: '••••',
+                      label: 'PIN (6 digits)',
+                      hint: '••••••',
                       icon: Icons.lock_outline_rounded,
                       required: true,
                       keyboardType: TextInputType.number,
@@ -625,7 +625,7 @@ class _manageStaffState extends State<manageStaff> {
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'PIN is required';
-                        if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return '4–6 digits only';
+                        if (!RegExp(r'^\d{6}$').hasMatch(v.trim())) return 'PIN must be exactly 6 digits';
                         return null;
                       },
                     ),
@@ -861,10 +861,11 @@ class _manageStaffState extends State<manageStaff> {
                       AppTextField(
                         controller: editPinController,
                         label: 'New PIN (leave blank to keep current)',
-                        hint: '4–6 digits',
+                        hint: '6 digits',
                         icon: Icons.lock_outline_rounded,
                         obscureText: !editPinVisible,
                         keyboardType: TextInputType.number,
+                        maxLength: 6,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -875,7 +876,7 @@ class _manageStaffState extends State<manageStaff> {
                         ),
                         validator: (v) {
                           if (v != null && v.trim().isNotEmpty) {
-                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
+                            if (!RegExp(r'^\d{6}$').hasMatch(v.trim())) return 'PIN must be exactly 6 digits';
                           }
                           return null;
                         },

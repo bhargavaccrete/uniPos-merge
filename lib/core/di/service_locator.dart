@@ -54,6 +54,7 @@ import 'package:unipos/data/repositories/restaurant/expense_category_repository.
 import 'package:unipos/data/repositories/restaurant/tax_repository.dart';
 import 'package:unipos/data/repositories/restaurant/company_repository.dart';
 import 'package:unipos/data/repositories/restaurant/eod_repository.dart';
+import 'package:unipos/data/repositories/restaurant/item_cancellation_repository.dart';
 import 'package:unipos/data/repositories/restaurant/printer_repository.dart';
 
 import 'package:unipos/domain/store/restaurant/category_store.dart';
@@ -79,11 +80,13 @@ import 'package:unipos/domain/store/restaurant/eod_store.dart';
 import 'package:unipos/domain/store/restaurant/appStore.dart';
 import 'package:unipos/domain/store/restaurant/printer_store.dart';
 import 'package:unipos/domain/store/restaurant/attendance_store.dart';
+import 'package:unipos/domain/store/restaurant/notification_store.dart';
 import 'package:unipos/domain/store/restaurant/license_store.dart';
 import 'package:unipos/domain/services/common/license_api_service.dart';
 import 'package:unipos/domain/services/restaurant/thermal_printer_service.dart';
 
 import 'package:unipos/data/repositories/restaurant/attendance_repository.dart';
+import 'package:unipos/data/repositories/restaurant/notification_repository.dart';
 
 // Type aliases for convenience getters (to avoid prefixing with 'restaurant.')
 typedef CartStoreRes = restaurant.CartStoreRes;
@@ -215,6 +218,8 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<EodStore>(
     () => EodStore(locator<EodRepository>()),
   );
+  locator.registerLazySingleton<ItemCancellationRepository>(
+      () => ItemCancellationRepository());
 
   // Cash Drawer (Cash In / Cash Out) — reused from restaurant. The repository
   // binds to the shared cashMovementsBox (opened for retail in hive_init), and
@@ -252,8 +257,11 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
   locator.registerLazySingleton<CompanyRepository>(() => CompanyRepository());
   locator.registerLazySingleton<EodRepository>(() => EodRepository());
+  locator.registerLazySingleton<ItemCancellationRepository>(
+      () => ItemCancellationRepository());
   locator.registerLazySingleton<PrinterRepository>(() => PrinterRepository());
   locator.registerLazySingleton<AttendanceRepository>(() => AttendanceRepository());
+  locator.registerLazySingleton<NotificationRepository>(() => NotificationRepository());
   locator.registerLazySingleton<ThermalPrinterService>(() => ThermalPrinterService());
 
   // ==================== RESTAURANT STORES ====================
@@ -325,6 +333,7 @@ Future<void> _registerRestaurantDependencies() async {
     () => PrinterStore(locator<PrinterRepository>(), locator<ThermalPrinterService>()),
   );
   locator.registerLazySingleton<AttendanceStore>(() => AttendanceStore(locator<AttendanceRepository>()));
+  locator.registerLazySingleton<NotificationStore>(() => NotificationStore(locator<NotificationRepository>()));
 
   // Load saved printers at startup so defaultKotPrinter / defaultReceiptPrinter
   // are available immediately when the first order is placed.
@@ -432,6 +441,7 @@ EodStore get eodStore => locator<EodStore>();
 AppStore get appStore => locator<AppStore>();
 PrinterStore get printerStore => locator<PrinterStore>();
 AttendanceStore get attendanceStore => locator<AttendanceStore>();
+NotificationStore get notificationStore => locator<NotificationStore>();
 LicenseStore get licenseStore => locator<LicenseStore>();
 
 /// Restaurant Repositories

@@ -131,7 +131,7 @@ abstract class _SetupWizardStore with Store {
   bool get canProceedFromStoreDetails => hasStoreDetails;
 
   @computed
-  double get progressPercentage => (currentStep + 1) / 8;
+  double get progressPercentage => (currentStep + 1) / 10;
 
   /// Check if business type selection is locked (after setup completion)
   /// Once locked, user cannot change the business type
@@ -154,7 +154,7 @@ abstract class _SetupWizardStore with Store {
 
   @action
   void nextStep() {
-    if (currentStep < 7) {
+    if (currentStep < 9) {
       currentStep++;
     }
   }
@@ -643,6 +643,28 @@ abstract class _SetupWizardStore with Store {
   }
 
   // ==================== HELPER METHODS ====================
+
+  /// Server business-category code. Samples used 3 for restaurant.
+  int get _businessCategoryCode =>
+      selectedBusinessTypeId == 'retail' ? 3 : 3;
+
+  /// Assembles the self-signup request body from the store details already
+  /// captured in the wizard. Sent to the request-otp endpoint.
+  Map<String, dynamic> buildSignupBody() => {
+        'customername': storeName,
+        'businesscategory': _businessCategoryCode,
+        'ownername': ownerName,
+        'contactperson': ownerName,
+        'email': email,
+        'phone': phone,
+        'gstin': gstin,
+        'panno': pan,
+        'addressline1': address,
+        'city': city,
+        'state': state,
+        'country': country,
+        'pincode': pincode,
+      };
 
   String _getDescriptionForType(String typeId) {
     final type = businessTypes.firstWhere(

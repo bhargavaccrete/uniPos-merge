@@ -81,11 +81,14 @@ Future<Response> getKdsOrdersHandler(Request request) async {
               tableNo: order.tableNo ?? 'N/A',
               orderType: order.orderType,
               status: kdsStatus,
-              createdAt: order.timeStamp,
+              // Per-KOT creation time so add-on KOTs show their own timer;
+              // first/legacy KOTs fall back to the order's placement time.
+              createdAt: order.kotTimestamps?[kotNum] ?? order.timeStamp,
               items: kdsItems,
               kotNumber: kotNum,
               allKotNumbers: kotNumbers,
               isPartialOrder: kotNumbers.length > 1,
+              remark: order.remark,
             ));
           }
 

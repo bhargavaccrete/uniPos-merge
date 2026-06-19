@@ -40,6 +40,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
       {'key': 'Tax', 'icon': Icons.percent, 'description': 'Show GST/tax breakdown'},
       {'key': 'Subtotal', 'icon': Icons.calculate, 'description': 'Show subtotal before tax'},
       {'key': 'Payment Paid', 'icon': Icons.money, 'description': 'Show cash received and change'},
+      {'key': 'UPI QR', 'icon': Icons.qr_code_2, 'description': 'Show UPI Scan & Pay QR on unpaid bills'},
     ],
     'Additional Options': [
       {'key': 'Powered By', 'icon': Icons.info_outline, 'description': 'Show "Powered by UniPOS" footer'},

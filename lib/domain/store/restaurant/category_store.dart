@@ -89,6 +89,17 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
+      // Block case-insensitive duplicate names at the source, so every caller
+      // (add screens, import) is protected even if it forgets to pre-check.
+      final nameKey = category.name.trim().toLowerCase();
+      final isDuplicate =
+          categories.any((c) => c.name.trim().toLowerCase() == nameKey);
+      if (isDuplicate) {
+        errorMessage =
+            'A category named "${category.name.trim()}" already exists';
+        return false;
+      }
+
       await _repository.addCategory(category);
       categories.add(category);
       categoryItemsMap[category.id] = [];
@@ -166,6 +177,15 @@ abstract class _CategoryStore with Store {
   /// Get item count for a category
   int getItemCountForCategory(String categoryId) {
     return categoryItemsMap[categoryId]?.length ?? 0;
+  }
+
+  /// Categories that contain at least one of [items]. Callers pass the live
+  /// item list (e.g. the menu's enabled items) so the result matches exactly
+  /// what's on screen — out-of-stock items still count, only categories with no
+  /// items at all are dropped. Used to hide empty categories on the order screen.
+  List<Category> categoriesWithItems(List<Items> items) {
+    final usedIds = items.map((i) => i.categoryOfItem).toSet();
+    return categories.where((c) => usedIds.contains(c.id)).toList();
   }
 
   /// Check if category exists

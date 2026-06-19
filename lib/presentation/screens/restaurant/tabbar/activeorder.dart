@@ -1105,6 +1105,7 @@ class _ActiveorderState extends State<Activeorder> {
     ws.broadcastEvent({
       'type': 'CANCEL_KOT_ITEM',
       'orderId': order.id,
+      'orderNumber': order.orderNumber,
       'kotNumber': order.kotNumbers[kotIndex],
       'tableNo': order.tableNo,
       'cancelledItem': item.title,

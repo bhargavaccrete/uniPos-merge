@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:unipos/core/constants/api_constants.dart';
 import 'device_payload_service.dart';
 import 'location_service.dart';
 
@@ -15,24 +17,14 @@ class LicenseApiException implements Exception {
 /// Pure HTTP layer for the licensing server.
 /// Each method returns the parsed [data] block or throws [LicenseApiException].
 class LicenseApiService {
-  // ── API Config ─────────────────────────────────────────────────────────────
-  static const _baseUrl = 'http://192.168.120.47:8005';
-  static const _validateKeyPath = '/api/v1/mobile/license/validate';
-  static const _activatePath = '/api/v1/mobile/license/activate';
-  static const _statusPath = '/api/v1/mobile/license/status';
-  static const _heartbeatPath = '/api/v1/mobile/license/heartbeat';
-  static const _deactivatePath = '/api/v1/mobile/license/deactivate';
   static const _timeout = Duration(seconds: 15);
-  static const _headers = {
-    'Content-Type': 'application/json',
-    'X-Device-Key': '66e6c682046bd7998b86bc27ed26963ad260e04b8fd62f76d48b9e718ffdee65',
-  };
 
   // ── Validate Key ──────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> validateKey(String key) async {
     final device = await DevicePayloadService.build();
-    return _post(_validateKeyPath, {'licensekey': key, 'device': device});
+    return _post(
+        ApiConstants.licenseValidatePath, {'licensekey': key, 'device': device});
   }
 
   // ── Activate ──────────────────────────────────────────────────────────────
@@ -44,7 +36,7 @@ class LicenseApiService {
   }) async {
     final device = await DevicePayloadService.build();
     final location = await LocationService.build();
-    return _post(_activatePath, {
+    return _post(ApiConstants.licenseActivatePath, {
       'licensekey': key,
       'device': device,
       'businesscategory': businessCategory,
@@ -57,7 +49,7 @@ class LicenseApiService {
 
   Future<Map<String, dynamic>> checkStatus(String licenseKey) async {
     final device = await DevicePayloadService.build();
-    return _post(_statusPath, {
+    return _post(ApiConstants.licenseStatusPath, {
       'licensekey': licenseKey,
       'deviceid': device['deviceid'],
       'device': device,
@@ -79,15 +71,15 @@ class LicenseApiService {
     if (kDebugMode) {
       const pretty = JsonEncoder.withIndent('  ');
       debugPrint('── LICENSE API REQUEST ─────────────────────────');
-      debugPrint('POST $_baseUrl$_heartbeatPath');
+      debugPrint('POST ${ApiConstants.baseUrl}${ApiConstants.licenseHeartbeatPath}');
       debugPrint(pretty.convert(requestBody));
       debugPrint('────────────────────────────────────────────────');
     }
 
     final response = await http
         .post(
-          Uri.parse('$_baseUrl$_heartbeatPath'),
-          headers: _headers,
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.licenseHeartbeatPath}'),
+          headers: ApiConstants.headers,
           body: jsonEncode(requestBody),
         )
         .timeout(const Duration(seconds: 10));
@@ -116,14 +108,14 @@ class LicenseApiService {
     if (kDebugMode) {
       const pretty = JsonEncoder.withIndent('  ');
       debugPrint('── LICENSE API REQUEST ─────────────────────────');
-      debugPrint('POST $_baseUrl$_deactivatePath');
+      debugPrint('POST ${ApiConstants.baseUrl}${ApiConstants.licenseDeactivatePath}');
       debugPrint(pretty.convert(requestBody));
       debugPrint('────────────────────────────────────────────────');
     }
     final response = await http
         .post(
-          Uri.parse('$_baseUrl$_deactivatePath'),
-          headers: _headers,
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.licenseDeactivatePath}'),
+          headers: ApiConstants.headers,
           body: jsonEncode(requestBody),
         )
         .timeout(const Duration(seconds: 10));
@@ -135,6 +127,23 @@ class LicenseApiService {
     }
   }
 
+  // ── Self-Signup (Email OTP → License Key) ──────────────────────────────────
+
+  /// Registers the business and triggers an OTP email. [signup] is the full
+  /// signup body assembled by the store (customername, businesscategory, …).
+  Future<Map<String, dynamic>> requestSignupOtp(
+          Map<String, dynamic> signup) =>
+      _post(ApiConstants.licenseRequestOtp, signup);
+
+  /// Verifies the emailed OTP. On success the server issues + emails the
+  /// license key; the response `data` also carries `licensekey`.
+  Future<Map<String, dynamic>> verifyOtp(String email, String otp) =>
+      _post(ApiConstants.licenseVerifyOtp, {'email': email, 'otp': otp});
+
+  /// Re-sends the OTP to [email]. Returns a fresh `expiresat`/`expiryMinutes`.
+  Future<Map<String, dynamic>> resendOtp(String email) =>
+      _post(ApiConstants.licenseResendOtp, {'email': email});
+
   // ── Core HTTP Helper ──────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> _post(
@@ -143,15 +152,15 @@ class LicenseApiService {
       if (kDebugMode) {
         const pretty = JsonEncoder.withIndent('  ');
         debugPrint('── LICENSE API REQUEST ─────────────────────────');
-        debugPrint('POST $_baseUrl$path');
+        debugPrint('POST ${ApiConstants.baseUrl}$path');
         debugPrint(pretty.convert(body));
         debugPrint('────────────────────────────────────────────────');
       }
 
       final response = await http
           .post(
-            Uri.parse('$_baseUrl$path'),
-            headers: _headers,
+            Uri.parse('${ApiConstants.baseUrl}$path'),
+            headers: ApiConstants.headers,
             body: jsonEncode(body),
           )
           .timeout(_timeout);
@@ -167,8 +176,8 @@ class LicenseApiService {
           jsonDecode(response.body) as Map<String, dynamic>;
       final success = responseBody['success'];
 
-      if (response.statusCode != 200 ||
-          (success != 1 && success != true)) {
+      final ok2xx = response.statusCode >= 200 && response.statusCode < 300;
+      if (!ok2xx || (success != 1 && success != true)) {
         throw LicenseApiException(
             responseBody['message'] as String? ?? 'Request failed');
       }
@@ -184,11 +193,20 @@ class LicenseApiService {
     } on TimeoutException {
       throw const LicenseApiException(
           'Connection timed out. Please try again.');
-    } on http.ClientException {
+    } on http.ClientException catch (e) {
+      // ClientException covers far more than "no internet": cleartext-blocked,
+      // connection refused, connection reset, host unreachable, etc. Log the
+      // real reason so a misleading "no internet" never masks the true cause.
+      if (kDebugMode) debugPrint('── LICENSE API NETWORK ERROR ── $e');
       throw const LicenseApiException(
-          'No internet connection. Please try again.');
+          'Could not reach the server. Check your connection and try again.');
+    } on SocketException catch (e) {
+      if (kDebugMode) debugPrint('── LICENSE API SOCKET ERROR ── $e');
+      throw const LicenseApiException(
+          'Could not reach the server. Check your connection and try again.');
     } catch (e) {
       if (e is LicenseApiException) rethrow;
+      if (kDebugMode) debugPrint('── LICENSE API UNEXPECTED ERROR ── $e');
       throw const LicenseApiException('Unexpected error. Please try again.');
     }
   }

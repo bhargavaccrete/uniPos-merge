@@ -6,9 +6,11 @@ import 'package:unipos/domain/services/restaurant/notification_service.dart';
 import 'package:unipos/domain/store/restaurant/license_store.dart';
 import 'package:unipos/stores/setup_wizard_store.dart';
 import 'package:unipos/presentation/screens/onboarding/storeDetailsScreen.dart';
+import 'package:unipos/presentation/screens/onboarding/email_verification_step.dart';
 import 'package:unipos/presentation/screens/onboarding/taxSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/paymentSetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/staffSetupStep.dart';
+import 'package:unipos/presentation/screens/onboarding/securitySetupStep.dart';
 import 'package:unipos/presentation/screens/onboarding/license_activated_screen.dart';
 
 import '../../../util/restaurant/restaurant_session.dart';
@@ -523,7 +525,20 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 3: Tax Setup - uses store
+      // Step 3: Verify Email - self-signup OTP + license key
+      SlideTransition(
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: EmailVerificationStep(
+            store: _store,
+            onNext: _nextStep,
+            onPrevious: _previousStep,
+          ),
+        ),
+      ),
+
+      // Step 4: Tax Setup - uses store
       SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -536,7 +551,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 4: Product Setup - Restaurant or Retail specific
+      // Step 5: Product Setup - Restaurant or Retail specific
       SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -555,7 +570,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 5: Payment Methods
+      // Step 6: Payment Methods
       SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -567,7 +582,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 6: Staff Setup
+      // Step 7: Staff Setup
       SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -580,7 +595,20 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 7: Review - uses store
+      // Step 8: Security - admin PIN + backup password
+      SlideTransition(
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SecuritySetupStep(
+            store: _store,
+            onNext: _nextStep,
+            onPrevious: _previousStep,
+          ),
+        ),
+      ),
+
+      // Step 9: Review - uses store
       SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
@@ -930,6 +958,12 @@ class SetupStep {
         estimatedTime: '2 min',
       ),
       const SetupStep(
+        title: 'Verify Email',
+        icon: Icons.mark_email_read_rounded,
+        description: 'Verify your email and activate your license',
+        estimatedTime: '2 min',
+      ),
+      const SetupStep(
         title: 'Tax Setup',
         icon: Icons.receipt,
         description: 'Configure tax settings for your region',
@@ -951,6 +985,12 @@ class SetupStep {
         title: 'Staff Setup',
         icon: Icons.people,
         description: 'Add staff members and permissions',
+        estimatedTime: '1 min',
+      ),
+      const SetupStep(
+        title: 'Security',
+        icon: Icons.security_rounded,
+        description: 'Set your admin PIN and backup password',
         estimatedTime: '1 min',
       ),
       const SetupStep(

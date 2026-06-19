@@ -120,10 +120,10 @@ class _CaptainLoginScreenState extends State<CaptainLoginScreen> {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.1),
+                        color: AppColors.primary.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.restaurant_menu, size: 40, color: AppColors.accent),
+                      child: Icon(Icons.restaurant_menu, size: 40, color: AppColors.primary),
                     ),
                     const SizedBox(height: 20),
 
@@ -244,7 +244,7 @@ class _CaptainLoginScreenState extends State<CaptainLoginScreen> {
                     CommonButton(
                       width: double.infinity,
                       onTap: _isLoading ? () {} : _handleLogin,
-                      bgcolor: _isLoading ? Colors.grey : AppColors.accent,
+                      bgcolor: _isLoading ? Colors.grey : AppColors.primary,
                       child: _isLoading
                           ? const SizedBox(
                               height: 22,

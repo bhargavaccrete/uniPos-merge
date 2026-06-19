@@ -19,6 +19,8 @@ import 'util/restaurant/print_settings.dart';
 import 'util/restaurant/order_settings.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
 import 'domain/services/restaurant/auto_backup_service.dart';
+import 'domain/services/common/local_notification_service.dart';
+import 'domain/services/restaurant/notification_sync_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
 
@@ -51,6 +53,15 @@ void main() async {
     }
 
     runApp(const UniPOSApp());
+
+    // Ask for notification permission once the UI is up. The Android 13+
+    // POST_NOTIFICATIONS prompt is ignored if requested before the activity
+    // is resumed, so we defer it to after the first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (AppConfig.isRestaurant) {
+        LocalNotificationService.instance.requestPermissionIfNeeded();
+      }
+    });
   }, (error, stackTrace) {
     print('🔴🔴🔴 ZONE ERROR CAUGHT 🔴🔴🔴');
     print('Error: $error');
@@ -145,6 +156,14 @@ Future<void> _initializeApp() async {
     // Start auto-backup timer (runs hourly, triggers daily backups)
     AutoBackupService.initialize();
     print('   ✅ Auto-backup service initialized');
+
+    // Local notifications: init OS plugin, seed history + schedule reminders.
+    // Permission is requested AFTER the first frame (see main()) because the
+    // Android 13+ prompt needs a resumed activity.
+    await LocalNotificationService.instance.init();
+    await notificationStore.load();
+    await NotificationSyncService.runStartupChecks();
+    print('   ✅ Local notifications ready');
 
 
     // Start local server in background — don't block app launch
@@ -249,11 +268,13 @@ class UniPOSApp extends StatelessWidget {
       title: 'UniPOS',
       debugShowCheckedModeBanner: false,
 
-      // Wrap all routes with NotificationOverlay using builder
+      // Wrap all routes with NotificationOverlay + app-wide inactivity handling.
       builder: (context, child) {
         return NotificationOverlay(
           service: NotificationService.instance,
-          child: child ?? const SizedBox.shrink(),
+          child: _SessionActivityWrapper(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
 
@@ -297,7 +318,73 @@ class UniPOSApp extends StatelessWidget {
       // Set initial route
       initialRoute: RouteNames.splash,
       routes: AppRoutes.routes,
+      // Always cold-start at splash. On a full restart the platform can replay
+      // a stale route name (e.g. the screen the app was last on), which Flutter
+      // can't resolve as an initial route and warns about. This pins startup to
+      // the splash screen — splash then routes to login/home based on state.
+      onGenerateInitialRoutes: (_) => [
+        MaterialPageRoute(
+          settings: const RouteSettings(name: RouteNames.splash),
+          builder: AppRoutes.routes[RouteNames.splash]!,
+        ),
+      ],
 
+    );
+  }
+}
+
+/// App-wide inactivity handling, mounted once at the MaterialApp root (via
+/// `builder`) so it works on EVERY screen regardless of how it was navigated
+/// to — unlike the per-screen RestaurantGuard, which the post-login home
+/// bypassed (the home is built directly, not via the guarded named route).
+///   • Resets the inactivity timer on any pointer touch — a raw [Listener], so
+///     it can't be swallowed by a child widget's gesture arena.
+///   • Forces logout when [RestaurantSession.sessionExpiredNotifier] fires.
+class _SessionActivityWrapper extends StatefulWidget {
+  final Widget child;
+  const _SessionActivityWrapper({required this.child});
+
+  @override
+  State<_SessionActivityWrapper> createState() => _SessionActivityWrapperState();
+}
+
+class _SessionActivityWrapperState extends State<_SessionActivityWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    RestaurantSession.sessionExpiredNotifier.addListener(_onExpired);
+  }
+
+  @override
+  void dispose() {
+    RestaurantSession.sessionExpiredNotifier.removeListener(_onExpired);
+    super.dispose();
+  }
+
+  void _onExpired() {
+    if (!RestaurantSession.sessionExpiredNotifier.value) return;
+    if (!RestaurantSession.isLoggedIn) {
+      // Nothing to log out of — just clear the stale flag.
+      RestaurantSession.sessionExpiredNotifier.value = false;
+      return;
+    }
+    RestaurantSession.clearSession(); // clears session + resets the flag
+    navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      RouteNames.restaurantLogin,
+      (route) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) {
+        if (RestaurantSession.isLoggedIn) {
+          RestaurantSession.resetInactivityTimer();
+        }
+      },
+      child: widget.child,
     );
   }
 }

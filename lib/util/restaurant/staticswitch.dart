@@ -13,14 +13,10 @@ class AppSettings {
     // Layout Settings
     "Item Image": true,
     "Item Price": true,
-    "Fix Item Card": false,
-    "All Items Category": false,
     "Round Off": false,
 
     // Input & Interaction
     "Visual Keyboard": false,
-    "Addresss Suggestion": true,
-    // "Separate Quantity": false, // ❌ NOT IMPLEMENTED - Commented out
 
     // Order Processing
     // "Auto Print KOT On Delete Item": false, // ❌ NOT IMPLEMENTED - Commented out
@@ -62,14 +58,10 @@ class AppSettings {
     "Layout Settings": [
       "Item Image",
       "Item Price",
-      "Fix Item Card",
-      "All Items Category",
       "Round Off",
     ],
     "Input & Interaction": [
       "Visual Keyboard",
-      "Addresss Suggestion",
-      // "Separate Quantity", // ❌ NOT IMPLEMENTED - Commented out
     ],
     "Order Processing": [
       // "Auto Print KOT On Delete Item", // ❌ NOT IMPLEMENTED - Commented out
@@ -191,12 +183,9 @@ class AppSettings {
   static bool get showItemImage => values["Item Image"] ?? true;
   static bool get showItemPrice => values["Item Price"] ?? true;
   // static bool get showDefaultItemImage => values["Item Default Image"] ?? false;
-  static bool get fixItemCard => values["Fix Item Card"] ?? false;
-  static bool get allItemsCategory => values["All Items Category"] ?? false;
   static bool get roundOff => values["Round Off"] ?? true;
 
   static bool get visualKeyboard => values["Visual Keyboard"] ?? false;
-  static bool get addressSuggestion => values["Addresss Suggestion"] ?? true;
   static bool get shiftHandover => values["Shift Handover"] ?? true;
 
   // static bool get  sepratedQuantity => values["Separate Quantity"] ?? false;

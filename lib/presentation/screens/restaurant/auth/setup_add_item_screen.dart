@@ -113,7 +113,6 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     super.initState();
     _loadItemCount();
     _loadTaxes();
-    _itemCodeController.text = itemStore.generateNextItemCode();
   }
 
   @override
@@ -150,6 +149,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       await itemStore.loadItems();
       setState(() {
         _totalItemsInDatabase = itemStore.items.length;
+        _itemCodeController.text = itemStore.generateNextItemCode();
       });
     } catch (e) {
       // Ignore errors during count
@@ -300,49 +300,111 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         : 24.0;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => Dialog(
         insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        title: Text(
-          'Missing Required Fields',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-            color: Colors.red,
-          ),
-        ),
-        content: Column(
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: errors.map((error) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+          children: [
+            // Header: icon badge + title
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withOpacity(0.06),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.error_outline,
+                        color: AppColors.danger, size: 24),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      error,
-                      style: GoogleFonts.poppins(fontSize: 14),
+                      'Missing Required Fields',
+                      style: GoogleFonts.poppins(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.danger,
+                      ),
                     ),
                   ),
                 ],
               ),
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'OK',
-              style: GoogleFonts.poppins(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+            ),
+            // Error list
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: errors.map((error) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 6),
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.danger,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            error,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
             ),
-          ),
-        ],
+            // Action
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(
+                    'OK',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -673,7 +735,6 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               const SizedBox(height: 25),
               _buildViewItemsBanner(),
             ],
-            const SizedBox(height: 100), // Space for bottom bar
           ],
         ),
       ),
@@ -1356,68 +1417,144 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     );
   }
 
-  Future<void> _handleNext() async {
-    final hInsetNext = !AppResponsive.isMobile(context)
+  Future<bool> _showConfirmDialog({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    required Color accent,
+    required IconData icon,
+  }) async {
+    final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
         : 24.0;
-    if (_itemNameController.text.isNotEmpty ||
-        _priceController.text.isNotEmpty ||
-        _selectedCategoryId != null) {
-      final shouldContinue = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: hInsetNext, vertical: 24),
-          title: const Text('Unsaved Item'),
-          content: const Text(
-              'You have entered details for an item but haven\'t added it yet. Are you sure you want to continue without saving?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.warning,
-                foregroundColor: Colors.white,
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header: icon badge + title
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: BoxDecoration(
+                color: accent.withOpacity(0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
               ),
-              child: const Text('Continue Without Saving'),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: accent, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Message
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                message,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            // Actions
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.poppins(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accent,
+                      foregroundColor: AppColors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      confirmLabel,
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-      );
+      ),
+    );
+    return result == true;
+  }
 
-      if (shouldContinue != true) {
-        return;
-      }
-    }
+  Future<void> _handleNext() async {
+    final hasUnsavedInput = _itemNameController.text.isNotEmpty ||
+        _priceController.text.isNotEmpty ||
+        _selectedCategoryId != null;
 
     if (_totalItemsInDatabase == 0) {
-      final shouldContinueEmpty = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: hInsetNext, vertical: 24),
-          title: const Text('No Items Added'),
-          content: const Text(
-              'You haven\'t added any items to your menu yet. Are you sure you want to skip? You can add items later from the dashboard.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Skip Item Setup'),
-            ),
-          ],
-        ),
+      // Skipping the whole step — single confirmation covers the unsaved item too.
+      final shouldContinueEmpty = await _showConfirmDialog(
+        title: 'No Items Added',
+        message:
+            'You haven\'t added any items to your menu yet. Are you sure you want to skip? You can add items later from the dashboard.',
+        confirmLabel: 'Skip Item Setup',
+        accent: AppColors.primary,
+        icon: Icons.inventory_2_outlined,
       );
 
-      if (shouldContinueEmpty != true) {
+      if (!shouldContinueEmpty) {
+        return;
+      }
+    } else if (hasUnsavedInput) {
+      final shouldContinue = await _showConfirmDialog(
+        title: 'Unsaved Item',
+        message:
+            'You have entered details for an item but haven\'t added it yet. Are you sure you want to continue without saving?',
+        confirmLabel: 'Continue Without Saving',
+        accent: AppColors.warning,
+        icon: Icons.warning_amber_rounded,
+      );
+
+      if (!shouldContinue) {
         return;
       }
     }

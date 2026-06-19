@@ -61,6 +61,8 @@ class HiveTypeIds {
 
   static const int restaurantSession = 131; // RestaurantSessionModel — Session-based day management
   static const int restaurantAttendance = 132; // AttendanceModel — Staff clock-in/clock-out
+  static const int restaurantAppNotification = 133; // AppNotificationModel — persisted notifications
+  static const int restaurantItemCancellation = 134; // ItemCancellationModel — item-level cancel audit
 
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
@@ -166,5 +168,9 @@ class HiveTypeIds {
     restaurantCashMovement,
     restaurantCashHandover,
     savedPrinter,
+    restaurantSession,
+    restaurantAttendance,
+    restaurantAppNotification,
+    restaurantItemCancellation,
   ];
 }

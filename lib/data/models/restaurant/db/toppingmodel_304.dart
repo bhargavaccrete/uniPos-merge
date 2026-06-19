@@ -84,7 +84,9 @@ class Topping extends HiveObject{
       'isveg': isveg,
       'price': price,
       'isContainSize':isContainSize,
-      'variantion':variantion,
+      // Serialize nested variants as maps — raw VariantModel objects break
+      // jsonEncode (e.g. the /captain/menu response) for size-bound toppings.
+      'variantion': variantion?.map((v) => v.toMap()).toList(),
       'variantPrices': variantPrices,
       'createdTime': createdTime?.toIso8601String(),
       'lastEditedTime': lastEditedTime?.toIso8601String(),
@@ -101,7 +103,11 @@ class Topping extends HiveObject{
       // price: map['price'] as String,
       price: map['price'] is String? double.parse(map['price']):map['price'],
       isContainSize: map['isContainSize'] as bool?,
-      variantion: map['variantion'] as List<VariantModel>?,
+      variantion: (map['variantion'] as List?)
+          ?.map((v) => v is VariantModel
+              ? v
+              : VariantModel.fromMap(Map<String, dynamic>.from(v as Map)))
+          .toList(),
       variantPrices: map['variantPrices'] != null
           ? Map<String, double>.from(map['variantPrices'])
           : null,

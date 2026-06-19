@@ -226,11 +226,14 @@ class ImportTemplateBuilder {
       'Pick an extra', 'Pick an extra', 'Pick an extra',
     ], instr);
 
-    _setRow(s, 3, ['Margherita Pizza', '1001', 0, 'Pizza', 'Veg', 'Classic tomato & mozzarella', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'Crust Type', 'Spice Level', '', 'Toppings', 'Cheese Options', '']);
-    _setRow(s, 4, ['Paneer Butter Masala', '1002', 220, 'Main Course', 'Veg', 'Cottage cheese in tomato cream', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
-    _setRow(s, 5, ['Masala Chai', '1003', 40, 'Beverages', 'Veg', 'Spiced Indian tea', '', 'No', '', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '', '', '', '', '']);
+    // ItemCode left blank on purpose — the app auto-assigns codes starting at
+    // 1001, so hardcoding 1001-1004 here collided with manually-added items.
+    // Blank ItemCode → importer generates a fresh, non-colliding code.
+    _setRow(s, 3, ['Margherita Pizza', '', 0, 'Pizza', 'Veg', 'Classic tomato & mozzarella', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'Crust Type', 'Spice Level', '', 'Toppings', 'Cheese Options', '']);
+    _setRow(s, 4, ['Paneer Butter Masala', '', 220, 'Main Course', 'Veg', 'Cottage cheese in tomato cream', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
+    _setRow(s, 5, ['Masala Chai', '', 40, 'Beverages', 'Veg', 'Spiced Indian tea', '', 'No', '', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '', '', '', '', '']);
     // By-weight example — shows how Unit is used (Yes + kg).
-    _setRow(s, 6, ['Kaju Katli (per kg)', '1004', 700, 'Desserts', 'Veg', 'Cashew fudge sold by weight', '', 'Yes', 'kg', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
+    _setRow(s, 6, ['Kaju Katli (per kg)', '', 700, 'Desserts', 'Veg', 'Cashew fudge sold by weight', '', 'Yes', 'kg', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
 
     // Single-value dropdowns (columns are 1-based: A=1 … U=21)
     _dropdownFromRange(

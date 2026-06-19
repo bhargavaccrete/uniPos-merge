@@ -12,8 +12,11 @@ import 'package:unipos/util/restaurant/restaurant_session.dart';
 ///
 /// - Checks [RestaurantSession.isLoggedIn] synchronously (no SharedPreferences hit).
 /// - Checks [permissionKey] against [RestaurantSession.canAccess] if provided.
-/// - Listens to [RestaurantSession.sessionExpiredNotifier] for inactivity logout.
-/// - Wraps child with a [GestureDetector] that resets the inactivity timer on touch.
+/// - Reactive to license status via [Observer].
+///
+/// NOTE: inactivity auto-logout + touch-reset are handled APP-WIDE in main.dart
+/// (`_SessionActivityWrapper`), not here — the post-login home is built without
+/// this guard, so per-screen handling missed it.
 class RestaurantGuard extends StatefulWidget {
   final Widget child;
   final String? permissionKey;
@@ -31,13 +34,6 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
   void initState() {
     super.initState();
     _checkAuth();
-    RestaurantSession.sessionExpiredNotifier.addListener(_onSessionExpired);
-  }
-
-  @override
-  void dispose() {
-    RestaurantSession.sessionExpiredNotifier.removeListener(_onSessionExpired);
-    super.dispose();
   }
 
   void _checkAuth() {
@@ -60,14 +56,6 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
     _state = true;
   }
 
-  void _onSessionExpired() {
-    if (!RestaurantSession.sessionExpiredNotifier.value) return;
-    if (!mounted) return;
-    RestaurantSession.clearSession();
-    Navigator.pushNamedAndRemoveUntil(
-        context, RouteNames.restaurantLogin, (_) => false);
-  }
-
   @override
   Widget build(BuildContext context) {
     // Observer makes this subtree reactive — rebuilds instantly whenever
@@ -83,12 +71,7 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
-        return GestureDetector(
-          onTap: RestaurantSession.resetInactivityTimer,
-          onPanUpdate: (_) => RestaurantSession.resetInactivityTimer(),
-          behavior: HitTestBehavior.translucent,
-          child: widget.child,
-        );
+        return widget.child;
       },
     );
   }

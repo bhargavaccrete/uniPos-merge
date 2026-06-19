@@ -21,6 +21,7 @@ class PrintSettings {
     "Tax": true,
     "Subtotal": true,
     "Payment Paid": true,
+    "UPI QR": true,
     "Powered By": true,
     "Custom Field": false,
     "Extra Info": false,
@@ -29,6 +30,22 @@ class PrintSettings {
   /// ---- Notifiers ----
   static final ValueNotifier<Map<String, bool>> settingsNotifier =
       ValueNotifier(Map.from(_defaultPrintSettings));
+
+  /// Bill format used for printing bills — 'thermal' (80mm) or 'a4'.
+  /// Stored separately from the boolean map (string value).
+  static const String _billFormatKey = 'print_bill_format';
+  static const String _billFormatDefault = 'thermal';
+  static final ValueNotifier<String> billFormatNotifier =
+      ValueNotifier(_billFormatDefault);
+
+  static String get billFormat => billFormatNotifier.value;
+  static bool get isBillFormatA4 => billFormat == 'a4';
+
+  static Future<void> setBillFormat(String value) async {
+    billFormatNotifier.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_billFormatKey, value);
+  }
 
   /// ---- Public Getters ----
   static Map<String, bool> get values => settingsNotifier.value;
@@ -48,6 +65,7 @@ class PrintSettings {
   static bool get showTax => getSetting("Tax");
   static bool get showSubtotal => getSetting("Subtotal");
   static bool get showPaymentPaid => getSetting("Payment Paid");
+  static bool get showUpiQr => getSetting("UPI QR");
   static bool get showPoweredBy => getSetting("Powered By");
   static bool get showCustomField => getSetting("Custom Field");
   static bool get showExtraInfo => getSetting("Extra Info");
@@ -62,6 +80,7 @@ class PrintSettings {
 
   static Future<void> resetToDefaults() async {
     settingsNotifier.value = Map.from(_defaultPrintSettings);
+    await setBillFormat(_billFormatDefault);
     await _save();
   }
 
@@ -82,5 +101,7 @@ class PrintSettings {
     }
 
     settingsNotifier.value = loaded;
+    billFormatNotifier.value =
+        prefs.getString(_billFormatKey) ?? _billFormatDefault;
   }
 }

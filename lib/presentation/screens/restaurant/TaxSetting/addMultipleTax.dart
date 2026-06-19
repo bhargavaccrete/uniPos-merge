@@ -96,7 +96,7 @@ class _AddtaxState extends State<Addtax> {
 
         // Apply tax to all items if checkbox is checked
         if (_ischecked1 && success) {
-          await _applyTaxToAllItems(taxPercentage);
+          await _applyTaxToAllItems(newTax.id, taxPercentage);
         }
       }
 
@@ -122,12 +122,14 @@ class _AddtaxState extends State<Addtax> {
     }
   }
 
-  Future<void> _applyTaxToAllItems(double taxPercentage) async {
+  Future<void> _applyTaxToAllItems(String taxId, double taxPercentage) async {
     final rate = taxPercentage / 100.0;
 
     for (final item in itemStore.items) {
-      item.applyTax(rate);
-      await itemStore.updateItem(item);
+      // Adds the tax (max 2 per item); skips items already taxed / at the cap.
+      if (item.applyTax(taxId, rate)) {
+        await itemStore.updateItem(item);
+      }
     }
 
     NotificationService.instance.showSuccess(
