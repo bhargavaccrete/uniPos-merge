@@ -152,28 +152,38 @@ class LocalNotificationService {
     return b.toString();
   }
 
+  static const Map<String, String> _channelNames = {
+    NotificationChannels.lowStock: 'Low Stock Alerts',
+    NotificationChannels.appAlerts: 'App Alerts',
+    NotificationChannels.orders: 'New Orders',
+  };
+
+  static const Set<String> _highChannels = {
+    NotificationChannels.lowStock,
+    NotificationChannels.orders,
+  };
+
   Future<void> _createAndroidChannels() async {
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
-    await android.createNotificationChannel(const AndroidNotificationChannel(
-      NotificationChannels.lowStock,
-      'Low Stock Alerts',
-      importance: Importance.high,
-    ));
-    await android.createNotificationChannel(const AndroidNotificationChannel(
-      NotificationChannels.appAlerts,
-      'App Alerts',
-      importance: Importance.defaultImportance,
-    ));
+    for (final entry in _channelNames.entries) {
+      await android.createNotificationChannel(AndroidNotificationChannel(
+        entry.key,
+        entry.value,
+        importance: _highChannels.contains(entry.key)
+            ? Importance.high
+            : Importance.defaultImportance,
+      ));
+    }
   }
 
   NotificationDetails _detailsFor(String channelId) {
-    final high = channelId == NotificationChannels.lowStock;
+    final high = _highChannels.contains(channelId);
     return NotificationDetails(
       android: AndroidNotificationDetails(
         channelId,
-        high ? 'Low Stock Alerts' : 'App Alerts',
+        _channelNames[channelId] ?? 'App Alerts',
         importance: high ? Importance.high : Importance.defaultImportance,
         priority: high ? Priority.high : Priority.defaultPriority,
       ),

@@ -8,6 +8,7 @@ class NotificationChannels {
   NotificationChannels._();
   static const String lowStock = 'low_stock';
   static const String appAlerts = 'app_alerts';
+  static const String orders = 'orders'; // captain orders / KOT — high + sound
 }
 
 class NotificationView {

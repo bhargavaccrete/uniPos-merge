@@ -6,8 +6,15 @@ import '../../data/models/restaurant/db/database/hive_order.dart';
 import '../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../domain/services/restaurant/day_management_service.dart';
 import '../../domain/services/restaurant/inventory_service.dart';
+import '../../domain/services/common/local_notification_service.dart';
+import '../../data/models/restaurant/notification_presenter.dart';
+import '../../core/routes/routes_name.dart';
 import '../../util/restaurant/restaurant_auth_helper.dart';
 import '../websocket.dart';
+
+/// Human label for an order's location used in captain notifications.
+String _orderLocationLabel(String? tableNo) =>
+    (tableNo != null && tableNo.isNotEmpty) ? 'Table $tableNo' : 'Take Away';
 
 // ── Idempotency Cache ─────────────────────────────────────────────────────────
 // Prevents duplicate orders if captain taps Send twice (network retry / double-tap).
@@ -31,19 +38,18 @@ void _pruneExpiredRequests() {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 /// POST /captain/auth
-/// Body: { "username": "...", "pin": "..." }
+/// Body: { "pin": "..." }
 /// Returns: { "success": true, "staffId": "...", "name": "...", "role": "cashier|waiter" }
 Future<Response> captainAuthHandler(Request request) async {
   try {
     final body = await request.readAsString();
     final data = jsonDecode(body) as Map<String, dynamic>;
 
-    final username = (data['username'] as String?)?.trim() ?? '';
     final pin = (data['pin'] as String?)?.trim() ?? '';
 
-    if (username.isEmpty || pin.isEmpty) {
+    if (pin.isEmpty) {
       return Response.badRequest(
-        body: jsonEncode({'success': false, 'error': 'Username and PIN are required'}),
+        body: jsonEncode({'success': false, 'error': 'PIN is required'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -52,14 +58,13 @@ Future<Response> captainAuthHandler(Request request) async {
 
     final match = staffStore.staff.where((s) =>
       s.isActive &&
-      s.userName.trim() == username &&
       RestaurantAuthHelper.verifyPassword(pin, s.pinNo.trim()),
     ).firstOrNull;
 
     if (match == null) {
       return Response(
         401,
-        body: jsonEncode({'success': false, 'error': 'Invalid username or PIN'}),
+        body: jsonEncode({'success': false, 'error': 'Invalid PIN'}),
         headers: {'Content-Type': 'application/json'},
       );
     }
@@ -215,6 +220,13 @@ Future<Response> captainSendOrderHandler(Request request) async {
         'newItemCount': newItems.length,
         'tableNo': updated.tableNo,
       });
+      await LocalNotificationService.instance.showNow(
+        idSeed: 'kot_${updated.id}_${updated.kotNumbers.last}',
+        title: 'New KOT #${updated.kotNumbers.last}',
+        body: '${newItems.length} item${newItems.length == 1 ? '' : 's'} added · ${_orderLocationLabel(updated.tableNo)}',
+        channelId: NotificationChannels.orders,
+        payload: RouteNames.restaurantActiveOrders,
+      );
       final addedResponse = {
         'success': true,
         'orderId': updated.id,
@@ -236,6 +248,9 @@ Future<Response> captainSendOrderHandler(Request request) async {
     // No active order — create new one
     final orderId = DateTime.now().millisecondsSinceEpoch.toString();
     final kotNumber = await orderStore.getNextKotNumber();
+    // Daily order number — without this the KDS/bill fall back to showing the
+    // raw epoch orderId instead of a clean "Order #N".
+    final orderNumber = await orderStore.getNextOrderNumber();
 
     final order = OrderModel(
       id: orderId,
@@ -251,6 +266,7 @@ Future<Response> captainSendOrderHandler(Request request) async {
       kotNumbers: [kotNumber],
       itemCountAtLastKot: newItems.length,
       kotBoundaries: [newItems.length],
+      orderNumber: orderNumber,
       sessionId: currentSessionId, // Link to POS session
     );
 
@@ -274,6 +290,13 @@ Future<Response> captainSendOrderHandler(Request request) async {
       'tableNo': tableNo ?? 'Take Away',
       'orderType': orderType,
     });
+    await LocalNotificationService.instance.showNow(
+      idSeed: 'order_$orderId',
+      title: 'New Order',
+      body: '${_orderLocationLabel(tableNo)} · KOT #$kotNumber',
+      channelId: NotificationChannels.orders,
+      payload: RouteNames.restaurantActiveOrders,
+    );
 
     final newOrderResponse = {
       'success': true,
@@ -330,12 +353,18 @@ Future<Response> captainModifyOrderHandler(Request request, String orderId) asyn
     // Generate a Cancel KOT number
     final cancelKotNumber = await orderStore.getNextKotNumber();
 
-    // Save order with updated items
-    final updatedOrder = order.copyWith(
-      items: updatedItems,
-      totalPrice: newTotal,
-    );
-    await HiveOrders.updateOrder(updatedOrder);
+    // If every item was cancelled, void the now-empty order instead of leaving
+    // an empty "Processing" ghost in active orders.
+    final allCancelled = updatedItems.isEmpty;
+    if (allCancelled) {
+      await orderStore.deleteOrder(orderId);
+    } else {
+      final updatedOrder = order.copyWith(
+        items: updatedItems,
+        totalPrice: newTotal,
+      );
+      await HiveOrders.updateOrder(updatedOrder);
+    }
 
     // Restore stock for cancelled items
     if (cancelledItems.isNotEmpty) {
@@ -345,29 +374,42 @@ Future<Response> captainModifyOrderHandler(Request request, String orderId) asyn
       await InventoryService.restoreStockForRefund(restockMap);
     }
 
-    // Update table total
-    if (order.tableNo != null) {
-      await tableStore.updateTableStatus(
-        order.tableNo!,
-        order.status,
-        total: newTotal,
-        orderId: orderId,
-        orderTime: order.timeStamp,
-      );
+    // Table: free it when the order is gone, else update its running total.
+    if (order.tableNo != null && order.tableNo!.isNotEmpty) {
+      if (allCancelled) {
+        await tableStore.updateTableStatus(order.tableNo!, 'Available');
+      } else {
+        await tableStore.updateTableStatus(
+          order.tableNo!,
+          order.status,
+          total: newTotal,
+          orderId: orderId,
+          orderTime: order.timeStamp,
+        );
+      }
     }
 
-    // Broadcast Cancel KOT to kitchen
+    // The KDS flashes its cancellation warning on ORDER_MODIFIED (the POS's own
+    // correction event). Emit ONLY this (matching the POS's own cancel flow) so
+    // the kitchen gets exactly one warning with the real KOT number.
+    final modifiedKots = cancelledItems
+        .map((i) {
+          final m = RegExp(r'#(\d+)').firstMatch(i.instruction ?? '');
+          return m != null ? int.tryParse(m.group(1)!) : null;
+        })
+        .where((e) => e != null)
+        .toSet()
+        .toList();
     broadcastEvent({
-      'type': 'CANCEL_KOT',
+      'type': 'ORDER_MODIFIED',
       'orderId': orderId,
       'orderNumber': order.orderNumber,
-      'cancelKotNumber': cancelKotNumber,
+      'kotNumbers': modifiedKots.isNotEmpty ? modifiedKots : order.kotNumbers,
       'tableNo': order.tableNo,
-      'cancelledItems': cancelledItems.map((i) => {
-        'title': i.title,
-        'quantity': i.quantity,
-        'variantName': i.variantName,
-      }).toList(),
+      'removedItems': cancelledItems
+          .map((i) => {'id': i.id, 'title': i.title, 'quantity': i.quantity})
+          .toList(),
+      'reducedItems': [],
     });
 
     // Also trigger ORDER_UPDATED so activeorder.dart reloads MobX store
@@ -378,6 +420,17 @@ Future<Response> captainModifyOrderHandler(Request request, String orderId) asyn
       'kotNumber': cancelKotNumber,
       'newItemCount': 0,
     });
+
+    final hasCancellations = cancelledItems.isNotEmpty;
+    await LocalNotificationService.instance.showNow(
+      idSeed: 'cancel_${orderId}_$cancelKotNumber',
+      title: hasCancellations ? 'Items Cancelled' : 'Order Modified',
+      body: hasCancellations
+          ? '${cancelledItems.length} item${cancelledItems.length == 1 ? '' : 's'} cancelled · ${_orderLocationLabel(order.tableNo)}'
+          : 'Order updated · ${_orderLocationLabel(order.tableNo)}',
+      channelId: NotificationChannels.orders,
+      payload: RouteNames.restaurantActiveOrders,
+    );
 
     return Response.ok(
       jsonEncode({'success': true, 'cancelKotNumber': cancelKotNumber}),

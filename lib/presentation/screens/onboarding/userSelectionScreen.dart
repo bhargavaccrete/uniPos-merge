@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../util/responsive.dart';
-import '../captain/captain_setup_screen.dart';
 
 class UserSelectionScreen extends StatefulWidget {
   const UserSelectionScreen({Key? key}) : super(key: key);
@@ -79,13 +78,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
     Navigator.pushNamed(context, '/existingUserRestoreScreen');
   }
 
-  void _navigateToCaptain() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const CaptainSetupScreen()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,8 +116,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
                   SizedBox(height: AppResponsive.extraLargeSpacing(context)),
                   _buildUserCards(isMobile: true),
                   SizedBox(height: AppResponsive.largeSpacing(context)),
-                  _buildCaptainLink(),
-                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildFooterInfo(),
                   SizedBox(height: AppResponsive.mediumSpacing(context)),
                 ],
@@ -148,8 +138,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             _buildUserCards(isMobile: false),
             SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildCaptainLink(),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _buildFooterInfo(),
           ],
         ),
@@ -169,8 +157,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             _buildUserCards(isMobile: false),
             SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildCaptainLink(),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _buildFooterInfo(),
           ],
         ),
@@ -371,37 +357,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCaptainLink() {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Using this device for taking orders? ',
-            style: TextStyle(
-              fontSize: AppResponsive.smallFontSize(context),
-              color: AppColors.darkNeutral.withOpacity(0.6),
-            ),
-          ),
-          GestureDetector(
-            onTap: _navigateToCaptain,
-            child: Text(
-              'Captain App →',
-              style: TextStyle(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.accent,
-                fontWeight: FontWeight.w600,
-                decoration: TextDecoration.underline,
-                decorationColor: AppColors.accent,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

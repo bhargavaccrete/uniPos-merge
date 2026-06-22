@@ -7,8 +7,6 @@ import 'package:unipos/core/config/app_config.dart';
 import 'package:unipos/domain/services/common/device_id_service.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
-import '../captain/captain_home_screen.dart';
-import '../captain/captain_login_screen.dart';
 
 // Import your color and responsive utilities
 // import '../util/color.dart';
@@ -116,20 +114,8 @@ class _SplashScreenState extends State<SplashScreen>
 
     final prefs = await SharedPreferences.getInstance();
 
-    // Captain mode check — must be FIRST, before any POS setup logic
-    final isCaptainMode = prefs.getBool('is_captain_mode') ?? false;
-    if (isCaptainMode) {
-      final captainLoggedIn = prefs.getBool('captain_logged_in') ?? false;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => captainLoggedIn
-              ? const CaptainHomeScreen()
-              : const CaptainLoginScreen(),
-        ),
-      );
-      return;
-    }
+    // Captain runs as its own standalone app now (unipos_captain) — the POS is
+    // only the server for it. No captain client here.
 
     // Check if setup is complete
     if (AppConfig.isSetupComplete) {

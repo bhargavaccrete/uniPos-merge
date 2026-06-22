@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(flutter analyze *)",
-      "Bash(echo \"errors: $\\(flutter analyze lib/presentation/screens/restaurant/tabbar/item_options_dialog.dart 2>&1)"
+      "Bash(echo \"errors: $\\(flutter analyze lib/presentation/screens/restaurant/tabbar/item_options_dialog.dart 2>&1)",
+      "Read(//d/flutter/unipos_captain/lib/**)",
+      "Bash(sed -i \"\\\\#import 'package:unipos_captain/constants/restaurant/color.dart';#d\" presentation/widget/componets/restaurant/componets/visual_keyboard.dart)",
+      "Bash(sed -i \"\\\\#constants/restaurant/color.dart#d\" presentation/widget/componets/restaurant/componets/visual_keyboard.dart)",
+      "Bash(rm -f constants/restaurant/color.dart)",
+      "Bash(rmdir constants/restaurant constants)"
     ]
   },
   "outputStyle": "Learning"

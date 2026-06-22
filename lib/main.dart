@@ -157,22 +157,29 @@ Future<void> _initializeApp() async {
     AutoBackupService.initialize();
     print('   ✅ Auto-backup service initialized');
 
-    // Local notifications: init OS plugin, seed history + schedule reminders.
-    // Permission is requested AFTER the first frame (see main()) because the
-    // Android 13+ prompt needs a resumed activity.
-    await LocalNotificationService.instance.init();
-    await notificationStore.load();
-    await NotificationSyncService.runStartupChecks();
-    print('   ✅ Local notifications ready');
-
-
-    // Start local server in background — don't block app launch
-    print('🌐 Step 7/7: Starting local server (background)...');
+    // Start local server FIRST — captain/KDS clients connect to :9090 on launch,
+    // so it must bind before anything slower (notifications) runs. Fire-and-forget.
+    print('🌐 Starting local server (background)...');
     startServer().then((_) {
       print('   ✅ UniPOS Local Server Started Successfully');
     }).catchError((e) {
       print('   ⚠️  Failed to start UniPOS Local Server: $e');
     });
+
+    // Local notifications: init OS plugin, seed history + schedule reminders.
+    // Runs after the server is already binding — not time-critical.
+    // Wrapped so a notification failure (e.g. exact-alarm permission denied on
+    // Android 13/14) can never break or block app startup.
+    // Permission is requested AFTER the first frame (see main()) because the
+    // Android 13+ prompt needs a resumed activity.
+    try {
+      await LocalNotificationService.instance.init();
+      await notificationStore.load();
+      await NotificationSyncService.runStartupChecks();
+      print('   ✅ Local notifications ready');
+    } catch (e) {
+      print('   ⚠️  Local notifications init failed (non-fatal): $e');
+    }
 
   } else if (AppConfig.isRetail) {
     print('   Loading retail settings...');
